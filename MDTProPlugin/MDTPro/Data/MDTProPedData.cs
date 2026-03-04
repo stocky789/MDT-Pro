@@ -84,7 +84,13 @@ namespace MDTPro.Data {
                 Game.LogTrivial($"[MDTPro] Warning: Could not read CDF permit/license data for {Name}: {e.Message}");
             }
             if (CDFPedData.HasRealPed && Holder != null && Holder.IsValid()) {
-                IsInGang = Holder?.RelationshipGroup?.Name?.ToLower().Contains("gang") ?? false;
+                try {
+                    var rg = Holder.RelationshipGroup;
+                    string groupName = rg.Name;
+                    IsInGang = groupName != null && groupName.ToLower().Contains("gang");
+                } catch {
+                    IsInGang = false;
+                }
             }
             AdvisoryText = CDFPedData.AdvisoryText;
             WarrantText = IsWanted ? GetRandomWarrantCharge().name : null;
