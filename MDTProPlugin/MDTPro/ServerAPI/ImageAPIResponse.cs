@@ -1,0 +1,20 @@
+using MDTPro.Setup;
+using System.IO;
+using System.Net;
+
+namespace MDTPro.ServerAPI {
+    internal class ImageAPIResponse : APIResponse {
+        internal ImageAPIResponse(HttpListenerRequest req) : base(null) {
+            string path = req.Url.AbsolutePath.Substring("/image/".Length);
+            if (string.IsNullOrEmpty(path)) return;
+            if (path.EndsWith(".png") || path.EndsWith(".jpg")) path = path.Substring(0, path.Length - 4);
+            if (path.EndsWith(".jpeg")) path = path.Substring(0, path.Length - ".jpeg".Length);
+
+            if (path == "map") {
+                buffer = File.ReadAllBytes($"{SetupController.ImgDirPath}/map.png");
+                status = 200;
+                contentType = "image/png";
+            } 
+        }
+    }
+}

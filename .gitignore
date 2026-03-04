@@ -1,0 +1,12 @@
+Releases
+References
+MDTPro/MDTPro.log
+MDTPro/data/*.db
+MDTPro/data/*.json.bak
+MDTProPlugin/packages
+MDTProPlugin/.vs
+MDTProPlugin/.idea
+MDTProPlugin/MDTPro/.vs
+MDTProPlugin/MDTPro/bin
+MDTProPlugin/MDTPro/obj
+PR_DRAFT.md

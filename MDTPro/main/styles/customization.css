@@ -1,0 +1,152 @@
+body {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  height: 100vh;
+  background-color: var(--color-background);
+  overflow: hidden;
+}
+
+.sidebar {
+  background-color: var(--color-surface-dimmed);
+  border-right: 1px solid var(--color-border);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+}
+
+.sidebar::before {
+  content: 'LSPD MDT SYSTEMS';
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  color: var(--color-accent-secondary);
+  border: 1px solid var(--color-border);
+  background: linear-gradient(180deg, #1e314b 0%, #16263b 100%);
+  padding: 8px 10px;
+  border-radius: var(--radius-small);
+}
+
+.sidebar button {
+  border-radius: var(--radius-small);
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+}
+
+.main {
+  margin: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  overflow: auto;
+  line-height: 1.4;
+  background-color: #0d182a80;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  padding: 10px;
+}
+
+.pluginsWrapper {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 10px;
+}
+
+.pluginsWrapper .plugin {
+  width: 250px;
+  height: min-content;
+  border-radius: var(--radius-medium);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  padding: 10px;
+  cursor: pointer;
+  transition:
+    var(--transition-time-short) ease,
+    transform var(--transition-time-short) ease;
+}
+
+.pluginsWrapper .plugin.selected {
+  border-color: var(--color-accent-secondary);
+}
+
+.pluginsWrapper .plugin:hover {
+  border-color: var(--color-accent);
+  transform: translateY(-1px);
+}
+
+.pluginsWrapper .plugin .name {
+  font-size: 16px;
+  margin-bottom: 2.5px;
+  padding-bottom: 2.5px;
+  border-bottom: 1px solid var(--color-border);
+  transition: var(--transition-time-short) ease;
+}
+
+.pluginsWrapper .plugin:hover .name {
+  color: var(--color-accent);
+}
+
+.pluginsWrapper .plugin.selected .name {
+  color: var(--color-accent-secondary);
+}
+
+.configWrapper {
+  display: flex;
+  flex-direction: column;
+  margin-top: 10px;
+}
+
+.configWrapper .configItem:not(:last-child) {
+  margin-bottom: 5px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.configWrapper .configItem {
+  display: flex;
+  flex-direction: row;
+  gap: 5px;
+  align-items: center;
+}
+
+.configWrapper .configItem label::after {
+  content: ':';
+}
+
+.configWrapper .configItem input:not([type='checkbox']) {
+  width: 100%;
+}
+
+@media (max-width: 820px) {
+  body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .sidebar::before {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .sidebar button {
+    width: auto;
+    min-width: 140px;
+    text-align: center;
+  }
+
+  .main {
+    margin: 8px;
+    padding: 8px;
+  }
+}

@@ -1,0 +1,88 @@
+using System.Collections.Generic;
+
+namespace MDTPro.Data {
+    public class CourtData {
+        internal CourtData(string pedName, string number, string reportId, int shortYear) {
+            PedName = pedName;
+            Number = number;
+            ReportId = reportId;
+            ShortYear = shortYear;
+            CreatedAtUtc = System.DateTime.UtcNow.ToString("o");
+            LastUpdatedUtc = CreatedAtUtc;
+        }
+
+        public CourtData() { }
+
+        public string PedName;
+        public string Number;
+        public string ReportId;
+        public int ShortYear;
+        public int Status = 0;
+        public bool IsJuryTrial = false;
+        public int JurySize = 0;
+        public int JuryVotesForConviction = 0;
+        public int JuryVotesForAcquittal = 0;
+        public int PriorCitationCount = 0;
+        public int PriorArrestCount = 0;
+        public int PriorConvictionCount = 0;
+        public int SeverityScore = 0;
+        public int EvidenceScore = 0;
+        public bool EvidenceHadWeapon = false;
+        public bool EvidenceWasWanted = false;
+        public bool EvidenceWasPatDown = false;
+        public bool EvidenceWasDrunk = false;
+        public bool EvidenceWasFleeing = false;
+        public bool EvidenceAssaultedPed = false;
+        public bool EvidenceDamagedVehicle = false;
+        public bool EvidenceIllegalWeapon = false;
+        public bool EvidenceViolatedSupervision = false;
+        public int RepeatOffenderScore = 0;
+        public int ConvictionChance = 0;
+        public string ResolveAtUtc;
+        public float SentenceMultiplier = 1f;
+        public float ProsecutionStrength = 0f;
+        public float DefenseStrength = 0f;
+        public float DocketPressure = 0f;
+        public float PolicyAdjustment = 0f;
+        public string CourtDistrict;
+        public string CourtName;
+        public string CourtType;
+        public bool HasPublicDefender = true;
+        public string Plea = "Not Guilty";
+        public string JudgeName;
+        public string ProsecutorName;
+        public string DefenseAttorneyName;
+        public string HearingDateUtc;
+        public string CreatedAtUtc;
+        public string LastUpdatedUtc;
+        public string OutcomeNotes;
+        public string OutcomeReasoning;
+        public List<Charge> Charges = new List<Charge>();
+
+        public class Charge {
+            internal Charge(string name, int fine, int? time) {
+                Name = name;
+                Fine = fine;
+                Time = time;
+            }
+
+            internal Charge(string name, int fine, int? time, bool isArrestable) {
+                Name = name;
+                Fine = fine;
+                Time = time;
+                IsArrestable = isArrestable;
+            }
+
+            public Charge() { }
+
+            public string Name;
+            public int Fine;
+            public int? Time;
+            public bool? IsArrestable;
+        }
+
+        public void AddCharge(Charge charge) {
+            Charges.Add(charge);
+        }
+    }
+}
