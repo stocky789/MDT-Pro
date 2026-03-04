@@ -29,10 +29,16 @@ if (-not $DeployOnly) {
     Write-Host "Build OK." -ForegroundColor Green
 }
 
-# --- Purge existing MDT Pro in game ---
-Write-Host "Purging existing MDT Pro from game directory..." -ForegroundColor Cyan
+# --- Purge existing MDT Pro in game (preserve database) ---
+Write-Host "Purging existing MDT Pro from game directory (keeping database)..." -ForegroundColor Cyan
 $gameMDTPro = Join-Path $GameRoot "MDTPro"
+$gameData = Join-Path $gameMDTPro "data"
+$dbBackup = Join-Path $env:TEMP "MDTPro_data_backup"
 if (Test-Path $gameMDTPro) {
+    if (Test-Path $gameData) {
+        Copy-Item $gameData $dbBackup -Recurse -Force
+        Write-Host "  Backed up data (database) to $dbBackup"
+    }
     Remove-Item $gameMDTPro -Recurse -Force
     Write-Host "  Removed $gameMDTPro"
 }
@@ -56,4 +62,12 @@ Write-Host "  Copied MDTPro.dll -> plugins\LSPDFR\"
 Copy-Item $MDTProFolder $GameRoot -Recurse -Force
 Write-Host "  Copied MDTPro folder -> game root"
 
-Write-Host "Done. MDT Pro is purged and redeployed." -ForegroundColor Green
+if (Test-Path $dbBackup) {
+    $newData = Join-Path (Join-Path $GameRoot "MDTPro") "data"
+    if (-not (Test-Path $newData)) { New-Item $newData -ItemType Directory -Force | Out-Null }
+    Copy-Item (Join-Path $dbBackup "*") $newData -Recurse -Force
+    Remove-Item $dbBackup -Recurse -Force
+    Write-Host "  Restored database (data folder) into new MDTPro"
+}
+
+Write-Host "Done. MDT Pro is purged and redeployed (database preserved)." -ForegroundColor Green

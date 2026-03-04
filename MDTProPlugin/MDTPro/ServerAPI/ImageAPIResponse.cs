@@ -22,9 +22,14 @@ namespace MDTPro.ServerAPI {
                     contentType = "image/png";
                 }
             } else if (path == "badge") {
-                string badgePath = $"{SetupController.ImgDirPath}/badge.png";
-                if (File.Exists(badgePath)) {
-                    buffer = File.ReadAllBytes(badgePath);
+                string badgeSvg = $"{SetupController.ImgDirPath}/badge.svg";
+                string badgePng = $"{SetupController.ImgDirPath}/badge.png";
+                if (File.Exists(badgeSvg)) {
+                    buffer = File.ReadAllBytes(badgeSvg);
+                    status = 200;
+                    contentType = "image/svg+xml";
+                } else if (File.Exists(badgePng)) {
+                    buffer = File.ReadAllBytes(badgePng);
                     status = 200;
                     contentType = "image/png";
                 }

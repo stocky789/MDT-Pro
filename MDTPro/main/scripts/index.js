@@ -437,8 +437,20 @@ async function openWindow(name, pluginId = null) {
 
   focusWindow()
 
-  taskbarIcon.classList.add('open')
-  taskbarIcon.innerHTML = icon.innerHTML
+  taskbarIcon.classList.add('open', 'taskbarWindow')
+  const taskbarIconIcon = document.createElement('span')
+  taskbarIconIcon.classList.add('taskbarWindowIcon')
+  taskbarIconIcon.innerHTML = icon.innerHTML
+  taskbarIcon.appendChild(taskbarIconIcon)
+  const taskbarClose = document.createElement('span')
+  taskbarClose.classList.add('taskbarWindowClose')
+  taskbarClose.innerHTML = document.querySelector('.iconAccess .closeWindow').innerHTML
+  taskbarClose.title = 'Close'
+  taskbarClose.addEventListener('click', function (e) {
+    e.stopPropagation()
+    close.click()
+  })
+  taskbarIcon.appendChild(taskbarClose)
   taskbarIcon.addEventListener('click', function () {
     this.blur()
     if (

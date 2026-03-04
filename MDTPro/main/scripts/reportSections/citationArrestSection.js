@@ -19,6 +19,7 @@ async function getCitationArrestSection(type, isList = false, list = []) {
   if (isList) sectionWrapper.classList.add('searchResponseWrapper')
 
   const additionalWrapper = document.createElement('div')
+  const canEdit = !isList
 
   const optionsWrapper = document.createElement('div')
   optionsWrapper.classList.add('optionsWrapper')
@@ -37,7 +38,6 @@ async function getCitationArrestSection(type, isList = false, list = []) {
   })
   optionsWrapper.appendChild(optionsSearchInput)
 
-  performSearch()
   async function performSearch(search) {
     optionsWrapper.querySelectorAll('details').forEach((el) => el.remove())
     for (const group of options) {
@@ -105,7 +105,7 @@ async function getCitationArrestSection(type, isList = false, list = []) {
 
     chargeWrapper.appendChild(chargeName)
     chargeWrapper.appendChild(chargeDetails)
-    if (list.length < 1) chargeWrapper.appendChild(deleteChargeButton)
+    if (canEdit) chargeWrapper.appendChild(deleteChargeButton)
 
     optionsList.appendChild(chargeWrapper)
   }
@@ -118,7 +118,20 @@ async function getCitationArrestSection(type, isList = false, list = []) {
   }
 
   sectionWrapper.appendChild(title)
-  if (list.length < 1) additionalWrapper.appendChild(optionsWrapper)
+  if (canEdit) {
+    if (list.length > 0) {
+      const addMoreLabel = document.createElement('div')
+      addMoreLabel.classList.add('addChargesLabel')
+      addMoreLabel.style.marginBottom = '8px'
+      addMoreLabel.style.fontSize = '13px'
+      addMoreLabel.style.fontWeight = '600'
+      addMoreLabel.style.color = 'var(--color-accent)'
+      addMoreLabel.textContent = language.reports.sections?.addMoreCharges ?? 'Add more charges (search and click below)'
+      additionalWrapper.appendChild(addMoreLabel)
+    }
+    additionalWrapper.appendChild(optionsWrapper)
+    await performSearch()
+  }
   additionalWrapper.appendChild(optionsList)
   sectionWrapper.appendChild(additionalWrapper)
 

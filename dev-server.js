@@ -16,6 +16,7 @@ const MIME = {
   '.js': 'application/javascript',
   '.json': 'application/json',
   '.png': 'image/png',
+  '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
 };
 
@@ -83,9 +84,16 @@ const server = http.createServer((req, res) => {
   } else if (url === '/image/desktop' || url === '/image/desktop.png') {
     filePath = path.join(ROOT, 'img', 'desktop.png');
     contentType = 'image/png';
-  } else if (url === '/image/badge' || url === '/image/badge.png') {
-    filePath = path.join(ROOT, 'img', 'badge.png');
-    contentType = 'image/png';
+  } else if (url === '/image/badge' || url === '/image/badge.png' || url === '/image/badge.svg') {
+    const badgeSvg = path.join(ROOT, 'img', 'badge.svg');
+    const badgePng = path.join(ROOT, 'img', 'badge.png');
+    if (fs.existsSync(badgeSvg)) {
+      filePath = badgeSvg;
+      contentType = 'image/svg+xml';
+    } else {
+      filePath = badgePng;
+      contentType = 'image/png';
+    }
   } else if (url === '/version') {
     send(res, 200, '1.0.0-dev', 'text/plain');
     return;
