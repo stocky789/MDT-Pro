@@ -6,72 +6,73 @@ body {
 
 .listPage,
 .createPage {
-  padding: 10px 0 10px 10px;
-  background:
-    linear-gradient(180deg, #0d1829 0%, #0b1320 100%),
-    repeating-linear-gradient(
-      0deg,
-      transparent 0,
-      transparent 31px,
-      #ffffff08 32px
-    );
+  padding: 12px;
+  background-color: var(--color-background);
 }
 
 .listWrapper {
   display: grid;
-  grid-template-columns: minmax(100px, 1fr) 3fr;
-  gap: 10px;
+  grid-template-columns: minmax(140px, 1fr) 3fr;
+  gap: 12px;
+  min-height: 0;
 }
 
 .reportInformation,
 .reportsList {
-  max-height: calc(100vh - 73px);
+  max-height: calc(100vh - 100px);
   overflow: auto;
-  padding-right: 10px;
 }
 
 .buttonWrapper:has(.createButton),
 .buttonWrapper:has(.saveButton) {
-  margin-right: 10px;
-  margin-bottom: 10px;
-  padding-bottom: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--color-border);
+  display: flex;
+  gap: 8px;
 }
 
 .typeSelector {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding-right: 10px;
+  gap: 2px;
+  padding: 8px 0;
   border-right: 1px solid var(--color-border);
-  max-height: calc(100vh - 73px);
+  max-height: calc(100vh - 100px);
   overflow: auto;
-  background-color: #0e1a2b80;
-  padding-top: 8px;
+  background-color: var(--color-surface);
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 .typeSelector button {
-  border-radius: 3px;
   width: 100%;
   text-align: left;
+  padding: 10px 12px;
+  border-radius: var(--radius-small);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color var(--transition-time-short) ease;
+}
+
+.typeSelector button:hover {
+  background-color: var(--color-surface-elevated);
 }
 
 .createPage .reportInformation .section .title {
-  font-size: 15px;
+  font-size: 12px;
   font-weight: 600;
   border-bottom: 1px solid var(--color-border);
-  color: var(--color-text-primary);
-  margin-bottom: 5px;
-  padding-bottom: 5px;
-  letter-spacing: 0.7px;
-  text-transform: uppercase;
-  font-family: var(--font-family-mono);
+  color: var(--color-text-primary-dimmed);
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  letter-spacing: 0.04em;
 }
 
 .createPage .reportInformation .section:not(:first-child) .title {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 2px solid var(--color-border);
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
 }
 
 .createPage
@@ -331,19 +332,18 @@ body {
 .listPage .reportsList {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   color: var(--color-text-primary);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .listPage .reportsList .listElement,
 .listPage .reportsList .filter {
-  padding: 10px;
+  padding: 12px 14px;
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 6px;
-  box-shadow: var(--shadow-soft);
+  border-radius: var(--radius-small);
 }
 
 .listPage .reportsList .listElement .infoWrapper {
@@ -351,11 +351,12 @@ body {
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  padding: 10px;
+  padding: 0;
+  gap: 12px;
 }
 
 .listPage .reportsList .listElement .infoWrapper .textWrapper {
-  padding-right: 10px;
+  min-width: 0;
 }
 
 .listPage .reportsList .listElement .infoWrapper .textWrapper span {
@@ -365,12 +366,12 @@ body {
 
 .listPage .reportsList .listElement .infoWrapper .status {
   padding: 4px 10px;
-  border-radius: 90px;
-  border: 1px solid;
-  font-family: var(--font-family-mono);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  font-size: 12px;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--color-border);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
 }
 
 .listPage .reportsList .filter {
@@ -454,11 +455,11 @@ body {
   .typeSelector {
     border-right: none;
     border-bottom: 1px solid var(--color-border);
-    padding-right: 0;
-    padding-bottom: 8px;
+    padding: 8px 0 12px;
     max-height: none;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 4px;
   }
 
   .reportInformation,

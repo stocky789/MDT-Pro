@@ -135,7 +135,13 @@ namespace MDTPro.Data {
             }
             Ped[] nearbyPeds = Main.Player.GetNearbyPeds(SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles);
             for (int i = 0; i < nearbyPeds.Length; i++) {
-                ResolvePedForReEncounter(nearbyPeds[i]);
+                Ped p = nearbyPeds[i];
+                if (p == null || !p.Exists()) continue;
+                try {
+                    ResolvePedForReEncounter(p);
+                } catch (Exception ex) {
+                    Helper.Log($"Skipping ped in PopulatePedDatabase: {ex.Message}", false, Helper.LogSeverity.Warning);
+                }
             }
         }
 
@@ -146,10 +152,16 @@ namespace MDTPro.Data {
             }
             Vehicle[] nearbyVehicles = Main.Player.GetNearbyVehicles(SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles);
             for (int i = 0; i < nearbyVehicles.Length; i++) {
-                MDTProVehicleData mdtProVehicleData = new MDTProVehicleData(nearbyVehicles[i]);
-                if (mdtProVehicleData == null || mdtProVehicleData.LicensePlate == null) continue;
-                if (vehicleDatabase.Any(x => x.LicensePlate == mdtProVehicleData.LicensePlate)) continue;
-                vehicleDatabase.Add(mdtProVehicleData);
+                Vehicle v = nearbyVehicles[i];
+                if (v == null || !v.Exists()) continue;
+                try {
+                    MDTProVehicleData mdtProVehicleData = new MDTProVehicleData(v);
+                    if (mdtProVehicleData == null || mdtProVehicleData.LicensePlate == null) continue;
+                    if (vehicleDatabase.Any(x => x.LicensePlate == mdtProVehicleData.LicensePlate)) continue;
+                    vehicleDatabase.Add(mdtProVehicleData);
+                } catch (Exception ex) {
+                    Helper.Log($"Skipping vehicle in PopulateVehicleDatabase: {ex.Message}", false, Helper.LogSeverity.Warning);
+                }
             }
         }
 
@@ -189,23 +201,33 @@ namespace MDTPro.Data {
 
         internal static void SyncPedDatabaseWithCDF() {
             foreach (MDTProPedData databasePed in PedDatabase) {
-                databasePed.CDFPedData.Wanted = databasePed.IsWanted;
-                databasePed.CDFPedData.IsOnProbation = databasePed.IsOnProbation;
-                databasePed.CDFPedData.IsOnParole = databasePed.IsOnParole;
-                if (Enum.TryParse(databasePed.LicenseStatus, out ELicenseState licenseStatusValue)) {
-                    databasePed.CDFPedData.DriversLicenseState = licenseStatusValue;
+                if (databasePed?.CDFPedData == null) continue;
+                try {
+                    databasePed.CDFPedData.Wanted = databasePed.IsWanted;
+                    databasePed.CDFPedData.IsOnProbation = databasePed.IsOnProbation;
+                    databasePed.CDFPedData.IsOnParole = databasePed.IsOnParole;
+                    if (Enum.TryParse(databasePed.LicenseStatus, out ELicenseState licenseStatusValue)) {
+                        databasePed.CDFPedData.DriversLicenseState = licenseStatusValue;
+                    }
+                } catch (Exception ex) {
+                    Helper.Log($"SyncPedDatabaseWithCDF skip ped: {ex.Message}", false, Helper.LogSeverity.Warning);
                 }
             }
         }
 
         internal static void SyncVehicleDatabaseWithCDF() {
             foreach (MDTProVehicleData databaseVehicle in VehicleDatabase) {
-                databaseVehicle.CDFVehicleData.IsStolen = databaseVehicle.IsStolen;
-                if (Enum.TryParse(databaseVehicle.RegistrationStatus, out EDocumentStatus registrationStatusValue)) {
-                    databaseVehicle.CDFVehicleData.Registration.Status = registrationStatusValue;
-                }
-                if (Enum.TryParse(databaseVehicle.InsuranceStatus, out EDocumentStatus insuranceStatusValue)) {
-                    databaseVehicle.CDFVehicleData.Insurance.Status = insuranceStatusValue;
+                if (databaseVehicle?.CDFVehicleData == null) continue;
+                try {
+                    databaseVehicle.CDFVehicleData.IsStolen = databaseVehicle.IsStolen;
+                    if (Enum.TryParse(databaseVehicle.RegistrationStatus, out EDocumentStatus registrationStatusValue)) {
+                        databaseVehicle.CDFVehicleData.Registration.Status = registrationStatusValue;
+                    }
+                    if (Enum.TryParse(databaseVehicle.InsuranceStatus, out EDocumentStatus insuranceStatusValue)) {
+                        databaseVehicle.CDFVehicleData.Insurance.Status = insuranceStatusValue;
+                    }
+                } catch (Exception ex) {
+                    Helper.Log($"SyncVehicleDatabaseWithCDF skip vehicle: {ex.Message}", false, Helper.LogSeverity.Warning);
                 }
             }
         }
@@ -219,10 +241,31 @@ namespace MDTPro.Data {
             if (ped == null || !ped.IsValid()) return;
             string pedName = null;
             try { pedName = ped.GetPedData()?.FullName; } catch { }
+            if (string.IsNullOrEmpty(pedName)) {
+                try {
+                    var persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped);
+                    if (persona != null && !string.IsNullOrEmpty(persona.FullName)) pedName = persona.FullName;
+                } catch { }
+            }
             if (string.IsNullOrEmpty(pedName)) return;
 
             MDTProPedData pedData = pedDatabase.FirstOrDefault(x => x.Name == pedName);
-            if (pedData == null) return;
+            if (pedData == null) {
+                pedData = keepInPedDatabase.FirstOrDefault(x => x.Name == pedName);
+                if (pedData != null) {
+                    lock (_pedDbLock) {
+                        if (!pedDatabase.Any(x => x.Name == pedName)) pedDatabase.Add(pedData);
+                    }
+                }
+            }
+            if (pedData == null) {
+                pedData = new MDTProPedData { Name = pedName };
+                pedData.IdentificationHistory = new List<MDTProPedData.IdentificationEntry>();
+                lock (_pedDbLock) {
+                    if (!pedDatabase.Any(x => x.Name == pedName)) pedDatabase.Add(pedData);
+                }
+                KeepPedInDatabase(pedData);
+            }
 
             if (pedData.IdentificationHistory == null) pedData.IdentificationHistory = new List<MDTProPedData.IdentificationEntry>();
             pedData.IdentificationHistory.Insert(0, new MDTProPedData.IdentificationEntry {
@@ -230,6 +273,7 @@ namespace MDTPro.Data {
                 Timestamp = System.DateTime.UtcNow.ToString("o")
             });
             if (pedData.IdentificationHistory.Count > 10) pedData.IdentificationHistory.RemoveAt(pedData.IdentificationHistory.Count - 1);
+            KeepPedInDatabase(pedData);
             Database.SavePed(pedData);
         }
 
@@ -288,20 +332,24 @@ namespace MDTPro.Data {
 
         internal static void AddCDFPedDataPedToDatabase(PedData pedData) {
             if (pedData == null) return;
-            if (pedData.Holder != null && pedData.Holder.IsValid()) {
-                ResolvePedForReEncounter(pedData.Holder);
-                return;
-            }
+            try {
+                if (pedData.Holder != null && pedData.Holder.IsValid()) {
+                    ResolvePedForReEncounter(pedData.Holder);
+                    return;
+                }
 
-            MDTProPedData mdtProPedData = new MDTProPedData(pedData);
-            if (mdtProPedData == null || mdtProPedData.Name == null) return;
-            lock (_pedDbLock) {
-                if (pedDatabase.Any(x => x.Name == mdtProPedData.Name)) return;
-            }
-            TryApplyReEncounterProfile(mdtProPedData);
-            lock (_pedDbLock) {
-                if (pedDatabase.Any(x => x.Name == mdtProPedData.Name)) return;
-                pedDatabase.Add(mdtProPedData);
+                MDTProPedData mdtProPedData = new MDTProPedData(pedData);
+                if (mdtProPedData == null || mdtProPedData.Name == null) return;
+                lock (_pedDbLock) {
+                    if (pedDatabase.Any(x => x.Name == mdtProPedData.Name)) return;
+                }
+                TryApplyReEncounterProfile(mdtProPedData);
+                lock (_pedDbLock) {
+                    if (pedDatabase.Any(x => x.Name == mdtProPedData.Name)) return;
+                    pedDatabase.Add(mdtProPedData);
+                }
+            } catch (Exception ex) {
+                Helper.Log($"AddCDFPedDataPedToDatabase failed: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
         }
 
@@ -338,7 +386,7 @@ namespace MDTPro.Data {
         internal static void AddReport(Report report) {
             if (report is CitationReport citationReport) {
                 if (!string.IsNullOrEmpty(citationReport.OffenderPedName)) {
-                    int pedIndex = pedDatabase.FindIndex(pedData => pedData.Name.ToLower() == citationReport.OffenderPedName.ToLower());
+                    int pedIndex = pedDatabase.FindIndex(pedData => pedData.Name?.ToLower() == citationReport.OffenderPedName.ToLower());
                     if (pedIndex != -1) {
                         MDTProPedData pedDataToAdd = pedDatabase[pedIndex];
 
@@ -350,7 +398,7 @@ namespace MDTPro.Data {
                 }
 
                 if (!string.IsNullOrEmpty(citationReport.OffenderVehicleLicensePlate)) {
-                    MDTProVehicleData vehicleDataToAdd = vehicleDatabase.FirstOrDefault(vehicleData => vehicleData.LicensePlate.ToLower() == citationReport.OffenderVehicleLicensePlate.ToLower());
+                    MDTProVehicleData vehicleDataToAdd = vehicleDatabase.FirstOrDefault(vehicleData => vehicleData.LicensePlate?.ToLower() == citationReport.OffenderVehicleLicensePlate.ToLower());
                     if (vehicleDataToAdd != null) KeepVehicleInDatabase(vehicleDataToAdd);
                 }
 
@@ -396,7 +444,7 @@ namespace MDTPro.Data {
                 }
             } else if (report is ArrestReport arrestReport) {
                 if (!string.IsNullOrEmpty(arrestReport.OffenderPedName)) {
-                    int pedIndex = pedDatabase.FindIndex(pedData => pedData.Name.ToLower() == arrestReport.OffenderPedName.ToLower());
+                    int pedIndex = pedDatabase.FindIndex(pedData => pedData.Name?.ToLower() == arrestReport.OffenderPedName.ToLower());
                     if (pedIndex != -1) {
                         MDTProPedData pedDataToAdd = pedDatabase[pedIndex];
 
@@ -408,7 +456,7 @@ namespace MDTPro.Data {
                 }
 
                 if (!string.IsNullOrEmpty(arrestReport.OffenderVehicleLicensePlate)) {
-                    MDTProVehicleData vehicleDataToAdd = vehicleDatabase.FirstOrDefault(vehicleData => vehicleData.LicensePlate.ToLower() == arrestReport.OffenderVehicleLicensePlate.ToLower());
+                    MDTProVehicleData vehicleDataToAdd = vehicleDatabase.FirstOrDefault(vehicleData => vehicleData.LicensePlate?.ToLower() == arrestReport.OffenderVehicleLicensePlate.ToLower());
                     if (vehicleDataToAdd != null) KeepVehicleInDatabase(vehicleDataToAdd);
                 }
 
@@ -447,7 +495,7 @@ namespace MDTPro.Data {
                 ApplyRepeatOffenderSentencing(courtData);
 
                 if (!string.IsNullOrEmpty(arrestReport.OffenderPedName)) {
-                    int pedIndex = pedDatabase.FindIndex(pedData => pedData.Name.ToLower() == arrestReport.OffenderPedName.ToLower());
+                    int pedIndex = pedDatabase.FindIndex(pedData => pedData.Name?.ToLower() == arrestReport.OffenderPedName.ToLower());
                     if (pedIndex != -1) {
                         MDTProPedData pedDataToUpdate = pedDatabase[pedIndex];
                         UpdatePedIncarcerationFromCourtData(pedDataToUpdate, courtData);
@@ -473,14 +521,14 @@ namespace MDTPro.Data {
             } else if (report is IncidentReport incidentReport) {
                 foreach (string offenderPedName in incidentReport.OffenderPedsNames) {
                     if (!string.IsNullOrEmpty(offenderPedName)) {
-                        MDTProPedData pedDataToAdd = pedDatabase.FirstOrDefault(pedData => pedData.Name.ToLower() == offenderPedName.ToLower());
+                        MDTProPedData pedDataToAdd = pedDatabase.FirstOrDefault(pedData => pedData.Name?.ToLower() == offenderPedName.ToLower());
                         if (pedDataToAdd != null) KeepPedInDatabase(pedDataToAdd);
                     }
                 }
 
                 foreach (string witnessPedName in incidentReport.WitnessPedsNames) {
                     if (!string.IsNullOrEmpty(witnessPedName)) {
-                        MDTProPedData pedDataToAdd = pedDatabase.FirstOrDefault(pedData => pedData.Name.ToLower() == witnessPedName.ToLower());
+                        MDTProPedData pedDataToAdd = pedDatabase.FirstOrDefault(pedData => pedData.Name?.ToLower() == witnessPedName.ToLower());
                         if (pedDataToAdd != null) KeepPedInDatabase(pedDataToAdd);
                     }
                 }
@@ -664,7 +712,7 @@ namespace MDTPro.Data {
             courtCase.LastUpdatedUtc = DateTime.UtcNow.ToString("o");
 
             if (!string.IsNullOrEmpty(courtCase.PedName)) {
-                int pedIndex = pedDatabase.FindIndex(pedData => pedData.Name.ToLower() == courtCase.PedName.ToLower());
+                int pedIndex = pedDatabase.FindIndex(pedData => pedData.Name?.ToLower() == courtCase.PedName?.ToLower());
                 if (pedIndex != -1) {
                     MDTProPedData pedData = pedDatabase[pedIndex];
 

@@ -14,7 +14,21 @@ namespace MDTPro.ServerAPI {
                 buffer = File.ReadAllBytes($"{SetupController.ImgDirPath}/map.png");
                 status = 200;
                 contentType = "image/png";
-            } 
+            } else if (path == "desktop") {
+                string desktopPath = $"{SetupController.ImgDirPath}/desktop.png";
+                if (File.Exists(desktopPath)) {
+                    buffer = File.ReadAllBytes(desktopPath);
+                    status = 200;
+                    contentType = "image/png";
+                }
+            } else if (path == "badge") {
+                string badgePath = $"{SetupController.ImgDirPath}/badge.png";
+                if (File.Exists(badgePath)) {
+                    buffer = File.ReadAllBytes(badgePath);
+                    status = 200;
+                    contentType = "image/png";
+                }
+            }
         }
     }
 }

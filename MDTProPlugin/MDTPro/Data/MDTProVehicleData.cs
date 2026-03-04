@@ -33,23 +33,28 @@ namespace MDTPro.Data {
 
         private void PopulateParameters() {
             if (Holder == null || CDFVehicleData == null) return;
+            if (CDFVehicleData.Owner == null) return;
 
             LicensePlate = Holder.LicensePlate;
             ModelName = Holder.Model.Name;
             IsStolen = CDFVehicleData.IsStolen;
-            Owner = CDFVehicleData.Owner.FullName.Trim();
+            Owner = CDFVehicleData.Owner.FullName?.Trim() ?? string.Empty;
 
-            if (CDFVehicleData.Owner.FullName.Trim() != "Government") {
+            if (CDFVehicleData.Owner.FullName?.Trim() != "Government") {
                 DataController.AddCDFPedDataPedToDatabase(CDFVehicleData.Owner);
             }
 
-            RegistrationStatus = CDFVehicleData.Registration.Status.ToString();
-            RegistrationExpiration = CDFVehicleData.Registration.ExpirationDate?.ToString("s");
-            InsuranceStatus = CDFVehicleData.Insurance.Status.ToString();
-            InsuranceExpiration = CDFVehicleData.Insurance.ExpirationDate?.ToString("s");
+            if (CDFVehicleData.Registration != null) {
+                RegistrationStatus = CDFVehicleData.Registration.Status.ToString();
+                RegistrationExpiration = CDFVehicleData.Registration.ExpirationDate?.ToString("s");
+            }
+            if (CDFVehicleData.Insurance != null) {
+                InsuranceStatus = CDFVehicleData.Insurance.Status.ToString();
+                InsuranceExpiration = CDFVehicleData.Insurance.ExpirationDate?.ToString("s");
+            }
             Color = Rage.Native.NativeFunction.Natives.GET_VEHICLE_LIVERY<int>(Holder) == -1 ? $"{Holder.PrimaryColor.R}-{Holder.PrimaryColor.G}-{Holder.PrimaryColor.B}" : null;
-            VehicleIdentificationNumber = CDFVehicleData.Vin.Number;
-            
+            VehicleIdentificationNumber = CDFVehicleData.Vin?.Number;
+
             string unlocalizedModelDisplayName = Rage.Native.NativeFunction.Natives.GET_DISPLAY_NAME_FROM_VEHICLE_MODEL<string>(Holder.Model.Hash);
 
             ModelDisplayName = Game.GetLocalizedString(unlocalizedModelDisplayName);

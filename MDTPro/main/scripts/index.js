@@ -389,7 +389,7 @@ async function openWindow(name, pluginId = null) {
       windowElement.style.width = 'calc(100% - 2px)'
       windowElement.style.height = `calc(100% - var(--tb-height))`
       windowElement.style.left = '0'
-      windowElement.style.top = '0'
+      windowElement.style.top = '' /* use CSS .window.maximized top so window sits below taskbar */
       windowElement.style.minWidth = `${
         iconTitleWrapper.offsetWidth + windowControls.offsetWidth
       }px`

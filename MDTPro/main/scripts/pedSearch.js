@@ -19,14 +19,44 @@
     })
 })()
 
-document
-  .querySelector('.searchInputWrapper #pedSearchInput')
-  .addEventListener('keydown', async function (e) {
-    if (e.key == 'Enter') {
-      e.preventDefault()
-      document.querySelector('.searchInputWrapper button').click()
+const searchInput = document.querySelector('.searchInputWrapper #pedSearchInput')
+
+searchInput.addEventListener('keydown', async function (e) {
+  if (e.key == 'Enter') {
+    e.preventDefault()
+    document.querySelector('.searchInputWrapper button').click()
+  }
+})
+
+searchInput.addEventListener('input', function () {
+  filterPersonLists(this.value.trim())
+})
+
+function filterPersonLists(searchText) {
+  const q = (searchText || '').toLowerCase()
+  const lists = [
+    document.querySelector('.recentIdsList'),
+    document.querySelector('.searchHistoryList'),
+    document.querySelector('.repeatOffendersList'),
+  ]
+  const wrappers = [
+    document.querySelector('.recentIdsWrapper'),
+    document.querySelector('.searchHistoryWrapper'),
+    document.querySelector('.repeatOffendersWrapper'),
+  ]
+  lists.forEach((list, i) => {
+    if (!list || !wrappers[i]) return
+    let visibleCount = 0
+    for (const item of list.children) {
+      const name = (item.dataset.searchName || item.textContent || '').toLowerCase()
+      const show = !q || name.includes(q)
+      item.style.display = show ? '' : 'none'
+      if (show) visibleCount++
     }
+    if (wrappers[i].classList.contains('hidden')) return
+    wrappers[i].style.display = q && visibleCount === 0 ? 'none' : ''
   })
+}
 
 document
   .querySelector('.searchInputWrapper button')
@@ -58,6 +88,7 @@ async function loadRecentIds() {
 
   for (const entry of recentIds) {
     const item = document.createElement('button')
+    item.dataset.searchName = entry.Name
     item.innerHTML = `${entry.Name} <span class="searchCount">(${entry.Type})</span>`
     item.addEventListener('click', async function () {
       document.querySelector('.searchInputWrapper #pedSearchInput').value = entry.Name
@@ -89,6 +120,7 @@ async function loadSearchHistory() {
 
   for (const entry of history) {
     const item = document.createElement('button')
+    item.dataset.searchName = entry.ResultName
     item.textContent = entry.ResultName
     item.addEventListener('click', async function () {
       document.querySelector('.searchInputWrapper #pedSearchInput').value =
@@ -116,6 +148,7 @@ async function loadRepeatOffenders() {
 
   for (const offender of offenders) {
     const item = document.createElement('button')
+    item.dataset.searchName = offender.Name
     const count =
       (offender.CitationCount || 0) + (offender.ArrestCount || 0)
     item.innerHTML = `${offender.Name} <span class="searchCount">(${count})</span>`
