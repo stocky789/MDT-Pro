@@ -4,51 +4,51 @@ A Police Computer Plugin for LSPDFR.
 
 ## Installation
 
-- Move all files and folders from the ZIP file into your GTA main directory
+- Extract all files and folders from the ZIP into the GTA main directory
 
 ## Setup
 
 - When going on duty using LSPDFR, MDT Pro will display notifications in-game containing the addresses used to access the MDT
-- If you missed them, MDT Pro also generates a file including the addresses: `MDTPro/ipAddresses.txt`
-- You can access MDT Pro using any browser of your choice (however I recommend a Chromium based browser, e.g. Chrome, Brave, etc.) by entering one of the addresses (if one doesn't work, try the other)
+- If the in-game notifications were missed, addresses are also written to `MDTPro/ipAddresses.txt`
+- Access MDT Pro from any browser. Chromium-based browsers (e.g. Chrome, Brave) work best. Enter one of the displayed addresses—if one fails, try another.
 
 ### Setup using Steam overlay
 
 - In Steam go to Steam <a>&rarr;</a> Settings <a>&rarr;</a> In Game
 - Make sure _Enable the Steam Overlay while in-game_ is enabled
-- Set _Overlay shortcut key(s)_ to whatever key you want to use to open MDT Pro
-- Set _Web browser home page_ to `http://127.0.0.1:8080` (or the url provided by MDT Pro)
+- Set _Overlay shortcut key(s)_ to the key you prefer for opening MDT Pro
+- Set _Web browser home page_ to `http://127.0.0.1:8080` (or the address shown by MDT Pro)
 
 ## UI Usage
 
 ### Desktop
 
-- In the center of the taskbar you'll find an MDT Pro icon, clicking it will open the _Control Panel_
-- Here you can enter information about yourself (Officer Information) and start or end your shift
-- You can also open the [customization page](#customization) from here
+- The taskbar shows an MDT Pro icon in the center. Click it to open the _Control Panel_
+- Enter officer information and start or end shifts from the Control Panel
+- The [customization page](#customization) is also accessible from here
 
 ### Reports
 
-- All reports include a section for general, officer and location information which will be auto filled, but can be changed
-- The report ID can not be changed
-- The status can be used in the reports list to filter; When a report has a status of canceled it is considered delete, however you are still able to access the report
-- Reports created while on duty (shift menu on control panel), will be added to the current shift
-- There also is a notes section that can be used to describe the incident or to give more information on what happened
+- All reports include general, officer, and location sections. These are auto-filled but can be edited.
+- The report ID cannot be changed
+- Use the status field in the reports list to filter. Canceled reports are treated as deleted but remain viewable.
+- Reports created while on duty (via the shift menu in the Control Panel) are attached to the current shift
+- A notes section is available to describe the incident or provide additional details
 
 #### Incident reports
 
-- Incident reports can be used for all kind of reporting that don't fit in any of the other categories (there will be more later :))
-- You can, but don't have to, enter the names of offenders and witnesses or victims
+- Incident reports handle any reporting that does not fit the other categories
+- Offender, witness, and victim names are optional
 
 #### Citation and arrest reports
 
 - The given charges will be added to the offender, if the offender exists, when creating the report
-- If you're using PolicingRedefined you can give citations to the offender using the ped menu
+- With PolicingRedefined installed, citations can be issued to offenders directly from the ped menu
 
 ### Ped Lookup
 
 - Entering and searching for a person's name will show various information about that person
-- Clicking on the citation/arrest area in the history section, you can open a new report for that ped
+- Click the citation or arrest entry in the history section to create a new report for that ped
 
 ### Vehicle Lookup
 
@@ -57,16 +57,16 @@ A Police Computer Plugin for LSPDFR.
 
 ### Shift History
 
-- Here you can find all your prior shifts
+- View all prior shifts and their linked reports
 - Reports created during a shift are linked
 
 ## Customization
 
-On the customization page you can activate plugins and change your config.
+The customization page allows activating plugins and changing configuration.
 
 ## Plugins
 
-Plugins allow you to expand MDT Pro's functionality by injecting JavaScript and CSS.
+Plugins extend MDT Pro's functionality by injecting JavaScript and CSS.
 
 ### Using a plugin
 
@@ -92,12 +92,12 @@ Plugin Name
             style 2.css
 ```
 
-You can add multiple pages, scripts and styles.
+Multiple pages, scripts, and styles are supported per plugin.
 
-HTML files in pages are served at `/plugin/<pluginId>/page/<fileName>`.
-JS files in scripts are served at `/plugin/<pluginId>/script/<fileName>`.
-CSS files in styles are served at `/plugin/<pluginId>/style/<fileName>`.
-In JavaScript you can get the pluginId like this: `const pluginId = document.currentScript.dataset.pluginId`.
+- HTML files in `pages` are served at `/plugin/<pluginId>/page/<fileName>`
+- JS files in `scripts` are served at `/plugin/<pluginId>/script/<fileName>`
+- CSS files in `styles` are served at `/plugin/<pluginId>/style/<fileName>`
+- In JavaScript, retrieve the plugin ID with: `const pluginId = document.currentScript.dataset.pluginId`
 Scripts and styles are loaded onto the index page when activated using the customization page.
 
 #### info.json example
@@ -106,14 +106,14 @@ Scripts and styles are loaded onto the index page when activated using the custo
 {
   "name": "Plugin Name",
   "description": "An MDT Pro plugin",
-  "author": "Palü",
+  "author": "Your Name",
   "version": "2.0.1"
 }
 ```
 
 #### Plugin API
 
-If you're making a plugin for MDT Pro that includes JavaScript, you can use some functions provided in `MDTPro/main/scripts/pluginAPI.js`. To get IntelliSense in VSCode, simply open the file in another tab. All functions are children of `API`.
+Plugin developers can use the functions in `MDTPro/main/scripts/pluginAPI.js`. Open that file in another editor tab for IntelliSense. All API functions are exposed under the `API` object.
 
 #### Example plugin to create a new page
 
@@ -127,10 +127,6 @@ function initTestPage(contentWindow) {
   contentWindow.document.body.innerHTML = 'Test page loaded'
 }
 ```
-
-## Discord Server
-
-If you need support, have a suggestion or bug report, want to see what's coming in new versions, or want to download plugins made by me (or others), you can join https://discord.gg/RW9uy3spVb
 
 ## License
 

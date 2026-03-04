@@ -37,7 +37,7 @@ namespace ClearMDTProData {
             Console.CursorVisible = false;
             Console.OutputEncoding = Encoding.UTF8;
 
-            Console.WriteLine("Use \u2191 and \u2193 to navigate and press \u21b5 Enter to select the file(s) you want to reset.\n");
+            Console.WriteLine("Use \u2191 and \u2193 to navigate, then press \u21b5 Enter to select the data to reset.\n");
 
             int selection = 0;
             bool inOptionMenu = true;
@@ -74,7 +74,7 @@ namespace ClearMDTProData {
                 options[selection].Callback();
             } catch {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("An Error occured! Tf did you do? Follow the damn instructions! (Sorry jk, if you need support ask on Discord: https://discord.gg/RW9uy3spVb)");
+                Console.WriteLine("An error occurred. Please check the instructions and try again.");
                 Console.ResetColor();
             }
             Console.WriteLine("Press \u21b5 Enter to exit");

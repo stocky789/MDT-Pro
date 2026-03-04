@@ -4,7 +4,7 @@ using System;
 namespace MDTPro.Data.Reports {
     public class Report {
         public string Id;
-        public int ShortYear; // this will cause issues in 100 years, but by then I'll be dead and it will no longer be my problem
+        public int ShortYear; // two-digit year; sufficient for practical use
         public OfficerInformationData OfficerInformation;
         public Location Location;
         public DateTime TimeStamp;

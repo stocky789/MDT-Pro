@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("MDTPro")]
-[assembly: AssemblyCopyright("Copyright (c) 2023-2026 Jul Levi Strunz")]
+[assembly: AssemblyCopyright("Copyright (c) 2025 Matt")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

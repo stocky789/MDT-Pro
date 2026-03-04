@@ -65,8 +65,8 @@ namespace MDTPro {
                         GameFiber.WaitUntil(CommonDataFramework.API.CDFFunctions.IsPluginReady, 30000);
                         if (!CommonDataFramework.API.CDFFunctions.IsPluginReady()) {
                             Server.Stop();
-                            Game.DisplayNotification("MDT Pro failed to load. CommonDataFramework didn't load (blame Marcel).");
-                            Log("Loading aborted. CommonDataFramework didn't load.", true, LogSeverity.Error);
+                            Game.DisplayNotification("MDT Pro failed to load. CommonDataFramework did not initialize in time.");
+                            Log("Loading aborted. CommonDataFramework did not initialize in time.", true, LogSeverity.Error);
                             return;
                         }
 
