@@ -14,6 +14,16 @@ namespace MDTPro.Setup {
         public Customization customization = new Customization();
         public Map map = new Map();
         public Callout callout = new Callout();
+        public Alpr alpr = new Alpr();
+
+        public class Alpr {
+            public string alertTitle = "ALPR Alert";
+            public string owner = "Owner";
+            public string model = "Model";
+            public string openVehicleLookup = "Open Vehicle Lookup";
+            public string clearAlpr = "Clear ALPR";
+            public string inGameNotEnabled = "In-game ALPR is not enabled.";
+        }
 
         public class InGame {
             public string loaded = "MDT Pro is ready.";

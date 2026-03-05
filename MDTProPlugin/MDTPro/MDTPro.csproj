@@ -88,6 +88,7 @@
     <Compile Include="Data\Database.cs" />
     <Compile Include="Data\SearchHistoryEntry.cs" />
     <Compile Include="Data\DataController.cs" />
+    <Compile Include="Data\ALPRHit.cs" />
     <Compile Include="Data\MDTProVehicleData.cs" />
     <Compile Include="Data\OfficerInformationData.cs" />
     <Compile Include="Data\Reports\ArrestReport.cs" />
@@ -124,6 +125,8 @@
     <Compile Include="Setup\Language.cs" />
     <Compile Include="Utility\CitationArrestHelper.cs" />
     <Compile Include="Utility\PlayerCoords.cs" />
+    <Compile Include="ALPR\ALPRController.cs" />
+    <Compile Include="ALPR\ALPRHUD.cs" />
     <Compile Include="Utility\PRHelper.cs" />
   </ItemGroup>
   <ItemGroup>

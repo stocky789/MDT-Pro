@@ -1,0 +1,144 @@
+/* ALPR plugin – popup styling */
+.alpr-popup {
+  max-width: 340px;
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-warning);
+  box-shadow: var(--shadow-medium);
+  overflow: hidden;
+  pointer-events: auto;
+  animation: alpr-popup-in 0.25s ease;
+}
+
+@keyframes alpr-popup-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.alpr-popup-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--color-warning-half);
+  border-bottom: 1px solid var(--color-warning);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.alpr-popup-icon {
+  font-size: 18px;
+  color: var(--color-warning);
+  flex-shrink: 0;
+}
+
+.alpr-popup-title {
+  color: var(--color-text-primary);
+  flex-shrink: 0;
+}
+
+.alpr-popup-plate {
+  font-family: var(--font-family-mono);
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  color: var(--color-accent);
+  margin-left: auto;
+}
+
+.alpr-popup-dismiss {
+  margin-left: 4px;
+  padding: 0 6px;
+  font-size: 20px;
+  line-height: 1;
+  background: transparent;
+  border: none;
+  color: var(--color-text-primary-half);
+  cursor: pointer;
+  border-radius: 2px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.alpr-popup-dismiss:hover {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.alpr-popup-body {
+  padding: 14px;
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
+.alpr-popup-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.alpr-popup-row:last-of-type {
+  margin-bottom: 12px;
+}
+
+.alpr-popup-label {
+  flex-shrink: 0;
+  color: var(--color-text-primary-half);
+  min-width: 70px;
+}
+
+.alpr-popup-value {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.alpr-popup-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.alpr-popup-flags .alpr-flag {
+  display: inline-block;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 2px;
+  background: var(--color-error-half);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-error);
+}
+
+.alpr-popup-btn {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 13px;
+  background: var(--color-accent);
+  color: var(--color-background);
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.alpr-popup-btn:hover {
+  opacity: 0.95;
+  background: var(--color-accent-dimmed);
+}
+
+.alpr-popup-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.alpr-popup-timer {
+  height: 3px;
+  width: 0;
+  background: var(--color-warning);
+  transition: width linear;
+}

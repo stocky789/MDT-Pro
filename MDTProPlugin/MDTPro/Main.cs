@@ -21,6 +21,7 @@ namespace MDTPro {
         }
 
         public override void Finally() {
+            ALPR.ALPRController.Stop();
             Data.DataController.EndCurrentShift();
             Server.Stop();
             Data.Database.Close();
@@ -29,7 +30,11 @@ namespace MDTPro {
         }
 
         private static void Functions_OnOnDutyStateChanged(bool OnDuty) {
-            if (OnDuty) {
+            if (!OnDuty) {
+                ALPR.ALPRController.Stop();
+                return;
+            }
+            {
                 GameFiber.StartNew(() => {
                     if (!Directory.Exists(MDTProPath)) {
                         RageNotification.ShowError("MDT Pro failed to load. Missing MDT Pro files. Please reinstall and follow the installation instructions.");
@@ -93,6 +98,8 @@ namespace MDTPro {
                         }
 
                         RageNotification.ShowSuccess($"{GetLanguage().inGame.loaded} v{Version}");
+
+                        ALPR.ALPRController.Start();
 
                         var cfg = GetConfig();
                         if (cfg.checkForUpdates && !string.IsNullOrWhiteSpace(cfg.githubReleasesRepo)) {
