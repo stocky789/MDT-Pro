@@ -2,6 +2,7 @@
   const config = await getConfig()
   const language = await getLanguage()
   if (config.updateDomWithLanguageOnLoad) await updateDomWithLanguage('index')
+  applySettingsInfoTooltips(language)
   const version = await (await fetch('/version')).text()
   document.querySelector('.overlay .settings .version').innerHTML =
     `${language.index.settings.version}: ${version}`
@@ -529,6 +530,20 @@ document
     hideLoadingOnButton(this)
   })
 
+function applySettingsInfoTooltips(language) {
+  const base = language?.index?.static
+  if (!base) return
+  document.querySelectorAll('.overlay .settings [data-language-info]').forEach((el) => {
+    const key = el.getAttribute('data-language-info')
+    if (!key) return
+    const value = key.split('.').reduce((o, k) => o?.[k], base)
+    if (typeof value === 'string') {
+      el.title = value
+      el.setAttribute('aria-label', value)
+    }
+  })
+}
+
 function applyOfficerInformationToDOM(officerInformation) {
   const inputWrapper = document.querySelector(
     '.overlay .settings .officerInformation .inputWrapper'
@@ -602,3 +617,10 @@ document
 
     hideLoadingOnButton(this)
   })
+
+document.querySelector('.overlay .settings .customization')?.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    window.open('/page/customization', '_blank')
+  }
+})

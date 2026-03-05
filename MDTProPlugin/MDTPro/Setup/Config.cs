@@ -90,18 +90,24 @@ namespace MDTPro.Setup {
         public string githubReleasesRepo = "stocky789/MDT-Pro";
 
         // ---- ALPR ----
-        /// <summary>Enable ALPR scanning and HUD in-game.</summary>
-        public bool alprEnabled = true;
+        /// <summary>Enable ALPR scanning and HUD in-game. Only active when in a police cruiser and on duty.</summary>
+        public bool alprEnabled = false;
         /// <summary>ALPR popup auto-close in MDT (seconds). 0 = no auto-close. Used by ALPR plugin.</summary>
         public int alprPopupDuration = 0;
-        /// <summary>Scan interval in milliseconds.</summary>
+        /// <summary>Scan interval in milliseconds. Enforced minimum 1500 ms in code to avoid FPS impact.</summary>
         public int alprScanIntervalMs = 2000;
+        /// <summary>Maximum distance in meters to consider vehicles (candidates).</summary>
+        public float alprScanRangeMeters = 25f;
+        /// <summary>Effective read range in meters (mobile ALPR typically 2–8m). Only vehicles within this range and in cone are read.</summary>
+        public float alprReadRangeMeters = 6f;
+        /// <summary>Cone angle in degrees (±) from cruiser forward. Real units work best at ±30°.</summary>
+        public float alprConeAngleDegrees = 30f;
         /// <summary>Per-plate cooldown before re-alerting (seconds).</summary>
         public int alprCooldownSeconds = 90;
         /// <summary>Play sound on flagged hit.</summary>
         public bool alprPlaySoundOnHit = true;
-        /// <summary>Show in-game notification on flagged hit.</summary>
-        public bool alprShowInGameNotification = true;
+        /// <summary>Show in-game popup notification on flagged hit. If false, only the ALPR HUD panel is shown.</summary>
+        public bool alprShowInGameNotification = false;
         /// <summary>HUD anchor: TopLeft, TopRight, BottomLeft, BottomRight.</summary>
         public string alprHudAnchor = "TopRight";
         /// <summary>HUD offset X in pixels from anchor.</summary>

@@ -70,6 +70,19 @@ if (-not (Test-Path $DllOutput)) { Write-Error "Build output not found: $DllOutp
 Copy-Item $DllOutput (Join-Path $pluginsLspdfr "MDTPro.dll") -Force
 Write-Host "  Copied MDTPro.dll -> plugins\LSPDFR\"
 
+# --- Ensure MDTPro.ini exists in MDTPro folder (settings / keybind config; plugin reads MDTProPath/MDTPro.ini) ---
+$iniPath = Join-Path $mdtProDest "MDTPro.ini"
+$iniContent = @"
+; MDT Pro - In-game plugin settings
+; Edit this file to change keybinds and other options. Restart the game or go off/on duty for changes to take effect.
+
+[MDTPro]
+; Key to open the in-game Settings menu (ALPR and other options). Use key names like F7, F8, F9, F10, etc.
+SettingsMenuKey=F7
+"@
+Set-Content -Path $iniPath -Value $iniContent -Encoding UTF8
+Write-Host "  Created MDTPro\MDTPro.ini"
+
 # --- Write install README ---
 $readme = @"
 MDT Pro v$Version - Installation

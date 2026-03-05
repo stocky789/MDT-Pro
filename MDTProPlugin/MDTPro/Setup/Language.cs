@@ -59,9 +59,11 @@ namespace MDTPro.Setup {
                 }
 
                 public class Settings {
-                    public string customization = "Customization";
+                    public string customization = "Config and Plugins";
+                    public string customizationInfo = "Change config and manage installed plugins. Opens in a new tab.";
                     public OfficerInformation officerInformation = new OfficerInformation();
                     public CurrentShift currentShift = new CurrentShift();
+                    public OfficerMetrics officerMetrics = new OfficerMetrics();
 
                     public class OfficerInformation {
                         public string title = "Officer Information";
@@ -69,15 +71,42 @@ namespace MDTPro.Setup {
                         public string lastName = "Last Name";
                         public string rank = "Rank";
                         public string callSign = "Call Sign";
-                        public string agency = "Agency";
+                        public string agency = "Department";
                         public string badgeNumber = "Badge Number";
-                        public string autoFill = "Auto Fill";
+                        public string autoFill = "Fill from Game";
                         public string save = "Save";
+                        public Info info = new Info();
+                        public class Info {
+                            public string title = "Your character details. Used to pre-fill reports and show who is on duty.";
+                            public string firstName = "Your character's first name.";
+                            public string lastName = "Your character's last name.";
+                            public string badgeNumber = "Your badge or employee number.";
+                            public string rank = "e.g. Officer, Sergeant, Lieutenant.";
+                            public string callSign = "Radio call sign or unit number (e.g. Adam-12).";
+                            public string agency = "Your department or agency name.";
+                            public string autoFill = "Pull your current character info from the game (LSPDFR).";
+                            public string save = "Save these details to the MDT. They will be used on reports and when you start a shift.";
+                        }
                     }
 
                     public class CurrentShift {
+                        public string title = "Current Shift";
                         public string startShift = "Start Shift";
                         public string endShift = "End Shift";
+                        public Info info = new Info();
+                        public class Info {
+                            public string title = "Track your on-duty time. Start when you go on patrol, end when you finish.";
+                            public string startShift = "Mark the start of your shift. Your info above is shown in notifications.";
+                            public string endShift = "End your current shift. Duration is saved to your statistics.";
+                        }
+                    }
+
+                    public class OfficerMetrics {
+                        public string title = "Career Statistics";
+                        public Info info = new Info();
+                        public class Info {
+                            public string title = "Totals from your completed shifts and reports. Read-only.";
+                        }
                     }
                 }
             }
@@ -85,11 +114,22 @@ namespace MDTPro.Setup {
             public class Settings {
                 public string version = "Version";
                 public CurrentShift currentShift = new CurrentShift();
+                public OfficerMetrics officerMetrics = new OfficerMetrics();
 
                 public class CurrentShift {
-                    public string startTime = "Start Time";
+                    public string startTime = "Start";
                     public string duration = "Duration";
-                    public string offDuty = "Currently off duty.";
+                    public string offDuty = "Off duty";
+                }
+
+                public class OfficerMetrics {
+                    public string totalShifts = "Total Shifts";
+                    public string avgDuration = "Avg. Shift Duration";
+                    public string incidents = "Incidents";
+                    public string citations = "Citations";
+                    public string arrests = "Arrests";
+                    public string totalReports = "Total Reports";
+                    public string reportsPerShift = "Reports per Shift";
                 }
             }
 
