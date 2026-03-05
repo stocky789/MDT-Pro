@@ -38,7 +38,7 @@
         ${flags.length ? `<div class="alpr-popup-flags">${flagsHtml}</div>` : ''}
         <button type="button" class="alpr-popup-btn">${alpr.openVehicleLookup || 'Open Vehicle Lookup'}</button>
       </div>
-      ${duration >= 0 ? '<div class="alpr-popup-timer"></div>' : ''}
+      ${duration > 0 ? '<div class="alpr-popup-timer"></div>' : ''}
     `
 
     const btn = wrapper.querySelector('.alpr-popup-btn')
@@ -63,7 +63,7 @@
     const container = document.querySelector('.overlay .notifications') || document.body
     container.appendChild(wrapper)
 
-    if (duration >= 0) {
+    if (duration > 0) {
       const timer = wrapper.querySelector('.alpr-popup-timer')
       if (timer) {
         timer.style.transition = `width ${duration}ms linear`

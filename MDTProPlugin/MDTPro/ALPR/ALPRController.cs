@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Linq;
 using static MDTPro.Setup.SetupController;
 using static MDTPro.Utility.Helper;
-using static MDTPro.Main;
 
 namespace MDTPro.ALPR {
     /// <summary>
@@ -78,13 +77,13 @@ namespace MDTPro.ALPR {
                     int cooldownSec = Math.Max(10, Math.Min(300, cfg.alprCooldownSeconds));
                     int maxVehicles = Math.Max(5, cfg.maxNumberOfNearbyPedsOrVehicles);
 
-                    if (Player == null || !Player.Exists()) {
+                    if (Main.Player == null || !Main.Player.Exists()) {
                         GameFiber.Sleep(intervalMs);
                         continue;
                     }
 
-                    Vehicle playerVehicle = Player.CurrentVehicle;
-                    Vehicle[] nearby = Player.GetNearbyVehicles(maxVehicles);
+                    Vehicle playerVehicle = Main.Player.CurrentVehicle;
+                    Vehicle[] nearby = Main.Player.GetNearbyVehicles(maxVehicles);
                     if (nearby == null || nearby.Length == 0) {
                         GameFiber.Sleep(intervalMs);
                         continue;

@@ -10,7 +10,7 @@ namespace MDTPro.ALPR {
     /// Draws the ALPR HUD panel on screen using Rage Graphics API.
     /// </summary>
     internal static class ALPRHUD {
-        private static GameFiber _drawFiber;
+        private static bool _subscribed;
         private const string FontName = "Arial";
         private const float FontSizeTitle = 14f;
         private const float FontSizeBody = 11f;
@@ -23,30 +23,29 @@ namespace MDTPro.ALPR {
         private static readonly Color FlagExpiredColor = Color.FromArgb(255, 255, 165, 0);
 
         internal static void Start() {
-            if (_drawFiber != null) return;
-            _drawFiber = GameFiber.StartNew(DrawLoop);
+            if (_subscribed) return;
+            Game.RawFrameRender += OnFrameRender;
+            _subscribed = true;
         }
 
         internal static void Stop() {
-            _drawFiber?.Abort();
-            _drawFiber = null;
+            if (!_subscribed) return;
+            Game.RawFrameRender -= OnFrameRender;
+            _subscribed = false;
         }
 
-        private static void DrawLoop() {
-            while (ALPRController.IsRunning) {
-                try {
-                    var cfg = GetConfig();
-                    if (ALPRController.CurrentHit != null && cfg != null && cfg.alprEnabled) {
-                        DrawPanel(ALPRController.CurrentHit);
-                    }
-                } catch (Exception) {
-                    // Silently ignore draw errors (e.g. during unload)
+        private static void OnFrameRender(object sender, GraphicsEventArgs e) {
+            try {
+                var cfg = GetConfig();
+                if (ALPRController.CurrentHit != null && cfg != null && cfg.alprEnabled) {
+                    DrawPanel(e.Graphics, ALPRController.CurrentHit);
                 }
-                GameFiber.Yield();
+            } catch (Exception) {
+                // Silently ignore draw errors (e.g. during unload)
             }
         }
 
-        private static void DrawPanel(ALPRHit hit) {
+        private static void DrawPanel(Rage.Graphics g, ALPRHit hit) {
             if (hit == null) return;
             int actualW = Game.Resolution.Width;
             int actualH = Game.Resolution.Height;
@@ -67,34 +66,34 @@ namespace MDTPro.ALPR {
             var rect = new RectangleF(x, y, panelW, panelH);
 
             // Background
-            Rage.Graphics.DrawRectangle(rect, BgColor);
+            g.DrawRectangle(rect, BgColor);
             // Border
-            Rage.Graphics.DrawRectangle(new RectangleF(rect.X, rect.Y, rect.Width, 2), BorderColor);
-            Rage.Graphics.DrawRectangle(new RectangleF(rect.X, rect.Y + rect.Height - 2, rect.Width, 2), BorderColor);
-            Rage.Graphics.DrawRectangle(new RectangleF(rect.X, rect.Y, 2, rect.Height), BorderColor);
-            Rage.Graphics.DrawRectangle(new RectangleF(rect.X + rect.Width - 2, rect.Y, 2, rect.Height), BorderColor);
+            g.DrawRectangle(new RectangleF(rect.X, rect.Y, rect.Width, 2), BorderColor);
+            g.DrawRectangle(new RectangleF(rect.X, rect.Y + rect.Height - 2, rect.Width, 2), BorderColor);
+            g.DrawRectangle(new RectangleF(rect.X, rect.Y, 2, rect.Height), BorderColor);
+            g.DrawRectangle(new RectangleF(rect.X + rect.Width - 2, rect.Y, 2, rect.Height), BorderColor);
 
             float lineY = rect.Y + Padding;
 
             // Plate (title)
-            Rage.Graphics.DrawText(hit.Plate ?? "", FontName, FontSizeTitle, new PointF(rect.X + Padding, lineY), TextColor);
+            g.DrawText(hit.Plate ?? "", FontName, FontSizeTitle, new PointF(rect.X + Padding, lineY), TextColor);
             lineY += LineHeight;
 
             // Owner
-            Rage.Graphics.DrawText((hit.Owner ?? "").Length > 22 ? (hit.Owner ?? "").Substring(0, 22) + "…" : (hit.Owner ?? ""), FontName, FontSizeBody, new PointF(rect.X + Padding, lineY), TextColor);
+            g.DrawText((hit.Owner ?? "").Length > 22 ? (hit.Owner ?? "").Substring(0, 22) + "…" : (hit.Owner ?? ""), FontName, FontSizeBody, new PointF(rect.X + Padding, lineY), TextColor);
             lineY += LineHeight;
 
             // Model
             string model = hit.ModelDisplayName ?? "";
             if (model.Length > 24) model = model.Substring(0, 24) + "…";
-            Rage.Graphics.DrawText(model, FontName, FontSizeBody, new PointF(rect.X + Padding, lineY), TextColor);
+            g.DrawText(model, FontName, FontSizeBody, new PointF(rect.X + Padding, lineY), TextColor);
             lineY += LineHeight;
 
             // Flags
             if (hit.Flags != null) {
                 foreach (string f in hit.Flags) {
                     Color c = IsSevereFlag(f) ? FlagStolenColor : FlagExpiredColor;
-                    Rage.Graphics.DrawText("• " + f, FontName, FontSizeBody, new PointF(rect.X + Padding, lineY), c);
+                    g.DrawText("• " + f, FontName, FontSizeBody, new PointF(rect.X + Padding, lineY), c);
                     lineY += LineHeight;
                 }
             }
