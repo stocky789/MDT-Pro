@@ -1,3 +1,4 @@
+using MDTPro.ALPR;
 using MDTPro.Data;
 using MDTPro.EventListeners;
 using MDTPro.Setup;
@@ -16,6 +17,7 @@ using static MDTPro.Utility.Helper;
 namespace MDTPro.ServerAPI {
     internal class WebSocketHandler {
         private static readonly List<WebSocket> WebSockets = new List<WebSocket>();
+        private static readonly HashSet<WebSocket> AlprSubscribers = new HashSet<WebSocket>();
         private static readonly object WebSocketLock = new Object();
         private static readonly Dictionary<WebSocket, CancellationTokenSource> IntervalTokens = new Dictionary<WebSocket, CancellationTokenSource>();
 
@@ -37,6 +39,7 @@ namespace MDTPro.ServerAPI {
                     if (result.MessageType == WebSocketMessageType.Close) {
                         lock (WebSocketLock) {
                             WebSockets.Remove(webSocket);
+                            AlprSubscribers.Remove(webSocket);
                             if (IntervalTokens.TryGetValue(webSocket, out var cts)) {
                                 cts.Cancel();
                                 IntervalTokens.Remove(webSocket);
@@ -59,6 +62,10 @@ namespace MDTPro.ServerAPI {
                         switch (clientMsg) {
                             case "ping":
                                 await SendData(webSocket, "\"Pong!\"", clientMsg);
+                                break;
+                            case "alprSubscribe":
+                                lock (WebSocketLock) { AlprSubscribers.Add(webSocket); }
+                                await SendData(webSocket, "\"subscribed\"", clientMsg);
                                 break;
                             case "shiftHistoryUpdated":
                                 DataController.ShiftHistoryUpdated += OnShiftHistoryUpdated;
@@ -156,6 +163,28 @@ namespace MDTPro.ServerAPI {
             );
         }
 
+        /// <summary>Broadcast ALPR hit to subscribed clients.</summary>
+        internal static void BroadcastALPRHit(ALPRHit hit) {
+            if (hit == null) return;
+            string json = JsonConvert.SerializeObject(new {
+                plate = hit.Plate,
+                owner = hit.Owner,
+                modelDisplayName = hit.ModelDisplayName,
+                flags = hit.Flags ?? new System.Collections.Generic.List<string>(),
+                timeScanned = hit.TimeScanned.ToString("o")
+            });
+            string msg = $"{{\"response\":{json},\"request\":\"alprSubscribe\"}}";
+            byte[] bytes = Encoding.UTF8.GetBytes(msg);
+            lock (WebSocketLock) {
+                foreach (var ws in new List<WebSocket>(AlprSubscribers)) {
+                    try {
+                        if (ws.State == WebSocketState.Open)
+                            ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, System.Threading.CancellationToken.None);
+                    } catch { }
+                }
+            }
+        }
+
         internal static async Task CloseAllWebSockets() {
             WebSocket[] webSocketsArr;
             lock (WebSocketLock) {
@@ -163,6 +192,7 @@ namespace MDTPro.ServerAPI {
                     cts.Cancel();
                 }
                 IntervalTokens.Clear();
+                AlprSubscribers.Clear();
 
                 webSocketsArr = WebSockets.ToArray();
                 WebSockets.Clear();

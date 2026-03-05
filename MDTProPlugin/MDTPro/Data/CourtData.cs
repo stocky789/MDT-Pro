@@ -36,6 +36,7 @@ namespace MDTPro.Data {
         public bool EvidenceDamagedVehicle = false;
         public bool EvidenceIllegalWeapon = false;
         public bool EvidenceViolatedSupervision = false;
+        public bool EvidenceResisted = false;
         public int RepeatOffenderScore = 0;
         public int ConvictionChance = 0;
         public string ResolveAtUtc;
