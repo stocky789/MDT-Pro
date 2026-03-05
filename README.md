@@ -2,6 +2,33 @@
 
 A Police Computer Plugin for LSPDFR.
 
+## Building (for developers)
+
+To build the plugin from source:
+
+1. **Restore NuGet packages**  
+   From repo root:  
+   `nuget restore MDTProPlugin\MDTPro.sln`  
+   (Or open the solution in Visual Studio and build; it will restore automatically.)
+
+2. **Provide reference DLLs**  
+   Create a `References` folder in the repo root and copy these from your GTA V install:
+   - `plugins/LSPDFR/CalloutInterface.dll`
+   - `plugins/LSPDFR/CalloutInterfaceAPI.dll` (or from game root)
+   - `plugins/LSPDFR/CommonDataFramework.dll`
+   - `plugins/LSPDFR/PolicingRedefined.dll`
+   - `plugins/LSPDFR/LSPD First Response.dll` (from `plugins/`)
+   - `IPT.Common.dll` (game root)
+   - `Newtonsoft.Json.dll` (game root, or comes from NuGet)
+   - `System.Data.SQLite.dll` (from `plugins/LSPDFR/`; or ensure NuGet package has the DLL in `packages/.../lib/net46/`)
+
+   `References` is in `.gitignore` (each dev uses their own game copy).
+
+3. **Build**  
+   Open `MDTProPlugin/MDTPro.sln` in Visual Studio and build **Release**, or run  
+   `.\build-and-deploy.ps1`  
+   to build and deploy to a GTA V path (edit `$GameRoot` in the script for your install).
+
 ## Installation
 
 - Extract all files and folders from the ZIP into the GTA main directory

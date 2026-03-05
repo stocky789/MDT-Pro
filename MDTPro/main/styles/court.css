@@ -2,56 +2,46 @@ body {
   background-color: var(--color-background);
   margin: 0;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, #0d1829 0%, #0b1320 100%),
-    repeating-linear-gradient(
-      0deg,
-      transparent 0,
-      transparent 31px,
-      #ffffff08 32px
-    );
 }
 
 .list {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 10px;
-  height: calc(100vh - 20px);
+  padding: 12px;
+  height: calc(100vh - 24px);
   overflow: auto;
   color: var(--color-text-primary);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .courtControls {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr;
-  gap: 10px;
+  gap: 12px;
   position: sticky;
   top: 0;
   z-index: 2;
-  padding: 10px;
+  padding: 14px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-medium);
+  border-radius: var(--radius-small);
   background: var(--color-surface);
-  box-shadow: var(--shadow-soft);
 }
 
 .courtCaseList {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .listItem {
-  padding: 0 10px;
+  padding: 14px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-medium);
+  border-radius: var(--radius-small);
   background-color: var(--color-surface);
   display: grid;
   grid-template-columns: 1fr 1fr;
-  box-shadow: var(--shadow-soft);
 }
 
 .searchResponseWrapper:first-child {
@@ -67,28 +57,27 @@ body {
 .courtSectionHeader {
   grid-column: 1 / -1;
   margin-top: 4px;
-  padding: 6px 8px;
+  padding: 8px 10px;
   border: 1px solid var(--color-border);
   border-left: 3px solid var(--color-accent-secondary);
   border-radius: var(--radius-small);
-  background: var(--color-background);
-  color: var(--color-accent-secondary);
-  font-family: var(--font-family-mono);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
   font-size: 12px;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.03em;
 }
 
 .courtHint {
   grid-column: 1 / -1;
-  margin: -4px 0 2px 0;
-  color: var(--color-text-primary-half);
+  margin: 2px 0 4px 0;
+  color: var(--color-text-primary-dimmed);
   font-size: 12px;
   line-height: 1.4;
   font-weight: 500;
-  padding: 6px 8px;
+  padding: 8px 10px;
   border-left: 2px solid var(--color-border);
-  background: #ffffff05;
+  background: var(--color-surface-elevated);
 }
 
 .chargesWrapper .inputWrapper > div label {
