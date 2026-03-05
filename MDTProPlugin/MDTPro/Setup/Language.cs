@@ -31,6 +31,8 @@ namespace MDTPro.Setup {
             public string listeningOnIpAddress = "MDT Pro is available at: ";
             public string serverFail = "Server failed to start. Restart the game and try again.";
             public string updateAvailable = "A newer version (v{0}) is available. Download from GitHub releases.";
+            /// <summary>Shown when a closed citation is saved so the officer can hand it to the suspect. {0} = ped full name.</summary>
+            public string handCitationTo = "Hand citation to {0}";
         }
 
         public class Index {
@@ -437,6 +439,9 @@ namespace MDTPro.Setup {
             public string status = "Status";
             public string statusUpdated = "Case updated.";
             public string statusUpdateError = "Update failed.";
+            public string forceResolve = "Force Resolve";
+            public string forceResolveSuccess = "Case resolved.";
+            public string forceResolveError = "Could not resolve case.";
             public string searchPlaceholder = "Search by case #, name, or report";
             public string allStatuses = "All statuses";
             public string[] statusMap = {
@@ -460,6 +465,7 @@ namespace MDTPro.Setup {
             public string judge = "Judge";
             public string severityScore = "Severity Score";
             public string evidenceScore = "Evidence Score";
+            public string evidenceResisted = "Resisted Arrest";
             public string prosecutionStrength = "Prosecution Strength";
             public string defenseStrength = "Defense Strength";
             public string docketPressure = "Docket Pressure";

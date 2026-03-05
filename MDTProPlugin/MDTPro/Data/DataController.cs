@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 
 namespace MDTPro.Data {
@@ -82,6 +83,7 @@ namespace MDTPro.Data {
 
         // Evidence trigger reliability (for UI: only show reliably tracked items in court breakdown):
         // Reliable: HadWeapon (native at arrest), WasWanted (LSPDFR persona), AssaultedPed (damage native + player check), DamagedVehicle (damage native).
+        // Resisted: from PR PedAPI.GetPedResistanceAction at arrest (Flee, Attack, Uncooperative = resisted).
         // Unreliable / conditional: WasPatDown (PR OnPedPatDown only; no LSPDFR), WasDrunk (IS_PED_DRUNK rarely set by game),
         // WasFleeing (only true if ped is fleeing at exact moment we run; chase-then-stop usually misses), HadIllegalWeapon (needs CDF permit data),
         // ViolatedSupervision (only from our DB prior cases; no game/PR API).
@@ -95,6 +97,7 @@ namespace MDTPro.Data {
             public bool DamagedVehicle;
             public bool HadIllegalWeapon;
             public bool ViolatedSupervision;
+            public bool Resisted;
             public DateTime CapturedAt = DateTime.UtcNow;
         }
 
@@ -203,6 +206,26 @@ namespace MDTPro.Data {
             SyncSingleVehicleToCDF(currentVehicleData);
             KeepVehicleInDatabase(currentVehicleData);
             Helper.Log($"Vehicle re-encounter matched by model+owner: {originalPlate} => same as {persistentMatch.LicensePlate} ({currentVehicleData.Owner})", false, Helper.LogSeverity.Info);
+        }
+
+        /// <summary>Called when Policing Redefined fires OnVehicleStopped. Resolves the driver and ensures the vehicle is in the DB so the MDT has them for citations/reports.</summary>
+        internal static void ResolveVehicleAndDriverForStop(Vehicle vehicle) {
+            if (vehicle == null || !vehicle.Exists()) return;
+            try {
+                Ped driver = vehicle.Driver;
+                if (driver != null && driver.IsValid()) ResolvePedForReEncounter(driver);
+
+                MDTProVehicleData mdtProVehicleData = new MDTProVehicleData(vehicle);
+                if (mdtProVehicleData.LicensePlate == null) return;
+                TryApplyReEncounterVehicleProfile(mdtProVehicleData, vehicle);
+                lock (_vehicleDbLock) {
+                    if (!vehicleDatabase.Any(x => x.LicensePlate == mdtProVehicleData.LicensePlate))
+                        vehicleDatabase.Add(mdtProVehicleData);
+                }
+                KeepVehicleInDatabase(mdtProVehicleData);
+            } catch (Exception ex) {
+                Helper.Log($"ResolveVehicleAndDriverForStop: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
         }
 
         private static MDTProVehicleData GetReEncounterVehicleCandidate(MDTProVehicleData currentVehicleData, Vehicle vehicle) {
@@ -571,7 +594,10 @@ namespace MDTPro.Data {
                     citationReports[index] = citationReport;
                 } else {
                     citationReports.Add(citationReport);
-                    if (Main.usePR) PRHelper.GiveCitation(courtData);
+                }
+                // Notify Policing Redefined so "Give Citation" shows in the ped menu (new or updated citation saved as closed)
+                if (Main.usePR && citationReport.Status == ReportStatus.Closed) {
+                    PRHelper.GiveCitation(courtData);
                 }
             } else if (report is ArrestReport arrestReport) {
                 if (!string.IsNullOrEmpty(arrestReport.OffenderPedName)) {
@@ -963,6 +989,8 @@ namespace MDTPro.Data {
                     }
                 }
 
+                bool resisted = GetPedResistanceFromPR(ped);
+
                 string cacheKey = dbPed?.Name ?? persona.FullName;
                 lock (pedEvidenceLock) {
                     PruneStaleEvidenceEntries();
@@ -978,6 +1006,7 @@ namespace MDTPro.Data {
                     ctx.DamagedVehicle = damagedVehicle;
                     ctx.HadIllegalWeapon = hadIllegalWeapon;
                     ctx.ViolatedSupervision = violatedSupervision;
+                    ctx.Resisted = resisted;
                     ctx.CapturedAt = DateTime.UtcNow;
                 }
             } catch (Exception e) {
@@ -1019,6 +1048,23 @@ namespace MDTPro.Data {
                 }
             } catch (Exception e) {
                 Helper.Log($"PatDown capture failed: {e.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>Returns true if PR reports the ped's resistance action as something other than None (Flee, Attack, or Uncooperative). Only valid when PR is loaded.</summary>
+        private static bool GetPedResistanceFromPR(Ped ped) {
+            if (ped == null || !ped.IsValid() || !Main.usePR) return false;
+            try {
+                Type pedApiType = Type.GetType("PolicingRedefined.API.PedAPI, PolicingRedefined");
+                if (pedApiType == null) return false;
+                MethodInfo getResistance = pedApiType.GetMethod("GetPedResistanceAction", BindingFlags.Public | BindingFlags.Static);
+                if (getResistance == null) return false;
+                object result = getResistance.Invoke(null, new object[] { ped });
+                if (result == null) return false;
+                int value = Convert.ToInt32(result);
+                return value != 0;
+            } catch {
+                return false;
             }
         }
 
@@ -1185,6 +1231,7 @@ namespace MDTPro.Data {
                         if (ctx.DamagedVehicle) { score += config.courtEvidenceVehicleDamageBonus; courtData.EvidenceDamagedVehicle = true; }
                         if (ctx.HadIllegalWeapon) { score += config.courtEvidenceIllegalWeaponBonus; courtData.EvidenceIllegalWeapon = true; }
                         if (ctx.ViolatedSupervision) { score += config.courtEvidenceSupervisionViolationBonus; courtData.EvidenceViolatedSupervision = true; }
+                        if (ctx.Resisted) { score += config.courtEvidenceResistedBonus; courtData.EvidenceResisted = true; }
                     }
                 }
             }
@@ -1277,6 +1324,7 @@ namespace MDTPro.Data {
                 if (courtData.EvidenceWasDrunk) factors.Add("the defendant was visibly intoxicated");
                 if (courtData.EvidenceWasFleeing) factors.Add("the defendant attempted to flee");
                 if (courtData.EvidenceAssaultedPed) factors.Add("the defendant committed assault");
+                if (courtData.EvidenceResisted) factors.Add("the defendant resisted arrest");
                 if (factors.Count > 0)
                     b.Append($" Key factors: {string.Join("; ", factors)}.");
                 if (courtData.RepeatOffenderScore >= 5)
@@ -1318,6 +1366,15 @@ namespace MDTPro.Data {
             } catch (Exception e) {
                 Helper.Log($"Court auto-resolution check failed: {e.Message}", false, Helper.LogSeverity.Warning);
             }
+        }
+
+        /// <summary>Force-resolve a pending court case now (run trial/verdict logic immediately). Returns true if the case was found and was pending.</summary>
+        internal static bool ForceResolveCourtCase(string caseNumber) {
+            if (string.IsNullOrWhiteSpace(caseNumber)) return false;
+            CourtData courtCase = courtDatabase.Find(x => x.Number == caseNumber);
+            if (courtCase == null || courtCase.Status != 0) return false;
+            ResolveCaseAuto(courtCase);
+            return true;
         }
 
         private static void ResolveCaseAuto(CourtData courtCase) {

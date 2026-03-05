@@ -147,7 +147,13 @@
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- Wipe Release folder before building so output is always a fresh, complete mod (ready to zip for LSPDFR). -->
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <!-- Wipe Release so every build is fresh (ready to zip for LSPDFR). Ignore rmdir failure if folder is in use. -->
+    <PreBuildEvent>if exist "$(ProjectDir)..\..\Release" rmdir /s /q "$(ProjectDir)..\..\Release" 2>nul &amp; exit 0</PreBuildEvent>
+  </PropertyGroup>
   <Target Name="CopyMDTProFolder" AfterTargets="AfterBuild" Condition="'$(Configuration)'=='Release'">
     <Exec Command="robocopy &quot;$(ProjectDir)..\..\MDTPro&quot; &quot;$(ProjectDir)..\..\Release\MDTPro&quot; /E /IS /IT /NFL /NDL /NJH /NJS" IgnoreExitCode="true" />
+    <Message Importance="high" Text="Copied MDTPro web GUI to Release\MDTPro" />
   </Target>
 </Project>

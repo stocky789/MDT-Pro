@@ -57,6 +57,7 @@ namespace MDTPro.Setup {
         public float courtEvidenceVehicleDamageBonus = 8f;
         public float courtEvidenceIllegalWeaponBonus = 18f;
         public float courtEvidenceSupervisionViolationBonus = 22f;
+        public float courtEvidenceResistedBonus = 15f;
         public float courtCaseResolutionMinBase = 20f;
         public float courtCaseResolutionMaxMinutes = 300f;
         public float courtCaseResolutionSeverityScale = 12f;
