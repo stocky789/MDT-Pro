@@ -108,6 +108,8 @@
     <Compile Include="ServerAPI\StyleAPIResponse.cs" />
     <Compile Include="ServerAPI\WebSocketHandler.cs" />
     <Compile Include="Utility\Helper.cs" />
+    <Compile Include="Utility\RageNotification.cs" />
+    <Compile Include="Utility\UpdateChecker.cs" />
     <Compile Include="Main.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Server.cs" />

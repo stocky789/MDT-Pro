@@ -25,38 +25,38 @@ namespace MDTPro {
             Server.Stop();
             Data.Database.Close();
             ClearCache();
-            Game.DisplayNotification(GetLanguage().inGame.unloaded);
+            RageNotification.Show(GetLanguage().inGame.unloaded, RageNotification.NotificationType.Info);
         }
 
         private static void Functions_OnOnDutyStateChanged(bool OnDuty) {
             if (OnDuty) {
                 GameFiber.StartNew(() => {
                     if (!Directory.Exists(MDTProPath)) {
-                        Game.DisplayNotification("MDT Pro failed to load. Missing MDT Pro files. Please reinstall and follow the installation instructions.");
+                        RageNotification.ShowError("MDT Pro failed to load. Missing MDT Pro files. Please reinstall and follow the installation instructions.");
                         Game.LogTrivial("MDT Pro: [Error] Loading aborted. Missing MDT Pro files.");
                         return;
                     }
 
                     if (!DependencyCheck.IsNewtonsoftJsonAvailable()) {
-                        Game.DisplayNotification("MDT Pro failed to load. Couldn't find Newtonsoft.Json.");
+                        RageNotification.ShowError("MDT Pro failed to load. Couldn't find Newtonsoft.Json.");
                         Game.LogTrivial("MDT Pro: [Error] Loading aborted. Couldn't find Newtonsoft.Json.");
                         return;
                     }
 
                     if (!DependencyCheck.IsCIAPIAvailable()) {
-                        Game.DisplayNotification("MDT Pro failed to load. Couldn't find CalloutInterfaceAPI.");
+                        RageNotification.ShowError("MDT Pro failed to load. Couldn't find CalloutInterfaceAPI.");
                         Game.LogTrivial("MDT Pro: [Error] Loading aborted. Couldn't find CalloutInterfaceAPI.");
                         return;
                     }
 
                     if (!DependencyCheck.IsCDFAvailable()) {
-                        Game.DisplayNotification("MDT Pro failed to load. Couldn't find CommonDataFramework.");
+                        RageNotification.ShowError("MDT Pro failed to load. Couldn't find CommonDataFramework.");
                         Game.LogTrivial("MDT Pro: [Error] Loading aborted. Couldn't find CommonDataFramework.");
                         return;
                     }
 
                     if (!UrlAclExists($"http://+:{GetConfig().port}/") && !AddUrlAcl($"http://+:{GetConfig().port}/")) {
-                        Game.DisplayNotification("MDT Pro failed to load. Failed to add URL ACL.");
+                        RageNotification.ShowError("MDT Pro failed to load. Failed to add URL ACL.");
                         Game.LogTrivial("MDT Pro: [Error] Loading aborted. Failed to add URL ACL.");
                         return;
                     }
@@ -65,7 +65,7 @@ namespace MDTPro {
                         GameFiber.WaitUntil(CommonDataFramework.API.CDFFunctions.IsPluginReady, 30000);
                         if (!CommonDataFramework.API.CDFFunctions.IsPluginReady()) {
                             Server.Stop();
-                            Game.DisplayNotification("MDT Pro failed to load. CommonDataFramework did not initialize in time.");
+                            RageNotification.ShowError("MDT Pro failed to load. CommonDataFramework did not initialize in time.");
                             Log("Loading aborted. CommonDataFramework did not initialize in time.", true, LogSeverity.Error);
                             return;
                         }
@@ -92,7 +92,16 @@ namespace MDTPro {
                             EventListeners.LSPDFREvents.SubscribeToLSPDFREvents();
                         }
 
-                        Game.DisplayNotification(GetLanguage().inGame.loaded);
+                        RageNotification.ShowSuccess($"{GetLanguage().inGame.loaded} v{Version}");
+
+                        var cfg = GetConfig();
+                        if (cfg.checkForUpdates && !string.IsNullOrWhiteSpace(cfg.githubReleasesRepo)) {
+                            string repo = cfg.githubReleasesRepo;
+                            string ver = Version;
+                            bool checkEnabled = cfg.checkForUpdates;
+                            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+                                UpdateChecker.CheckForUpdates(ver, repo, checkEnabled));
+                        }
                     });
                 });
             } 

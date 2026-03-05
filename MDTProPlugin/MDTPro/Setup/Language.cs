@@ -20,6 +20,7 @@ namespace MDTPro.Setup {
             public string unloaded = "MDT Pro has been shut down.";
             public string listeningOnIpAddress = "MDT Pro is available at: ";
             public string serverFail = "Server failed to start. Restart the game and try again.";
+            public string updateAvailable = "A newer version (v{0}) is available. Download from GitHub releases.";
         }
 
         public class Index {
