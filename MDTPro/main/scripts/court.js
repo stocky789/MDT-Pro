@@ -14,6 +14,13 @@
   listContainer.classList.add('courtCaseList')
   root.appendChild(listContainer)
 
+  listContainer.addEventListener('click', (e) => {
+    const row = e.target && e.target.closest('.courtCaseRow')
+    if (!row) return
+    const listItem = row.closest('.courtCaseListItem')
+    if (listItem) toggleCourtCaseExpanded(listItem)
+  })
+
   const state = {
     query: '',
     status: 'all',
@@ -129,11 +136,17 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   details.hidden = true
   listItem.appendChild(details)
 
-  row.addEventListener('click', () => toggleCourtCaseExpanded(listItem))
+  row.addEventListener('click', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const item = (e.currentTarget && e.currentTarget.closest('.courtCaseListItem')) || listItem
+    toggleCourtCaseExpanded(item)
+  })
   row.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
-      toggleCourtCaseExpanded(listItem)
+      const item = (e.currentTarget && e.currentTarget.closest('.courtCaseListItem')) || listItem
+      toggleCourtCaseExpanded(item)
     }
   })
 
@@ -546,13 +559,13 @@ function escapeHtml(s) {
 }
 
 function toggleCourtCaseExpanded(listItem) {
+  if (!listItem || !listItem.classList || !listItem.classList.contains('courtCaseListItem')) return
   const details = listItem.querySelector('.courtCaseDetails')
   const row = listItem.querySelector('.courtCaseRow')
   if (!details || !row) return
-  const isExpanded = !details.hidden
-  details.hidden = isExpanded
-  row.setAttribute('aria-expanded', isExpanded ? 'false' : 'true')
-  listItem.classList.toggle('courtCaseListItem--expanded', !isExpanded)
+  details.hidden = !details.hidden
+  row.setAttribute('aria-expanded', details.hidden ? 'false' : 'true')
+  listItem.classList.toggle('courtCaseListItem--expanded', !details.hidden)
 }
 
 function createLabel(text) {

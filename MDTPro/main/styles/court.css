@@ -2,6 +2,7 @@ body {
   background-color: var(--color-background);
   margin: 0;
   overflow: hidden;
+  min-width: 520px;
 }
 
 .list {
@@ -14,6 +15,7 @@ body {
   color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 500;
+  min-width: 0;
 }
 
 .courtControls {
@@ -27,6 +29,8 @@ body {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-small);
   background: var(--color-surface);
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .courtCaseList {
@@ -82,6 +86,11 @@ body {
   content: '▼';
 }
 
+.courtCaseRow,
+.courtCaseRow * {
+  pointer-events: auto;
+}
+
 .courtCaseRowName {
   font-weight: 600;
   color: var(--color-text-primary);
@@ -135,7 +144,16 @@ body {
   padding: 14px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0;
+  gap: 12px;
+  min-width: 0;
+}
+
+.courtCaseDetails .searchResponseWrapper {
+  min-width: 0;
+}
+
+.courtCaseDetails .chargesWrapper {
+  min-width: 0;
 }
 
 .listItem {
