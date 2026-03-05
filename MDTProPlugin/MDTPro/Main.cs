@@ -1,7 +1,9 @@
 using LSPD_First_Response.Mod.API;
 using Rage;
+using System;
 using System.IO;
 using System.Threading;
+using System.Windows.Forms;
 using MDTPro.Utility;
 using static MDTPro.Setup.SetupController;
 using static MDTPro.Utility.Helper;
@@ -21,6 +23,8 @@ namespace MDTPro {
         }
 
         public override void Finally() {
+            UI.SettingsMenu.Stop();
+            ALPR.ALPRController.Stop();
             Data.DataController.EndCurrentShift();
             Server.Stop();
             Data.Database.Close();
@@ -29,7 +33,12 @@ namespace MDTPro {
         }
 
         private static void Functions_OnOnDutyStateChanged(bool OnDuty) {
-            if (OnDuty) {
+            if (!OnDuty) {
+                UI.SettingsMenu.Stop();
+                ALPR.ALPRController.Stop();
+                return;
+            }
+            {
                 GameFiber.StartNew(() => {
                     if (!Directory.Exists(MDTProPath)) {
                         RageNotification.ShowError("MDT Pro failed to load. Missing MDT Pro files. Please reinstall and follow the installation instructions.");
@@ -93,6 +102,15 @@ namespace MDTPro {
                         }
 
                         RageNotification.ShowSuccess($"{GetLanguage().inGame.loaded} v{Version}");
+
+                        string iniPath = Path.Combine(MDTProPath, "MDTPro.ini");
+                        string menuKeyStr = ReadIniValue(iniPath, "MDTPro", "SettingsMenuKey");
+                        Keys parsedKey;
+                        if (!string.IsNullOrWhiteSpace(menuKeyStr) && Enum.TryParse<Keys>(menuKeyStr.Trim(), true, out parsedKey))
+                            UI.SettingsMenu.MenuKey = parsedKey;
+
+                        ALPR.ALPRController.Start();
+                        UI.SettingsMenu.Start();
 
                         var cfg = GetConfig();
                         if (cfg.checkForUpdates && !string.IsNullOrWhiteSpace(cfg.githubReleasesRepo)) {

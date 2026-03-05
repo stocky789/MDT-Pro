@@ -20,6 +20,30 @@ namespace MDTPro.Utility {
             File.WriteAllText(filePath, JsonConvert.SerializeObject(objectToWrite, Newtonsoft.Json.Formatting.Indented));
         }
 
+        /// <summary>Read a value from an INI file. Returns null if file/section/key missing.</summary>
+        internal static string ReadIniValue(string filePath, string section, string key) {
+            if (!File.Exists(filePath)) return null;
+            string[] lines = File.ReadAllLines(filePath);
+            bool inSection = false;
+            section = "[" + section.TrimStart('[').TrimEnd(']') + "]";
+            key = key?.Trim();
+            if (string.IsNullOrEmpty(key)) return null;
+            for (int i = 0; i < lines.Length; i++) {
+                string line = lines[i].Trim();
+                if (line.StartsWith("[") && line.EndsWith("]")) {
+                    inSection = string.Equals(line, section, StringComparison.OrdinalIgnoreCase);
+                    continue;
+                }
+                if (!inSection) continue;
+                int eq = line.IndexOf('=');
+                if (eq <= 0) continue;
+                string k = line.Substring(0, eq).Trim();
+                if (string.Equals(k, key, StringComparison.OrdinalIgnoreCase))
+                    return line.Substring(eq + 1).Trim();
+            }
+            return null;
+        }
+
         internal static void Log(string message, bool logInGame = false, LogSeverity severity = LogSeverity.Info) {
             if (logInGame) Game.LogTrivial($"MDT Pro: [{severity}] {message}");
             try {
@@ -69,7 +93,9 @@ namespace MDTPro.Utility {
 
 
         internal static string GetCallSignFromIPTCommon() {
+#pragma warning disable CS0618 // Type or member is obsolete - use StatusHandler.Instance when IPT.Common provides it
             return IPT.Common.Handlers.PlayerHandler.GetCallsign();
+#pragma warning restore CS0618
         }
 
         internal static string GenerateUniqueId(int length) {

@@ -32,12 +32,57 @@ const mockConfig = {
 const mockLanguage = {
   index: {
     title: 'MDT Pro',
+    static: {
+      title: 'MDT Pro',
+      desktop: {},
+      taskbar: { settings: 'Control Panel' },
+      settings: {
+        officerInformation: {
+          title: 'Officer Information',
+          firstName: 'First Name',
+          lastName: 'Last Name',
+          badgeNumber: 'Badge Number',
+          rank: 'Rank',
+          callSign: 'Call Sign',
+          agency: 'Department',
+          autoFill: 'Fill from Game',
+          save: 'Save',
+          info: {
+            title: 'Your character details. Used to pre-fill reports and show who is on duty.',
+            firstName: 'Your character\'s first name.',
+            lastName: 'Your character\'s last name.',
+            badgeNumber: 'Your badge or employee number.',
+            rank: 'e.g. Officer, Sergeant, Lieutenant.',
+            callSign: 'Radio call sign or unit number (e.g. Adam-12).',
+            agency: 'Your department or agency name.',
+            autoFill: 'Pull your current character info from the game (LSPDFR).',
+            save: 'Save these details to the MDT. They will be used on reports and when you start a shift.',
+          },
+        },
+        currentShift: {
+          title: 'Current Shift',
+          startShift: 'Start Shift',
+          endShift: 'End Shift',
+          info: {
+            title: 'Track your on-duty time. Start when you go on patrol, end when you finish.',
+            startShift: 'Mark the start of your shift. Your info above is shown in notifications.',
+            endShift: 'End your current shift. Duration is saved to your statistics.',
+          },
+        },
+        officerMetrics: {
+          title: 'Career Statistics',
+          info: { title: 'Totals from your completed shifts and reports. Read-only.' },
+        },
+        customization: 'Config and Plugins',
+        customizationInfo: 'Change config and manage installed plugins. Opens in a new tab.',
+      },
+    },
     settings: {
       version: 'Version',
-      officerInformation: { title: 'Officer Information', firstName: 'First Name', lastName: 'Last Name', badgeNumber: 'Badge Number', rank: 'Rank', callSign: 'Call Sign', agency: 'Department', autoFill: 'Auto Fill', save: 'Save' },
-      officerMetrics: { title: 'Career Statistics', totalShifts: 'Total Shifts', avgDuration: 'Avg Shift Duration', incidents: 'Incidents', citations: 'Citations', arrests: 'Arrests', totalReports: 'Total Reports', reportsPerShift: 'Reports/Shift' },
+      officerInformation: { title: 'Officer Information', firstName: 'First Name', lastName: 'Last Name', badgeNumber: 'Badge Number', rank: 'Rank', callSign: 'Call Sign', agency: 'Department', autoFill: 'Fill from Game', save: 'Save' },
+      officerMetrics: { title: 'Career Statistics', totalShifts: 'Total Shifts', avgDuration: 'Avg. Shift Duration', incidents: 'Incidents', citations: 'Citations', arrests: 'Arrests', totalReports: 'Total Reports', reportsPerShift: 'Reports per Shift' },
       currentShift: { startTime: 'Start', duration: 'Duration', offDuty: 'Off duty', startShift: 'Start Shift', endShift: 'End Shift' },
-      customization: 'Open Customization',
+      customization: 'Config and Plugins',
     },
     notifications: {
       currentShiftStarted: 'Shift started.',
@@ -69,13 +114,18 @@ function send(res, status, body, contentType = 'text/plain') {
   res.end(buf);
 }
 
-function serveFile(res, filePath, contentType) {
+function serveFile(res, filePath, contentType, noCache) {
   fs.readFile(filePath, (err, data) => {
     if (err) {
       send(res, 404, 'Not found');
       return;
     }
-    res.writeHead(200, { 'Content-Type': contentType, 'Content-Length': data.length });
+    const headers = { 'Content-Type': contentType, 'Content-Length': data.length };
+    if (noCache) {
+      headers['Cache-Control'] = 'no-store, no-cache, must-revalidate';
+      headers['Pragma'] = 'no-cache';
+    }
+    res.writeHead(200, headers);
     res.end(data);
   });
 }
@@ -88,22 +138,41 @@ const server = http.createServer((req, res) => {
   if (url === '/') {
     filePath = path.join(ROOT, 'main', 'pages', 'index.html');
     contentType = 'text/html';
-  } else if (url === '/favicon') {
-    filePath = path.join(ROOT, 'img', 'favicon.png');
-    contentType = 'image/png';
+    serveFile(res, filePath, contentType, true);
+    return;
+  } else if (url === '/favicon' || url === '/favicon.svg') {
+    const faviconSvg = path.join(ROOT, 'img', 'favicon.svg');
+    const faviconPng = path.join(ROOT, 'img', 'favicon.png');
+    if (fs.existsSync(faviconSvg)) {
+      filePath = faviconSvg;
+      contentType = 'image/svg+xml';
+    } else if (fs.existsSync(faviconPng)) {
+      filePath = faviconPng;
+      contentType = 'image/png';
+    } else {
+      send(res, 404, 'Not found');
+      return;
+    }
+    serveFile(res, filePath, contentType, true);
+    return;
   } else if (url === '/image/desktop' || url === '/image/desktop.png') {
     filePath = path.join(ROOT, 'img', 'desktop.png');
     contentType = 'image/png';
   } else if (url === '/image/badge' || url === '/image/badge.png' || url === '/image/badge.svg') {
     const badgeSvg = path.join(ROOT, 'img', 'badge.svg');
     const badgePng = path.join(ROOT, 'img', 'badge.png');
-    if (fs.existsSync(badgeSvg)) {
+    if (fs.existsSync(badgePng)) {
+      filePath = badgePng;
+      contentType = 'image/png';
+    } else if (fs.existsSync(badgeSvg)) {
       filePath = badgeSvg;
       contentType = 'image/svg+xml';
     } else {
-      filePath = badgePng;
-      contentType = 'image/png';
+      send(res, 404, 'Not found');
+      return;
     }
+    serveFile(res, filePath, contentType, true);
+    return;
   } else if (url === '/version') {
     send(res, 200, '1.0.0-dev', 'text/plain');
     return;

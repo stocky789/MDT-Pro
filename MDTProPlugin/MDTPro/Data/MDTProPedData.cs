@@ -1,5 +1,6 @@
 using CommonDataFramework.Modules.PedDatabase;
 using MDTPro.Setup;
+using System.Reflection;
 using Rage;
 using System;
 using System.Collections.Generic;
@@ -54,7 +55,10 @@ namespace MDTPro.Data {
         public MDTProPedData() { }
 
         private void PopulateParameters() {
-            if (CDFPedData == null) return;
+            if (CDFPedData == null) {
+                PopulateFromLSPDFRPersonaFallback();
+                return;
+            }
 
             Name = CDFPedData.FullName;
             FirstName = CDFPedData.Firstname;
@@ -118,6 +122,24 @@ namespace MDTPro.Data {
             TimesStopped = CDFPedData.TimesStopped;
         }
 
+        /// <summary>When CDF PedData is null, populate Name/Model from LSPDFR Persona so we can still resolve peds.</summary>
+        private void PopulateFromLSPDFRPersonaFallback() {
+            Citations = new List<CitationGroup.Charge>();
+            Arrests = new List<ArrestGroup.Charge>();
+            IdentificationHistory = new List<IdentificationEntry>();
+            if (Holder == null || !Holder.IsValid()) return;
+            try {
+                var persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(Holder);
+                if (persona != null) {
+                    Name = persona.FullName;
+                    FirstName = persona.Forename;
+                    LastName = persona.Surname;
+                }
+                ModelHash = (uint)Holder.Model.Hash;
+                ModelName = Holder.Model.Name;
+            } catch { /* LSPDFR not available or ped invalid */ }
+        }
+
         public class IdentificationEntry {
             public string Type;
             public string Timestamp;
@@ -173,6 +195,36 @@ namespace MDTPro.Data {
                     canBeWarrant = charge.canBeWarrant
                 })
                 .ToList() ?? new List<ArrestGroup.Charge>();
+        }
+
+        /// <summary>Try to sync CDF PedData name to match persistent identity after re-encounter. Uses CDF API property names (Firstname/Lastname). Wrapped in try-catch.</summary>
+        internal void TrySyncCDFPersonaToPersistentIdentity() {
+            if (CDFPedData == null || string.IsNullOrEmpty(Name)) return;
+            try {
+                string first = FirstName;
+                string last = LastName;
+                if (string.IsNullOrEmpty(first) && string.IsNullOrEmpty(last)) return;
+                if (string.IsNullOrEmpty(first) && !string.IsNullOrEmpty(Name)) {
+                    var parts = Name.Trim().Split(new[] { ' ' }, 2, StringSplitOptions.RemoveEmptyEntries);
+                    first = parts.Length > 0 ? parts[0] : null;
+                    last = parts.Length > 1 ? parts[1] : null;
+                }
+                var type = CDFPedData.GetType();
+                if (!string.IsNullOrEmpty(first)) {
+                    var pi = type.GetProperty("Firstname", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                        ?? type.GetProperty("FirstName", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                    if (pi != null && pi.CanWrite && pi.PropertyType == typeof(string))
+                        pi.SetValue(CDFPedData, first);
+                }
+                if (!string.IsNullOrEmpty(last)) {
+                    var pi = type.GetProperty("Lastname", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                        ?? type.GetProperty("LastName", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                    if (pi != null && pi.CanWrite && pi.PropertyType == typeof(string))
+                        pi.SetValue(CDFPedData, last);
+                }
+            } catch (Exception ex) {
+                Game.LogTrivial($"[MDTPro] Could not sync CDF PedData name: {ex.Message}");
+            }
         }
     }
 }
