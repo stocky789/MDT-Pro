@@ -236,7 +236,10 @@ async function openWindow(name, pluginId = null) {
   const url = pluginId
     ? `/plugin/${pluginId}/page/${name}.html`
     : `/page/${name}.html`
-  const size = [config.initialWindowWidth, config.initialWindowHeight]
+  let size = [config.initialWindowWidth, config.initialWindowHeight]
+  if (name === 'court') {
+    size = [Math.max(size[0], 720), Math.max(size[1], 420)]
+  }
   const windowDimensions = [window.innerWidth, window.innerHeight]
   const offset = [
     windowDimensions[0] / 2 - size[0] / 2,
@@ -367,7 +370,11 @@ async function openWindow(name, pluginId = null) {
   minimize.innerHTML = document.querySelector(
     '.iconAccess .minimizeWindow'
   ).innerHTML
-  minimize.addEventListener('click', function () {
+  minimize.addEventListener('mousedown', function (e) {
+    e.stopPropagation()
+  })
+  minimize.addEventListener('click', function (e) {
+    e.stopPropagation()
     windowElement.classList.toggle('minimized')
     if (!windowElement.classList.contains('minimized')) {
       focusWindow()
@@ -381,7 +388,11 @@ async function openWindow(name, pluginId = null) {
   maximize.innerHTML = document.querySelector(
     '.iconAccess .maximizeWindow'
   ).innerHTML
-  maximize.addEventListener('click', function () {
+  maximize.addEventListener('mousedown', function (e) {
+    e.stopPropagation()
+  })
+  maximize.addEventListener('click', function (e) {
+    e.stopPropagation()
     if (windowElement.classList.contains('maximized')) {
       windowElement.classList.remove('maximized')
       windowElement.style.width = lastSize[0]
@@ -418,7 +429,11 @@ async function openWindow(name, pluginId = null) {
   const close = document.createElement('div')
   close.classList.add('closeButton')
   close.innerHTML = document.querySelector('.iconAccess .closeWindow').innerHTML
-  close.addEventListener('click', async function () {
+  close.addEventListener('mousedown', function (e) {
+    e.stopPropagation()
+  })
+  close.addEventListener('click', async function (e) {
+    e.stopPropagation()
     windowElement.style.pointerEvents = 'none'
     taskbarIcon.style.pointerEvents = 'none'
     const CSSRootTransitionTimeLong = parseInt(
