@@ -3,6 +3,23 @@
   if (config.updateDomWithLanguageOnLoad)
     await updateDomWithLanguage('vehicleSearch')
 
+  const alprPlate = sessionStorage.getItem('alprVehicleSearchPlate')
+  if (alprPlate && typeof alprPlate === 'string') {
+    sessionStorage.removeItem('alprVehicleSearchPlate')
+    const trimmed = alprPlate.trim()
+    if (trimmed) {
+      const input = document.querySelector('.searchInputWrapper #vehicleSearchInput')
+      if (input) {
+        input.value = trimmed
+        try {
+          await performSearch(trimmed)
+        } catch {
+          /* performSearch shows its own error */
+        }
+      }
+    }
+  }
+
   await loadNearbyVehicles()
   await loadSearchHistory()
 })()

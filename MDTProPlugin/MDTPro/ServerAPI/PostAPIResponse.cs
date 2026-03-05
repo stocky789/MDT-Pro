@@ -12,6 +12,14 @@ namespace MDTPro.ServerAPI {
             string path = req.Url.AbsolutePath.Substring("/post/".Length);
             if (string.IsNullOrEmpty(path)) return;
 
+            if (path == "alprClear") {
+                ALPR.ALPRController.Clear();
+                buffer = Encoding.UTF8.GetBytes("OK");
+                contentType = "text/plain";
+                status = 200;
+                return;
+            }
+
             string body = Helper.GetRequestPostData(req);
             if (string.IsNullOrEmpty(body)) {
                 buffer = Encoding.UTF8.GetBytes("Bad Request - Empty Body");

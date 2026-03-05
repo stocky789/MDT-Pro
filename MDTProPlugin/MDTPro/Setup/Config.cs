@@ -16,6 +16,10 @@ namespace MDTPro.Setup {
         public float hasPriorArrestsProbability = 0.2f;
         public float hasPriorArrestsWithWarrantProbability = 0.8f;
         public float reEncounterChance = 0.08f;
+        /// <summary>Base chance (0-1) for vehicle re-encounter when driver is unknown. Uses reEncounterChance if &lt;= 0.</summary>
+        public float reEncounterVehicleChance = 0.08f;
+        /// <summary>Chance (0-1) for vehicle re-encounter when driver is a known/persistent ped (same person, same car).</summary>
+        public float reEncounterVehicleChanceWhenPedKnown = 0.85f;
         public int maxNumberOfPriorCitations = 5;
         public int maxNumberOfPriorArrests = 3;
         public int maxNumberOfPriorArrestsWithWarrant = 8;
@@ -84,5 +88,25 @@ namespace MDTPro.Setup {
         /// GitHub repo in "owner/repo" format. Leave empty to skip update check.
         /// </summary>
         public string githubReleasesRepo = "stocky789/MDT-Pro";
+
+        // ---- ALPR ----
+        /// <summary>Enable ALPR scanning and HUD in-game.</summary>
+        public bool alprEnabled = true;
+        /// <summary>ALPR popup auto-close in MDT (seconds). 0 = no auto-close. Used by ALPR plugin.</summary>
+        public int alprPopupDuration = 0;
+        /// <summary>Scan interval in milliseconds.</summary>
+        public int alprScanIntervalMs = 2000;
+        /// <summary>Per-plate cooldown before re-alerting (seconds).</summary>
+        public int alprCooldownSeconds = 90;
+        /// <summary>Play sound on flagged hit.</summary>
+        public bool alprPlaySoundOnHit = true;
+        /// <summary>Show in-game notification on flagged hit.</summary>
+        public bool alprShowInGameNotification = true;
+        /// <summary>HUD anchor: TopLeft, TopRight, BottomLeft, BottomRight.</summary>
+        public string alprHudAnchor = "TopRight";
+        /// <summary>HUD offset X in pixels from anchor.</summary>
+        public int alprHudOffsetX = 20;
+        /// <summary>HUD offset Y in pixels from anchor.</summary>
+        public int alprHudOffsetY = 150;
     }
 }
