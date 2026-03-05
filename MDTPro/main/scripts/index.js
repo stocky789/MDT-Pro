@@ -28,7 +28,16 @@
   `
 
   const pluginInfo = await (await fetch('/pluginInfo')).json()
-  const activePlugins = getActivePlugins()
+  let activePlugins = getActivePlugins()
+  const isDev = /^localhost$|^127\.0\.0\.1$/i.test(location.hostname)
+  if (isDev && pluginInfo.length > 0) {
+    const serverIds = pluginInfo.map((p) => p.id)
+    const missing = serverIds.filter((id) => !activePlugins.includes(id))
+    if (missing.length > 0) {
+      activePlugins = [...activePlugins, ...missing]
+      localStorage.setItem('activePlugins', JSON.stringify(activePlugins))
+    }
+  }
   for (const plugin of pluginInfo) {
     if (activePlugins.includes(plugin.id)) {
       for (const pluginScript of plugin.scripts) {

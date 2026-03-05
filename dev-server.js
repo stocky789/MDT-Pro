@@ -51,6 +51,16 @@ const mockLanguage = {
     },
   },
   desktop: { pedSearch: 'Person Search', vehicleSearch: 'Vehicle Search', reports: 'Reports', shiftHistory: 'Shift History', court: 'Court', map: 'GPS', callout: 'Active Call' },
+  customization: {
+    save: 'Save',
+    reset: 'Reset',
+    static: { title: 'Customization', sidebar: { plugins: 'Plugins', config: 'Config' } },
+    plugins: { version: 'Version', author: 'Author', noPlugins: 'No plugins installed.' },
+  },
+  units: {
+    year: 'y', month: 'mo', day: 'd', hour: 'h', minute: 'm', second: 's',
+    currencySymbol: '$', life: 'Life', meters: 'm', kilometers: 'km', feet: 'ft', miles: 'mi',
+  },
 };
 
 function send(res, status, body, contentType = 'text/plain') {
@@ -120,7 +130,42 @@ const server = http.createServer((req, res) => {
     }
     return;
   } else if (url === '/pluginInfo') {
-    send(res, 200, '[]', 'application/json');
+    const pluginsDir = path.join(ROOT, 'plugins');
+    const pluginDirs = fs.existsSync(pluginsDir) ? fs.readdirSync(pluginsDir, { withFileTypes: true }).filter(d => d.isDirectory()) : [];
+    const plugins = pluginDirs.map(d => {
+      const infoPath = path.join(pluginsDir, d.name, 'info.json');
+      if (!fs.existsSync(infoPath)) return null;
+      try {
+        const info = JSON.parse(fs.readFileSync(infoPath, 'utf8'));
+        info.id = d.name;
+        info.pages = fs.existsSync(path.join(pluginsDir, d.name, 'pages'))
+          ? fs.readdirSync(path.join(pluginsDir, d.name, 'pages')).filter(f => f.endsWith('.html')).map(f => f.replace('.html', '')) : [];
+        info.scripts = fs.existsSync(path.join(pluginsDir, d.name, 'scripts'))
+          ? fs.readdirSync(path.join(pluginsDir, d.name, 'scripts')).filter(f => f.endsWith('.js')).map(f => f.replace('.js', '')) : [];
+        info.styles = fs.existsSync(path.join(pluginsDir, d.name, 'styles'))
+          ? fs.readdirSync(path.join(pluginsDir, d.name, 'styles')).filter(f => f.endsWith('.css')).map(f => f.replace('.css', '')) : [];
+        return info;
+      } catch { return null; }
+    }).filter(Boolean);
+    send(res, 200, JSON.stringify(plugins), 'application/json');
+    return;
+  } else if (url.startsWith('/plugin/')) {
+    const parts = url.slice('/plugin/'.length).split('/');
+    if (parts.length >= 3) {
+      const [pluginId, type, fileName] = parts;
+      const ext = type === 'page' ? '.html' : type === 'script' ? '.js' : type === 'style' ? '.css' : null;
+      if (ext) {
+        const name = (fileName || '').replace(ext, '');
+        const subPath = type === 'page' ? 'pages' : type === 'script' ? 'scripts' : 'styles';
+        filePath = path.join(ROOT, 'plugins', pluginId, subPath, name + ext);
+        contentType = MIME[ext] || 'text/plain';
+        if (fs.existsSync(filePath) && path.resolve(filePath).startsWith(path.resolve(ROOT))) {
+          serveFile(res, filePath, contentType);
+          return;
+        }
+      }
+    }
+    send(res, 404, 'Not found');
     return;
   } else if (url === '/data/officerInformationData') {
     send(res, 200, JSON.stringify({}), 'application/json');
@@ -138,6 +183,42 @@ const server = http.createServer((req, res) => {
     return;
   } else if (url === '/data/currentShift') {
     send(res, 200, JSON.stringify({}), 'application/json');
+    return;
+  } else if (url === '/data/shiftHistory') {
+    const d = new Date();
+    const mockShifts = [
+      { startTime: new Date(d.getFullYear(), d.getMonth(), 1, 8, 0).toISOString(), endTime: new Date(d.getFullYear(), d.getMonth(), 1, 16, 30).toISOString(), reports: [] },
+      { startTime: new Date(d.getFullYear(), d.getMonth(), 5, 7, 0).toISOString(), endTime: new Date(d.getFullYear(), d.getMonth(), 5, 15, 0).toISOString(), reports: [] },
+      { startTime: new Date(d.getFullYear(), d.getMonth(), 12, 20, 0).toISOString(), endTime: new Date(d.getFullYear(), d.getMonth(), 13, 4, 0).toISOString(), reports: [] },
+    ];
+    send(res, 200, JSON.stringify(mockShifts), 'application/json');
+    return;
+  } else if (url === '/data/citationReports') {
+    const d = new Date();
+    const mockCitations = [
+      { Id: 'C-1', TimeStamp: new Date(d.getFullYear(), d.getMonth(), 5, 14, 30).toISOString(), OffenderPedName: 'John Doe', Status: 1 },
+      { Id: 'C-2', TimeStamp: new Date(d.getFullYear(), d.getMonth(), 12, 9, 15).toISOString(), OffenderPedName: 'Jane Smith', Status: 1 },
+      { Id: 'C-3', TimeStamp: new Date(d.getFullYear(), d.getMonth(), 12, 16, 45).toISOString(), OffenderPedName: 'Bob Wilson', Status: 1 },
+      { Id: 'C-4', TimeStamp: new Date(d.getFullYear(), d.getMonth(), 20, 11, 0).toISOString(), OffenderPedName: 'Alice Brown', Status: 1 },
+    ];
+    send(res, 200, JSON.stringify(mockCitations), 'application/json');
+    return;
+  } else if (url === '/data/arrestReports') {
+    const d = new Date();
+    const mockArrests = [
+      { Id: 'A-1', TimeStamp: new Date(d.getFullYear(), d.getMonth(), 3, 22, 10).toISOString(), OffenderPedName: 'Mike Johnson', Status: 1 },
+      { Id: 'A-2', TimeStamp: new Date(d.getFullYear(), d.getMonth(), 15, 2, 30).toISOString(), OffenderPedName: 'Sarah Davis', Status: 1 },
+      { Id: 'A-3', TimeStamp: new Date(d.getFullYear(), d.getMonth(), 20, 18, 0).toISOString(), OffenderPedName: 'Tom Miller', Status: 1 },
+    ];
+    send(res, 200, JSON.stringify(mockArrests), 'application/json');
+    return;
+  } else if (url === '/data/incidentReports') {
+    const d = new Date();
+    const mockIncidents = [
+      { Id: 'I-1', TimeStamp: new Date(d.getFullYear(), d.getMonth(), 5, 8, 0).toISOString(), OffenderPedsNames: ['Unknown Suspect'], Status: 1 },
+      { Id: 'I-2', TimeStamp: new Date(d.getFullYear(), d.getMonth(), 18, 12, 20).toISOString(), OffenderPedsNames: ['John Doe'], Status: 1 },
+    ];
+    send(res, 200, JSON.stringify(mockIncidents), 'application/json');
     return;
   } else if (url.startsWith('/page/')) {
     const name = url.slice('/page/'.length).replace(/\.html$/, '') || 'index';

@@ -66,7 +66,12 @@ const API = {
     desktopItem.appendChild(desktopTitle)
 
     if (addToDesktop) {
-      document.querySelector('.desktop').appendChild(desktopItem)
+      const sidebar = document.querySelector('.desktop .sidebar')
+      if (sidebar) {
+        sidebar.appendChild(desktopItem)
+      } else {
+        document.querySelector('.desktop').appendChild(desktopItem)
+      }
     }
 
     const iconAccessIcon = document.createElement('div')

@@ -7,6 +7,8 @@ MDTProPlugin/packages
 MDTProPlugin/nuget.exe
 MDTProPlugin/MDTPro/bin
 MDTProPlugin/MDTPro/obj
+# Node (e.g. dev-server.js); ignore if you add npm deps later.
+node_modules/
 *.user
 *.suo
 
@@ -22,13 +24,15 @@ agent-tools
 # ---- Runtime / local data (don’t commit) ----
 MDTPro/MDTPro.log
 MDTPro/data/
-MDTPro/data/*.db
-MDTPro/data/*.json.bak
 MDTPro/config.json
 MDTPro/language.json
 MDTPro/citationOptions.json
 MDTPro/arrestOptions.json
 MDTPro/ipAddresses.txt
+
+# ---- Secrets / env (never commit) ----
+.env
+.env.*
 
 # ---- Personal / misc ----
 PR_DRAFT.md

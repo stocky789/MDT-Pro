@@ -84,6 +84,13 @@ async function renderPluginsPage() {
 
     pluginsWrapper.appendChild(pluginElement)
   }
+  const hint = document.createElement('p')
+  hint.classList.add('pluginsHint')
+  hint.style.marginTop = '16px'
+  hint.style.color = 'var(--color-text-primary-half)'
+  hint.style.fontSize = '13px'
+  hint.textContent = 'Activated plugins appear in the sidebar on the main MDT page. If you don\'t see them, open or refresh that page.'
+  pluginsWrapper.appendChild(hint)
   document.querySelector('.main').appendChild(pluginsWrapper)
 }
 
@@ -95,6 +102,11 @@ function togglePluginActivation(pluginId) {
     activePlugins.push(pluginId)
   }
   localStorage.setItem('activePlugins', JSON.stringify(activePlugins))
+
+  // Refresh the main MDT page so plugin scripts load and the new app appears in the sidebar
+  if (window.opener && !window.opener.closed) {
+    window.opener.location.reload()
+  }
 }
 
 async function renderConfigPage() {
