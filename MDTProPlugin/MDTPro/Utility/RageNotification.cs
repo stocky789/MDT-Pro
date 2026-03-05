@@ -22,7 +22,7 @@ namespace MDTPro.Utility {
         public static void Show(string message, NotificationType type = NotificationType.Info, string subtitle = null) {
             if (string.IsNullOrEmpty(message)) return;
 
-            if (Game.FiberIsCurrent) {
+            if (GameFiber.CanSleepNow) {
                 ShowInternal(message, type, subtitle);
             } else {
                 GameFiber.StartNew(() => ShowInternal(message, type, subtitle));
@@ -55,7 +55,7 @@ namespace MDTPro.Utility {
             string text = localIp == machineName
                 ? localUrl
                 : $"{localUrl}~n~{machineUrl}";
-            string subtitle = GetLanguage().inGame.listeningOnIpAddress?.TrimEnd(' ', ':') ?? "Available at";
+            string subtitle = GetLanguage().listeningOnIpAddress?.TrimEnd(' ', ':') ?? "Available at";
             Show(text, NotificationType.Info, subtitle);
         }
 
