@@ -66,7 +66,10 @@ namespace MDTPro.Data {
             IsWanted = CDFPedData.Wanted;
             IsOnProbation = CDFPedData.IsOnProbation;
             IsOnParole = CDFPedData.IsOnParole;
-            Address = $"{CDFPedData.Address}, {CDFPedData.Address.Zone.RealAreaName}";
+            if (CDFPedData.Address != null && CDFPedData.Address.Zone != null)
+                Address = $"{CDFPedData.Address}, {CDFPedData.Address.Zone.RealAreaName}";
+            else
+                Address = CDFPedData.Address?.ToString() ?? string.Empty;
             try {
                 LicenseStatus = CDFPedData.DriversLicenseState.ToString();
                 LicenseExpiration = CDFPedData.DriversLicenseExpiration?.ToString("s");
@@ -80,8 +83,14 @@ namespace MDTPro.Data {
             } catch (Exception e) {
                 Game.LogTrivial($"[MDTPro] Warning: Could not read CDF permit/license data for {Name}: {e.Message}");
             }
-            if (CDFPedData.HasRealPed && Holder.IsValid()) {
-                IsInGang = Holder?.RelationshipGroup.Name?.ToLower().Contains("gang") ?? false;
+            if (CDFPedData.HasRealPed && Holder != null && Holder.IsValid()) {
+                try {
+                    var rg = Holder.RelationshipGroup;
+                    string groupName = rg.Name;
+                    IsInGang = groupName != null && groupName.ToLower().Contains("gang");
+                } catch {
+                    IsInGang = false;
+                }
             }
             AdvisoryText = CDFPedData.AdvisoryText;
             WarrantText = IsWanted ? GetRandomWarrantCharge().name : null;

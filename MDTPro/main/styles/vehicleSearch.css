@@ -2,18 +2,10 @@ body {
   background-color: var(--color-background);
   margin: 0;
   color: var(--color-text-primary);
-  background:
-    linear-gradient(180deg, #0d1829 0%, #0b1320 100%),
-    repeating-linear-gradient(
-      0deg,
-      transparent 0,
-      transparent 31px,
-      #ffffff08 32px
-    );
 }
 
 .searchInputWrapper {
-  margin-top: 14px;
+  margin: 12px 10px;
 }
 
 .searchHistoryList {

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Calendar</title>
+    <link rel="stylesheet" href="/style/root.css" />
+    <link rel="stylesheet" href="/plugin/Calendar/style/calendar.css" />
+  </head>
+  <body>
+    <div class="calendarPlugin">
+      <header class="calendarHeader">
+        <button class="navBtn prev" title="Previous month">‹</button>
+        <h1 class="monthTitle"></h1>
+        <button class="navBtn next" title="Next month">›</button>
+      </header>
+      <div class="calendarGrid">
+        <div class="weekdayHeaders"></div>
+        <div class="days"></div>
+      </div>
+      <aside class="dayDetail">
+        <h2 class="dayDetailTitle">Select a day</h2>
+        <div class="dayDetailContent"></div>
+      </aside>
+    </div>
+    <script src="/plugin/Calendar/script/calendarPage.js"></script>
+  </body>
+</html>

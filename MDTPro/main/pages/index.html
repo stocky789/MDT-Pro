@@ -9,7 +9,11 @@
     <link rel="stylesheet" href="/style/index.css" />
   </head>
   <body>
-    <div class="taskbar">
+    <header class="taskbar">
+      <div class="taskbarBrand">
+        <img src="/image/badge" alt="" class="taskbarLogo taskbarBadge" />
+        <span class="taskbarTitle">San Andreas Government</span>
+      </div>
       <div class="location"></div>
       <div class="icons">
         <button
@@ -23,116 +27,61 @@
           title="Control Panel"
           data-language-title="taskbar.settings"
         >
-          <img src="/favicon" />
+          <img src="/favicon" alt="Settings" />
+          <span class="settingsLabel" data-language="taskbar.settings">Settings</span>
         </button>
       </div>
       <div class="time"></div>
-    </div>
-    <div class="desktop">
-      <button class="desktopItem" data-name="pedSearch">
-        <div class="icon">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            xmlns:xlink="http://www.w3.org/1999/xlink"
-            viewBox="0 0 35.5 35.5"
-          >
-            <g>
-              <path
-                d="M33,8.812h-4.16V5.938c0-1.381-1.117-2.5-2.5-2.5h-1.93c-1.381,0-2.5,1.119-2.5,2.5v2.875h-8.32V5.938
-		c0-1.381-1.118-2.5-2.5-2.5H9.16c-1.381,0-2.5,1.119-2.5,2.5v2.875H2.5c-1.381,0-2.5,1.119-2.5,2.5v18.25
-		c0,1.381,1.119,2.5,2.5,2.5H33c1.381,0,2.5-1.119,2.5-2.5v-18.25C35.5,9.934,34.381,8.812,33,8.812z M16.551,26.362
-		c0,0.519-0.42,0.937-0.938,0.937H4.369c-0.521,0-0.938-0.418-0.938-0.938v-1.434c0-0.41,0.269-0.771,0.655-0.895l3.959-1.236
-		C7.191,21.776,6.67,20.164,6.67,18.65c0-2.285,1.304-3.762,3.318-3.762c2.018,0,3.32,1.477,3.32,3.762
-		c0,1.512-0.52,3.126-1.377,4.146l3.959,1.236c0.391,0.12,0.658,0.482,0.658,0.895v1.435H16.551z M32.068,27.312H18.625v-1.969
-		h13.443V27.312L32.068,27.312z M32.068,23.83H18.625v-1.969h13.443V23.83L32.068,23.83z M32.068,20.349H18.625v-1.97h13.443V20.349
-		L32.068,20.349z M32.068,16.866H18.625v-1.968h13.443V16.866L32.068,16.866z"
-              />
-            </g>
-          </svg>
+    </header>
+    <main class="desktop">
+      <nav class="sidebar">
+        <div class="sidebarBadge">
+          <img src="/image/badge" alt="San Andreas Government" />
         </div>
-        <div class="title" data-language="desktop.pedSearch">Person Search</div>
-      </button>
-      <button class="desktopItem" data-name="vehicleSearch">
-        <div class="icon">
-          <svg
-            viewBox="-4 0 32 32"
-            xmlns="http://www.w3.org/2000/svg"
-            style="transform: scale(1.1)"
-          >
-            <path
-              d="M19.938 7.188l3.563 7.156c0.063 0.094 0.094 0.219 0.125 0.313 0.219 0.563 0.375 1.344 0.375 1.844v3.406c0 1.063-0.719 1.938-1.719 2.188v2c0 0.969-0.781 1.719-1.719 1.719-0.969 0-1.719-0.75-1.719-1.719v-1.938h-13.688v1.938c0 0.969-0.75 1.719-1.719 1.719-0.938 0-1.719-0.75-1.719-1.719v-2c-1-0.25-1.719-1.125-1.719-2.188v-3.406c0-0.5 0.156-1.281 0.375-1.844 0.031-0.094 0.063-0.219 0.125-0.313l3.563-7.156c0.281-0.531 1.031-1.031 1.656-1.031h12.563c0.625 0 1.375 0.5 1.656 1.031zM5.531 9.344l-1.906 4.344c-0.094 0.156-0.094 0.344-0.094 0.469h16.938c0-0.125 0-0.313-0.094-0.469l-1.906-4.344c-0.25-0.563-1-1.063-1.594-1.063h-9.75c-0.594 0-1.344 0.5-1.594 1.063zM4.688 19.906c1 0 1.781-0.813 1.781-1.844 0-1-0.781-1.781-1.781-1.781s-1.844 0.781-1.844 1.781c0 1.031 0.844 1.844 1.844 1.844zM19.313 19.906c1 0 1.844-0.813 1.844-1.844 0-1-0.844-1.781-1.844-1.781s-1.781 0.781-1.781 1.781c0 1.031 0.781 1.844 1.781 1.844z"
-            ></path>
-          </svg>
-        </div>
-        <div class="title" data-language="desktop.vehicleSearch">
-          Vehicle Search
-        </div>
-      </button>
-      <button class="desktopItem" data-name="reports">
-        <div class="icon">
-          <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-            <rect x="10" y="18" width="8" height="2" />
-            <rect x="10" y="13" width="12" height="2" />
-            <rect x="10" y="23" width="5" height="2" />
-            <path
-              d="M25,5H22V4a2,2,0,0,0-2-2H12a2,2,0,0,0-2,2V5H7A2,2,0,0,0,5,7V28a2,2,0,0,0,2,2H25a2,2,0,0,0,2-2V7A2,2,0,0,0,25,5ZM12,4h8V8H12ZM25,28H7V7h3v3H22V7h3Z"
-            />
-          </svg>
-        </div>
-        <div class="title" data-language="desktop.reports">Reports</div>
-      </button>
-      <button class="desktopItem" data-name="shiftHistory">
-        <div class="icon stroke">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path
-              d="M3.0156 10H6.99999M3.0156 10V6M3.0156 10L6.34315 6.34315C9.46734 3.21895 14.5327 3.21895 17.6569 6.34315C20.781 9.46734 20.781 14.5327 17.6569 17.6569C14.5327 20.781 9.46734 20.781 6.34315 17.6569C5.55928 16.873 4.97209 15.9669 4.58158 15M12 9V13L15 14.5"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </div>
-        <div class="title" data-language="desktop.shiftHistory">
-          Shift History
-        </div>
-      </button>
-      <button class="desktopItem" data-name="court">
-        <div class="icon">
-          <svg viewBox="-2 0 19 19" xmlns="http://www.w3.org/2000/svg">
-            <path
-              d="M9.316 14.722a.477.477 0 0 1-.475.475H1.433a.477.477 0 0 1-.475-.475v-.863a.477.477 0 0 1 .475-.475h7.408a.476.476 0 0 1 .475.475zm-2.767-2.587a.552.552 0 0 1-.392-.163L2.96 8.776a.554.554 0 0 1 .784-.784L6.94 11.19a.554.554 0 0 1-.392.946zm7.33.992L9.435 8.682l1.085-1.084-3.173-3.173-2.97 2.97 3.173 3.172 1.102-1.101 4.445 4.445a.554.554 0 1 0 .784-.784zm-2.33-5.993a.552.552 0 0 1-.391-.162L7.96 3.775a.554.554 0 1 1 .784-.784l3.196 3.197a.554.554 0 0 1-.391.946z"
-            />
-          </svg>
-        </div>
-        <div class="title" data-language="desktop.court">Court</div>
-      </button>
-      <button class="desktopItem" data-name="map">
-        <div class="icon stroke">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path
-              d="M12 6H12.01M9 20L3 17V4L5 5M9 20L15 17M9 20V14M15 17L21 20V7L19 6M15 17V14M15 6.2C15 7.96731 13.5 9.4 12 11C10.5 9.4 9 7.96731 9 6.2C9 4.43269 10.3431 3 12 3C13.6569 3 15 4.43269 15 6.2Z"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </div>
-        <div class="title" data-language="desktop.map">GPS</div>
-      </button>
-      <button class="desktopItem" data-name="callout">
-        <div class="icon stroke">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path
-              d="M5.13641 12.764L8.15456 9.08664C8.46255 8.69065 8.61655 8.49264 8.69726 8.27058C8.76867 8.07409 8.79821 7.86484 8.784 7.65625C8.76793 7.42053 8.67477 7.18763 8.48846 6.72184L7.77776 4.9451C7.50204 4.25579 7.36417 3.91113 7.12635 3.68522C6.91678 3.48615 6.65417 3.35188 6.37009 3.29854C6.0477 3.238 5.68758 3.32804 4.96733 3.5081L3 4C3 14 9.99969 21 20 21L20.4916 19.0324C20.6717 18.3121 20.7617 17.952 20.7012 17.6296C20.6478 17.3456 20.5136 17.0829 20.3145 16.8734C20.0886 16.6355 19.7439 16.4977 19.0546 16.222L17.4691 15.5877C16.9377 15.3752 16.672 15.2689 16.4071 15.2608C16.1729 15.2536 15.9404 15.3013 15.728 15.4001C15.4877 15.512 15.2854 15.7143 14.8807 16.119L11.8274 19.1733M12.9997 7C13.9765 7.19057 14.8741 7.66826 15.5778 8.37194C16.2815 9.07561 16.7592 9.97326 16.9497 10.95M12.9997 3C15.029 3.22544 16.9213 4.13417 18.366 5.57701C19.8106 7.01984 20.7217 8.91101 20.9497 10.94"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </div>
-        <div class="title" data-language="desktop.callout">Active Call</div>
-      </button>
-    </div>
+        <button class="desktopItem" data-name="pedSearch">
+          <span class="icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 35.5 35.5"><path d="M33,8.812h-4.16V5.938c0-1.381-1.117-2.5-2.5-2.5h-1.93c-1.381,0-2.5,1.119-2.5,2.5v2.875h-8.32V5.938c0-1.381-1.118-2.5-2.5-2.5H9.16c-1.381,0-2.5,1.119-2.5,2.5v2.875H2.5c-1.381,0-2.5,1.119-2.5,2.5v18.25c0,1.381,1.119,2.5,2.5,2.5H33c1.381,0,2.5-1.119,2.5-2.5v-18.25C35.5,9.934,34.381,8.812,33,8.812z M16.551,26.362c0,0.519-0.42,0.937-0.938,0.937H4.369c-0.521,0-0.938-0.418-0.938-0.938v-1.434c0-0.41,0.269-0.771,0.655-0.895l3.959-1.236C7.191,21.776,6.67,20.164,6.67,18.65c0-2.285,1.304-3.762,3.318-3.762c2.018,0,3.32,1.477,3.32,3.762c0,1.512-0.52,3.126-1.377,4.146l3.959,1.236c0.391,0.12,0.658,0.482,0.658,0.895v1.435H16.551z M32.068,27.312H18.625v-1.969h13.443V27.312L32.068,27.312z M32.068,23.83H18.625v-1.969h13.443V23.83L32.068,23.83z M32.068,20.349H18.625v-1.97h13.443V20.349L32.068,20.349z M32.068,16.866H18.625v-1.968h13.443V16.866L32.068,16.866z"/></svg>
+          </span>
+          <span class="title" data-language="desktop.pedSearch">Person Search</span>
+        </button>
+        <button class="desktopItem" data-name="vehicleSearch">
+          <span class="icon">
+            <svg viewBox="-4 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19.938 7.188l3.563 7.156c0.063 0.094 0.094 0.219 0.125 0.313 0.219 0.563 0.375 1.344 0.375 1.844v3.406c0 1.063-0.719 1.938-1.719 2.188v2c0 0.969-0.781 1.719-1.719 1.719-0.969 0-1.719-0.75-1.719-1.719v-1.938h-13.688v1.938c0 0.969-0.75 1.719-1.719 1.719-0.938 0-1.719-0.75-1.719-1.719v-2c-1-0.25-1.719-1.125-1.719-2.188v-3.406c0-0.5 0.156-1.281 0.375-1.844 0.031-0.094 0.063-0.219 0.125-0.313l3.563-7.156c0.281-0.531 1.031-1.031 1.656-1.031h12.563c0.625 0 1.375 0.5 1.656 1.031zM5.531 9.344l-1.906 4.344c-0.094 0.156-0.094 0.344-0.094 0.469h16.938c0-0.125 0-0.313-0.094-0.469l-1.906-4.344c-0.25-0.563-1-1.063-1.594-1.063h-9.75c-0.594 0-1.344 0.5-1.594 1.063zM4.688 19.906c1 0 1.781-0.813 1.781-1.844 0-1-0.781-1.781-1.781-1.781s-1.844 0.781-1.844 1.781c0 1.031 0.844 1.844 1.844 1.844zM19.313 19.906c1 0 1.844-0.813 1.844-1.844 0-1-0.844-1.781-1.844-1.781s-1.781 0.781-1.781 1.781c0 1.031 0.781 1.844 1.781 1.844z"/></svg>
+          </span>
+          <span class="title" data-language="desktop.vehicleSearch">Vehicle Search</span>
+        </button>
+        <button class="desktopItem" data-name="reports">
+          <span class="icon">
+            <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><rect x="10" y="18" width="8" height="2" /><rect x="10" y="13" width="12" height="2" /><rect x="10" y="23" width="5" height="2" /><path d="M25,5H22V4a2,2,0,0,0-2-2H12a2,2,0,0,0-2,2V5H7A2,2,0,0,0,5,7V28a2,2,0,0,0,2,2H25a2,2,0,0,0,2-2V7A2,2,0,0,0,25,5ZM12,4h8V8H12ZM25,28H7V7h3v3H22V7h3Z"/></svg>
+          </span>
+          <span class="title" data-language="desktop.reports">Reports</span>
+        </button>
+        <button class="desktopItem" data-name="shiftHistory">
+          <span class="icon stroke">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3.0156 10H6.99999M3.0156 10V6M3.0156 10L6.34315 6.34315C9.46734 3.21895 14.5327 3.21895 17.6569 6.34315C20.781 9.46734 20.781 14.5327 17.6569 17.6569C14.5327 20.781 9.46734 20.781 6.34315 17.6569C5.55928 16.873 4.97209 15.9669 4.58158 15M12 9V13L15 14.5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="title" data-language="desktop.shiftHistory">Shift History</span>
+        </button>
+        <button class="desktopItem" data-name="court">
+          <span class="icon">
+            <svg viewBox="-2 0 19 19" xmlns="http://www.w3.org/2000/svg"><path d="M9.316 14.722a.477.477 0 0 1-.475.475H1.433a.477.477 0 0 1-.475-.475v-.863a.477.477 0 0 1 .475-.475h7.408a.476.476 0 0 1 .475.475zm-2.767-2.587a.552.552 0 0 1-.392-.163L2.96 8.776a.554.554 0 0 1 .784-.784L6.94 11.19a.554.554 0 0 1-.392.946zm7.33.992L9.435 8.682l1.085-1.084-3.173-3.173-2.97 2.97 3.173 3.172 1.102-1.101 4.445 4.445a.554.554 0 1 0 .784-.784zm-2.33-5.993a.552.552 0 0 1-.391-.162L7.96 3.775a.554.554 0 1 1 .784-.784l3.196 3.197a.554.554 0 0 1-.391.946z"/></svg>
+          </span>
+          <span class="title" data-language="desktop.court">Court</span>
+        </button>
+        <button class="desktopItem" data-name="map">
+          <span class="icon stroke">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 6H12.01M9 20L3 17V4L5 5M9 20L15 17M9 20V14M15 17L21 20V7L19 6M15 17V14M15 6.2C15 7.96731 13.5 9.4 12 11C10.5 9.4 9 7.96731 9 6.2C9 4.43269 10.3431 3 12 3C13.6569 3 15 4.43269 15 6.2Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="title" data-language="desktop.map">GPS</span>
+        </button>
+        <button class="desktopItem" data-name="callout">
+          <span class="icon stroke">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5.13641 12.764L8.15456 9.08664C8.46255 8.69065 8.61655 8.49264 8.69726 8.27058C8.76867 8.07409 8.79821 7.86484 8.784 7.65625C8.76793 7.42053 8.67477 7.18763 8.48846 6.72184L7.77776 4.9451C7.50204 4.25579 7.36417 3.91113 7.12635 3.68522C6.91678 3.48615 6.65417 3.35188 6.37009 3.29854C6.0477 3.238 5.68758 3.32804 4.96733 3.5081L3 4C3 14 9.99969 21 20 21L20.4916 19.0324C20.6717 18.3121 20.7617 17.952 20.7012 17.6296C20.6478 17.3456 20.5136 17.0829 20.3145 16.8734C20.0886 16.6355 19.7439 16.4977 19.0546 16.222L17.4691 15.5877C16.9377 15.3752 16.672 15.2689 16.4071 15.2608C16.1729 15.2536 15.9404 15.3013 15.728 15.4001C15.4877 15.512 15.2854 15.7143 14.8807 16.119L11.8274 19.1733M12.9997 7C13.9765 7.19057 14.8741 7.66826 15.5778 8.37194C16.2815 9.07561 16.7592 9.97326 16.9497 10.95M12.9997 3C15.029 3.22544 16.9213 4.13417 18.366 5.57701C19.8106 7.01984 20.7217 8.91101 20.9497 10.94" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="title" data-language="desktop.callout">Active Call</span>
+        </button>
+      </nav>
+    </main>
     <div class="overlay">
       <div class="windows"></div>
       <div class="settings hide">
