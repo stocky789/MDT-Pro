@@ -1,5 +1,8 @@
 # MDT-Pro: Build and package a release for distribution
-# Creates Release/ folder (and optional ZIP) ready to copy into GTA V root.
+#
+# Creates Release/ folder with the same structure as GTA V (MDTPro/, plugins\LSPDFR\MDTPro.dll).
+# Does NOT modify your game directory — use build-and-deploy.ps1 for that.
+#
 # Usage: .\build-release.ps1
 #        .\build-release.ps1 -CreateZip   # also creates MDT-Pro-v0.9.0.zip
 

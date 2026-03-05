@@ -1,46 +1,53 @@
-# MDT-Pro: Build and deploy to GTA V
-# Purges existing MDT Pro in game, then copies a fresh build (saves confusion).
-# Usage: .\build-and-deploy.ps1          # build + purge + deploy
-#        .\build-and-deploy.ps1 -DeployOnly   # purge + deploy (use existing build)
+# MDT-Pro: Build and deploy directly to your GTA V installation
+#
+# Builds the plugin, creates the Release package, purges existing MDT Pro from the game,
+# then copies the fresh build into the game directory. Preserves the database (data folder).
+#
+# Does NOT create a ZIP — use build-release.ps1 -CreateZip for distribution.
+#
+# Usage: .\build-and-deploy.ps1                    # build + deploy to default GTA V path
+#        .\build-and-deploy.ps1 -DeployOnly        # deploy existing Release/ (no rebuild)
+#        .\build-and-deploy.ps1 -GamePath "D:\Games\GTA V"   # custom game path
 
-param([switch]$DeployOnly)
+param(
+    [switch]$DeployOnly,
+    [string]$GamePath = "C:\Program Files (x86)\Steam\steamapps\common\Grand Theft Auto V"
+)
 
 $ErrorActionPreference = "Stop"
-$RepoRoot    = $PSScriptRoot
-$PluginDir   = Join-Path $RepoRoot "MDTProPlugin"
-$Solution    = Join-Path $PluginDir "MDTPro.sln"
-$MDTProFolder = Join-Path $RepoRoot "MDTPro"
-$GameRoot    = "C:\Program Files (x86)\Steam\steamapps\common\Grand Theft Auto V"
-$LSPDFR      = Join-Path $GameRoot "plugins\LSPDFR"
-$DllOutput   = Join-Path $PluginDir "MDTPro\bin\Release\MDTPro.dll"
+$RepoRoot  = $PSScriptRoot
+$ReleaseDir = Join-Path $RepoRoot "Release"
+$GameRoot  = $GamePath
+$LSPDFR    = Join-Path $GameRoot "plugins\LSPDFR"
+$GameMDTPro = Join-Path $GameRoot "MDTPro"
 
-# --- Build (unless DeployOnly) ---
+# --- Build and prepare Release package (unless DeployOnly) ---
 if (-not $DeployOnly) {
-    Write-Host "Building MDT-Pro (Release)..." -ForegroundColor Cyan
-    $msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe" 2>$null | Select-Object -First 1
-    if (-not $msbuild) {
-        $msbuild = "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe"
-    }
-    if (-not (Test-Path $msbuild)) {
-        Write-Error "MSBuild not found. Build in Visual Studio, then run: .\build-and-deploy.ps1 -DeployOnly"
-    }
-    & $msbuild $Solution /p:Configuration=Release /t:Rebuild /v:minimal
+    & (Join-Path $RepoRoot "build-release.ps1")
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    Write-Host "Build OK." -ForegroundColor Green
+}
+
+# --- Validate Release folder exists ---
+if (-not (Test-Path $ReleaseDir)) {
+    Write-Error "Release folder not found. Run build-release.ps1 first, or omit -DeployOnly."
+}
+
+# --- Validate game path ---
+if (-not (Test-Path $GameRoot)) {
+    Write-Error "Game path not found: $GameRoot`nUse -GamePath to specify your GTA V installation."
 }
 
 # --- Purge existing MDT Pro in game (preserve database) ---
 Write-Host "Purging existing MDT Pro from game directory (keeping database)..." -ForegroundColor Cyan
-$gameMDTPro = Join-Path $GameRoot "MDTPro"
-$gameData = Join-Path $gameMDTPro "data"
-$dbBackup = Join-Path $env:TEMP "MDTPro_data_backup"
-if (Test-Path $gameMDTPro) {
+$gameData  = Join-Path $GameMDTPro "data"
+$dbBackup  = Join-Path $env:TEMP "MDTPro_data_backup"
+if (Test-Path $GameMDTPro) {
     if (Test-Path $gameData) {
         Copy-Item $gameData $dbBackup -Recurse -Force
         Write-Host "  Backed up data (database) to $dbBackup"
     }
-    Remove-Item $gameMDTPro -Recurse -Force
-    Write-Host "  Removed $gameMDTPro"
+    Remove-Item $GameMDTPro -Recurse -Force
+    Write-Host "  Removed $GameMDTPro"
 }
 foreach ($name in @("MDTPro.dll", "MDTPro.pdb")) {
     $path = Join-Path $LSPDFR $name
@@ -51,23 +58,18 @@ foreach ($name in @("MDTPro.dll", "MDTPro.pdb")) {
 }
 Write-Host "Purge done." -ForegroundColor Green
 
-# --- Deploy fresh ---
-Write-Host "Deploying fresh copy..." -ForegroundColor Cyan
-if (-not (Test-Path $DllOutput)) {
-    Write-Error "Build output not found: $DllOutput"
-}
-Copy-Item $DllOutput (Join-Path $LSPDFR "MDTPro.dll") -Force
-Write-Host "  Copied MDTPro.dll -> plugins\LSPDFR\"
+# --- Deploy from Release folder ---
+Write-Host "Deploying from Release to $GameRoot..." -ForegroundColor Cyan
+Copy-Item (Join-Path $ReleaseDir "*") $GameRoot -Recurse -Force -Exclude "README.txt"
+Write-Host "  Deployed MDTPro\, plugins\LSPDFR\MDTPro.dll"
 
-Copy-Item $MDTProFolder $GameRoot -Recurse -Force
-Write-Host "  Copied MDTPro folder -> game root"
-
+# --- Restore database ---
 if (Test-Path $dbBackup) {
-    $newData = Join-Path (Join-Path $GameRoot "MDTPro") "data"
+    $newData = Join-Path $GameMDTPro "data"
     if (-not (Test-Path $newData)) { New-Item $newData -ItemType Directory -Force | Out-Null }
     Copy-Item (Join-Path $dbBackup "*") $newData -Recurse -Force
     Remove-Item $dbBackup -Recurse -Force
-    Write-Host "  Restored database (data folder) into new MDTPro"
+    Write-Host "  Restored database (data folder)"
 }
 
-Write-Host "Done. MDT Pro is purged and redeployed (database preserved)." -ForegroundColor Green
+Write-Host "Done. MDT Pro deployed (database preserved)." -ForegroundColor Green
