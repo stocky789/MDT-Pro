@@ -3,9 +3,9 @@
   if (config.updateDomWithLanguageOnLoad)
     await updateDomWithLanguage('vehicleSearch')
 
-  const alprPlate = sessionStorage.getItem('alprVehicleSearchPlate')
+  const alprPlate = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('alprVehicleSearchPlate')) || null
   if (alprPlate && typeof alprPlate === 'string') {
-    sessionStorage.removeItem('alprVehicleSearchPlate')
+    if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('alprVehicleSearchPlate')
     const trimmed = alprPlate.trim()
     if (trimmed) {
       const input = document.querySelector('.searchInputWrapper #vehicleSearchInput')

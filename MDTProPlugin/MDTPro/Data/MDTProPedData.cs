@@ -124,6 +124,9 @@ namespace MDTPro.Data {
 
         /// <summary>When CDF PedData is null, populate Name/Model from LSPDFR Persona so we can still resolve peds.</summary>
         private void PopulateFromLSPDFRPersonaFallback() {
+            Citations = new List<CitationGroup.Charge>();
+            Arrests = new List<ArrestGroup.Charge>();
+            IdentificationHistory = new List<IdentificationEntry>();
             if (Holder == null || !Holder.IsValid()) return;
             try {
                 var persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(Holder);
