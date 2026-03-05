@@ -4,14 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title data-language="title">MDT Pro</title>
-    <link rel="icon" href="/favicon" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon" type="image/png" />
     <link rel="stylesheet" href="/style/root.css" />
     <link rel="stylesheet" href="/style/index.css" />
   </head>
   <body>
     <header class="taskbar">
       <div class="taskbarBrand">
-        <img src="/image/badge" alt="" class="taskbarLogo taskbarBadge" />
+        <img src="/image/badge?v=7" alt="" class="taskbarLogo taskbarBadge" />
         <span class="taskbarTitle">San Andreas Government</span>
       </div>
       <div class="location"></div>
@@ -27,7 +28,12 @@
           title="Control Panel"
           data-language-title="taskbar.settings"
         >
-          <img src="/favicon" alt="Settings" />
+          <span class="settingsIcon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
+            </svg>
+          </span>
           <span class="settingsLabel" data-language="taskbar.settings">Settings</span>
         </button>
       </div>
@@ -36,7 +42,7 @@
     <main class="desktop">
       <nav class="sidebar">
         <div class="sidebarBadge">
-          <img src="/image/badge" alt="San Andreas Government" />
+          <img src="/image/badge?v=7" alt="San Andreas Government" />
         </div>
         <button class="desktopItem" data-name="pedSearch">
           <span class="icon">
@@ -86,108 +92,97 @@
       <div class="windows"></div>
       <div class="settings hide">
         <div class="officerInformation">
-          <div class="title" data-language="settings.officerInformation.title">
-            Officer Information
+          <div class="titleRow">
+            <span class="title" data-language="settings.officerInformation.title">Officer Information</span>
+            <span class="infoIcon" data-language-info="settings.officerInformation.info.title" role="img" aria-label="More information">?</span>
           </div>
           <div class="inputWrapper">
             <div class="firstName">
-              <label
-                data-language="settings.officerInformation.firstName"
-                for="officerInformationFirstNameInput"
-                >First Name</label
-              >
+              <label for="officerInformationFirstNameInput">
+                <span data-language="settings.officerInformation.firstName">First Name</span>
+                <span class="infoIcon" data-language-info="settings.officerInformation.info.firstName" role="img" aria-label="More information">?</span>
+              </label>
               <input type="text" id="officerInformationFirstNameInput" />
             </div>
             <div class="lastName">
-              <label
-                data-language="settings.officerInformation.lastName"
-                for="officerInformationLastNameInput"
-                >Last Name</label
-              >
+              <label for="officerInformationLastNameInput">
+                <span data-language="settings.officerInformation.lastName">Last Name</span>
+                <span class="infoIcon" data-language-info="settings.officerInformation.info.lastName" role="img" aria-label="More information">?</span>
+              </label>
               <input type="text" id="officerInformationLastNameInput" />
             </div>
             <div class="badgeNumber">
-              <label
-                data-language="settings.officerInformation.badgeNumber"
-                for="officerInformationBadgeNumberInput"
-                >Badge Number</label
-              >
+              <label for="officerInformationBadgeNumberInput">
+                <span data-language="settings.officerInformation.badgeNumber">Badge Number</span>
+                <span class="infoIcon" data-language-info="settings.officerInformation.info.badgeNumber" role="img" aria-label="More information">?</span>
+              </label>
               <input type="number" id="officerInformationBadgeNumberInput" />
             </div>
             <div class="rank">
-              <label
-                data-language="settings.officerInformation.rank"
-                for="officerInformationRankInput"
-                >Rank</label
-              >
+              <label for="officerInformationRankInput">
+                <span data-language="settings.officerInformation.rank">Rank</span>
+                <span class="infoIcon" data-language-info="settings.officerInformation.info.rank" role="img" aria-label="More information">?</span>
+              </label>
               <input type="text" id="officerInformationRankInput" />
             </div>
             <div class="callSign">
-              <label
-                data-language="settings.officerInformation.callSign"
-                for="officerInformationCallSignInput"
-                >Call Sign</label
-              >
+              <label for="officerInformationCallSignInput">
+                <span data-language="settings.officerInformation.callSign">Call Sign</span>
+                <span class="infoIcon" data-language-info="settings.officerInformation.info.callSign" role="img" aria-label="More information">?</span>
+              </label>
               <input type="text" id="officerInformationCallSignInput" />
             </div>
             <div class="agency">
-              <label
-                data-language="settings.officerInformation.agency"
-                for="officerInformationDepartmentInput"
-                >Department</label
-              >
+              <label for="officerInformationDepartmentInput">
+                <span data-language="settings.officerInformation.agency">Department</span>
+                <span class="infoIcon" data-language-info="settings.officerInformation.info.agency" role="img" aria-label="More information">?</span>
+              </label>
               <input type="text" id="officerInformationDepartmentInput" />
             </div>
           </div>
           <div class="buttonWrapper">
-            <button
-              class="autoFill"
-              data-language="settings.officerInformation.autoFill"
-            >
-              Auto Fill
-            </button>
-            <button
-              class="save"
-              data-language="settings.officerInformation.save"
-            >
-              Save
-            </button>
+            <span class="buttonWithInfo">
+              <button class="autoFill" data-language="settings.officerInformation.autoFill">Fill from Game</button>
+              <span class="infoIcon" data-language-info="settings.officerInformation.info.autoFill" role="img" aria-label="More information">?</span>
+            </span>
+            <span class="buttonWithInfo">
+              <button class="save" data-language="settings.officerInformation.save">Save</button>
+              <span class="infoIcon" data-language-info="settings.officerInformation.info.save" role="img" aria-label="More information">?</span>
+            </span>
           </div>
         </div>
         <div class="currentShift">
+          <div class="titleRow">
+            <span class="title" data-language="settings.currentShift.title">Current Shift</span>
+            <span class="infoIcon" data-language-info="settings.currentShift.info.title" role="img" aria-label="More information">?</span>
+          </div>
           <div class="timeWrapper">
             <div class="startTime"></div>
             <div class="duration"></div>
           </div>
           <div class="buttonWrapper">
-            <button
-              class="startShift"
-              data-language="settings.currentShift.startShift"
-            >
-              Start Shift
-            </button>
-            <button
-              class="endShift"
-              data-language="settings.currentShift.endShift"
-            >
-              End Shift
-            </button>
+            <span class="buttonWithInfo">
+              <button class="startShift" data-language="settings.currentShift.startShift">Start Shift</button>
+              <span class="infoIcon" data-language-info="settings.currentShift.info.startShift" role="img" aria-label="More information">?</span>
+            </span>
+            <span class="buttonWithInfo">
+              <button class="endShift" data-language="settings.currentShift.endShift">End Shift</button>
+              <span class="infoIcon" data-language-info="settings.currentShift.info.endShift" role="img" aria-label="More information">?</span>
+            </span>
           </div>
         </div>
         <div class="officerMetrics">
-          <div class="title" data-language="settings.officerMetrics.title">
-            Career Statistics
+          <div class="titleRow">
+            <span class="title" data-language="settings.officerMetrics.title">Career Statistics</span>
+            <span class="infoIcon" data-language-info="settings.officerMetrics.info.title" role="img" aria-label="More information">?</span>
           </div>
           <div class="metricsContent"></div>
         </div>
         <div class="versionCustomizationWrapper">
           <div class="version"></div>
-          <div
-            class="customization"
-            data-language="settings.customization"
-            onclick="window.open('/page/customization', '_blank')"
-          >
-            Open Customization
+          <div class="customizationRow">
+            <span class="customization" data-language="settings.customization" onclick="window.open('/page/customization', '_blank')" role="button" tabindex="0">Config and Plugins</span>
+            <span class="infoIcon" data-language-info="settings.customizationInfo" role="img" aria-label="More information">?</span>
           </div>
         </div>
       </div>

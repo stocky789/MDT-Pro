@@ -12,6 +12,14 @@ namespace MDTPro.ServerAPI {
             string path = req.Url.AbsolutePath.Substring("/post/".Length);
             if (string.IsNullOrEmpty(path)) return;
 
+            if (path == "alprClear") {
+                ALPR.ALPRController.Clear();
+                buffer = Encoding.UTF8.GetBytes("OK");
+                contentType = "text/plain";
+                status = 200;
+                return;
+            }
+
             string body = Helper.GetRequestPostData(req);
             if (string.IsNullOrEmpty(body)) {
                 buffer = Encoding.UTF8.GetBytes("Bad Request - Empty Body");
@@ -134,6 +142,23 @@ namespace MDTPro.ServerAPI {
                     data.OutcomeNotes,
                     data.OutcomeReasoning)) {
 
+                    buffer = Encoding.UTF8.GetBytes("OK");
+                    contentType = "text/plain";
+                    status = 200;
+                } else {
+                    buffer = Encoding.UTF8.GetBytes("Not Found");
+                    contentType = "text/plain";
+                    status = 404;
+                }
+            } else if (path == "forceResolveCourtCase") {
+                var data = JsonConvert.DeserializeAnonymousType(body, new { Number = "" });
+                if (data == null || string.IsNullOrWhiteSpace(data.Number)) {
+                    buffer = Encoding.UTF8.GetBytes("Bad Request");
+                    contentType = "text/plain";
+                    status = 400;
+                    return;
+                }
+                if (DataController.ForceResolveCourtCase(data.Number)) {
                     buffer = Encoding.UTF8.GetBytes("OK");
                     contentType = "text/plain";
                     status = 200;
