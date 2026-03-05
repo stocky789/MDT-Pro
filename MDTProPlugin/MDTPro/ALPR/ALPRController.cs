@@ -84,7 +84,7 @@ namespace MDTPro.ALPR {
                     int maxVehicles = Math.Min(10, Math.Max(3, cfg.maxNumberOfNearbyPedsOrVehicles));
                     float scanRangeMeters = Math.Max(10f, Math.Min(100f, cfg.alprScanRangeMeters));
                     float readRangeMeters = Math.Max(2f, Math.Min(15f, cfg.alprReadRangeMeters));
-                    float coneAngleDeg = Math.Max(10f, Math.Min(60f, cfg.alprConeAngleDegrees));
+                    float coneAngleDeg = Math.Max(10f, Math.Min(90f, cfg.alprConeAngleDegrees));
 
                     // ALPR only works when: (1) enabled in settings, (2) on duty (Start/Stop in Main), (3) in police vehicle
                     if (Main.Player == null || !Main.Player.Exists()) {
@@ -110,83 +110,87 @@ namespace MDTPro.ALPR {
                     if (loopCount > 0 && loopCount % 30 == 0)
                         PruneExpiredCooldowns(cooldownSec);
 
-                    // Realistic ALPR: only read vehicles in front (cone) and within read range; process closest one per cycle
+                    // Vehicles in cone up to scanRangeMeters; we will process up to 3 within read range (closest first)
                     InConeAndRangeBuffer.Clear();
-                    Vector3 cruiserPos = playerVehicle.Position; // playerVehicle is police vehicle (checked above)
+                    Vector3 cruiserPos = playerVehicle.Position;
                     Vector3 forward = playerVehicle.ForwardVector;
                     forward.Z = 0f;
                     if (forward.LengthSquared() < 0.0001f) forward = new Vector3(0f, 1f, 0f);
                     else forward = Vector3.Normalize(forward);
 
-                    // Consider vehicles in cone up to scanRangeMeters; only process (read) the closest if within readRangeMeters
                     foreach (Vehicle v in nearby) {
                         if (v == null || !v.Exists()) continue;
                         if (v == playerVehicle) continue;
                         float dist = cruiserPos.DistanceTo(v.Position);
                         if (dist > scanRangeMeters) continue;
                         if (!IsInCone(cruiserPos, forward, v.Position, coneAngleDeg)) continue;
-                        string plate = v.LicensePlate?.Trim();
-                        if (string.IsNullOrEmpty(plate)) continue;
+                        string p = v.LicensePlate?.Trim();
+                        if (string.IsNullOrEmpty(p)) continue;
                         InConeAndRangeBuffer.Add((v, dist));
                     }
 
-                    // Process only the single closest vehicle this cycle, and only if within read range (realistic ALPR read distance)
-                    Vehicle toScan = GetClosestVehicleInBuffer(InConeAndRangeBuffer);
-                    if (toScan != null) {
-                        if (cruiserPos.DistanceTo(toScan.Position) > readRangeMeters) {
-                            CurrentHit = null;
-                        } else {
+                    // Sort by distance and take up to 3 vehicles within read range
+                    SortBufferByDistance(InConeAndRangeBuffer);
+                    const int maxReadPerCycle = 3;
+                    int processed = 0;
+                    CurrentHit = null;
+
+                    for (int i = 0; i < InConeAndRangeBuffer.Count && processed < maxReadPerCycle; i++) {
+                        var (toScan, dist) = InConeAndRangeBuffer[i];
+                        if (dist > readRangeMeters) continue;
+
                         string plate = toScan.LicensePlate?.Trim();
-                        if (string.IsNullOrEmpty(plate)) {
-                            CurrentHit = null;
-                        } else {
+                        if (string.IsNullOrEmpty(plate)) continue;
+
                         string plateKey = plate.ToUpperInvariant();
                         try {
                             MDTProVehicleData vd = new MDTProVehicleData(toScan);
+                            List<string> flags;
+                            string owner;
+                            string modelDisplayName;
+
                             if (vd.CDFVehicleData?.Owner != null) {
-                                List<string> flags = BuildFlags(vd);
-                                if (flags.Count > 0) {
-                                    bool shouldAlert;
-                                    lock (Lock) {
-                                        shouldAlert = !AlertedPlates.Contains(plateKey);
-                                        if (shouldAlert) {
-                                            AlertedPlates.Add(plateKey);
-                                            PlateCooldown[plateKey] = DateTime.UtcNow.AddSeconds(cooldownSec);
-                                        }
-                                    }
-
-                                    var hit = new ALPRHit {
-                                        Plate = vd.LicensePlate ?? plate,
-                                        Owner = vd.Owner ?? "",
-                                        ModelDisplayName = vd.ModelDisplayName ?? vd.ModelName ?? "",
-                                        Flags = flags,
-                                        TimeScanned = DateTime.Now
-                                    };
-
-                                    CurrentHit = hit;
-
-                                    if (shouldAlert) {
-                                        if (cfg.alprPlaySoundOnHit) {
-                                            // RPH doesn't have built-in sound; could play a native or skip. Skip for now.
-                                        }
-                                        var hitCopy = hit;
-                                        System.Threading.ThreadPool.QueueUserWorkItem(_ =>
-                                            ServerAPI.WebSocketHandler.BroadcastALPRHit(hitCopy));
-                                    }
-                                } else {
-                                    CurrentHit = null;
-                                }
+                                flags = BuildFlags(vd);
+                                owner = vd.Owner ?? "";
+                                modelDisplayName = vd.ModelDisplayName ?? vd.ModelName ?? "";
                             } else {
-                                CurrentHit = null;
+                                flags = new List<string> { "Not in database" };
+                                owner = "—";
+                                modelDisplayName = GetModelDisplayName(toScan);
+                            }
+
+                            if (string.IsNullOrEmpty(modelDisplayName))
+                                modelDisplayName = GetModelDisplayName(toScan);
+
+                            bool shouldAlert;
+                            lock (Lock) {
+                                shouldAlert = !AlertedPlates.Contains(plateKey);
+                                if (shouldAlert) {
+                                    AlertedPlates.Add(plateKey);
+                                    PlateCooldown[plateKey] = DateTime.UtcNow.AddSeconds(cooldownSec);
+                                }
+                            }
+
+                            var hit = new ALPRHit {
+                                Plate = vd.LicensePlate ?? plate,
+                                Owner = owner,
+                                ModelDisplayName = modelDisplayName,
+                                Flags = flags,
+                                TimeScanned = DateTime.Now
+                            };
+
+                            CurrentHit = hit;
+                            processed++;
+
+                            if (shouldAlert) {
+                                if (cfg.alprPlaySoundOnHit) { /* RPH: no built-in sound */ }
+                                var hitCopy = hit;
+                                System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+                                    ServerAPI.WebSocketHandler.BroadcastALPRHit(hitCopy));
                             }
                         } catch (Exception ex) {
                             Log($"ALPR scan skip vehicle {plate}: {ex.Message}", false, LogSeverity.Warning);
-                            CurrentHit = null;
                         }
-                        }
-                        }
-                    } else {
-                        CurrentHit = null;
                     }
                 } catch (Exception ex) {
                     Log($"ALPR scan error: {ex.Message}", true, LogSeverity.Error);
@@ -227,18 +231,35 @@ namespace MDTPro.ALPR {
             return flags;
         }
 
-        /// <summary>Returns the closest vehicle from the buffer (by distance). No LINQ/allocations.</summary>
-        private static Vehicle GetClosestVehicleInBuffer(List<(Vehicle vehicle, float distance)> buffer) {
-            if (buffer == null || buffer.Count == 0) return null;
-            Vehicle closest = buffer[0].vehicle;
-            float minDist = buffer[0].distance;
-            for (int i = 1; i < buffer.Count; i++) {
-                if (buffer[i].distance < minDist) {
-                    minDist = buffer[i].distance;
-                    closest = buffer[i].vehicle;
+        /// <summary>Sorts the buffer in place by distance (closest first).</summary>
+        private static void SortBufferByDistance(List<(Vehicle vehicle, float distance)> buffer) {
+            if (buffer == null || buffer.Count <= 1) return;
+            for (int i = 0; i < buffer.Count - 1; i++) {
+                int minIdx = i;
+                float minDist = buffer[i].distance;
+                for (int j = i + 1; j < buffer.Count; j++) {
+                    if (buffer[j].distance < minDist) {
+                        minDist = buffer[j].distance;
+                        minIdx = j;
+                    }
+                }
+                if (minIdx != i) {
+                    var t = buffer[i];
+                    buffer[i] = buffer[minIdx];
+                    buffer[minIdx] = t;
                 }
             }
-            return closest;
+        }
+
+        /// <summary>Gets localized display name for the vehicle model (used when CDF has no owner data).</summary>
+        private static string GetModelDisplayName(Vehicle v) {
+            if (v == null || !v.Exists()) return "";
+            try {
+                string raw = Rage.Native.NativeFunction.Natives.GET_DISPLAY_NAME_FROM_VEHICLE_MODEL<string>(v.Model.Hash);
+                return string.IsNullOrEmpty(raw) ? "" : Game.GetLocalizedString(raw);
+            } catch {
+                return v.Model?.Name ?? "";
+            }
         }
 
         /// <summary>Returns true if target position is within the given cone (horizontal angle) in front of the cruiser.</summary>

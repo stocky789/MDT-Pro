@@ -80,6 +80,11 @@ namespace MDTPro.Data {
         private static DateTime _lastContextPedSetAt = DateTime.MinValue;
         private static readonly TimeSpan ContextPedTtl = TimeSpan.FromSeconds(60);
 
+        // Evidence trigger reliability (for UI: only show reliably tracked items in court breakdown):
+        // Reliable: HadWeapon (native at arrest), WasWanted (LSPDFR persona), AssaultedPed (damage native + player check), DamagedVehicle (damage native).
+        // Unreliable / conditional: WasPatDown (PR OnPedPatDown only; no LSPDFR), WasDrunk (IS_PED_DRUNK rarely set by game),
+        // WasFleeing (only true if ped is fleeing at exact moment we run; chase-then-stop usually misses), HadIllegalWeapon (needs CDF permit data),
+        // ViolatedSupervision (only from our DB prior cases; no game/PR API).
         private class PedEvidenceContext {
             public bool HadWeapon;
             public bool WasWanted;
@@ -615,7 +620,8 @@ namespace MDTPro.Data {
                         new CourtData.Charge(
                             charge.name,
                             Helper.GetRandomInt(charge.minFine, charge.maxFine),
-                            time
+                            time,
+                            charge.isArrestable
                             )
                         );
                 }
@@ -925,15 +931,23 @@ namespace MDTPro.Data {
                 bool wasDrunk = NativeFunction.Natives.IS_PED_DRUNK<bool>(ped);
                 bool wasFleeing = NativeFunction.Natives.IS_PED_FLEEING<bool>(ped);
 
+                // clearAfterRead: false so we don't clear damage state on first check (improves reliability)
                 Ped[] nearbyPeds = ped.GetNearbyPeds(50);
-                bool assaultedPed = nearbyPeds != null && nearbyPeds.Any(victim =>
-                    victim != ped && victim.IsValid() &&
-                    NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(victim, ped, true));
+                bool assaultedPed = false;
+                Ped playerPed = Main.Player;
+                if (playerPed != null && playerPed.IsValid() && playerPed != ped &&
+                    NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(playerPed, ped, false))
+                    assaultedPed = true;
+                if (!assaultedPed && nearbyPeds != null) {
+                    assaultedPed = nearbyPeds.Any(victim =>
+                        victim != ped && victim.IsValid() &&
+                        NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(victim, ped, false));
+                }
 
                 Vehicle[] nearbyVehicles = ped.GetNearbyVehicles(20);
                 bool damagedVehicle = nearbyVehicles != null && nearbyVehicles.Any(v =>
                     v.IsValid() &&
-                    NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(v, ped, true));
+                    NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(v, ped, false));
 
                 // Illegal weapon carry: armed but weapon permit status is not valid (requires CDF data)
                 // Also check probation/parole violation. Use Holder fallback for re-encounters.

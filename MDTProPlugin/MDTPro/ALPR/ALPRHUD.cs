@@ -23,29 +23,34 @@ namespace MDTPro.ALPR {
             TimeScanned = System.DateTime.UtcNow
         };
 
-        private const float PanelWidth = 220f;
-        private const float PreviewPanelHeight = 64f; // Padding*2 + LineHeight*3 for preview dummy
+        private const float PanelWidth = 240f;
+        private const float PreviewPanelHeight = 74f; // Padding*2 + LineHeight*3 for preview dummy
 
         private const string FontName = "Arial";
-        private const float FontSizeTitle = 14f;
-        private const float FontSizeBody = 11f;
-        private const float LineHeight = 16f;
-        private const float Padding = 8f;
-        private static readonly Color BgColor = Color.FromArgb(180, 20, 25, 35);
-        private static readonly Color BorderColor = Color.FromArgb(220, 70, 130, 180);
-        private static readonly Color TextColor = Color.White;
-        private static readonly Color FlagStolenColor = Color.FromArgb(255, 220, 80, 80);
-        private static readonly Color FlagExpiredColor = Color.FromArgb(255, 255, 165, 0);
+        private const float FontSizeTitle = 15f;
+        private const float FontSizeBody = 12f;
+        private const float LineHeight = 18f;
+        private const float Padding = 10f;
+        // Vanilla GTA 5–style: dark panel, subtle border, LSPD blue accent
+        private static readonly Color BgColor = Color.FromArgb(230, 22, 22, 28);
+        private static readonly Color BorderColor = Color.FromArgb(200, 45, 55, 72);
+        private static readonly Color AccentColor = Color.FromArgb(255, 0, 120, 215); // LSPD blue
+        private static readonly Color TextColor = Color.FromArgb(255, 240, 240, 240);
+        private static readonly Color TextMutedColor = Color.FromArgb(255, 180, 185, 195);
+        private static readonly Color FlagStolenColor = Color.FromArgb(255, 255, 95, 90);
+        private static readonly Color FlagExpiredColor = Color.FromArgb(255, 255, 200, 80);
 
         internal static void Start() {
             if (_subscribed) return;
-            Game.RawFrameRender += OnFrameRender;
+            // Use FrameRender so draw calls are queued with the game's renderer and stay visible
+            // (RawFrameRender draws too early and gets overdrawn by the game HUD)
+            Game.FrameRender += OnFrameRender;
             _subscribed = true;
         }
 
         internal static void Stop() {
             if (!_subscribed) return;
-            Game.RawFrameRender -= OnFrameRender;
+            Game.FrameRender -= OnFrameRender;
             _subscribed = false;
         }
 
@@ -165,36 +170,40 @@ namespace MDTPro.ALPR {
             y = Math.Max(0, Math.Min(actualH - panelH, y));
 
             var rect = new RectangleF(x, y, panelW, panelH);
+            const float AccentBarWidth = 4f;
 
-            // Background
+            // Background (vanilla GTA–style dark panel)
             g.DrawRectangle(rect, BgColor);
-            // Border
-            g.DrawRectangle(new RectangleF(rect.X, rect.Y, rect.Width, 2), BorderColor);
-            g.DrawRectangle(new RectangleF(rect.X, rect.Y + rect.Height - 2, rect.Width, 2), BorderColor);
-            g.DrawRectangle(new RectangleF(rect.X, rect.Y, 2, rect.Height), BorderColor);
-            g.DrawRectangle(new RectangleF(rect.X + rect.Width - 2, rect.Y, 2, rect.Height), BorderColor);
+            // Subtle border (drawn first so accent bar sits inside it)
+            g.DrawRectangle(new RectangleF(rect.X, rect.Y, rect.Width, 1), BorderColor);
+            g.DrawRectangle(new RectangleF(rect.X, rect.Y + rect.Height - 1, rect.Width, 1), BorderColor);
+            g.DrawRectangle(new RectangleF(rect.X, rect.Y, 1, rect.Height), BorderColor);
+            g.DrawRectangle(new RectangleF(rect.X + rect.Width - 1, rect.Y, 1, rect.Height), BorderColor);
+            // Left accent bar (LSPD blue), inset by 1px so it does not overlap the left border
+            g.DrawRectangle(new RectangleF(rect.X + 1, rect.Y, AccentBarWidth, rect.Height), AccentColor);
 
             float lineY = rect.Y + Padding;
+            float textX = rect.X + 1 + Padding + AccentBarWidth + 4f;
 
-            // Plate (title)
-            g.DrawText(hit.Plate ?? "", FontName, FontSizeTitle, new PointF(rect.X + Padding, lineY), TextColor);
+            // Plate (title, bold look)
+            g.DrawText(hit.Plate ?? "", FontName, FontSizeTitle, new PointF(textX, lineY), TextColor);
             lineY += LineHeight;
 
             // Owner
-            g.DrawText((hit.Owner ?? "").Length > 22 ? (hit.Owner ?? "").Substring(0, 22) + "…" : (hit.Owner ?? ""), FontName, FontSizeBody, new PointF(rect.X + Padding, lineY), TextColor);
+            g.DrawText((hit.Owner ?? "").Length > 24 ? (hit.Owner ?? "").Substring(0, 24) + "…" : (hit.Owner ?? ""), FontName, FontSizeBody, new PointF(textX, lineY), TextMutedColor);
             lineY += LineHeight;
 
             // Model
             string model = hit.ModelDisplayName ?? "";
-            if (model.Length > 24) model = model.Substring(0, 24) + "…";
-            g.DrawText(model, FontName, FontSizeBody, new PointF(rect.X + Padding, lineY), TextColor);
+            if (model.Length > 26) model = model.Substring(0, 26) + "…";
+            g.DrawText(model, FontName, FontSizeBody, new PointF(textX, lineY), TextMutedColor);
             lineY += LineHeight;
 
             // Flags
             if (hit.Flags != null) {
                 foreach (string f in hit.Flags) {
                     Color c = IsSevereFlag(f) ? FlagStolenColor : FlagExpiredColor;
-                    g.DrawText("• " + f, FontName, FontSizeBody, new PointF(rect.X + Padding, lineY), c);
+                    g.DrawText("• " + f, FontName, FontSizeBody, new PointF(textX, lineY), c);
                     lineY += LineHeight;
                 }
             }

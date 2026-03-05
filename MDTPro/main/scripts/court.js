@@ -237,9 +237,7 @@ async function createCourtCaseElement(courtCase, language) {
   evidenceBreakdown.classList.add('evidenceBreakdown')
   evidenceBreakdown.style.display = 'none'
 
-  const hasAnyRealEvidence = courtCase.EvidenceHadWeapon || courtCase.EvidenceWasWanted || courtCase.EvidenceWasPatDown
-    || courtCase.EvidenceWasDrunk || courtCase.EvidenceWasFleeing || courtCase.EvidenceAssaultedPed
-    || courtCase.EvidenceDamagedVehicle || courtCase.EvidenceIllegalWeapon || courtCase.EvidenceViolatedSupervision
+  const hasAnyRealEvidence = courtCase.EvidenceHadWeapon || courtCase.EvidenceWasWanted || courtCase.EvidenceAssaultedPed || courtCase.EvidenceDamagedVehicle
   const noEvidenceNote = document.createElement('div')
   noEvidenceNote.classList.add('evidenceBreakdownNote')
   noEvidenceNote.innerText = hasAnyRealEvidence
@@ -275,17 +273,12 @@ async function createCourtCaseElement(courtCase, language) {
   multiplierRow.appendChild(multiplierVal)
   evidenceBreakdown.appendChild(multiplierRow)
 
-  // Scene evidence flags
+  // Scene evidence flags — only show items we can track reliably (see DataController PedEvidenceContext comment)
   const evidenceItems = [
     { label: language.court.evidenceWeapon || 'Armed at Arrest', value: courtCase.EvidenceHadWeapon, active: courtCase.EvidenceHadWeapon },
-    { label: language.court.evidenceIllegalWeapon || 'Illegal Weapon Carry (No Valid Permit)', value: courtCase.EvidenceIllegalWeapon, active: courtCase.EvidenceIllegalWeapon },
     { label: language.court.evidenceWanted || 'Active Warrant at Encounter', value: courtCase.EvidenceWasWanted, active: courtCase.EvidenceWasWanted },
-    { label: language.court.evidencePatDown || 'Pat-Down Search Performed', value: courtCase.EvidenceWasPatDown, active: courtCase.EvidenceWasPatDown },
-    { label: language.court.evidenceDrunk || 'Drunk / Under Influence', value: courtCase.EvidenceWasDrunk, active: courtCase.EvidenceWasDrunk },
-    { label: language.court.evidenceFleeing || 'Fled from Officer', value: courtCase.EvidenceWasFleeing, active: courtCase.EvidenceWasFleeing },
     { label: language.court.evidenceAssault || 'Assaulted Another Person', value: courtCase.EvidenceAssaultedPed, active: courtCase.EvidenceAssaultedPed },
     { label: language.court.evidenceVehicleDamage || 'Damaged Vehicle / Property', value: courtCase.EvidenceDamagedVehicle, active: courtCase.EvidenceDamagedVehicle },
-    { label: language.court.evidenceSupervisionViolation || 'Violated Supervision (Probation/Parole)', value: courtCase.EvidenceViolatedSupervision, active: courtCase.EvidenceViolatedSupervision },
   ]
 
   for (const item of evidenceItems) {
