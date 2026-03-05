@@ -1,16 +1,19 @@
 # ---- Build & dependencies (keep repo clean) ----
 Releases
+Release
+MDT-Pro-v*.zip
 # References = LSPDFR/game DLLs; not in repo. See README "Building (for developers)".
 References
 # NuGet restores these; no need to commit.
 MDTProPlugin/packages
 MDTProPlugin/nuget.exe
-MDTProPlugin/MDTPro/bin
-MDTProPlugin/MDTPro/obj
-# Node (e.g. dev-server.js); ignore if you add npm deps later.
-node_modules/
+# .NET build output
+**/bin/
+**/obj/
 *.user
 *.suo
+# Node (e.g. dev-server.js)
+node_modules/
 
 # ---- IDE / editor (personal preference) ----
 .vs
