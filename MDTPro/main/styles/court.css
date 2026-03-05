@@ -32,7 +32,110 @@ body {
 .courtCaseList {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+}
+
+/* Collapsed row: person name + case # with status on the right */
+.courtCaseListItem {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background-color: var(--color-surface);
+  overflow: hidden;
+}
+
+.courtCaseRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  min-height: 44px;
+}
+
+.courtCaseRow:hover {
+  background-color: var(--color-surface-elevated);
+}
+
+.courtCaseRow:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.courtCaseRowExpandIcon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-primary-half);
+  font-size: 10px;
+  transition: transform 0.2s ease;
+}
+
+.courtCaseListItem--expanded .courtCaseRowExpandIcon {
+  transform: rotate(180deg);
+}
+
+.courtCaseRowExpandIcon::before {
+  content: '▼';
+}
+
+.courtCaseRowName {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.courtCaseRowCaseNumber {
+  font-size: 13px;
+  color: var(--color-text-primary-half);
+  font-family: var(--font-family-mono);
+  flex-shrink: 0;
+}
+
+.courtCaseRowStatus {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: var(--radius-small);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.courtCaseRowStatus--info {
+  background: color-mix(in srgb, var(--color-info) 20%, transparent);
+  color: var(--color-info);
+  border: 1px solid var(--color-info);
+}
+
+.courtCaseRowStatus--error {
+  background: color-mix(in srgb, var(--color-error) 20%, transparent);
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
+}
+
+.courtCaseRowStatus--success {
+  background: color-mix(in srgb, var(--color-success) 20%, transparent);
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
+}
+
+.courtCaseRowStatus--warning {
+  background: color-mix(in srgb, var(--color-warning) 20%, transparent);
+  color: var(--color-warning);
+  border: 1px solid var(--color-warning);
+}
+
+.courtCaseDetails {
+  border-top: 1px solid var(--color-border);
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
 }
 
 .listItem {
@@ -110,6 +213,7 @@ body {
 
 .courtStatusWrapper .buttonWrapper {
   flex-wrap: nowrap;
+  gap: 8px;
 }
 
 .courtStatusWrapper .buttonWrapper button {
@@ -222,6 +326,21 @@ body {
 
 @media (max-width: 900px) {
   .courtControls {
+    grid-template-columns: 1fr;
+  }
+
+  .courtCaseRow {
+    flex-wrap: wrap;
+  }
+
+  .courtCaseRowCaseNumber {
+    width: 100%;
+    order: 1;
+    margin-left: 32px;
+    font-size: 12px;
+  }
+
+  .courtCaseDetails {
     grid-template-columns: 1fr;
   }
 

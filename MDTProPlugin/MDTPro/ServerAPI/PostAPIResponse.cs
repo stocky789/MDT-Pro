@@ -150,6 +150,23 @@ namespace MDTPro.ServerAPI {
                     contentType = "text/plain";
                     status = 404;
                 }
+            } else if (path == "forceResolveCourtCase") {
+                var data = JsonConvert.DeserializeAnonymousType(body, new { Number = "" });
+                if (data == null || string.IsNullOrWhiteSpace(data.Number)) {
+                    buffer = Encoding.UTF8.GetBytes("Bad Request");
+                    contentType = "text/plain";
+                    status = 400;
+                    return;
+                }
+                if (DataController.ForceResolveCourtCase(data.Number)) {
+                    buffer = Encoding.UTF8.GetBytes("OK");
+                    contentType = "text/plain";
+                    status = 200;
+                } else {
+                    buffer = Encoding.UTF8.GetBytes("Not Found");
+                    contentType = "text/plain";
+                    status = 404;
+                }
             } else if (path == "clearSearchHistory") {
                 string searchType = string.IsNullOrWhiteSpace(body) ? "ped" : body.Trim();
                 Database.ClearSearchHistory(searchType);

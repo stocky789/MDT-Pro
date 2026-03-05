@@ -18,13 +18,23 @@ namespace MDTPro.EventListeners {
             "OnRequestPedCheck",
             "OnPedRanThroughDispatch",
             "OnPedArrested",
-            "OnPedReleased"
+            "OnPedReleased",
+            "OnVehicleStopped",
+            "OnPedSurrendered",
+            "OnDeadPedSearched",
+            "OnRequestVehicleCheck",
+            "OnVehicleRanThroughDispatch"
         };
 
         private static readonly Dictionary<string, string> identificationEventTypes = new Dictionary<string, string> {
             { "OnIdentificationGiven",         "State ID" },
             { "OnDriverIdentificationGiven",   "Driver's License" },
             { "OnOccupantIdentificationGiven", "Occupant ID" }
+        };
+
+        private static readonly HashSet<string> vehicleDispatchEventNames = new HashSet<string> {
+            "OnRequestVehicleCheck",
+            "OnVehicleRanThroughDispatch"
         };
 
         internal static void SubscribeToPREvents() {
@@ -42,9 +52,24 @@ namespace MDTPro.EventListeners {
                     eventInfo.AddEventHandler(null, handler);
                 }
 
+                SubscribeToOnFootTrafficStopStarted();
                 subscribed = true;
             } catch (Exception e) {
                 Game.LogTrivial($"MDT Pro: [Warning] Failed to subscribe to PR events: {e.Message}");
+            }
+        }
+
+        private static void SubscribeToOnFootTrafficStopStarted() {
+            try {
+                Type apiType = Type.GetType("PolicingRedefined.API.OnFootTrafficStopAPI, PolicingRedefined");
+                if (apiType == null) return;
+                EventInfo eventInfo = apiType.GetEvent("OnFootTrafficStopStarted", BindingFlags.Public | BindingFlags.Static);
+                if (eventInfo == null) return;
+
+                Delegate handler = CreateForwardingDelegate(eventInfo.EventHandlerType, "OnFootTrafficStopStarted");
+                eventInfo.AddEventHandler(null, handler);
+            } catch (Exception e) {
+                Game.LogTrivial($"MDT Pro: [Warning] Failed to subscribe to PR OnFootTrafficStopStarted: {e.Message}");
             }
         }
 
@@ -70,9 +95,64 @@ namespace MDTPro.EventListeners {
         private static void HandlePREvent(string eventName, object[] args) {
             if (args == null || args.Length == 0) return;
 
+            if (eventName == "OnVehicleStopped" && args[0] is Vehicle vehicle) {
+                DataController.ResolveVehicleAndDriverForStop(vehicle);
+                return;
+            }
+
+            if (vehicleDispatchEventNames.Contains(eventName) && args[0] is Vehicle dispatchVehicle) {
+                DataController.ResolveVehicleAndDriverForStop(dispatchVehicle);
+                return;
+            }
+
+            if (eventName == "OnFootTrafficStopStarted" && args.Length > 0) {
+                HandleOnFootTrafficStopStarted(args[0]);
+                return;
+            }
+
+            if (identificationEventTypes.ContainsKey(eventName) && args.Length >= 2 && args[0] is Ped idPed) {
+                string idType = MapIdentificationEnum(args[1]);
+                if (idType != null) {
+                    if (eventName == "OnOccupantIdentificationGiven") idType = idType + " (occupant)";
+                    DataController.AddIdentificationEvent(idPed, idType);
+                    return;
+                }
+            }
+
             foreach (object value in args) {
                 ResolvePedFromValue(value, eventName);
             }
+        }
+
+        private static void HandleOnFootTrafficStopStarted(object handle) {
+            if (handle == null) return;
+            try {
+                Type apiType = Type.GetType("PolicingRedefined.API.OnFootTrafficStopAPI, PolicingRedefined");
+                if (apiType == null) return;
+                MethodInfo getVehicle = apiType.GetMethod("GetOnFootTrafficStopVehicle", BindingFlags.Public | BindingFlags.Static);
+                MethodInfo getSuspect = apiType.GetMethod("GetOnFootTrafficStopSuspect", BindingFlags.Public | BindingFlags.Static);
+                if (getVehicle == null || getSuspect == null) return;
+
+                object vehicleObj = getVehicle.Invoke(null, new[] { handle });
+                object suspectObj = getSuspect.Invoke(null, new[] { handle });
+                if (suspectObj is Ped suspect && suspect.IsValid())
+                    DataController.ResolvePedForReEncounter(suspect);
+                if (vehicleObj is Vehicle vehicle && vehicle.Exists())
+                    DataController.ResolveVehicleAndDriverForStop(vehicle);
+            } catch (Exception ex) {
+                Game.LogTrivial($"MDT Pro: [Warning] OnFootTrafficStopStarted handler: {ex.Message}");
+            }
+        }
+
+        /// <summary>Maps PR's EGivenIdentification enum to our ID type strings. Returns null if unknown.</summary>
+        private static string MapIdentificationEnum(object enumValue) {
+            if (enumValue == null) return null;
+            Type t = enumValue.GetType();
+            if (!t.IsEnum) return null;
+            string name = enumValue.ToString();
+            if (string.Equals(name, "ID", StringComparison.OrdinalIgnoreCase)) return "State ID";
+            if (string.Equals(name, "DriversLicense", StringComparison.OrdinalIgnoreCase)) return "Driver's License";
+            return null;
         }
 
         private static void ResolvePedFromValue(object value, string eventName) {

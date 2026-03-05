@@ -3,7 +3,7 @@
   const config = await getConfig()
   if (config.updateDomWithLanguageOnLoad) await updateDomWithLanguage('court')
 
-  const courtCases = await (await fetch('/data/court')).json()
+  let courtCases = await (await fetch('/data/court')).json()
   const root = document.querySelector('.list')
   root.innerHTML = ''
 
@@ -18,6 +18,11 @@
     query: '',
     status: 'all',
     sort: 'updatedDesc',
+  }
+
+  const refreshCourtList = async () => {
+    courtCases = await (await fetch('/data/court')).json()
+    await render()
   }
 
   const render = async () => {
@@ -48,7 +53,7 @@
     }
 
     for (const courtCase of filteredCases) {
-      listContainer.appendChild(await createCourtCaseElement(courtCase, language))
+      listContainer.appendChild(await createCourtCaseElement(courtCase, language, refreshCourtList))
     }
   }
 
@@ -97,9 +102,40 @@ function createControls(language) {
   return { wrapper, searchInput, statusSelect, sortSelect }
 }
 
-async function createCourtCaseElement(courtCase, language) {
+async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   const listItem = document.createElement('div')
-  listItem.classList.add('listItem')
+  listItem.classList.add('listItem', 'courtCaseListItem')
+
+  const statusMap = language.court.statusMap || ['Pending', 'Convicted', 'Acquitted', 'Dismissed']
+  const courtStatusColorMap = { 0: 'info', 1: 'error', 2: 'success', 3: 'warning' }
+  const statusLabel = statusMap[courtCase.Status] || 'Unknown'
+  const statusColor = courtStatusColorMap[courtCase.Status] || 'info'
+
+  const row = document.createElement('div')
+  row.classList.add('courtCaseRow')
+  row.setAttribute('role', 'button')
+  row.setAttribute('tabindex', '0')
+  row.setAttribute('aria-expanded', 'false')
+  row.innerHTML = `
+    <span class="courtCaseRowExpandIcon" aria-hidden="true"></span>
+    <span class="courtCaseRowName">${escapeHtml(courtCase.PedName || '–')}</span>
+    <span class="courtCaseRowCaseNumber">${language.court.number || 'Case'}: ${escapeHtml(courtCase.Number || '–')}</span>
+    <span class="courtCaseRowStatus courtCaseRowStatus--${statusColor}">${escapeHtml(statusLabel)}</span>
+  `
+  listItem.appendChild(row)
+
+  const details = document.createElement('div')
+  details.classList.add('courtCaseDetails')
+  details.hidden = true
+  listItem.appendChild(details)
+
+  row.addEventListener('click', () => toggleCourtCaseExpanded(listItem))
+  row.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      toggleCourtCaseExpanded(listItem)
+    }
+  })
 
   const chargesSearchResponseWrapper = document.createElement('div')
   chargesSearchResponseWrapper.classList.add('searchResponseWrapper', 'chargesWrapper', 'section')
@@ -237,7 +273,7 @@ async function createCourtCaseElement(courtCase, language) {
   evidenceBreakdown.classList.add('evidenceBreakdown')
   evidenceBreakdown.style.display = 'none'
 
-  const hasAnyRealEvidence = courtCase.EvidenceHadWeapon || courtCase.EvidenceWasWanted || courtCase.EvidenceAssaultedPed || courtCase.EvidenceDamagedVehicle
+  const hasAnyRealEvidence = courtCase.EvidenceHadWeapon || courtCase.EvidenceWasWanted || courtCase.EvidenceAssaultedPed || courtCase.EvidenceDamagedVehicle || courtCase.EvidenceResisted
   const noEvidenceNote = document.createElement('div')
   noEvidenceNote.classList.add('evidenceBreakdownNote')
   noEvidenceNote.innerText = hasAnyRealEvidence
@@ -279,6 +315,7 @@ async function createCourtCaseElement(courtCase, language) {
     { label: language.court.evidenceWanted || 'Active Warrant at Encounter', value: courtCase.EvidenceWasWanted, active: courtCase.EvidenceWasWanted },
     { label: language.court.evidenceAssault || 'Assaulted Another Person', value: courtCase.EvidenceAssaultedPed, active: courtCase.EvidenceAssaultedPed },
     { label: language.court.evidenceVehicleDamage || 'Damaged Vehicle / Property', value: courtCase.EvidenceDamagedVehicle, active: courtCase.EvidenceDamagedVehicle },
+    { label: language.court.evidenceResisted || 'Resisted Arrest', value: courtCase.EvidenceResisted, active: courtCase.EvidenceResisted },
   ]
 
   for (const item of evidenceItems) {
@@ -413,20 +450,45 @@ async function createCourtCaseElement(courtCase, language) {
   statusWrapper.classList.add('courtStatusWrapper')
   statusWrapper.appendChild(createLabel(language.court.status || 'Status'))
 
-  const courtStatusMap = language.court.statusMap || ['Pending', 'Convicted', 'Acquitted', 'Dismissed']
-  const courtStatusColorMap = { 0: 'info', 1: 'error', 2: 'success', 3: 'warning' }
-
-  const currentStatusLabel = createReadOnlyInput(courtStatusMap[courtCase.Status] || 'Unknown')
+  const currentStatusLabel = createReadOnlyInput(statusMap[courtCase.Status] || 'Unknown')
   currentStatusLabel.style.borderColor = `var(--color-${courtStatusColorMap[courtCase.Status] || 'info'})`
   statusWrapper.appendChild(currentStatusLabel)
 
-  // Only show Dismiss button when case is still pending (auto-resolution handles Convicted/Acquitted)
+  // Only show Dismiss and Force Resolve when case is still pending
   if (courtCase.Status === 0) {
     const statusButtonWrapper = document.createElement('div')
     statusButtonWrapper.classList.add('buttonWrapper')
 
+    const forceResolveBtn = document.createElement('button')
+    forceResolveBtn.className = 'forceResolveBtn'
+    forceResolveBtn.innerText = language.court.forceResolve || 'Force Resolve'
+    forceResolveBtn.style.borderColor = 'var(--color-accent)'
+    forceResolveBtn.addEventListener('click', async function () {
+      if (forceResolveBtn.classList.contains('loading')) return
+      showLoadingOnButton(forceResolveBtn)
+      let responseText
+      try {
+        const res = await fetch('/post/forceResolveCourtCase', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ Number: courtCase.Number }),
+        })
+        responseText = await res.text()
+      } catch (_) {
+        responseText = ''
+      }
+      if (responseText === 'OK' && typeof refreshCourtList === 'function') {
+        topWindow.showNotification(language.court.forceResolveSuccess || 'Case resolved.', 'success')
+        await refreshCourtList()
+      } else {
+        topWindow.showNotification(language.court.forceResolveError || 'Could not resolve case.', 'error')
+      }
+      hideLoadingOnButton(forceResolveBtn)
+    })
+    statusButtonWrapper.appendChild(forceResolveBtn)
+
     const dismissBtn = document.createElement('button')
-    dismissBtn.innerHTML = courtStatusMap[3] || 'Dismissed'
+    dismissBtn.innerHTML = statusMap[3] || 'Dismissed'
     dismissBtn.style.borderColor = `var(--color-${courtStatusColorMap[3]})`
     dismissBtn.addEventListener('click', async function () {
       if (dismissBtn.classList.contains('loading')) return
@@ -453,7 +515,7 @@ async function createCourtCaseElement(courtCase, language) {
         courtCase.Status = 3
         courtCase.Plea = pleaSelect.value
         courtCase.OutcomeNotes = notesInput.value
-        currentStatusLabel.value = courtStatusMap[3] || 'Dismissed'
+        currentStatusLabel.value = statusMap[3] || 'Dismissed'
         currentStatusLabel.style.borderColor = `var(--color-${courtStatusColorMap[3]})`
         statusButtonWrapper.style.display = 'none'
         topWindow.showNotification(language.court.statusUpdated || 'Court case updated', 'success')
@@ -470,10 +532,27 @@ async function createCourtCaseElement(courtCase, language) {
 
   searchResponseWrapper.appendChild(inputWrapper)
   chargesSearchResponseWrapper.appendChild(chargesInputWrapper)
-  listItem.appendChild(searchResponseWrapper)
-  listItem.appendChild(chargesSearchResponseWrapper)
+  details.appendChild(searchResponseWrapper)
+  details.appendChild(chargesSearchResponseWrapper)
 
   return listItem
+}
+
+function escapeHtml(s) {
+  if (s == null || typeof s !== 'string') return '–'
+  const div = document.createElement('div')
+  div.textContent = s
+  return div.innerHTML
+}
+
+function toggleCourtCaseExpanded(listItem) {
+  const details = listItem.querySelector('.courtCaseDetails')
+  const row = listItem.querySelector('.courtCaseRow')
+  if (!details || !row) return
+  const isExpanded = !details.hidden
+  details.hidden = isExpanded
+  row.setAttribute('aria-expanded', isExpanded ? 'false' : 'true')
+  listItem.classList.toggle('courtCaseListItem--expanded', !isExpanded)
 }
 
 function createLabel(text) {
