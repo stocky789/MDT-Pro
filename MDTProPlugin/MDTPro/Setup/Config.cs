@@ -16,6 +16,10 @@ namespace MDTPro.Setup {
         public float hasPriorArrestsProbability = 0.2f;
         public float hasPriorArrestsWithWarrantProbability = 0.8f;
         public float reEncounterChance = 0.08f;
+        /// <summary>Base chance (0-1) for vehicle re-encounter when driver is unknown. Uses reEncounterChance if &lt;= 0.</summary>
+        public float reEncounterVehicleChance = 0.08f;
+        /// <summary>Chance (0-1) for vehicle re-encounter when driver is a known/persistent ped (same person, same car).</summary>
+        public float reEncounterVehicleChanceWhenPedKnown = 0.85f;
         public int maxNumberOfPriorCitations = 5;
         public int maxNumberOfPriorArrests = 3;
         public int maxNumberOfPriorArrestsWithWarrant = 8;
@@ -53,6 +57,7 @@ namespace MDTPro.Setup {
         public float courtEvidenceVehicleDamageBonus = 8f;
         public float courtEvidenceIllegalWeaponBonus = 18f;
         public float courtEvidenceSupervisionViolationBonus = 22f;
+        public float courtEvidenceResistedBonus = 15f;
         public float courtCaseResolutionMinBase = 20f;
         public float courtCaseResolutionMaxMinutes = 300f;
         public float courtCaseResolutionSeverityScale = 12f;
@@ -84,5 +89,31 @@ namespace MDTPro.Setup {
         /// GitHub repo in "owner/repo" format. Leave empty to skip update check.
         /// </summary>
         public string githubReleasesRepo = "stocky789/MDT-Pro";
+
+        // ---- ALPR ----
+        /// <summary>Enable ALPR scanning and HUD in-game. Only active when in a police cruiser and on duty.</summary>
+        public bool alprEnabled = false;
+        /// <summary>ALPR popup auto-close in MDT (seconds). 0 = no auto-close. Used by ALPR plugin.</summary>
+        public int alprPopupDuration = 0;
+        /// <summary>Scan interval in milliseconds. Enforced minimum 1500 ms in code to avoid FPS impact.</summary>
+        public int alprScanIntervalMs = 2000;
+        /// <summary>Maximum distance in meters to consider vehicles (candidates).</summary>
+        public float alprScanRangeMeters = 40f;
+        /// <summary>Effective read range in meters. Only vehicles within this range and in cone are read.</summary>
+        public float alprReadRangeMeters = 12f;
+        /// <summary>Cone angle in degrees (±) from cruiser forward.</summary>
+        public float alprConeAngleDegrees = 45f;
+        /// <summary>Per-plate cooldown before re-alerting (seconds).</summary>
+        public int alprCooldownSeconds = 90;
+        /// <summary>Play sound on flagged hit.</summary>
+        public bool alprPlaySoundOnHit = true;
+        /// <summary>Show in-game popup notification on flagged hit. If false, only the ALPR HUD panel is shown.</summary>
+        public bool alprShowInGameNotification = false;
+        /// <summary>HUD anchor: TopLeft, TopRight, BottomLeft, BottomRight.</summary>
+        public string alprHudAnchor = "TopRight";
+        /// <summary>HUD offset X in pixels from anchor.</summary>
+        public int alprHudOffsetX = 20;
+        /// <summary>HUD offset Y in pixels from anchor.</summary>
+        public int alprHudOffsetY = 150;
     }
 }
