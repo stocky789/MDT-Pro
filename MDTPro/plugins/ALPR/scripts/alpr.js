@@ -63,6 +63,15 @@
     const container = document.querySelector('.overlay .notifications') || document.body
     container.appendChild(wrapper)
 
+    // Keep only the most recent 4 ALPR popups in the MDT
+    const popups = container.querySelectorAll('.alpr-popup')
+    const maxAlprPopups = 4
+    if (popups.length > maxAlprPopups) {
+      for (let i = 0; i < popups.length - maxAlprPopups; i++) {
+        popups[i].remove()
+      }
+    }
+
     if (duration > 0) {
       const timer = wrapper.querySelector('.alpr-popup-timer')
       if (timer) {
