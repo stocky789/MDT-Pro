@@ -258,7 +258,7 @@ namespace MDTPro.ALPR {
                 string raw = Rage.Native.NativeFunction.Natives.GET_DISPLAY_NAME_FROM_VEHICLE_MODEL<string>(v.Model.Hash);
                 return string.IsNullOrEmpty(raw) ? "" : Game.GetLocalizedString(raw);
             } catch {
-                return v.Model?.Name ?? "";
+                return v.Model.Name ?? "";
             }
         }
 
