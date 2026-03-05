@@ -97,11 +97,11 @@ namespace MDTPro.Setup {
         /// <summary>Scan interval in milliseconds. Enforced minimum 1500 ms in code to avoid FPS impact.</summary>
         public int alprScanIntervalMs = 2000;
         /// <summary>Maximum distance in meters to consider vehicles (candidates).</summary>
-        public float alprScanRangeMeters = 25f;
-        /// <summary>Effective read range in meters (mobile ALPR typically 2–8m). Only vehicles within this range and in cone are read.</summary>
-        public float alprReadRangeMeters = 6f;
-        /// <summary>Cone angle in degrees (±) from cruiser forward. Real units work best at ±30°.</summary>
-        public float alprConeAngleDegrees = 30f;
+        public float alprScanRangeMeters = 40f;
+        /// <summary>Effective read range in meters. Only vehicles within this range and in cone are read.</summary>
+        public float alprReadRangeMeters = 12f;
+        /// <summary>Cone angle in degrees (±) from cruiser forward.</summary>
+        public float alprConeAngleDegrees = 45f;
         /// <summary>Per-plate cooldown before re-alerting (seconds).</summary>
         public int alprCooldownSeconds = 90;
         /// <summary>Play sound on flagged hit.</summary>
