@@ -74,5 +74,15 @@ namespace MDTPro.Setup {
         public bool mapSmoothPlayerIcon = false;
 
         public bool showAgencyInCalloutInfo = true;
+
+        /// <summary>
+        /// Check for updates on load via GitHub Releases. Set to false to disable.
+        /// </summary>
+        public bool checkForUpdates = true;
+
+        /// <summary>
+        /// GitHub repo in "owner/repo" format. Leave empty to skip update check.
+        /// </summary>
+        public string githubReleasesRepo = "stocky789/MDT-Pro";
     }
 }
