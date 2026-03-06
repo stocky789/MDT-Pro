@@ -18,10 +18,18 @@ namespace MDTPro.ServerAPI {
                 buffer = File.ReadAllBytes($"{SetupController.MDTProPath}/main/pages/index.html");
                 status = 200;
                 contentType = "text/html";
-            } else if (path == "/favicon") {
-                buffer = File.ReadAllBytes($"{SetupController.MDTProPath}/img/favicon.png");
-                status = 200;
-                contentType = "image/png";
+            } else if (path == "/favicon" || path == "/favicon.svg") {
+                string faviconSvg = $"{SetupController.MDTProPath}/img/favicon.svg";
+                string faviconPng = $"{SetupController.MDTProPath}/img/favicon.png";
+                if (File.Exists(faviconSvg)) {
+                    buffer = File.ReadAllBytes(faviconSvg);
+                    status = 200;
+                    contentType = "image/svg+xml";
+                } else if (File.Exists(faviconPng)) {
+                    buffer = File.ReadAllBytes(faviconPng);
+                    status = 200;
+                    contentType = "image/png";
+                }
             } else if (path == "/customization") {
                 buffer = File.ReadAllBytes($"{SetupController.MDTProPath}/customization/index.html");
                 status = 200;

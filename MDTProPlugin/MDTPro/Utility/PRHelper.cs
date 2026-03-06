@@ -17,6 +17,8 @@ namespace MDTPro.Utility {
                 Citation citation = new Citation(ped, charge.Name, charge.Fine, SetupController.GetLanguage().units.currencySymbol, SetupController.GetConfig().displayCurrencySymbolBeforeNumber, isArrestable);
                 PolicingRedefined.API.PedAPI.GiveCitationToPed(ped, citation);
             }
+            string message = string.Format(SetupController.GetLanguage().inGame.handCitationTo ?? "Hand citation to {0}", courtData.PedName ?? "");
+            if (!string.IsNullOrWhiteSpace(message)) RageNotification.ShowSuccess(message);
         }
     }
 }

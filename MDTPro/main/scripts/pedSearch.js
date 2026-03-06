@@ -5,7 +5,6 @@
 
   await loadRecentIds()
   await loadSearchHistory()
-  await loadRepeatOffenders()
 
   document
     .querySelector('.clearSearchHistoryBtn')
@@ -37,12 +36,10 @@ function filterPersonLists(searchText) {
   const lists = [
     document.querySelector('.recentIdsList'),
     document.querySelector('.searchHistoryList'),
-    document.querySelector('.repeatOffendersList'),
   ]
   const wrappers = [
     document.querySelector('.recentIdsWrapper'),
     document.querySelector('.searchHistoryWrapper'),
-    document.querySelector('.repeatOffendersWrapper'),
   ]
   lists.forEach((list, i) => {
     if (!list || !wrappers[i]) return
@@ -125,37 +122,6 @@ async function loadSearchHistory() {
     item.addEventListener('click', async function () {
       document.querySelector('.searchInputWrapper #pedSearchInput').value =
         entry.ResultName
-      document.querySelector('.searchInputWrapper button').click()
-    })
-    list.appendChild(item)
-  }
-}
-
-async function loadRepeatOffenders() {
-  const language = await getLanguage()
-  const offenders = await (await fetch('/data/repeatOffenders')).json()
-
-  const wrapper = document.querySelector('.repeatOffendersWrapper')
-  const list = document.querySelector('.repeatOffendersList')
-  list.innerHTML = ''
-
-  if (offenders.length === 0) {
-    wrapper.classList.add('hidden')
-    return
-  }
-
-  wrapper.classList.remove('hidden')
-
-  for (const offender of offenders) {
-    const item = document.createElement('button')
-    item.dataset.searchName = offender.Name
-    const count =
-      (offender.CitationCount || 0) + (offender.ArrestCount || 0)
-    item.innerHTML = `${offender.Name} <span class="searchCount">(${count})</span>`
-    if (offender.IsWanted) item.style.borderColor = 'var(--color-error)'
-    item.addEventListener('click', async function () {
-      document.querySelector('.searchInputWrapper #pedSearchInput').value =
-        offender.Name
       document.querySelector('.searchInputWrapper button').click()
     })
     list.appendChild(item)

@@ -16,7 +16,7 @@ namespace MDTPro.Data {
         private static SQLiteConnection connection;
         private static readonly object dbLock = new object();
 
-        private const int CurrentSchemaVersion = 11;
+        private const int CurrentSchemaVersion = 12;
 
         internal static void Initialize() {
             lock (dbLock) {
@@ -158,6 +158,7 @@ namespace MDTPro.Data {
                     EvidenceDamagedVehicle  INTEGER NOT NULL DEFAULT 0,
                     EvidenceIllegalWeapon   INTEGER NOT NULL DEFAULT 0,
                     EvidenceViolatedSupervision INTEGER NOT NULL DEFAULT 0,
+                    EvidenceResisted         INTEGER NOT NULL DEFAULT 0,
                     ConvictionChance        INTEGER NOT NULL DEFAULT 0,
                     ResolveAtUtc            TEXT,
                     RepeatOffenderScore     INTEGER NOT NULL DEFAULT 0,
@@ -481,6 +482,15 @@ namespace MDTPro.Data {
                 Helper.Log("Database migrated to schema version 11 (identification history)");
             }
 
+            if (fromVersion < 12) {
+                using (var cmd = new SQLiteCommand(@"
+                    ALTER TABLE court_cases ADD COLUMN EvidenceResisted INTEGER NOT NULL DEFAULT 0;
+                ", connection)) {
+                    cmd.ExecuteNonQuery();
+                }
+                Helper.Log("Database migrated to schema version 12 (evidence resisted from PR)");
+            }
+
             SetSchemaVersion(CurrentSchemaVersion);
         }
 
@@ -666,6 +676,7 @@ namespace MDTPro.Data {
                                 EvidenceDamagedVehicle = reader["EvidenceDamagedVehicle"] is DBNull ? false : Convert.ToBoolean(reader["EvidenceDamagedVehicle"]),
                                 EvidenceIllegalWeapon = reader["EvidenceIllegalWeapon"] is DBNull ? false : Convert.ToBoolean(reader["EvidenceIllegalWeapon"]),
                                 EvidenceViolatedSupervision = reader["EvidenceViolatedSupervision"] is DBNull ? false : Convert.ToBoolean(reader["EvidenceViolatedSupervision"]),
+                                EvidenceResisted = reader["EvidenceResisted"] is DBNull ? false : Convert.ToBoolean(reader["EvidenceResisted"]),
                                 ConvictionChance = reader["ConvictionChance"] is DBNull ? 0 : Convert.ToInt32(reader["ConvictionChance"]),
                                 ResolveAtUtc = reader["ResolveAtUtc"] as string,
                                 RepeatOffenderScore = Convert.ToInt32(reader["RepeatOffenderScore"]),
@@ -1181,7 +1192,7 @@ namespace MDTPro.Data {
                     PriorCitationCount, PriorArrestCount, PriorConvictionCount, SeverityScore, EvidenceScore,
                     EvidenceHadWeapon, EvidenceWasWanted, EvidenceWasPatDown,
                     EvidenceWasDrunk, EvidenceWasFleeing, EvidenceAssaultedPed, EvidenceDamagedVehicle, EvidenceIllegalWeapon,
-                    EvidenceViolatedSupervision, ConvictionChance, ResolveAtUtc,
+                    EvidenceViolatedSupervision, EvidenceResisted, ConvictionChance, ResolveAtUtc,
                     RepeatOffenderScore,
                     SentenceMultiplier, ProsecutionStrength, DefenseStrength, DocketPressure, PolicyAdjustment,
                     CourtDistrict, CourtName, CourtType, HasPublicDefender, Plea,
@@ -1193,7 +1204,7 @@ namespace MDTPro.Data {
                     @PriorCitationCount, @PriorArrestCount, @PriorConvictionCount, @SeverityScore, @EvidenceScore,
                     @EvidenceHadWeapon, @EvidenceWasWanted, @EvidenceWasPatDown,
                     @EvidenceWasDrunk, @EvidenceWasFleeing, @EvidenceAssaultedPed, @EvidenceDamagedVehicle, @EvidenceIllegalWeapon,
-                    @EvidenceViolatedSupervision, @ConvictionChance, @ResolveAtUtc,
+                    @EvidenceViolatedSupervision, @EvidenceResisted, @ConvictionChance, @ResolveAtUtc,
                     @RepeatOffenderScore,
                     @SentenceMultiplier, @ProsecutionStrength, @DefenseStrength, @DocketPressure, @PolicyAdjustment,
                     @CourtDistrict, @CourtName, @CourtType, @HasPublicDefender, @Plea,
@@ -1224,6 +1235,7 @@ namespace MDTPro.Data {
                 cmd.Parameters.AddWithValue("@EvidenceDamagedVehicle", courtCase.EvidenceDamagedVehicle ? 1 : 0);
                 cmd.Parameters.AddWithValue("@EvidenceIllegalWeapon", courtCase.EvidenceIllegalWeapon ? 1 : 0);
                 cmd.Parameters.AddWithValue("@EvidenceViolatedSupervision", courtCase.EvidenceViolatedSupervision ? 1 : 0);
+                cmd.Parameters.AddWithValue("@EvidenceResisted", courtCase.EvidenceResisted ? 1 : 0);
                 cmd.Parameters.AddWithValue("@ConvictionChance", courtCase.ConvictionChance);
                 cmd.Parameters.AddWithValue("@ResolveAtUtc", (object)courtCase.ResolveAtUtc ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@RepeatOffenderScore", courtCase.RepeatOffenderScore);
