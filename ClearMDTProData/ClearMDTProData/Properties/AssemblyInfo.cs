@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("ClearMDTProData")]
-[assembly: AssemblyCopyright("Copyright (c) 2025 Matt")]
+[assembly: AssemblyCopyright("Copyright (c) 2025 MDT-Pro Contributors")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
