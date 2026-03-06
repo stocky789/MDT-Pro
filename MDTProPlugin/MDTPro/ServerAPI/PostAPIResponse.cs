@@ -90,9 +90,6 @@ namespace MDTPro.ServerAPI {
 
                 Database.SaveCitationReport(report);
 
-                CourtData courtCase = DataController.courtDatabase.Find(x => x.Number == report.CourtCaseNumber);
-                if (courtCase != null) Database.SaveCourtCase(courtCase);
-
                 buffer = Encoding.UTF8.GetBytes("OK");
                 contentType = "text/plain";
                 status = 200;
