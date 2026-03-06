@@ -12,6 +12,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace MDTPro.Data {
     public class DataController {
@@ -82,7 +83,7 @@ namespace MDTPro.Data {
         private static readonly TimeSpan ContextPedTtl = TimeSpan.FromSeconds(60);
 
         // Evidence trigger reliability (for UI: only show reliably tracked items in court breakdown):
-        // Reliable: HadWeapon (native at arrest), WasWanted (LSPDFR persona), AssaultedPed (damage native + player check), DamagedVehicle (damage native).
+        // Reliable: HadWeapon (native at arrest), WasWanted (LSPDFR persona or MDT ped IsWanted/WarrantText), AssaultedPed (damage native + player check), DamagedVehicle (damage native).
         // Resisted: from PR PedAPI.GetPedResistanceAction at arrest (Flee, Attack, Uncooperative = resisted).
         // Unreliable / conditional: WasPatDown (PR OnPedPatDown only; no LSPDFR), WasDrunk (IS_PED_DRUNK rarely set by game),
         // WasFleeing (only true if ped is fleeing at exact moment we run; chase-then-stop usually misses), HadIllegalWeapon (needs CDF permit data),
@@ -308,6 +309,17 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>Look up vehicle by license plate for ALPR. Returns MDT record if present (stolen, registration, etc.).</summary>
+        internal static MDTProVehicleData GetVehicleByLicensePlate(string plate) {
+            if (string.IsNullOrWhiteSpace(plate)) return null;
+            string key = plate.Trim();
+            lock (_vehicleDbLock) {
+                var v = vehicleDatabase.FirstOrDefault(x => string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase));
+                if (v != null) return v;
+                return keepInVehicleDatabase.FirstOrDefault(x => string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase));
+            }
+        }
+
         internal static void SyncPedDatabaseWithCDF() {
             foreach (MDTProPedData databasePed in PedDatabase) {
                 if (databasePed?.CDFPedData == null) continue;
@@ -379,6 +391,17 @@ namespace MDTPro.Data {
                 if (byHolder != null) return byHolder;
             }
             return null;
+        }
+
+        /// <summary>Get ped data by name (case-insensitive). Checks pedDatabase first, then keepInPedDatabase. Used when handing citations so the offender is found even if not currently "nearby".</summary>
+        internal static MDTProPedData GetPedDataByName(string pedName) {
+            if (string.IsNullOrWhiteSpace(pedName)) return null;
+            lock (_pedDbLock) {
+                MDTProPedData byName = pedDatabase.FirstOrDefault(x => x.Name != null && x.Name.Equals(pedName, StringComparison.OrdinalIgnoreCase));
+                if (byName != null) return byName;
+                byName = keepInPedDatabase.FirstOrDefault(x => x.Name != null && x.Name.Equals(pedName, StringComparison.OrdinalIgnoreCase));
+                return byName;
+            }
         }
 
         internal static void AddIdentificationEvent(Ped ped, string eventType) {
@@ -502,6 +525,26 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>Add a name-only stub so a callout-mentioned suspect appears in Person Search. Used when callouts do not register the suspect with CDF.</summary>
+        internal static void AddCalloutSuspectNameToDatabase(string fullName) {
+            if (string.IsNullOrWhiteSpace(fullName)) return;
+            fullName = fullName.Trim();
+            if (fullName.Length < 3) return;
+            MDTProPedData stub = null;
+            lock (_pedDbLock) {
+                if (pedDatabase.Any(x => x.Name != null && x.Name.Equals(fullName, StringComparison.OrdinalIgnoreCase))) return;
+                if (keepInPedDatabase.Any(x => x.Name != null && x.Name.Equals(fullName, StringComparison.OrdinalIgnoreCase))) return;
+                stub = new MDTProPedData { Name = fullName };
+                stub.Citations = new List<CitationGroup.Charge>();
+                stub.Arrests = new List<ArrestGroup.Charge>();
+                stub.IdentificationHistory = new List<MDTProPedData.IdentificationEntry>();
+                pedDatabase.Add(stub);
+                keepInPedDatabase.Add(stub);
+            }
+            KeepPedInDatabase(stub);
+            Database.SavePed(stub);
+        }
+
         internal static void UpdateVehicleData(MDTProVehicleData vehicleData) {
             lock (_vehicleDbLock) {
                 int index = vehicleDatabase.FindIndex(x => x.LicensePlate == vehicleData.LicensePlate);
@@ -556,48 +599,38 @@ namespace MDTPro.Data {
                     if (vehicleDataToAdd != null) KeepVehicleInDatabase(vehicleDataToAdd);
                 }
 
-                string courtCaseNumber = citationReport.CourtCaseNumber ?? Helper.GetCourtCaseNumber();
-
-                citationReport.CourtCaseNumber = courtCaseNumber;
-
-                CourtData courtData = new CourtData(
-                    citationReport.OffenderPedName,
-                    courtCaseNumber,
-                    citationReport.Id,
-                    int.Parse(DateTime.Now.ToString("yy"))
-                    );
-
-                foreach (CitationReport.Charge charge in citationReport.Charges) {
-                    courtData.AddCharge(
-                        new CourtData.Charge(
-                            charge.name,
-                            Helper.GetRandomInt(charge.minFine, charge.maxFine),
-                            0,
-                            charge.isArrestable
-                            )
-                        );
-                }
-
-                BuildCourtCaseMetadata(courtData, citationReport.OffenderPedName, citationReport.Location);
-                ApplyRepeatOffenderSentencing(courtData);
-
-                if (!courtDatabase.Any(x => x.Number == courtCaseNumber)) {
-                    if (courtDatabase.Count > SetupController.GetConfig().courtDatabaseMaxEntries) {
-                        Database.DeleteCourtCase(courtDatabase[0].Number);
-                        courtDatabase.RemoveAt(0);
-                    }
-                    courtDatabase.Add(courtData);
-                }
+                // Citations are resolved directly and should not create court cases.
+                citationReport.CourtCaseNumber = null;
 
                 int index = citationReports.FindIndex(x => x.Id == citationReport.Id);
+                CitationReport existingCitation = index >= 0 ? citationReports[index] as CitationReport : null;
+                bool wasAlreadyClosed = existingCitation?.Status == ReportStatus.Closed;
+                bool newlyClosed = citationReport.Status == ReportStatus.Closed && citationReport.Charges != null && citationReport.Charges.Count > 0 && !wasAlreadyClosed;
+
+                if (newlyClosed) {
+                    // Set FinalAmount once when the citation becomes closed; do not recalculate on later saves.
+                    var chargesToHand = citationReport.Charges
+                        .Select(charge => new PRHelper.CitationHandoutCharge {
+                            Name = charge.name,
+                            Fine = Helper.GetRandomInt(charge.minFine, charge.maxFine),
+                            IsArrestable = charge.isArrestable,
+                        })
+                        .ToList();
+                    citationReport.FinalAmount = chargesToHand.Sum(c => c.Fine);
+                    Database.SaveCitationReport(citationReport);
+
+                    if (Main.usePR) {
+                        PRHelper.GiveCitation(citationReport.OffenderPedName, chargesToHand);
+                    }
+                } else if (citationReport.Status == ReportStatus.Closed) {
+                    // Already closed: persist any other edits without recalculating FinalAmount or re-issuing citation.
+                    Database.SaveCitationReport(citationReport);
+                }
+
                 if (index != -1) {
                     citationReports[index] = citationReport;
                 } else {
                     citationReports.Add(citationReport);
-                }
-                // Notify Policing Redefined so "Give Citation" shows in the ped menu (new or updated citation saved as closed)
-                if (Main.usePR && citationReport.Status == ReportStatus.Closed) {
-                    PRHelper.GiveCitation(courtData);
                 }
             } else if (report is ArrestReport arrestReport) {
                 if (!string.IsNullOrEmpty(arrestReport.OffenderPedName)) {
@@ -953,7 +986,9 @@ namespace MDTPro.Data {
 
                 // 0xA2719263 = WEAPON_UNARMED hash; GET_BEST_PED_WEAPON returns unarmed if ped has no weapon
                 bool hadWeapon = NativeFunction.Natives.GET_BEST_PED_WEAPON<uint>(ped, false) != 0xA2719263u;
-                bool wasWanted = persona.Wanted;
+                MDTProPedData dbPed = GetPedDataForPed(ped);
+                // Use both LSPDFR persona and MDT ped data: MDT is authoritative for warrants (IsWanted/WarrantText)
+                bool wasWanted = persona.Wanted || (dbPed != null && (dbPed.IsWanted || !string.IsNullOrWhiteSpace(dbPed.WarrantText)));
                 bool wasDrunk = NativeFunction.Natives.IS_PED_DRUNK<bool>(ped);
                 bool wasFleeing = NativeFunction.Natives.IS_PED_FLEEING<bool>(ped);
 
@@ -979,7 +1014,6 @@ namespace MDTPro.Data {
                 // Also check probation/parole violation. Use Holder fallback for re-encounters.
                 bool hadIllegalWeapon = false;
                 bool violatedSupervision = false;
-                MDTProPedData dbPed = GetPedDataForPed(ped);
                 if (dbPed != null) {
                     if (hadWeapon && !string.IsNullOrEmpty(dbPed.WeaponPermitStatus)) {
                         hadIllegalWeapon = !dbPed.WeaponPermitStatus.Equals("Valid", StringComparison.OrdinalIgnoreCase);
@@ -1142,10 +1176,12 @@ namespace MDTPro.Data {
             convictionChance = Math.Max(10, Math.Min(90, convictionChance));
 
             if (courtData.IsJuryTrial && courtData.JurySize > 0) {
-                int votesForConviction = 0;
-                for (int i = 0; i < courtData.JurySize; i++) {
-                    if (Helper.GetRandomInt(1, 100) <= convictionChance) votesForConviction++;
-                }
+                // Mean votes for conviction from conviction chance; add spread so we see more 9-3, 8-4 etc. instead of mostly 11-1
+                float meanVotes = (convictionChance / 100f) * courtData.JurySize;
+                int spread = Math.Max(1, courtData.JurySize / 3);
+                int spreadAmount = Helper.GetRandomInt(-spread, spread);
+                int votesForConviction = Math.Max(0, Math.Min(courtData.JurySize,
+                    (int)Math.Round(meanVotes) + spreadAmount));
                 courtData.JuryVotesForConviction = votesForConviction;
                 courtData.JuryVotesForAcquittal = courtData.JurySize - votesForConviction;
             }
@@ -1232,6 +1268,14 @@ namespace MDTPro.Data {
                         if (ctx.HadIllegalWeapon) { score += config.courtEvidenceIllegalWeaponBonus; courtData.EvidenceIllegalWeapon = true; }
                         if (ctx.ViolatedSupervision) { score += config.courtEvidenceSupervisionViolationBonus; courtData.EvidenceViolatedSupervision = true; }
                         if (ctx.Resisted) { score += config.courtEvidenceResistedBonus; courtData.EvidenceResisted = true; }
+                    }
+                }
+                // Fallback: MDT is authoritative for warrants; if cache didn't set EvidenceWasWanted, set from ped record (both pedDatabase and keepInPedDatabase)
+                if (!courtData.EvidenceWasWanted) {
+                    MDTProPedData pedData = GetPedDataByName(courtData.PedName);
+                    if (pedData != null && (pedData.IsWanted || !string.IsNullOrWhiteSpace(pedData.WarrantText))) {
+                        score += config.courtEvidenceWantedBonus;
+                        courtData.EvidenceWasWanted = true;
                     }
                 }
             }

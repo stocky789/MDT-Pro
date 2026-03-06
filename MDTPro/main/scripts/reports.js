@@ -419,6 +419,14 @@ async function renderReports(reports, type) {
         if (report.OffenderPedName) textWrapper.appendChild(offenderElement)
         if (report.OffenderVehicleLicensePlate)
           textWrapper.appendChild(vehicleElement)
+        // FinalAmount is set only when a citation is closed (ReportStatus.Closed = 0)
+        if (type === 'citation' && report.Status == 0 && report.FinalAmount != null) {
+          const finalAmountEl = document.createElement('div')
+          // Await before template; using await inside the literal can show "[object Promise]" in some environments
+          const formattedAmount = await getCurrencyString(report.FinalAmount)
+          finalAmountEl.innerHTML = `${language.reports.list.finalAmount}: <span>${formattedAmount}</span>`
+          textWrapper.appendChild(finalAmountEl)
+        }
         break
     }
 
@@ -521,6 +529,7 @@ async function renderReportInformation(report, type, isList) {
   }
 
   reportInformationEl.innerHTML = ''
+  delete reportInformationEl.dataset.courtCaseNumber
 
   const timeStamp = new Date(report.TimeStamp)
   timeStamp.setMinutes(timeStamp.getMinutes() - timeStamp.getTimezoneOffset())
@@ -588,7 +597,7 @@ async function renderReportInformation(report, type, isList) {
           await getCitationArrestSection(type, isList, report.Charges || [])
         )
       }
-      if (report.CourtCaseNumber)
+      if (type === 'arrest' && report.CourtCaseNumber)
         reportInformationEl.dataset.courtCaseNumber = report.CourtCaseNumber
       break
   }
@@ -854,7 +863,7 @@ async function saveReport(type) {
         )
       }
 
-      report.CourtCaseNumber = el.dataset.courtCaseNumber ?? null
+      report.CourtCaseNumber = null
 
       response = await (
         await fetch('/post/createCitationReport', {

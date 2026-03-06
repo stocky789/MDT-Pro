@@ -5,8 +5,9 @@ namespace MDTPro.Setup {
         public int port = 8080;
         public int maxNumberOfNearbyPedsOrVehicles = 15;
         public int databaseLimitMultiplier = 10;
-        public int webSocketUpdateInterval = 100;
-        public int databaseUpdateInterval = 15000;
+        /// <summary>Milliseconds between WebSocket pushes for time, location, and map coords. Higher = less CPU; 1000 is smooth for taskbar/map.</summary>
+        public int webSocketUpdateInterval = 1000;
+        public int databaseUpdateInterval = 10000;
         public bool updateDomWithLanguageOnLoad = false;
         public bool useInGameTime = false;
         public bool showSecondsInTaskbarClock = false;
@@ -79,6 +80,8 @@ namespace MDTPro.Setup {
         public bool mapSmoothPlayerIcon = false;
 
         public bool showAgencyInCalloutInfo = true;
+        /// <summary>When true, names mentioned in callout additional messages (e.g. "associated with Joe Thomas") are added as stub person records so they appear in Person Search. Callout packs that use CDF to register suspects do not need this.</summary>
+        public bool addCalloutSuspectNamesFromMessages = true;
 
         /// <summary>
         /// Check for updates on load via GitHub Releases. Set to false to disable.
@@ -97,12 +100,12 @@ namespace MDTPro.Setup {
         public int alprPopupDuration = 0;
         /// <summary>Scan interval in milliseconds. Enforced minimum 1500 ms in code to avoid FPS impact.</summary>
         public int alprScanIntervalMs = 2000;
-        /// <summary>Maximum distance in meters to consider vehicles (candidates).</summary>
-        public float alprScanRangeMeters = 40f;
-        /// <summary>Effective read range in meters. Only vehicles within this range and in cone are read.</summary>
-        public float alprReadRangeMeters = 12f;
-        /// <summary>Cone angle in degrees (±) from cruiser forward.</summary>
-        public float alprConeAngleDegrees = 45f;
+        /// <summary>Maximum distance in meters to consider vehicles (candidates). Real mobile ALPR typically 20–25 m.</summary>
+        public float alprScanRangeMeters = 25f;
+        /// <summary>Effective read range in meters. Only vehicles within this range and in cone are read. Real systems ~15–25 m (e.g. 50–75 ft).</summary>
+        public float alprReadRangeMeters = 20f;
+        /// <summary>Cone angle in degrees (±) from cruiser forward. Real LPR cameras use narrow FOV (~15–25° half-angle) for reliable plate capture.</summary>
+        public float alprConeAngleDegrees = 22f;
         /// <summary>Per-plate cooldown before re-alerting (seconds).</summary>
         public int alprCooldownSeconds = 90;
         /// <summary>Play sound on flagged hit.</summary>

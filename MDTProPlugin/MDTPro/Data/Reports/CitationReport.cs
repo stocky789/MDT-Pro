@@ -7,6 +7,8 @@ namespace MDTPro.Data.Reports {
         public string OffenderPedName;
         public string OffenderVehicleLicensePlate;
         public string CourtCaseNumber;
+        /// <summary>Total fine amount when the citation was closed (set when status becomes Closed).</summary>
+        public int? FinalAmount;
         
         public class Charge : CitationGroup.Charge {
             public bool addedByReportInEdit = false;

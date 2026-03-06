@@ -1,11 +1,14 @@
 // Ignore Spelling: Callsign Coords
 
+using MDTPro.Data;
 using MDTPro.Data.Reports;
+using MDTPro.Setup;
 using MDTPro.Utility;
 using LSPD_First_Response.Mod.API;
 using LSPD_First_Response.Mod.Callouts;
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 
 namespace MDTPro.EventListeners {
     public class CalloutEvents {
@@ -65,6 +68,11 @@ namespace MDTPro.EventListeners {
 
                 CalloutInfo = new CalloutInformation(callout);
 
+                if (SetupController.GetConfig().addCalloutSuspectNamesFromMessages) {
+                    TryAddCalloutSuspectNameFromText(CalloutInfo.Message);
+                    TryAddCalloutSuspectNameFromText(CalloutInfo.Advisory);
+                }
+
                 OnCalloutEvent?.Invoke(CalloutInfo);
             }
 
@@ -89,10 +97,32 @@ namespace MDTPro.EventListeners {
             }
         }
 
+        /// <summary>Patterns to extract a suspect name from callout dispatch text (e.g. "associated with Joe Thomas" -> Joe Thomas).</summary>
+        private static readonly Regex[] CalloutSuspectNamePatterns = new[] {
+            new Regex(@"associated with\s+([A-Za-z]+\s+[A-Za-z]+)", RegexOptions.IgnoreCase),
+            new Regex(@"sightings of\s+([A-Za-z]+\s+[A-Za-z]+)", RegexOptions.IgnoreCase),
+            new Regex(@"person (?:named\s+)?([A-Za-z]+\s+[A-Za-z]+)", RegexOptions.IgnoreCase),
+            new Regex(@"identified as\s+([A-Za-z]+\s+[A-Za-z]+)", RegexOptions.IgnoreCase),
+            new Regex(@"suspect\s+([A-Za-z]+\s+[A-Za-z]+)", RegexOptions.IgnoreCase),
+        };
+
         internal static void SendAdditionalMessage(string message) {
             if (CalloutInfo != null) {
                 CalloutInfo.AdditionalMessages.Add(message);
                 OnCalloutEvent?.Invoke(CalloutInfo);
+            }
+            if (SetupController.GetConfig().addCalloutSuspectNamesFromMessages) TryAddCalloutSuspectNameFromText(message);
+        }
+
+        private static void TryAddCalloutSuspectNameFromText(string text) {
+            if (string.IsNullOrWhiteSpace(text)) return;
+            foreach (var re in CalloutSuspectNamePatterns) {
+                var m = re.Match(text);
+                if (m.Success && m.Groups.Count > 1) {
+                    string name = m.Groups[1].Value.Trim();
+                    if (name.Length >= 3) DataController.AddCalloutSuspectNameToDatabase(name);
+                    break;
+                }
             }
         }
     }
