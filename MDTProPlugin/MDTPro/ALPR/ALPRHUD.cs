@@ -30,7 +30,7 @@ namespace MDTPro.ALPR {
             TimeScanned = System.DateTime.UtcNow
         };
 
-        private const float BasePanelWidth = 240f;
+        private const float BasePanelWidth = 320f;
         private const float BasePadding = 10f;
         private const float BaseLineHeight = 18f;
         // PreviewPanelHeight = BasePadding*2 + BaseLineHeight*3 for preview dummy
@@ -38,12 +38,16 @@ namespace MDTPro.ALPR {
         private const string FontName = "Arial";
         private const float BaseFontSizeTitle = 15f;
         private const float BaseFontSizeBody = 12f;
-        // Vanilla GTA 5–style: dark panel, subtle border, LSPD blue accent
-        private static readonly Color BgColor = Color.FromArgb(230, 22, 22, 28);
-        private static readonly Color BorderColor = Color.FromArgb(200, 45, 55, 72);
-        private static readonly Color AccentColor = Color.FromArgb(255, 0, 120, 215); // LSPD blue
-        private static readonly Color TextColor = Color.FromArgb(255, 240, 240, 240);
-        private static readonly Color TextMutedColor = Color.FromArgb(255, 180, 185, 195);
+        // Modernized ALPR card style (dark glass + clear state accents)
+        private static readonly Color BgOuterColor = Color.FromArgb(230, 10, 14, 22);
+        private static readonly Color BgInnerColor = Color.FromArgb(235, 18, 25, 38);
+        private static readonly Color BorderColor = Color.FromArgb(220, 53, 68, 92);
+        private static readonly Color DividerColor = Color.FromArgb(130, 82, 98, 122);
+        private static readonly Color ScanAccentColor = Color.FromArgb(255, 26, 160, 255);
+        private static readonly Color AlertAccentColor = Color.FromArgb(255, 255, 95, 90);
+        private static readonly Color PillBgColor = Color.FromArgb(170, 30, 40, 58);
+        private static readonly Color TextColor = Color.FromArgb(255, 245, 248, 252);
+        private static readonly Color TextMutedColor = Color.FromArgb(255, 170, 182, 202);
         private static readonly Color FlagStolenColor = Color.FromArgb(255, 255, 95, 90);
         private static readonly Color FlagExpiredColor = Color.FromArgb(255, 255, 200, 80);
 
@@ -175,16 +179,27 @@ namespace MDTPro.ALPR {
             float panelW = BasePanelWidth * scale;
             float padding = BasePadding * scale;
             float lineHeight = BaseLineHeight * scale;
-            float fontSizeTitle = BaseFontSizeTitle * scale;
+            float fontSizeTitle = (BaseFontSizeTitle + 1f) * scale;
             float fontSizeBody = BaseFontSizeBody * scale;
-            float accentBarWidth = 4f * scale;
+            float fontSizeSmall = (BaseFontSizeBody - 1f) * scale;
+            float borderW = Math.Max(1, (int)(1 * scale));
+            float topBandH = 24f * scale;
+            float statusPillH = 16f * scale;
+            float statusPillW = 76f * scale;
+            float holdBarH = 3f * scale;
+
+            bool isScanning = IsScanningPlaceholder(hit);
+            bool isAlert = hit.HasFlags;
+            Color accentColor = isAlert ? AlertAccentColor : ScanAccentColor;
+
+            int extraLines = Math.Max(0, hit.Flags?.Count ?? 0);
+            int contentLines = isScanning ? 2 : (2 + extraLines + 1); // plate + owner/model + flags + hold/status
 
             int actualW = Game.Resolution.Width;
             int actualH = Game.Resolution.Height;
             int w = Math.Max(640, actualW);
             int h = Math.Max(480, actualH);
-            int lineCount = 3 + (hit.Flags?.Count ?? 0);
-            float panelH = padding * 2 + lineHeight * lineCount;
+            float panelH = topBandH + padding * 2 + lineHeight * contentLines + holdBarH;
 
             float x, y;
             ResolvePosition(anchor ?? "TopRight", offsetX, offsetY, w, h, panelW, panelH, out x, out y);
@@ -194,46 +209,85 @@ namespace MDTPro.ALPR {
 
             var rect = new RectangleF(x, y, panelW, panelH);
 
-            // Background (vanilla GTA–style dark panel)
-            g.DrawRectangle(rect, BgColor);
-            // Subtle border (drawn first so accent bar sits inside it)
-            float borderW = Math.Max(1, (int)(1 * scale));
+            // Layered card background and border
+            g.DrawRectangle(rect, BgOuterColor);
+            g.DrawRectangle(new RectangleF(rect.X + borderW, rect.Y + borderW, rect.Width - borderW * 2, rect.Height - borderW * 2), BgInnerColor);
             g.DrawRectangle(new RectangleF(rect.X, rect.Y, rect.Width, borderW), BorderColor);
             g.DrawRectangle(new RectangleF(rect.X, rect.Y + rect.Height - borderW, rect.Width, borderW), BorderColor);
             g.DrawRectangle(new RectangleF(rect.X, rect.Y, borderW, rect.Height), BorderColor);
             g.DrawRectangle(new RectangleF(rect.X + rect.Width - borderW, rect.Y, borderW, rect.Height), BorderColor);
-            // Left accent bar (LSPD blue), inset so it does not overlap the left border
-            g.DrawRectangle(new RectangleF(rect.X + borderW, rect.Y, accentBarWidth, rect.Height), AccentColor);
 
-            float lineY = rect.Y + padding;
-            float textX = rect.X + borderW + padding + accentBarWidth + 4f * scale;
+            // Top state band
+            g.DrawRectangle(new RectangleF(rect.X + borderW, rect.Y + borderW, rect.Width - borderW * 2, topBandH), Color.FromArgb(120, accentColor));
 
-            // Plate (title, bold look)
-            g.DrawText(hit.Plate ?? "", FontName, fontSizeTitle, new PointF(textX, lineY), TextColor);
+            float contentX = rect.X + padding;
+            float rightX = rect.X + rect.Width - padding;
+            float lineY = rect.Y + topBandH + padding;
+
+            // Header text
+            string headerTitle = isAlert ? "ALPR ALERT" : "ALPR SCANNER";
+            g.DrawText(headerTitle, FontName, fontSizeSmall, new PointF(contentX, rect.Y + 4f * scale), TextColor);
+
+            // Status pill (top-right)
+            float pillX = rightX - statusPillW;
+            float pillY = rect.Y + 4f * scale;
+            g.DrawRectangle(new RectangleF(pillX, pillY, statusPillW, statusPillH), PillBgColor);
+            string pillText = isAlert ? "HIT" : "SCAN";
+            g.DrawText(pillText, FontName, fontSizeSmall, new PointF(pillX + 6f * scale, pillY + 1f * scale), accentColor);
+
+            // Plate/title line
+            string plateText = isScanning ? "SCANNING" : SafeTrim(hit.Plate, (int)(22 * scale));
+            g.DrawText(string.IsNullOrEmpty(plateText) ? "UNKNOWN" : plateText, FontName, fontSizeTitle, new PointF(contentX, lineY), TextColor);
             lineY += lineHeight;
 
-            // Owner
-            int ownerMaxLen = (int)(24 * scale);
-            string owner = hit.Owner ?? "";
-            if (owner.Length > ownerMaxLen) owner = owner.Substring(0, ownerMaxLen) + "…";
-            g.DrawText(owner, FontName, fontSizeBody, new PointF(textX, lineY), TextMutedColor);
-            lineY += lineHeight;
+            // Owner + model/status line
+            if (isScanning) {
+                g.DrawText("Monitoring nearby plates", FontName, fontSizeBody, new PointF(contentX, lineY), TextMutedColor);
+                lineY += lineHeight;
+            } else {
+                string owner = SafeTrim(hit.Owner, (int)(28 * scale));
+                string model = SafeTrim(hit.ModelDisplayName, (int)(22 * scale));
+                g.DrawText("Owner: " + (string.IsNullOrEmpty(owner) ? "Unknown" : owner), FontName, fontSizeBody, new PointF(contentX, lineY), TextMutedColor);
+                lineY += lineHeight;
+                g.DrawText("Vehicle: " + (string.IsNullOrEmpty(model) ? "Unknown" : model), FontName, fontSizeBody, new PointF(contentX, lineY), TextMutedColor);
+                lineY += lineHeight;
 
-            // Model
-            string model = hit.ModelDisplayName ?? "";
-            int modelMaxLen = (int)(26 * scale);
-            if (model.Length > modelMaxLen) model = model.Substring(0, modelMaxLen) + "…";
-            g.DrawText(model, FontName, fontSizeBody, new PointF(textX, lineY), TextMutedColor);
-            lineY += lineHeight;
-
-            // Flags
-            if (hit.Flags != null) {
-                foreach (string f in hit.Flags) {
-                    Color c = IsSevereFlag(f) ? FlagStolenColor : FlagExpiredColor;
-                    g.DrawText("• " + f, FontName, fontSizeBody, new PointF(textX, lineY), c);
-                    lineY += lineHeight;
+                if (hit.Flags != null && hit.Flags.Count > 0) {
+                    foreach (string f in hit.Flags) {
+                        Color c = IsSevereFlag(f) ? FlagStolenColor : FlagExpiredColor;
+                        g.DrawText("• " + SafeTrim(f, (int)(34 * scale)), FontName, fontSizeBody, new PointF(contentX, lineY), c);
+                        lineY += lineHeight;
+                    }
                 }
+
+                int remaining = ALPRController.GetDisplayedHitSecondsRemaining();
+                g.DrawText("Hold: " + remaining + "s", FontName, fontSizeBody, new PointF(contentX, lineY), TextMutedColor);
+                lineY += lineHeight;
             }
+
+            // Divider + hold bar
+            float dividerY = rect.Y + rect.Height - holdBarH - borderW - 1f;
+            g.DrawRectangle(new RectangleF(rect.X + borderW, dividerY - 1f, rect.Width - borderW * 2, 1f), DividerColor);
+
+            float fillWidth = rect.Width - borderW * 2;
+            if (isAlert) {
+                int remaining = ALPRController.GetDisplayedHitSecondsRemaining();
+                float ratio = Math.Max(0f, Math.Min(1f, remaining / 30f));
+                fillWidth *= ratio;
+            }
+            g.DrawRectangle(new RectangleF(rect.X + borderW, rect.Y + rect.Height - holdBarH - borderW, fillWidth, holdBarH), accentColor);
+        }
+
+        private static bool IsScanningPlaceholder(ALPRHit hit) {
+            if (hit == null) return false;
+            return string.Equals(hit.Owner ?? string.Empty, "Scanning", StringComparison.OrdinalIgnoreCase) &&
+                   !hit.HasFlags;
+        }
+
+        private static string SafeTrim(string value, int maxLen) {
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+            if (maxLen <= 0 || value.Length <= maxLen) return value;
+            return value.Substring(0, maxLen) + "…";
         }
 
         private static bool IsSevereFlag(string flag) {

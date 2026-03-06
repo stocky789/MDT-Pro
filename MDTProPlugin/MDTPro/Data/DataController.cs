@@ -556,38 +556,8 @@ namespace MDTPro.Data {
                     if (vehicleDataToAdd != null) KeepVehicleInDatabase(vehicleDataToAdd);
                 }
 
-                string courtCaseNumber = citationReport.CourtCaseNumber ?? Helper.GetCourtCaseNumber();
-
-                citationReport.CourtCaseNumber = courtCaseNumber;
-
-                CourtData courtData = new CourtData(
-                    citationReport.OffenderPedName,
-                    courtCaseNumber,
-                    citationReport.Id,
-                    int.Parse(DateTime.Now.ToString("yy"))
-                    );
-
-                foreach (CitationReport.Charge charge in citationReport.Charges) {
-                    courtData.AddCharge(
-                        new CourtData.Charge(
-                            charge.name,
-                            Helper.GetRandomInt(charge.minFine, charge.maxFine),
-                            0,
-                            charge.isArrestable
-                            )
-                        );
-                }
-
-                BuildCourtCaseMetadata(courtData, citationReport.OffenderPedName, citationReport.Location);
-                ApplyRepeatOffenderSentencing(courtData);
-
-                if (!courtDatabase.Any(x => x.Number == courtCaseNumber)) {
-                    if (courtDatabase.Count > SetupController.GetConfig().courtDatabaseMaxEntries) {
-                        Database.DeleteCourtCase(courtDatabase[0].Number);
-                        courtDatabase.RemoveAt(0);
-                    }
-                    courtDatabase.Add(courtData);
-                }
+                // Citations are resolved directly and should not create court cases.
+                citationReport.CourtCaseNumber = null;
 
                 int index = citationReports.FindIndex(x => x.Id == citationReport.Id);
                 if (index != -1) {
@@ -597,7 +567,15 @@ namespace MDTPro.Data {
                 }
                 // Notify Policing Redefined so "Give Citation" shows in the ped menu (new or updated citation saved as closed)
                 if (Main.usePR && citationReport.Status == ReportStatus.Closed) {
-                    PRHelper.GiveCitation(courtData);
+                    var chargesToHand = citationReport.Charges
+                        .Select(charge => new PRHelper.CitationHandoutCharge {
+                            Name = charge.name,
+                            Fine = Helper.GetRandomInt(charge.minFine, charge.maxFine),
+                            IsArrestable = charge.isArrestable,
+                        })
+                        .ToList();
+
+                    PRHelper.GiveCitation(citationReport.OffenderPedName, chargesToHand);
                 }
             } else if (report is ArrestReport arrestReport) {
                 if (!string.IsNullOrEmpty(arrestReport.OffenderPedName)) {
