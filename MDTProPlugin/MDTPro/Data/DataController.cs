@@ -37,7 +37,7 @@ namespace MDTPro.Data {
             District = "Los Santos Judicial District",
             CourtName = "Los Santos Superior Court",
             CourtType = "Superior Court",
-            Judges = new[] { "Hon. K. Matthews", "Hon. S. Alvarez", "Hon. D. Whitaker", "Hon. T. Ellison" },
+            Judges = new[] { "Hon. K. Martinez", "Hon. S. Alvarez", "Hon. D. Whitaker", "Hon. T. Ellison" },
             Prosecutors = new[] { "A. Mercer", "L. O'Neil", "M. Reeves" },
             DefenseAttorneys = new[] { "Public Defender Office", "C. Price", "R. Sinclair" },
             PolicyAdjustment = 0.02f,
