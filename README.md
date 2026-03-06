@@ -2,6 +2,8 @@
 
 A Police Computer Plugin for LSPDFR. MDT Pro runs a local web server when you go on duty, so you can use the MDT (Mobile Data Terminal) from any browser—on the same machine or over your network.
 
+![MDT Pro overview](Screenshots/Overview.png)
+
 ## Requirements
 
 - **LSPDFR**
