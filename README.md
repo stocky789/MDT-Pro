@@ -208,7 +208,7 @@ function initTestPage(contentWindow) {
 
 ## Resetting data (optional)
 
-The **ClearMDTProData** utility (in the repo) can reset the SQLite database, legacy shift/court/peds JSON, etc. Run it from the directory that contains the `MDTPro` folder (e.g. GTA V main directory after install, or repo root when using the repo’s `MDTPro`). Use when you want a clean slate without deleting the whole `MDTPro` folder.
+The **ClearMDTProData** utility (in the repo, in the `ClearMDTProData` folder) can reset the SQLite database, legacy shift/court/peds JSON, etc. Build it first (e.g. open `ClearMDTProData/ClearMDTProData.sln` and build, or run `dotnet run` from the `ClearMDTProData` folder). Then run the executable from the directory that contains the `MDTPro` folder (e.g. GTA V main directory after install, or repo root when using the repo’s `MDTPro`). Use when you want a clean slate without deleting the whole `MDTPro` folder.
 
 ## License
 
