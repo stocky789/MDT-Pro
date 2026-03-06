@@ -381,6 +381,17 @@ namespace MDTPro.Data {
             return null;
         }
 
+        /// <summary>Get ped data by name (case-insensitive). Checks pedDatabase first, then keepInPedDatabase. Used when handing citations so the offender is found even if not currently "nearby".</summary>
+        internal static MDTProPedData GetPedDataByName(string pedName) {
+            if (string.IsNullOrWhiteSpace(pedName)) return null;
+            lock (_pedDbLock) {
+                MDTProPedData byName = pedDatabase.FirstOrDefault(x => x.Name != null && x.Name.Equals(pedName, StringComparison.OrdinalIgnoreCase));
+                if (byName != null) return byName;
+                byName = keepInPedDatabase.FirstOrDefault(x => x.Name != null && x.Name.Equals(pedName, StringComparison.OrdinalIgnoreCase));
+                return byName;
+            }
+        }
+
         internal static void AddIdentificationEvent(Ped ped, string eventType) {
             if (ped == null || !ped.IsValid()) return;
             string pedName = null;

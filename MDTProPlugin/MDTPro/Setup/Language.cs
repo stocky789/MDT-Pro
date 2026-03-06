@@ -33,6 +33,10 @@ namespace MDTPro.Setup {
             public string updateAvailable = "A newer version (v{0}) is available. Download from GitHub releases.";
             /// <summary>Shown when a closed citation is saved so the officer can hand it to the suspect. {0} = ped full name.</summary>
             public string handCitationTo = "Hand citation to {0}";
+            /// <summary>Shown when citation was saved but the person is not in range or was not identified this stop (e.g. vehicle stop / ID check).</summary>
+            public string handCitationPersonNotPresent = "Citation saved. Have the person present and identified (e.g. run the vehicle or ask for ID) so you can hand them the citation from the ped menu.";
+            /// <summary>Shown when citation was saved but the person was not found in the database. {0} = offender name.</summary>
+            public string handCitationPersonNotFound = "Citation saved for {0}, but they were not found. Make sure the person was identified (e.g. vehicle stop or ID check) and the name matches exactly.";
         }
 
         public class Index {
