@@ -22,6 +22,13 @@ namespace MDTPro.ALPR {
             Flags = new System.Collections.Generic.List<string>(),
             TimeScanned = System.DateTime.UtcNow
         };
+        private static readonly ALPRHit ScanningDummyHit = new ALPRHit {
+            Plate = "ALPR",
+            Owner = "Scanning",
+            ModelDisplayName = "",
+            Flags = new System.Collections.Generic.List<string>(),
+            TimeScanned = System.DateTime.UtcNow
+        };
 
         private const float BasePanelWidth = 240f;
         private const float BasePadding = 10f;
@@ -63,10 +70,9 @@ namespace MDTPro.ALPR {
                     return;
                 }
                 // Only show ALPR HUD when: enabled in settings, on duty (ALPR only runs then), and in police vehicle.
-                if (ALPRController.CurrentHit == null) return;
                 if (cfg == null || !cfg.alprEnabled) return;
                 if (!IsPlayerInPoliceVehicle()) return;
-                DrawPanel(e.Graphics, ALPRController.CurrentHit, cfg);
+                DrawPanel(e.Graphics, ALPRController.CurrentHit ?? ScanningDummyHit, cfg);
             } catch (Exception) {
                 // Silently ignore draw errors (e.g. during unload)
             }
