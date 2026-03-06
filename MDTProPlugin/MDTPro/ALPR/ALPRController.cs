@@ -18,6 +18,8 @@ namespace MDTPro.ALPR {
         private static readonly HashSet<string> AlertedPlates = new HashSet<string>();
         private static readonly Dictionary<string, DateTime> PlateCooldown = new Dictionary<string, DateTime>();
         private static readonly object Lock = new object();
+        private static readonly TimeSpan CurrentHitHoldDuration = TimeSpan.FromSeconds(30);
+        private static DateTime _currentHitHoldUntilUtc = DateTime.MinValue;
         /// <summary>Reused each scan to avoid per-frame allocations (scan fiber only).</summary>
         private static readonly List<(Vehicle vehicle, float distance)> InConeAndRangeBuffer = new List<(Vehicle, float)>(16);
 
@@ -51,6 +53,7 @@ namespace MDTPro.ALPR {
             _scanFiber = null;
             ALPRHUD.Stop();
             CurrentHit = null;
+            _currentHitHoldUntilUtc = DateTime.MinValue;
             lock (Lock) {
                 AlertedPlates.Clear();
                 PlateCooldown.Clear();
@@ -60,6 +63,7 @@ namespace MDTPro.ALPR {
 
         internal static void Clear() {
             CurrentHit = null;
+            _currentHitHoldUntilUtc = DateTime.MinValue;
             lock (Lock) {
                 AlertedPlates.Clear();
                 PlateCooldown.Clear();
@@ -72,6 +76,7 @@ namespace MDTPro.ALPR {
             int intervalMs = 2000;
             while (IsRunning && Server.RunServer) {
                 try {
+                    ExpireDisplayedHitIfNeeded();
                     var cfg = GetConfig();
                     if (cfg == null || !cfg.alprEnabled) {
                         GameFiber.Sleep(1000);
@@ -89,6 +94,7 @@ namespace MDTPro.ALPR {
                     // ALPR only works when: (1) enabled in settings, (2) on duty (Start/Stop in Main), (3) in police vehicle
                     if (Main.Player == null || !Main.Player.Exists()) {
                         CurrentHit = null;
+                        _currentHitHoldUntilUtc = DateTime.MinValue;
                         GameFiber.Sleep(intervalMs);
                         continue;
                     }
@@ -97,6 +103,7 @@ namespace MDTPro.ALPR {
                     bool inPoliceVehicle = playerVehicle != null && playerVehicle.Exists() && playerVehicle.IsPoliceVehicle;
                     if (!inPoliceVehicle) {
                         CurrentHit = null;
+                        _currentHitHoldUntilUtc = DateTime.MinValue;
                         GameFiber.Sleep(intervalMs);
                         continue;
                     }
@@ -133,7 +140,6 @@ namespace MDTPro.ALPR {
                     SortBufferByDistance(InConeAndRangeBuffer);
                     const int maxReadPerCycle = 3;
                     int processed = 0;
-                    CurrentHit = null;
 
                     for (int i = 0; i < InConeAndRangeBuffer.Count && processed < maxReadPerCycle; i++) {
                         var (toScan, dist) = InConeAndRangeBuffer[i];
@@ -179,7 +185,9 @@ namespace MDTPro.ALPR {
                                 TimeScanned = DateTime.Now
                             };
 
-                            CurrentHit = hit;
+                            if (ShouldReplaceDisplayedHit(hit)) {
+                                SetDisplayedHit(hit);
+                            }
                             processed++;
 
                             if (shouldAlert) {
@@ -285,6 +293,42 @@ namespace MDTPro.ALPR {
                     AlertedPlates.Remove(key);
                 }
             }
+        }
+
+        private static bool IsDisplayedHitHeld() {
+            return CurrentHit != null && DateTime.UtcNow < _currentHitHoldUntilUtc;
+        }
+
+        private static bool ShouldReplaceDisplayedHit(ALPRHit candidate) {
+            if (candidate == null) return false;
+            if (CurrentHit == null) return true;
+            if (!IsDisplayedHitHeld()) return true;
+
+            // While locked, only replace a non-flagged display with a flagged one.
+            // This preserves a stable HUD but still promotes important hits immediately.
+            bool currentHasFlags = CurrentHit.HasFlags;
+            bool candidateHasFlags = candidate.HasFlags;
+            return !currentHasFlags && candidateHasFlags;
+        }
+
+        private static void SetDisplayedHit(ALPRHit hit) {
+            CurrentHit = hit;
+            _currentHitHoldUntilUtc = DateTime.UtcNow.Add(CurrentHitHoldDuration);
+        }
+
+        private static void ExpireDisplayedHitIfNeeded() {
+            if (CurrentHit == null) return;
+            if (DateTime.UtcNow >= _currentHitHoldUntilUtc) {
+                CurrentHit = null;
+                _currentHitHoldUntilUtc = DateTime.MinValue;
+            }
+        }
+
+        internal static int GetDisplayedHitSecondsRemaining() {
+            if (CurrentHit == null) return 0;
+            var remaining = _currentHitHoldUntilUtc - DateTime.UtcNow;
+            if (remaining.TotalSeconds <= 0) return 0;
+            return (int)Math.Ceiling(remaining.TotalSeconds);
         }
     }
 }
