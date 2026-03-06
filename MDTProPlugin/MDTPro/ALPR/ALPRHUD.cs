@@ -23,14 +23,14 @@ namespace MDTPro.ALPR {
             TimeScanned = System.DateTime.UtcNow
         };
 
-        private const float PanelWidth = 240f;
-        private const float PreviewPanelHeight = 74f; // Padding*2 + LineHeight*3 for preview dummy
+        private const float BasePanelWidth = 240f;
+        private const float BasePadding = 10f;
+        private const float BaseLineHeight = 18f;
+        // PreviewPanelHeight = BasePadding*2 + BaseLineHeight*3 for preview dummy
 
         private const string FontName = "Arial";
-        private const float FontSizeTitle = 15f;
-        private const float FontSizeBody = 12f;
-        private const float LineHeight = 18f;
-        private const float Padding = 10f;
+        private const float BaseFontSizeTitle = 15f;
+        private const float BaseFontSizeBody = 12f;
         // Vanilla GTA 5–style: dark panel, subtle border, LSPD blue accent
         private static readonly Color BgColor = Color.FromArgb(230, 22, 22, 28);
         private static readonly Color BorderColor = Color.FromArgb(200, 45, 55, 72);
@@ -56,13 +56,14 @@ namespace MDTPro.ALPR {
 
         private static void OnFrameRender(object sender, GraphicsEventArgs e) {
             try {
+                var cfg = GetConfig();
+                float scale = GetEffectiveScale(cfg);
                 if (_previewMode) {
-                    DrawPanelAt(e.Graphics, PreviewDummyHit, _previewAnchor, _previewOffsetX, _previewOffsetY);
+                    DrawPanelAt(e.Graphics, PreviewDummyHit, _previewAnchor, _previewOffsetX, _previewOffsetY, scale);
                     return;
                 }
                 // Only show ALPR HUD when: enabled in settings, on duty (ALPR only runs then), and in police vehicle.
                 if (ALPRController.CurrentHit == null) return;
-                var cfg = GetConfig();
                 if (cfg == null || !cfg.alprEnabled) return;
                 if (!IsPlayerInPoliceVehicle()) return;
                 DrawPanel(e.Graphics, ALPRController.CurrentHit, cfg);
@@ -90,10 +91,16 @@ namespace MDTPro.ALPR {
             _previewMode = false;
         }
 
+        private static float GetEffectiveScale(Config cfg) {
+            if (cfg == null) return 1f;
+            return Math.Max(0.75f, Math.Min(2f, cfg.alprHudScale));
+        }
+
         /// <summary>When in preview mode, returns the panel's screen rectangle for hit-testing. Panel top-left follows anchor + offset.</summary>
         internal static bool TryGetPreviewBounds(out float x, out float y, out float w, out float h) {
-            w = PanelWidth;
-            h = PreviewPanelHeight;
+            float scale = GetEffectiveScale(GetConfig());
+            w = BasePanelWidth * scale;
+            h = (BasePadding * 2 + BaseLineHeight * 3) * scale;
             if (!_previewMode) {
                 x = y = 0;
                 return false;
@@ -112,8 +119,9 @@ namespace MDTPro.ALPR {
         internal static void ScreenToOffset(string anchor, float screenX, float screenY, out int offsetX, out int offsetY) {
             int actualW = Game.Resolution.Width;
             int actualH = Game.Resolution.Height;
-            float panelW = PanelWidth;
-            float panelH = PreviewPanelHeight;
+            float scale = GetEffectiveScale(GetConfig());
+            float panelW = BasePanelWidth * scale;
+            float panelH = (BasePadding * 2 + BaseLineHeight * 3) * scale;
             screenX = Math.Max(0, Math.Min(actualW - panelW, screenX));
             screenY = Math.Max(0, Math.Min(actualH - panelH, screenY));
             switch ((anchor ?? "TopRight").ToLowerInvariant()) {
@@ -150,18 +158,27 @@ namespace MDTPro.ALPR {
 
         private static void DrawPanel(Rage.Graphics g, ALPRHit hit, Config cfg) {
             if (hit == null || cfg == null) return;
-            DrawPanelAt(g, hit, cfg.alprHudAnchor, cfg.alprHudOffsetX, cfg.alprHudOffsetY);
+            float scale = GetEffectiveScale(cfg);
+            DrawPanelAt(g, hit, cfg.alprHudAnchor, cfg.alprHudOffsetX, cfg.alprHudOffsetY, scale);
         }
 
-        private static void DrawPanelAt(Rage.Graphics g, ALPRHit hit, string anchor, int offsetX, int offsetY) {
+        private static void DrawPanelAt(Rage.Graphics g, ALPRHit hit, string anchor, int offsetX, int offsetY, float scale) {
             if (hit == null) return;
+            if (scale <= 0) scale = 1f;
+
+            float panelW = BasePanelWidth * scale;
+            float padding = BasePadding * scale;
+            float lineHeight = BaseLineHeight * scale;
+            float fontSizeTitle = BaseFontSizeTitle * scale;
+            float fontSizeBody = BaseFontSizeBody * scale;
+            float accentBarWidth = 4f * scale;
+
             int actualW = Game.Resolution.Width;
             int actualH = Game.Resolution.Height;
             int w = Math.Max(640, actualW);
             int h = Math.Max(480, actualH);
-            float panelW = PanelWidth;
             int lineCount = 3 + (hit.Flags?.Count ?? 0);
-            float panelH = Padding * 2 + LineHeight * lineCount;
+            float panelH = padding * 2 + lineHeight * lineCount;
 
             float x, y;
             ResolvePosition(anchor ?? "TopRight", offsetX, offsetY, w, h, panelW, panelH, out x, out y);
@@ -170,41 +187,45 @@ namespace MDTPro.ALPR {
             y = Math.Max(0, Math.Min(actualH - panelH, y));
 
             var rect = new RectangleF(x, y, panelW, panelH);
-            const float AccentBarWidth = 4f;
 
             // Background (vanilla GTA–style dark panel)
             g.DrawRectangle(rect, BgColor);
             // Subtle border (drawn first so accent bar sits inside it)
-            g.DrawRectangle(new RectangleF(rect.X, rect.Y, rect.Width, 1), BorderColor);
-            g.DrawRectangle(new RectangleF(rect.X, rect.Y + rect.Height - 1, rect.Width, 1), BorderColor);
-            g.DrawRectangle(new RectangleF(rect.X, rect.Y, 1, rect.Height), BorderColor);
-            g.DrawRectangle(new RectangleF(rect.X + rect.Width - 1, rect.Y, 1, rect.Height), BorderColor);
-            // Left accent bar (LSPD blue), inset by 1px so it does not overlap the left border
-            g.DrawRectangle(new RectangleF(rect.X + 1, rect.Y, AccentBarWidth, rect.Height), AccentColor);
+            float borderW = Math.Max(1, (int)(1 * scale));
+            g.DrawRectangle(new RectangleF(rect.X, rect.Y, rect.Width, borderW), BorderColor);
+            g.DrawRectangle(new RectangleF(rect.X, rect.Y + rect.Height - borderW, rect.Width, borderW), BorderColor);
+            g.DrawRectangle(new RectangleF(rect.X, rect.Y, borderW, rect.Height), BorderColor);
+            g.DrawRectangle(new RectangleF(rect.X + rect.Width - borderW, rect.Y, borderW, rect.Height), BorderColor);
+            // Left accent bar (LSPD blue), inset so it does not overlap the left border
+            g.DrawRectangle(new RectangleF(rect.X + borderW, rect.Y, accentBarWidth, rect.Height), AccentColor);
 
-            float lineY = rect.Y + Padding;
-            float textX = rect.X + 1 + Padding + AccentBarWidth + 4f;
+            float lineY = rect.Y + padding;
+            float textX = rect.X + borderW + padding + accentBarWidth + 4f * scale;
 
             // Plate (title, bold look)
-            g.DrawText(hit.Plate ?? "", FontName, FontSizeTitle, new PointF(textX, lineY), TextColor);
-            lineY += LineHeight;
+            g.DrawText(hit.Plate ?? "", FontName, fontSizeTitle, new PointF(textX, lineY), TextColor);
+            lineY += lineHeight;
 
             // Owner
-            g.DrawText((hit.Owner ?? "").Length > 24 ? (hit.Owner ?? "").Substring(0, 24) + "…" : (hit.Owner ?? ""), FontName, FontSizeBody, new PointF(textX, lineY), TextMutedColor);
-            lineY += LineHeight;
+            int ownerMaxLen = (int)(24 * scale);
+            string owner = hit.Owner ?? "";
+            if (owner.Length > ownerMaxLen) owner = owner.Substring(0, ownerMaxLen) + "…";
+            g.DrawText(owner, FontName, fontSizeBody, new PointF(textX, lineY), TextMutedColor);
+            lineY += lineHeight;
 
             // Model
             string model = hit.ModelDisplayName ?? "";
-            if (model.Length > 26) model = model.Substring(0, 26) + "…";
-            g.DrawText(model, FontName, FontSizeBody, new PointF(textX, lineY), TextMutedColor);
-            lineY += LineHeight;
+            int modelMaxLen = (int)(26 * scale);
+            if (model.Length > modelMaxLen) model = model.Substring(0, modelMaxLen) + "…";
+            g.DrawText(model, FontName, fontSizeBody, new PointF(textX, lineY), TextMutedColor);
+            lineY += lineHeight;
 
             // Flags
             if (hit.Flags != null) {
                 foreach (string f in hit.Flags) {
                     Color c = IsSevereFlag(f) ? FlagStolenColor : FlagExpiredColor;
-                    g.DrawText("• " + f, FontName, FontSizeBody, new PointF(textX, lineY), c);
-                    lineY += LineHeight;
+                    g.DrawText("• " + f, FontName, fontSizeBody, new PointF(textX, lineY), c);
+                    lineY += lineHeight;
                 }
             }
         }

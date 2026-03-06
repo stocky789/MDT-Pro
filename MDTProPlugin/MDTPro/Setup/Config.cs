@@ -115,5 +115,7 @@ namespace MDTPro.Setup {
         public int alprHudOffsetX = 20;
         /// <summary>HUD offset Y in pixels from anchor.</summary>
         public int alprHudOffsetY = 150;
+        /// <summary>Scale factor for the ALPR HUD panel size (1.0 = default). Clamped 0.75–2.0 in code.</summary>
+        public float alprHudScale = 1.0f;
     }
 }

@@ -17,6 +17,7 @@ namespace MDTPro.UI {
         public static Keys MenuKey { get; set; } = Keys.F7;
 
         private static readonly string[] AnchorValues = { "TopLeft", "TopRight", "BottomLeft", "BottomRight" };
+        private static readonly float[] ScaleValues = { 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f };
         private const int OffsetMin = 0;
         private const int OffsetMax = 400;
         private const int OffsetStep = 10;
@@ -26,6 +27,7 @@ namespace MDTPro.UI {
         private static UIMenu _alprPositionMenu;
         private static UIMenuCheckboxItem _alprEnabledItem;
         private static UIMenuListItem _alprAnchorItem;
+        private static UIMenuListItem _alprScaleItem;
         private static UIMenuListItem _alprOffsetXItem;
         private static UIMenuListItem _alprOffsetYItem;
         private static GameFiber _menuFiber;
@@ -82,6 +84,7 @@ namespace MDTPro.UI {
                 _alprPositionMenu = null;
                 _alprEnabledItem = null;
                 _alprAnchorItem = null;
+                _alprScaleItem = null;
                 _alprOffsetXItem = null;
                 _alprOffsetYItem = null;
             }
@@ -123,6 +126,12 @@ namespace MDTPro.UI {
             _alprPositionMenu.AddItem(_alprAnchorItem);
             _alprAnchorItem.OnListChanged += (sender, newIndex) => ApplyAlprHudAnchor(AnchorValues[newIndex]);
 
+            var scaleDisplay = new List<object> { "75%", "100%", "125%", "150%", "175%", "200%" };
+            int scaleIdx = ScaleToIndex(cfg?.alprHudScale ?? 1f);
+            _alprScaleItem = new UIMenuListItem("Scale", scaleDisplay, scaleIdx, "Panel size. Default is 100%.");
+            _alprPositionMenu.AddItem(_alprScaleItem);
+            _alprScaleItem.OnListChanged += (sender, newIndex) => ApplyAlprHudScale(ScaleValues[newIndex]);
+
             var offsetOptions = new List<object>();
             for (int i = OffsetMin; i <= OffsetMax; i += OffsetStep) offsetOptions.Add(i.ToString());
             int ox = Math.Max(OffsetMin, Math.Min(OffsetMax, cfg?.alprHudOffsetX ?? 20));
@@ -158,6 +167,16 @@ namespace MDTPro.UI {
             }
         }
 
+        private static int ScaleToIndex(float scale) {
+            int best = 1;
+            float bestDiff = float.MaxValue;
+            for (int i = 0; i < ScaleValues.Length; i++) {
+                float d = Math.Abs(ScaleValues[i] - scale);
+                if (d < bestDiff) { bestDiff = d; best = i; }
+            }
+            return best;
+        }
+
         private static void SyncAlprPositionFromConfig() {
             var c = GetConfig();
             if (c == null) return;
@@ -174,8 +193,26 @@ namespace MDTPro.UI {
                     _alprOffsetXItem.Index = idxX;
                 if (_alprOffsetYItem != null && _alprOffsetYItem.Index != idxY)
                     _alprOffsetYItem.Index = idxY;
+                int scaleIdx = ScaleToIndex(Math.Max(0.75f, Math.Min(2f, c.alprHudScale)));
+                if (_alprScaleItem != null && _alprScaleItem.Index != scaleIdx)
+                    _alprScaleItem.Index = scaleIdx;
             } finally {
                 _syncingAlprPositionFromConfig = false;
+            }
+        }
+
+        private static void ApplyAlprHudScale(float value) {
+            if (_syncingAlprPositionFromConfig) return;
+            try {
+                var cfg = GetConfig();
+                if (cfg == null) return;
+                cfg.alprHudScale = Math.Max(0.75f, Math.Min(2f, value));
+                Helper.WriteToJsonFile(ConfigPath, cfg);
+                ResetConfig();
+            } catch (System.Exception ex) {
+                try { ResetConfig(); } catch { }
+                Helper.Log($"SettingsMenu ApplyAlprHudScale: {ex.Message}", true, Helper.LogSeverity.Error);
+                RageNotification.ShowError("Failed to save ALPR scale setting.");
             }
         }
 
