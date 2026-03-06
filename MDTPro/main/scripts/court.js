@@ -17,6 +17,7 @@
   listContainer.addEventListener('click', (e) => {
     const row = e.target && e.target.closest('.courtCaseRow')
     if (!row) return
+    e.preventDefault()
     const listItem = row.closest('.courtCaseListItem')
     if (listItem) toggleCourtCaseExpanded(listItem)
   })
@@ -136,17 +137,10 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   details.hidden = true
   listItem.appendChild(details)
 
-  row.addEventListener('click', (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    const item = (e.currentTarget && e.currentTarget.closest('.courtCaseListItem')) || listItem
-    toggleCourtCaseExpanded(item)
-  })
   row.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
-      const item = (e.currentTarget && e.currentTarget.closest('.courtCaseListItem')) || listItem
-      toggleCourtCaseExpanded(item)
+      toggleCourtCaseExpanded(listItem)
     }
   })
 
