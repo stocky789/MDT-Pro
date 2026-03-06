@@ -1,0 +1,6 @@
+{
+  "name": "ALPR",
+  "description": "Shows ALPR hit popups when the in-game scanner detects flagged vehicles. Enable ALPR in-game first.",
+  "author": "stocky789",
+  "version": "1.0.0"
+}

@@ -25,11 +25,15 @@ namespace MDTPro {
                 RunServer = false;
                 return;
             }
-            string fullIp = $"http://{GetLocalIPAddress()}:{Setup.SetupController.GetConfig().port}";
-            string fullName = $"http://{Environment.MachineName}:{Setup.SetupController.GetConfig().port}";
+            string localIp = GetLocalIPAddress();
+            if (string.IsNullOrEmpty(localIp)) localIp = "localhost";
+            int port = Setup.SetupController.GetConfig().port;
+            string fullIp = $"http://{localIp}:{port}";
+            string fullName = $"http://{Environment.MachineName}:{port}";
             Log($"Listening on: {fullIp}");
             Log($"Listening on: {fullName}");
             File.WriteAllText(Setup.SetupController.IpAddressesPath, $"{fullIp}\n{fullName}");
+            Utility.RageNotification.ShowAddressNotification(localIp, Environment.MachineName, port);
 
             while (RunServer) {
                 try {

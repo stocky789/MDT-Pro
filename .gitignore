@@ -1,12 +1,47 @@
+# ---- Build & dependencies (keep repo clean) ----
+Releases
+Release
+Release/
+MDT-Pro-v*.zip
+# References = LSPDFR/game DLLs; not in repo. See README "Building (for developers)".
 References
-MDTPro/MDTPro.log
-MDTPro/data/*.db
-MDTPro/data/*.json.bak
+# NuGet restores these; no need to commit.
 MDTProPlugin/packages
+MDTProPlugin/nuget.exe
+# .NET build output
+**/bin/
+**/obj/
+*.user
+*.suo
+# Node (e.g. dev-server.js)
+node_modules/
+
+# ---- IDE / editor (personal preference) ----
+.vs
+.vscode
+.idea
 MDTProPlugin/.vs
 MDTProPlugin/.idea
 MDTProPlugin/MDTPro/.vs
-MDTProPlugin/MDTPro/bin
-MDTProPlugin/MDTPro/obj
+agent-tools
+
+# ---- Runtime / local data (don't commit) ----
+MDTPro/MDTPro.log
+MDTPro/data/
+MDTPro/config.json
+MDTPro/language.json
+MDTPro/citationOptions.json
+MDTPro/arrestOptions.json
+MDTPro/ipAddresses.txt
+
+# ---- Secrets / env (never commit) ----
+.env
+.env.*
+
+# ---- Personal / misc ----
 PR_DRAFT.md
-Release/*
+Thumbs.db
+.DS_Store
+desktop.ini
+*.log
+*.pdb

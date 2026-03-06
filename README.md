@@ -1,76 +1,144 @@
 # MDT Pro
 
-A Police Computer Plugin for LSPDFR.
+A Police Computer Plugin for LSPDFR. MDT Pro runs a local web server when you go on duty, so you can use the MDT (Mobile Data Terminal) from any browser—on the same machine or over your network.
+
+## Requirements
+
+- **LSPDFR**
+- **CommonDataFramework (CDF)** — required; the plugin will not load without it.
+- **CalloutInterfaceAPI** — required (DLL in game root or `plugins/LSPDFR/`).
+
+Optional:
+
+- **CalloutInterface** — when installed, the *Active Call* page in the MDT shows live callout details (location, priority, messages). Without it, the page is still available but will not receive callout updates.
+- **PolicingRedefined (PR)** — when installed, citations can be issued to offenders directly from the ped menu in-game, and MDT Pro uses PR events for ped/vehicle stops and arrests.
+
+## Building (for developers)
+
+To build the plugin from source:
+
+1. **Restore NuGet packages**  
+   From repo root:  
+   `nuget restore MDTProPlugin\MDTPro.sln`  
+   (Or open the solution in Visual Studio and build; it will restore automatically.)
+
+2. **Provide reference DLLs**  
+   Create a `References` folder in the repo root and copy these from your GTA V install:
+   - `plugins/LSPDFR/CalloutInterface.dll`
+   - `plugins/LSPDFR/CalloutInterfaceAPI.dll` (or from game root)
+   - `plugins/LSPDFR/CommonDataFramework.dll`
+   - `plugins/LSPDFR/PolicingRedefined.dll`
+   - `plugins/LSPDFR/LSPD First Response.dll` (from `plugins/`)
+   - `IPT.Common.dll` (game root)
+   - `Newtonsoft.Json.dll` (game root, or from NuGet)
+   - `System.Data.SQLite.dll` (from `plugins/LSPDFR/`; or ensure the NuGet package has the DLL in `packages/.../lib/net46/`)
+
+   `References` is in `.gitignore` (each dev uses their own game copy).
+
+3. **Build**  
+   Open `MDTProPlugin/MDTPro.sln` in Visual Studio and build **Release**, or run  
+   `.\build-and-deploy.ps1`  
+   to build and deploy to a GTA V path (edit `$GamePath` in the script or pass `-GamePath "..."` for your install).
 
 ## Installation
 
-- Extract all files and folders from the ZIP into the GTA main directory
+- Extract all files and folders from the ZIP into the GTA V main directory (the folder containing `GTA5.exe`).
 
 ## Setup
 
-- When going on duty using LSPDFR, MDT Pro will display notifications in-game containing the addresses used to access the MDT
-- If the in-game notifications were missed, addresses are also written to `MDTPro/ipAddresses.txt`
-- Access MDT Pro from any browser. Chromium-based browsers (e.g. Chrome, Brave) work best. Enter one of the displayed addresses—if one fails, try another.
+- Go on duty with LSPDFR. MDT Pro will start its web server and show in-game notifications with the addresses to open the MDT.
+- If you miss the notifications, addresses are also written to `MDTPro/ipAddresses.txt`.
+- Open the MDT in any browser. Chromium-based browsers (e.g. Chrome, Brave) work best. Use one of the shown addresses—if one fails (e.g. firewall), try another.
+- The default port is **8080**. You can change it (and other options) on the **Customization** page (see [Customization](#customization)).
 
 ### Setup using Steam overlay
 
-- In Steam go to Steam <a>&rarr;</a> Settings <a>&rarr;</a> In Game
-- Make sure _Enable the Steam Overlay while in-game_ is enabled
-- Set _Overlay shortcut key(s)_ to the key you prefer for opening MDT Pro
-- Set _Web browser home page_ to `http://127.0.0.1:8080` (or the address shown by MDT Pro)
+- In Steam: **Steam → Settings → In-Game**.
+- Enable *Enable the Steam Overlay while in-game*.
+- Set *Overlay shortcut key(s)* to the key you want for opening the overlay (and thus the MDT).
+- Set *Web browser home page* to `http://127.0.0.1:8080` (or the address and port shown by MDT Pro).
 
 ## UI Usage
 
-### Desktop
+### Desktop and Control Panel
 
-- The taskbar shows an MDT Pro icon in the center. Click it to open the _Control Panel_
-- Enter officer information and start or end shifts from the Control Panel
-- The [customization page](#customization) is also accessible from here
+- The **taskbar** shows the badge, current location, a **Settings** (gear) button, and the clock. Click **Settings** to open the **Control Panel**.
+- In the Control Panel you can:
+  - Enter and save **Officer Information** (name, badge number, rank, call sign, department). Use *Fill from Game* to pull your character details from the game when supported.
+  - **Start** or **End** your current shift.
+  - View **Career Statistics** (totals from completed shifts and reports).
+- The **Customization** link in the Control Panel opens the config and plugins page in a new tab.
 
 ### Reports
 
-- All reports include general, officer, and location sections. These are auto-filled but can be edited.
-- The report ID cannot be changed
-- Use the status field in the reports list to filter. Canceled reports are treated as deleted but remain viewable.
-- Reports created while on duty (via the shift menu in the Control Panel) are attached to the current shift
-- A notes section is available to describe the incident or provide additional details
+- All reports include **general**, **officer**, and **location** sections. These are auto-filled from your officer info and current location but can be edited.
+- The **report ID** is generated automatically and cannot be changed.
+- Use the **status** filter in the reports list (e.g. active, completed, canceled). Canceled reports are treated as deleted but remain viewable.
+- Reports created **while a shift is active** (after you have clicked *Start Shift* in the Control Panel) are **attached to that shift** and appear in Shift History.
+- A **notes** section is available for incident description or extra details.
+- Report drafts are auto-saved in the browser; if you leave and return to the create page within 24 hours, you may be prompted to restore the draft.
 
 #### Incident reports
 
-- Incident reports handle any reporting that does not fit the other categories
-- Offender, witness, and victim names are optional
+- Use for any reporting that does not fit citations or arrests.
+- Offender, witness, and victim names are optional.
 
 #### Citation and arrest reports
 
-- The given charges will be added to the offender, if the offender exists, when creating the report
-- With PolicingRedefined installed, citations can be issued to offenders directly from the ped menu
+- The **charges** you add are stored with the report and, if an offender is set, are added to that person’s record for future lookups.
+- With **PolicingRedefined** installed, citations can be **issued to offenders from the ped menu** in-game; the MDT is used to create and manage the citation reports.
 
-### Ped Lookup
+### Person Lookup (Ped Search)
 
-- Entering and searching for a person's name will show various information about that person
-- Click the citation or arrest entry in the history section to create a new report for that ped
+- Search by name to see information about that person (from MDT Pro and, when available, CDF).
+- The **history** section lists citations and arrests. Click a citation or arrest entry to **create a new report** for that ped (pre-filled where applicable).
 
 ### Vehicle Lookup
 
-- Entering and searching for a vehicle's license plate or VIN will show various information about that vehicle
-- Clicking on the owner area in the basic information area will open the ped search for the vehicle's registered owner
+- Search by **license plate** or **VIN** to see vehicle and related information.
+- Click the **owner** in the basic information area to open Person Lookup for the vehicle’s registered owner.
 
 ### Shift History
 
-- View all prior shifts and their linked reports
-- Reports created during a shift are linked
+- View all past shifts and the **reports linked to each shift** (reports created while that shift was active).
+
+### Court
+
+- View and manage **court cases** derived from citation and arrest reports.
+- Filter and sort by status, case number, ped name, or report ID.
+- Cases can be updated (e.g. status, resolution); the system supports docket management, sentencing, and related options configurable in `config.json`.
+
+### Map (GPS)
+
+- Shows your **current position** on a map (updated via WebSocket while the game is running).
+- **Route** from your position to a chosen point; turn-by-turn instructions and map display are provided. Uses in-game road data and configurable routing options.
+
+### Active Call
+
+- Shows details of the **current callout** when **CalloutInterface** is installed: location (postal, street, area, county), priority, message, advisory, unit/callsign, and timestamps (displayed, accepted, finished).
+- Without CalloutInterface, the page opens but does not receive callout data.
 
 ## Customization
 
-The customization page allows activating plugins and changing configuration.
+The **Customization** page (linked from the Control Panel, or open `/page/customization` in a new tab) lets you:
+
+- **Change configuration** — e.g. HTTP port, in-game time vs real time, taskbar clock, window size, map options, court and evidence weights, and more. Settings are stored in `MDTPro/config.json`.
+- **Manage plugins** — enable or disable MDT Pro plugins (see [Plugins](#plugins)).
+
+### ALPR (Automatic License Plate Recognition)
+
+- ALPR is an **optional** in-game feature. Enable it in **Customization** (config) or via the **in-game Settings menu** (default key **F7**; set in `MDTPro/MDTPro.ini`).
+- When enabled and you are **on duty** and in a **police vehicle**, the game scans nearby vehicles and flags plates (e.g. wanted, prior reports). Flagged hits can show an in-game HUD panel and optional sound or notification.
+- The **ALPR plugin** (in `MDTPro/plugins/ALPR/`) adds **popups in the MDT** when the in-game scanner gets a hit, so you can see details in the browser. Enable the plugin on the Customization page.
 
 ## Plugins
 
-Plugins extend MDT Pro's functionality by injecting JavaScript and CSS.
+Plugins extend MDT Pro by injecting JavaScript and CSS and optionally adding new pages.
 
 ### Using a plugin
 
-Place the plugin folder inside `MDTPro/plugins`. The plugin can be activated on the customization page.
+- Place the plugin folder inside `MDTPro/plugins`.
+- Enable the plugin on the **Customization** page.
 
 ### Creating a plugin
 
@@ -94,11 +162,11 @@ Plugin Name
 
 Multiple pages, scripts, and styles are supported per plugin.
 
-- HTML files in `pages` are served at `/plugin/<pluginId>/page/<fileName>`
-- JS files in `scripts` are served at `/plugin/<pluginId>/script/<fileName>`
-- CSS files in `styles` are served at `/plugin/<pluginId>/style/<fileName>`
-- In JavaScript, retrieve the plugin ID with: `const pluginId = document.currentScript.dataset.pluginId`
-Scripts and styles are loaded onto the index page when activated using the customization page.
+- HTML in `pages` is served at `/plugin/<pluginId>/page/<fileName>`
+- JS in `scripts` is served at `/plugin/<pluginId>/script/<fileName>`
+- CSS in `styles` is served at `/plugin/<pluginId>/style/<fileName>`
+- In JavaScript, get the plugin ID with: `const pluginId = document.currentScript.dataset.pluginId`
+- Scripts and styles are loaded on the main index page when the plugin is enabled on the Customization page.
 
 #### info.json example
 
@@ -113,13 +181,13 @@ Scripts and styles are loaded onto the index page when activated using the custo
 
 #### Plugin API
 
-Plugin developers can use the functions in `MDTPro/main/scripts/pluginAPI.js`. Open that file in another editor tab for IntelliSense. All API functions are exposed under the `API` object.
+Use the functions in `MDTPro/main/scripts/pluginAPI.js`. Open that file in an editor for IntelliSense. All API functions are on the `API` object.
 
-#### Example plugin to create a new page
+#### Example: add a new page
 
 ```js
 const pageSVG =
-  '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1 1" xml:space="preserve"><!-- some valid svg stuff --></svg>'
+  '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1 1" xml:space="preserve"><!-- valid SVG --></svg>'
 
 API.createNewPage('test', 'Test Page', pageSVG, initTestPage) // requires test.html in pages folder
 
@@ -128,8 +196,12 @@ function initTestPage(contentWindow) {
 }
 ```
 
+## Resetting data (optional)
+
+The **ClearMDTProData** utility (in the repo) can reset the SQLite database, legacy shift/court/peds JSON, etc. Run it from the directory that contains the `MDTPro` folder (e.g. GTA V main directory after install, or repo root when using the repo’s `MDTPro`). Use when you want a clean slate without deleting the whole `MDTPro` folder.
+
 ## License
 
-MDT Pro is licensed under the [Eclipse Public License - v 2.0](LICENSE)
+MDT Pro is licensed under the [Eclipse Public License - v 2.0](LICENSE).
 
-The following files / folders are excluded and licensed under the [MIT License](MIT%20LICENSE): `MDTPro/arrestOptions.json`, `MDTPro/citationOptions.json`, `MDTPro/language.json`, `MDTPro/config.json`
+The following files/folders are excluded and licensed under the [MIT License](MIT%20LICENSE): `MDTPro/arrestOptions.json`, `MDTPro/citationOptions.json`, `MDTPro/language.json`, `MDTPro/config.json`
