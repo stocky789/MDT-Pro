@@ -105,6 +105,8 @@ function togglePluginActivation(pluginId) {
 
   // Refresh the main MDT page so plugin scripts load and the new app appears in the sidebar
   if (window.opener && !window.opener.closed) {
+    try { window.opener.location.reload() } catch (_) {}
+  }.closed) {
     window.opener.location.reload()
   }
 }

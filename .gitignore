@@ -1,6 +1,7 @@
 # ---- Build & dependencies (keep repo clean) ----
 Releases
 Release
+Release/
 MDT-Pro-v*.zip
 # References = LSPDFR/game DLLs; not in repo. See README "Building (for developers)".
 References
@@ -24,7 +25,7 @@ MDTProPlugin/.idea
 MDTProPlugin/MDTPro/.vs
 agent-tools
 
-# ---- Runtime / local data (don’t commit) ----
+# ---- Runtime / local data (don't commit) ----
 MDTPro/MDTPro.log
 MDTPro/data/
 MDTPro/config.json
