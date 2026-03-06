@@ -309,6 +309,17 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>Look up vehicle by license plate for ALPR. Returns MDT record if present (stolen, registration, etc.).</summary>
+        internal static MDTProVehicleData GetVehicleByLicensePlate(string plate) {
+            if (string.IsNullOrWhiteSpace(plate)) return null;
+            string key = plate.Trim();
+            lock (_vehicleDbLock) {
+                var v = vehicleDatabase.FirstOrDefault(x => string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase));
+                if (v != null) return v;
+                return keepInVehicleDatabase.FirstOrDefault(x => string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase));
+            }
+        }
+
         internal static void SyncPedDatabaseWithCDF() {
             foreach (MDTProPedData databasePed in PedDatabase) {
                 if (databasePed?.CDFPedData == null) continue;
@@ -591,7 +602,13 @@ namespace MDTPro.Data {
                 // Citations are resolved directly and should not create court cases.
                 citationReport.CourtCaseNumber = null;
 
-                if (citationReport.Status == ReportStatus.Closed && citationReport.Charges != null && citationReport.Charges.Count > 0) {
+                int index = citationReports.FindIndex(x => x.Id == citationReport.Id);
+                CitationReport existingCitation = index >= 0 ? citationReports[index] as CitationReport : null;
+                bool wasAlreadyClosed = existingCitation?.Status == ReportStatus.Closed;
+                bool newlyClosed = citationReport.Status == ReportStatus.Closed && citationReport.Charges != null && citationReport.Charges.Count > 0 && !wasAlreadyClosed;
+
+                if (newlyClosed) {
+                    // Set FinalAmount once when the citation becomes closed; do not recalculate on later saves.
                     var chargesToHand = citationReport.Charges
                         .Select(charge => new PRHelper.CitationHandoutCharge {
                             Name = charge.name,
@@ -605,9 +622,11 @@ namespace MDTPro.Data {
                     if (Main.usePR) {
                         PRHelper.GiveCitation(citationReport.OffenderPedName, chargesToHand);
                     }
+                } else if (citationReport.Status == ReportStatus.Closed) {
+                    // Already closed: persist any other edits without recalculating FinalAmount or re-issuing citation.
+                    Database.SaveCitationReport(citationReport);
                 }
 
-                int index = citationReports.FindIndex(x => x.Id == citationReport.Id);
                 if (index != -1) {
                     citationReports[index] = citationReport;
                 } else {
@@ -1251,14 +1270,12 @@ namespace MDTPro.Data {
                         if (ctx.Resisted) { score += config.courtEvidenceResistedBonus; courtData.EvidenceResisted = true; }
                     }
                 }
-                // Fallback: MDT is authoritative for warrants; if cache didn't set EvidenceWasWanted, set from ped record
+                // Fallback: MDT is authoritative for warrants; if cache didn't set EvidenceWasWanted, set from ped record (both pedDatabase and keepInPedDatabase)
                 if (!courtData.EvidenceWasWanted) {
-                    lock (_pedDbLock) {
-                        MDTProPedData pedData = pedDatabase.FirstOrDefault(p => p.Name?.ToLower() == courtData.PedName?.ToLower());
-                        if (pedData != null && (pedData.IsWanted || !string.IsNullOrWhiteSpace(pedData.WarrantText))) {
-                            score += config.courtEvidenceWantedBonus;
-                            courtData.EvidenceWasWanted = true;
-                        }
+                    MDTProPedData pedData = GetPedDataByName(courtData.PedName);
+                    if (pedData != null && (pedData.IsWanted || !string.IsNullOrWhiteSpace(pedData.WarrantText))) {
+                        score += config.courtEvidenceWantedBonus;
+                        courtData.EvidenceWasWanted = true;
                     }
                 }
             }

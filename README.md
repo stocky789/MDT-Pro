@@ -44,6 +44,14 @@ To build the plugin from source:
 
 - Extract all files and folders from the ZIP into the GTA V main directory (the folder containing `GTA5.exe`).
 
+## Updating
+
+- Overwrite the plugin files with the new version (replace the contents of `plugins/LSPDFR/` and the `MDTPro` folder with the updated files, or merge so that new files are added and existing ones updated). Your existing `MDTPro/data/` and `MDTPro/config.json` are preserved if you don’t delete them.
+- **Config:** Existing installs keep the values already in `MDTPro/config.json`. To use a **new default** (e.g. a lower-CPU WebSocket update rate), either:
+  - Open the MDT in your browser → **Settings** (gear) → **Customization** → **Config** tab, change the setting (e.g. `webSocketUpdateInterval` to `1000`), then **Save**, or
+  - Edit `MDTPro/config.json` in a text editor and set the value (e.g. `"webSocketUpdateInterval": 1000`), then save the file.
+- No need to wipe data or config unless you want a full reset (see [Resetting data](#resetting-data-optional)).
+
 ## Setup
 
 - Go on duty with LSPDFR. MDT Pro will start its web server and show in-game notifications with the addresses to open the MDT.
@@ -130,7 +138,8 @@ The **Customization** page (linked from the Control Panel, or open `/page/custom
 ### ALPR (Automatic License Plate Recognition)
 
 - ALPR is an **optional** in-game feature. Enable it in **Customization** (config) or via the **in-game Settings menu** (default key **F7**; set in `MDTPro/MDTPro.ini`).
-- When enabled and you are **on duty** and in a **police vehicle**, the game scans nearby vehicles and flags plates (e.g. wanted, prior reports). Flagged hits can show an in-game HUD panel and optional sound or notification.
+- When enabled and you are **on duty** and in a **police vehicle**, the game scans nearby vehicles and flags plates (e.g. stolen, expired registration/insurance, owner wanted). Flagged hits can show an in-game HUD panel and optional sound or notification.
+- **Where flags come from:** Stolen/expired/wanted are read only from **CDF** and the **MDT database** (vehicles you’ve run or marked in the MDT). If you rarely see any hits, vehicles may be outside the read range—increase `alprReadRangeMeters` in `config.json` (e.g. 18–22).
 - The **ALPR plugin** (in `MDTPro/plugins/ALPR/`) adds **popups in the MDT** when the in-game scanner gets a hit, so you can see details in the browser. Enable the plugin on the Customization page.
 
 ## Plugins

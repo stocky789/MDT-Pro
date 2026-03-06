@@ -145,20 +145,21 @@ async function getChargeDetailsString(type, charge) {
   if (charge.minFine == charge.maxFine) {
     fineString += await getCurrencyString(charge.minFine)
   } else {
-    fineString += `${await getCurrencyString(
-      charge.minFine
-    )} - ${await getCurrencyString(charge.maxFine)}`
+    const minFineStr = await getCurrencyString(charge.minFine)
+    const maxFineStr = await getCurrencyString(charge.maxFine)
+    fineString += `${minFineStr} - ${maxFineStr}`
   }
 
   let incarcerationString = `${language.reports.sections.incarceration}: `
   if (charge.minDays == charge.maxDays) {
     incarcerationString += await convertDaysToYMD(charge.minDays)
   } else {
-    incarcerationString += `${await convertDaysToYMD(charge.minDays)} - ${
+    const minDaysStr = await convertDaysToYMD(charge.minDays)
+    const maxDaysStr =
       charge.maxDays == null
         ? language.units.life
         : await convertDaysToYMD(charge.maxDays)
-    }`
+    incarcerationString += `${minDaysStr} - ${maxDaysStr}`
   }
 
   if (type == 'citation') {
