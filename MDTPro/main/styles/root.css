@@ -1,48 +1,54 @@
 :root {
-  --color-background: #0b1320;
-  --color-surface: #111c2d;
-  --color-surface-dimmed: #111c2de6;
-  --color-surface-elevated: #1b2a41;
-  --color-accent: #63a7ff;
-  --color-accent-dimmed: #63a7ffbf;
-  --color-accent-half: #63a7ff80;
-  --color-accent-secondary: #d7b56d;
-  --color-accent-secondary-dimmed: #d7b56dbf;
-  --color-accent-secondary-half: #d7b56d80;
+  /* San Andreas Government – navy & gold official palette */
+  --color-background: #0a1628;
+  --color-surface: #0f2137;
+  --color-surface-dimmed: #0f2137e6;
+  --color-surface-elevated: #152d47;
+  --color-surface-card: #12243a;
+  --color-accent: #c9a227;
+  --color-accent-dimmed: #c9a227bf;
+  --color-accent-half: #c9a22766;
+  --color-accent-glow: #c9a22722;
+  --color-accent-secondary: #d4c5a0;
+  --color-accent-secondary-dimmed: #d4c5a0bf;
+  --color-accent-secondary-half: #d4c5a066;
 
-  --color-text-primary: #ecf3ff;
-  --color-text-primary-dimmed: #ecf3ffbf;
-  --color-text-primary-half: #ecf3ff80;
-  --color-text-disabled: #8c9bb0;
+  --color-text-primary: #e8e6e1;
+  --color-text-primary-dimmed: #b8b4aa;
+  --color-text-primary-half: #8a8578;
+  --color-text-disabled: #6b6560;
 
-  --color-border: #2c3f5e;
+  --color-border: #1e3a5f;
+  --color-border-subtle: #152d47;
 
-  --color-success: #4caf50;
-  --color-success-half: #4caf5080;
-  --color-info: #2196f3;
-  --color-info-half: #2196f380;
-  --color-warning: #ffb74d;
-  --color-warning-half: #ffb74d80;
-  --color-error: #f44336;
-  --color-error-half: #f4433680;
+  --color-success: #34d399;
+  --color-success-half: #34d39980;
+  --color-info: #38bdf8;
+  --color-info-half: #38bdf880;
+  --color-warning: #fbbf24;
+  --color-warning-half: #fbbf2480;
+  --color-error: #f87171;
+  --color-error-half: #f8717180;
 
   --color-shadow: #00000099;
 
   --color-map: #1862ad;
 
-  --transition-time-short: 100ms;
-  --transition-time-long: 250ms;
+  --transition-time-short: 150ms;
+  --transition-time-long: 280ms;
 
-  --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-family-mono: 'Consolas', 'Courier New', monospace;
 
-  --liquid-ass: blur(12px) saturate(130%);
+  --liquid-ass: none;
 
-  --radius-small: 4px;
-  --radius-medium: 8px;
-  --radius-large: 12px;
-  --shadow-soft: 0 2px 10px #0000005e;
-  --shadow-medium: 0 10px 28px #00000075;
+  --radius-small: 0;
+  --radius-medium: 0;
+  --radius-large: 0;
+  --radius-xl: 0;
+  --shadow-soft: 0 2px 8px #00000030;
+  --shadow-medium: 0 8px 24px #00000040;
+  --shadow-glow: 0 0 24px var(--color-accent-glow);
   --focus-ring: 0 0 0 2px var(--color-accent-half);
 }
 
@@ -99,7 +105,7 @@ body {
 }
 
 button {
-  padding: 6px 8px;
+  padding: 8px 12px;
   background-color: var(--color-surface-elevated);
   border: 1px solid var(--color-border);
   outline: none;
@@ -107,13 +113,10 @@ button {
   border-radius: 0;
   transition: var(--transition-time-short) ease;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   font-family: var(--font-family);
-  border-radius: var(--radius-small);
-  letter-spacing: 0.2px;
-  text-transform: uppercase;
-  font-size: 12px;
+  letter-spacing: 0.02em;
 }
 
 button:disabled {
@@ -182,7 +185,7 @@ input {
     border-color var(--transition-time-short) ease,
     box-shadow var(--transition-time-short) ease,
     background-color var(--transition-time-short) ease;
-  border-radius: var(--radius-small);
+  border-radius: 0;
 }
 
 input:focus,
@@ -200,7 +203,7 @@ select {
   padding: 6px 8px;
   font-size: 14px;
   font-family: var(--font-family);
-  border-radius: var(--radius-small);
+  border-radius: 0;
 }
 
 textarea:focus,
@@ -284,13 +287,13 @@ input[type='number'] {
 }
 
 .buttonWrapper button:first-child {
-  border-top-left-radius: var(--radius-small);
-  border-bottom-left-radius: var(--radius-small);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
 }
 
 .buttonWrapper button:last-child {
-  border-top-right-radius: var(--radius-small);
-  border-bottom-right-radius: var(--radius-small);
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .inputWrapper + .buttonWrapper {
@@ -310,13 +313,13 @@ input[type='number'] {
 }
 
 .searchInputWrapper *:first-child {
-  border-top-left-radius: var(--radius-small);
-  border-bottom-left-radius: var(--radius-small);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
 }
 
 .searchInputWrapper *:last-child {
-  border-top-right-radius: var(--radius-small);
-  border-bottom-right-radius: var(--radius-small);
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .searchResponseWrapper {
@@ -329,7 +332,7 @@ input[type='number'] {
 
 .searchResponseWrapper .inputWrapper > div {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-small);
+  border-radius: 0;
   padding: 5px 10px;
   background-color: var(--color-surface-elevated);
   transition:

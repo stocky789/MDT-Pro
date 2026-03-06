@@ -23,7 +23,11 @@ namespace MDTPro.Data.Reports {
             Area = zone.RealAreaName;
             Street = World.GetStreetName(vector3);
             County = zone.County.ToString();
-            Postal = CommonDataFramework.Modules.Postals.PostalCodeController.GetPostalCode(vector3);
+            try {
+                Postal = CommonDataFramework.Modules.Postals.PostalCodeController.GetPostalCode(vector3);
+            } catch {
+                Postal = null;
+            }
         }
 
         public Location() { }

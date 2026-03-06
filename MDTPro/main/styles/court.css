@@ -2,56 +2,179 @@ body {
   background-color: var(--color-background);
   margin: 0;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, #0d1829 0%, #0b1320 100%),
-    repeating-linear-gradient(
-      0deg,
-      transparent 0,
-      transparent 31px,
-      #ffffff08 32px
-    );
+  min-width: 520px;
 }
 
 .list {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 10px;
-  height: calc(100vh - 20px);
+  padding: 12px;
+  height: calc(100vh - 24px);
   overflow: auto;
   color: var(--color-text-primary);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
+  min-width: 0;
 }
 
 .courtControls {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr;
-  gap: 10px;
+  gap: 12px;
   position: sticky;
   top: 0;
   z-index: 2;
-  padding: 10px;
+  padding: 14px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-medium);
+  border-radius: var(--radius-small);
   background: var(--color-surface);
-  box-shadow: var(--shadow-soft);
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .courtCaseList {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+
+/* Collapsed row: person name + case # with status on the right */
+.courtCaseList .courtCaseListItem {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background-color: var(--color-surface);
+  overflow: hidden;
+  /* Stack row above details (override .listItem 2-column grid) */
+  display: flex;
+  flex-direction: column;
+  grid-template-columns: unset;
+}
+
+/* Details panel: hidden by default, shown only when expanded */
+.courtCaseListItem:not(.courtCaseListItem--expanded) .courtCaseDetails {
+  display: none !important;
+}
+
+.courtCaseListItem--expanded .courtCaseDetails {
+  display: grid;
+}
+
+.courtCaseRow {
+  display: flex;
+  align-items: center;
   gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  min-height: 44px;
+}
+
+.courtCaseRow:hover {
+  background-color: var(--color-surface-elevated);
+}
+
+.courtCaseRow:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.courtCaseRowExpandIcon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-primary);
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.courtCaseRowExpandIcon::before {
+  content: '▶';
+}
+
+.courtCaseListItem--expanded .courtCaseRowExpandIcon::before {
+  content: '▼';
+}
+
+.courtCaseRow,
+.courtCaseRow * {
+  pointer-events: auto;
+}
+
+.courtCaseRowName {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.courtCaseRowCaseNumber {
+  font-size: 13px;
+  color: var(--color-text-primary-half);
+  font-family: var(--font-family-mono);
+  flex-shrink: 0;
+}
+
+.courtCaseRowStatus {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: var(--radius-small);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.courtCaseRowStatus--info {
+  background: color-mix(in srgb, var(--color-info) 20%, transparent);
+  color: var(--color-info);
+  border: 1px solid var(--color-info);
+}
+
+.courtCaseRowStatus--error {
+  background: color-mix(in srgb, var(--color-error) 20%, transparent);
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
+}
+
+.courtCaseRowStatus--success {
+  background: color-mix(in srgb, var(--color-success) 20%, transparent);
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
+}
+
+.courtCaseRowStatus--warning {
+  background: color-mix(in srgb, var(--color-warning) 20%, transparent);
+  color: var(--color-warning);
+  border: 1px solid var(--color-warning);
+}
+
+.courtCaseDetails {
+  border-top: 1px solid var(--color-border);
+  padding: 14px;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  min-width: 0;
+}
+
+.courtCaseDetails .searchResponseWrapper {
+  min-width: 0;
+}
+
+.courtCaseDetails .chargesWrapper {
+  min-width: 0;
 }
 
 .listItem {
-  padding: 0 10px;
+  padding: 14px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-medium);
+  border-radius: var(--radius-small);
   background-color: var(--color-surface);
   display: grid;
   grid-template-columns: 1fr 1fr;
-  box-shadow: var(--shadow-soft);
 }
 
 .searchResponseWrapper:first-child {
@@ -67,28 +190,27 @@ body {
 .courtSectionHeader {
   grid-column: 1 / -1;
   margin-top: 4px;
-  padding: 6px 8px;
+  padding: 8px 10px;
   border: 1px solid var(--color-border);
   border-left: 3px solid var(--color-accent-secondary);
   border-radius: var(--radius-small);
-  background: var(--color-background);
-  color: var(--color-accent-secondary);
-  font-family: var(--font-family-mono);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
   font-size: 12px;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.03em;
 }
 
 .courtHint {
   grid-column: 1 / -1;
-  margin: -4px 0 2px 0;
-  color: var(--color-text-primary-half);
+  margin: 2px 0 4px 0;
+  color: var(--color-text-primary-dimmed);
   font-size: 12px;
   line-height: 1.4;
   font-weight: 500;
-  padding: 6px 8px;
+  padding: 8px 10px;
   border-left: 2px solid var(--color-border);
-  background: #ffffff05;
+  background: var(--color-surface-elevated);
 }
 
 .chargesWrapper .inputWrapper > div label {
@@ -121,6 +243,7 @@ body {
 
 .courtStatusWrapper .buttonWrapper {
   flex-wrap: nowrap;
+  gap: 8px;
 }
 
 .courtStatusWrapper .buttonWrapper button {
@@ -233,6 +356,21 @@ body {
 
 @media (max-width: 900px) {
   .courtControls {
+    grid-template-columns: 1fr;
+  }
+
+  .courtCaseRow {
+    flex-wrap: wrap;
+  }
+
+  .courtCaseRowCaseNumber {
+    width: 100%;
+    order: 1;
+    margin-left: 32px;
+    font-size: 12px;
+  }
+
+  .courtCaseDetails {
     grid-template-columns: 1fr;
   }
 

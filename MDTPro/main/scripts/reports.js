@@ -572,6 +572,7 @@ async function renderReportInformation(report, type, isList) {
       break
     case 'citation':
     case 'arrest':
+      const canEditCharges = !isList || report.canEditCitationArrest
       reportInformationEl.appendChild(
         await getOffenderSection(
           {
@@ -579,12 +580,12 @@ async function renderReportInformation(report, type, isList) {
             vehicleLicensePlate: report.OffenderVehicleLicensePlate,
           },
           isList,
-          report.canEditCitationArrest
+          canEditCharges
         )
       )
-      if (report.canEditCitationArrest || report.Charges.length > 0) {
+      if (canEditCharges || (report.Charges && report.Charges.length > 0)) {
         reportInformationEl.appendChild(
-          await getCitationArrestSection(type, isList, report.Charges)
+          await getCitationArrestSection(type, isList, report.Charges || [])
         )
       }
       if (report.CourtCaseNumber)

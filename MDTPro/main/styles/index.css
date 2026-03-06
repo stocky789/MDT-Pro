@@ -1,170 +1,80 @@
+/* ========== MDT layout: top bar + sidebar list ========== */
 :root {
-  --tb-height: 45px;
+  --tb-height: 56px;
+  --sidebar-width: 220px;
 }
 
-.desktop {
+/* ---------- Top bar (taskbar) ---------- */
+.taskbar {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: calc(100% - var(--tb-height));
-  background:
-    linear-gradient(180deg, #0e1d31 0%, #0a1424 100%),
-    repeating-linear-gradient(
-      90deg,
-      transparent 0,
-      transparent 38px,
-      #ffffff08 39px,
-      transparent 40px
-    );
-  color: var(--color-text-primary);
-  /* background-image: url('/image/map'); */
-  background-repeat: no-repeat;
-  background-size: contain;
-  background-position: center;
-  display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  padding: 20px;
-  box-sizing: border-box;
-  gap: 20px;
-  overflow: auto;
-}
-
-@media (max-width: 700px) {
-  .desktop {
-    padding: 12px;
-    gap: 12px;
-  }
-
-  .desktop .desktopItem {
-    width: 110px;
-    font-size: 14px;
-  }
-
-  .desktop .desktopItem .icon {
-    width: 54px;
-    height: 54px;
-  }
-}
-
-.desktop .desktopItem {
-  width: 140px;
-  text-align: center;
-  transition:
-    background-color var(--transition-time-short) ease,
-    transform var(--transition-time-short) ease,
-    border-color var(--transition-time-short) ease;
-  border-radius: var(--radius-medium);
-  font-size: 16px;
-  padding: 5px;
-  background-color: transparent;
-  border: 1px solid transparent;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-items: center;
-  box-sizing: unset;
-}
-
-.desktop .desktopItem:hover {
-  background-color: var(--color-surface-dimmed);
-  color: var(--color-text-primary);
-  border-color: var(--color-accent-half);
-  transform: translateY(-2px);
-}
-
-.desktop .desktopItem:focus {
-  outline: none;
-  border-color: var(--color-border);
-}
-
-.desktop .desktopItem .icon {
-  width: 62px;
-  height: 62px;
-  margin-bottom: 5px;
-  fill: var(--color-accent-dimmed);
-  padding: 6px;
-  border-radius: var(--radius-medium);
-  border: 1px solid #ffffff17;
-  background: linear-gradient(180deg, #1f3552 0%, #16263b 100%);
-}
-
-.desktop .desktopItem .icon.stroke {
-  fill: none;
-  stroke: var(--color-accent-dimmed);
-}
-
-.desktop .desktopItem .title {
-  text-shadow: 1px 1px 2px var(--color-shadow);
-  word-wrap: break-word;
-  display: block;
-  line-height: 1.25;
-}
-
-.taskbar {
-  --border-width: 1px;
-  height: calc(var(--tb-height) - var(--border-width));
-  width: 100%;
-  position: fixed;
-  left: 0;
-  bottom: 0;
-  color: var(--color-text-primary);
-  background: linear-gradient(180deg, #1b2e49f2 0%, #122136f2 100%);
-  border-top: var(--border-width) solid var(--color-border);
-  backdrop-filter: blur(14px) saturate(120%);
-  -webkit-backdrop-filter: blur(14px) saturate(120%);
-  box-shadow: 0 -4px 16px #00000055;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 14px;
-  font-weight: 600;
+  right: 0;
+  height: var(--tb-height);
   z-index: 4;
-  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px 0 16px;
+  background-color: var(--color-surface);
+  border-bottom: 2px solid var(--color-accent-half);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  box-sizing: border-box;
 }
 
-.taskbar::before {
-  content: 'LOS SANTOS POLICE DEPARTMENT • MOBILE DATA TERMINAL';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translateX(-50%);
-  font-size: 10px;
-  letter-spacing: 0.9px;
-  color: var(--color-text-primary-half);
-  pointer-events: none;
-  opacity: 0.45;
+.taskbarBrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  background: transparent;
+}
+
+.taskbarLogo {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.taskbarBadge {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  background-color: var(--color-surface);
+}
+
+.taskbarTitle {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-accent-secondary);
   white-space: nowrap;
-  max-width: calc(100% - 260px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+}
+
+.taskbar .location {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-family-mono);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary-dimmed);
+  min-width: 0;
+  max-width: 280px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.taskbar > * {
-  white-space: nowrap;
-}
-
-.taskbar .time {
-  text-align: right;
-  padding-right: 10px;
-  color: var(--color-text-primary-dimmed);
-  font-family: var(--font-family-mono);
-  letter-spacing: 0.5px;
-}
-
-.taskbar .location {
-  padding-left: 10px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-family: var(--font-family-mono);
-  color: var(--color-accent-secondary);
-}
-
 .taskbar .location svg {
-  width: 25px;
-  height: 25px;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
   fill: var(--color-accent);
 }
 
@@ -174,29 +84,66 @@
 }
 
 .taskbar .icons {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
-  gap: 5px;
-  transition: var(--transition-time-long) ease;
-  z-index: 2;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .taskbar .icons button {
-  outline: none;
-  width: 40px;
-  height: 40px;
-  background-color: transparent;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  position: relative;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   border: none;
   border-radius: var(--radius-small);
-  padding: unset;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   transition: background-color var(--transition-time-short) ease;
-  transition: opacity var(--transition-time-long) ease;
+}
+
+.taskbar .icons button.settings {
+  width: auto;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 14px;
+  gap: 8px;
+  background-color: var(--color-surface-elevated);
+  border: 1px solid var(--color-accent-half);
+  color: var(--color-accent);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.taskbar .icons button.settings:hover,
+.taskbar .icons button.settings:focus,
+.taskbar .icons button.settings.focused {
+  background-color: var(--color-accent-half);
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
+}
+
+.taskbar .icons button.settings .settingsIcon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+
+.taskbar .icons button.settings .settingsIcon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.taskbar .icons button.settings .settingsLabel {
+  white-space: nowrap;
 }
 
 .taskbar .icons button:hover,
@@ -205,33 +152,10 @@
   background-color: var(--color-surface-elevated);
 }
 
-.taskbar .icons button::after {
-  transition: var(--transition-time-long) ease-in-out;
-}
-
-.taskbar .icons button.open::after {
-  content: '';
-  position: absolute;
-  transform: translateY(17px);
-  width: 7px;
-  height: 3px;
-  border-radius: 10px;
-  background-color: var(--color-border);
-}
-
-.taskbar .icons button.focused::after {
-  content: '';
-  position: absolute;
-  transform: translateY(17px);
-  width: 15px;
-  height: 3px;
-  border-radius: 10px;
-  background-color: var(--color-accent-secondary);
-}
-
-.taskbar .icons button > * {
-  width: 25px;
-  height: 25px;
+.taskbar .icons button:not(.settings) > *,
+.taskbar .icons button:not(.settings) img {
+  width: 20px;
+  height: 20px;
   fill: var(--color-accent);
 }
 
@@ -240,28 +164,213 @@
   stroke: var(--color-accent);
 }
 
+.taskbar .icons button.open::after,
+.taskbar .icons button.focused::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 2px;
+  background-color: var(--color-border);
+}
+
+.taskbar .icons button.focused::after {
+  background-color: var(--color-accent);
+  width: 8px;
+}
+
+.taskbar .icons button.taskbarWindow {
+  width: auto;
+  min-width: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.taskbar .icons button.taskbarWindow .taskbarWindowIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.taskbar .icons button.taskbarWindow .taskbarWindowIcon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.taskbar .icons button.taskbarWindow .taskbarWindowClose {
+  width: 14px;
+  height: 14px;
+  padding: 2px;
+  margin-right: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 2px;
+  fill: var(--color-text-primary-dimmed);
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.taskbar .icons button.taskbarWindow .taskbarWindowClose:hover {
+  background-color: var(--color-error);
+  fill: #fff;
+  opacity: 1;
+}
+
+.taskbar .icons button.taskbarWindow .taskbarWindowClose svg {
+  width: 10px;
+  height: 10px;
+}
+
+.taskbar .time {
+  font-family: var(--font-family-mono);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary-dimmed);
+  text-align: right;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+/* ---------- Main: sidebar list + San Andreas Government background ---------- */
+.desktop {
+  position: fixed;
+  top: var(--tb-height);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--color-background);
+  background-image: url('/image/desktop');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: flex;
+  box-sizing: border-box;
+}
+
+.sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  border-right: 1px solid var(--color-border);
+  background-color: var(--color-surface-dimmed);
+  padding: 8px 0;
+  overflow-y: auto;
+}
+
+.sidebarBadge {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 8px 16px;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 4px;
+  background-color: var(--color-surface-dimmed);
+  width: 100%;
+  box-sizing: border-box;
+  aspect-ratio: 1;
+  max-height: calc(var(--sidebar-width) - 16px);
+  overflow: hidden;
+}
+
+.sidebarBadge img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background-color: var(--color-surface-dimmed);
+  /* Scale logo up so it fills the square without extra empty space */
+  transform: scale(1.35);
+}
+
+.desktop .desktopItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: var(--font-family);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition-time-short) ease;
+  box-sizing: border-box;
+}
+
+.desktop .desktopItem:hover {
+  background-color: var(--color-surface-elevated);
+}
+
+.desktop .desktopItem:focus {
+  outline: none;
+  background-color: var(--color-surface-elevated);
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+.desktop .desktopItem .icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  fill: var(--color-text-primary-dimmed);
+}
+
+.desktop .desktopItem .icon.stroke {
+  fill: none;
+  stroke: var(--color-text-primary-dimmed);
+}
+
+.desktop .desktopItem .icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.desktop .desktopItem .title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Windows ---------- */
 .overlay .windows {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
+  pointer-events: none;
 }
 
 .overlay .windows .window {
-  --window-header-height: 30px;
-  --window-control-width: 40px;
+  --window-header-height: 36px;
+  --window-control-width: 44px;
   pointer-events: all;
   position: fixed;
-  background-color: transparent;
+  background-color: var(--color-surface);
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
   resize: both;
   overflow: hidden;
-  border-radius: var(--radius-medium);
   box-shadow: var(--shadow-medium);
   min-width: 320px;
-  min-height: 150px;
-  transition: var(--transition-time-long) ease-in-out;
+  min-height: 180px;
+  transition: box-shadow var(--transition-time-short) ease;
 }
 
 .overlay .windows .window.maximized {
@@ -271,6 +380,8 @@
   height: calc(100% - var(--tb-height));
   resize: none;
   border-radius: 0;
+  border-left: none;
+  border-top: none;
 }
 
 .overlay .windows .window.minimized {
@@ -280,40 +391,25 @@
 .overlay .windows .window .windowHeader {
   height: var(--window-header-height);
   display: flex;
-  display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  background-color: var(--color-surface-elevated);
   border-bottom: 1px solid var(--color-border);
-  background-color: var(--color-surface-dimmed);
-  backdrop-filter: var(--liquid-ass);
-  -webkit-backdrop-filter: var(--liquid-ass);
   user-select: none;
-  background-image: linear-gradient(
-    90deg,
-    #ffffff0d 0,
-    #ffffff0d 1px,
-    transparent 1px,
-    transparent 16px
-  );
-  background-size: 16px 100%;
-}
-
-.overlay .windows .window.maximized .windowHeader {
-  background-color: var(--color-surface);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 .overlay .windows .window .windowHeader .iconTitleWrapper {
   display: flex;
   align-items: center;
+  min-width: 0;
 }
 
 .overlay .windows .window .windowHeader .icon {
-  width: 25px;
-  height: 25px;
-  fill: var(--color-accent);
+  width: 20px;
+  height: 20px;
   margin-left: 10px;
+  flex-shrink: 0;
+  fill: var(--color-accent);
 }
 
 .overlay .windows .window .windowHeader .icon svg.stroke {
@@ -322,23 +418,19 @@
 }
 
 .overlay .windows .window .windowHeader .title {
-  pointer-events: none;
-  font-size: 16px;
+  margin-left: 8px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--color-text-primary);
-  padding-left: 10px;
-  text-wrap: nowrap;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-family: var(--font-family-mono);
-  font-size: 13px;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
 }
 
 .overlay .windows .window .windowHeader .windowControls {
   display: flex;
   width: calc(var(--window-control-width) * 3);
+  flex-shrink: 0;
 }
 
 .overlay .windows .window .windowHeader .closeButton,
@@ -347,251 +439,281 @@
   width: var(--window-control-width);
   height: var(--window-header-height);
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
   cursor: pointer;
   fill: var(--color-text-primary);
+  border: none;
+  background: transparent;
   transition: background-color var(--transition-time-short) ease;
 }
 
 .overlay .windows .window .windowHeader .closeButton svg,
 .overlay .windows .window .windowHeader .minimizeButton svg,
 .overlay .windows .window .windowHeader .maximizeButton svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
 .overlay .windows .window .windowHeader .minimizeButton:hover,
 .overlay .windows .window .windowHeader .maximizeButton:hover {
-  background-color: var(--color-text-primary-half);
+  background-color: var(--color-border);
 }
 
 .overlay .windows .window .windowHeader .closeButton:hover {
   background-color: var(--color-error);
+  fill: #fff;
 }
 
 .overlay .windows .window iframe {
   width: 100%;
   height: calc(100% - var(--window-header-height));
   border: none;
+  display: block;
 }
 
+/* ---------- Settings panel ---------- */
 .overlay .settings {
   position: fixed;
-  width: min(500px, calc(100% - 20px));
-  right: 10px;
-  top: 10px;
-  background-color: var(--color-surface-dimmed);
-  backdrop-filter: var(--liquid-ass);
-  -webkit-backdrop-filter: var(--liquid-ass);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-large);
-  box-shadow: var(--shadow-medium);
-  max-height: calc(100% - var(--tb-height) - 20px);
+  top: var(--tb-height);
+  right: 0;
+  width: min(380px, calc(100% - 24px));
+  height: calc(100% - var(--tb-height));
+  background-color: var(--color-surface);
+  border-left: 1px solid var(--color-border);
   overflow-y: auto;
-  transition: transform var(--transition-time-long) ease-in-out;
+  transition: transform var(--transition-time-long) ease;
   pointer-events: all;
   color: var(--color-text-primary);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
 }
 
 .overlay .settings::before {
-  content: 'LSPD OFFICER CONTROL PANEL';
-  display: block;
-  margin: 10px 10px 0;
-  padding: 8px 10px;
-  border: 1px solid var(--color-border);
-  background: linear-gradient(180deg, #1e314b 0%, #16263b 100%);
-  border-radius: var(--radius-small);
+  content: 'San Andreas Government — Control Panel';
+  flex-shrink: 0;
+  padding: 16px 18px;
+  border-bottom: 2px solid var(--color-accent-half);
+  font-size: 12px;
+  font-weight: 700;
   color: var(--color-accent-secondary);
-  font-family: var(--font-family-mono);
-  letter-spacing: 0.8px;
-  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-@media (max-width: 900px) {
-  .taskbar {
-    padding: 0 8px;
-    box-sizing: border-box;
-  }
-
-  .taskbar::before {
-    display: none;
-  }
-
-  .taskbar .icons {
-    position: static;
-    left: auto;
-    transform: none;
-    margin: 0 auto;
-  }
-
-  .taskbar .location,
-  .taskbar .time {
-    max-width: 30%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-
-@media (max-width: 640px) {
-  .taskbar .location {
-    display: none;
-  }
-
-  .taskbar {
-    justify-content: space-between;
-  }
-
-  .overlay .windows .window {
-    min-width: 260px;
-  }
-
-  .overlay .settings {
-    right: 6px;
-    top: 6px;
-    width: calc(100% - 12px);
-    max-height: calc(100% - var(--tb-height) - 12px);
-  }
-}
-
 .overlay .settings.hide {
-  transform: translateX(calc(100% + 20px));
+  transform: translateX(100%);
 }
 
-.overlay .settings .versionCustomizationWrapper {
-  display: flex;
-  justify-content: space-between;
-  margin: 10px;
-}
-
-.overlay .settings .version,
-.overlay .settings .customization {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.overlay .settings .title {
-  letter-spacing: 0.2px;
-}
-
-.overlay .settings .customization {
-  text-align: right;
-  text-decoration: underline;
-  cursor: pointer;
-  transition: var(--transition-time-short) ease;
-}
-
-.overlay .settings .customization:hover {
-  color: var(--color-accent);
-}
-
-.overlay .settings .officerInformation {
-  margin: 10px;
-  padding-bottom: 10px;
-  border-bottom: 2px solid var(--color-border);
-}
-
-.overlay .settings .officerInformation .title {
-  width: 100%;
-  font-size: 18px;
-  font-weight: 600;
-  padding-bottom: 5px;
-  margin-bottom: 5px;
+.overlay .settings .officerInformation,
+.overlay .settings .currentShift,
+.overlay .settings .officerMetrics {
+  padding: 18px;
   border-bottom: 1px solid var(--color-border);
 }
 
-.overlay .settings .currentShift {
-  margin: 10px;
-  padding-bottom: 10px;
-  border-bottom: 2px solid var(--color-border);
+.overlay .settings .titleRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.overlay .settings .titleRow .title,
+.overlay .settings .officerInformation .title,
+.overlay .settings .officerMetrics .title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary-dimmed);
+  letter-spacing: 0.04em;
+  padding-bottom: 0;
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.overlay .settings .infoIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-text-primary-dimmed);
+  color: var(--color-surface);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  flex-shrink: 0;
+}
+
+.overlay .settings .infoIcon:hover {
+  background: var(--color-accent);
+  color: var(--color-surface);
+}
+
+.overlay .settings .officerInformation .inputWrapper > div label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.overlay .settings .buttonWithInfo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.overlay .settings .customizationRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.overlay .settings .officerInformation .inputWrapper {
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.overlay .settings .officerInformation .inputWrapper > div {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.overlay .settings .officerInformation .inputWrapper > div label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-primary-dimmed);
+  margin-bottom: 4px;
+}
+
+.overlay .settings .officerInformation .inputWrapper > div input {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.overlay .settings .officerInformation .buttonWrapper {
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.overlay .settings .officerInformation .buttonWrapper button {
+  flex: 1 1 0;
+  padding: 10px 12px;
+  font-size: 13px;
 }
 
 .overlay .settings .currentShift .timeWrapper {
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--color-text-primary-dimmed);
 }
 
 .overlay .settings .currentShift .timeWrapper div {
+  flex: none;
+}
+
+.overlay .settings .currentShift .buttonWrapper {
+  gap: 8px;
+}
+
+.overlay .settings .currentShift .buttonWrapper button {
   flex: 1 1 0;
-  font-size: 14px;
-  font-weight: 600;
-  margin: 0 0 5px 0;
-}
-
-.overlay .settings .officerMetrics {
-  margin: 10px;
-  padding-bottom: 10px;
-  border-bottom: 2px solid var(--color-border);
-}
-
-.overlay .settings .officerMetrics .title {
-  width: 100%;
-  font-size: 18px;
-  font-weight: 600;
-  padding-bottom: 5px;
-  margin-bottom: 5px;
-  border-bottom: 1px solid var(--color-border);
+  padding: 10px 12px;
+  font-size: 13px;
 }
 
 .overlay .settings .officerMetrics .metricsContent {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5px 10px;
-  font-size: 14px;
+  grid-template-columns: 1fr auto;
+  gap: 8px 20px;
+  font-size: 13px;
+  align-items: baseline;
 }
 
 .overlay .settings .officerMetrics .metricsContent .metricLabel {
-  font-weight: 400;
-  color: var(--color-text-primary-half);
+  font-weight: 500;
+  color: var(--color-text-primary-dimmed);
 }
 
 .overlay .settings .officerMetrics .metricsContent .metricValue {
   font-weight: 600;
   text-align: right;
+  color: var(--color-text-primary);
 }
 
+.overlay .settings .versionCustomizationWrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 18px;
+  font-size: 13px;
+  margin-top: auto;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.overlay .settings .version {
+  font-weight: 500;
+  color: var(--color-text-primary-dimmed);
+  font-size: 12px;
+}
+
+.overlay .settings .customization {
+  font-weight: 600;
+  color: var(--color-accent);
+  cursor: pointer;
+  text-decoration: none;
+  transition: color var(--transition-time-short) ease;
+  font-size: 13px;
+}
+
+.overlay .settings .customization:hover {
+  color: var(--color-text-primary);
+}
+
+/* ---------- Notifications ---------- */
 .overlay .notifications {
   position: fixed;
-  top: 5px;
-  right: 5px;
-  pointer-events: none;
+  top: calc(var(--tb-height) + 16px);
+  right: 16px;
+  left: auto;
+  width: 320px;
+  max-width: calc(100vw - 32px);
   display: flex;
   flex-direction: column;
   gap: 10px;
+  pointer-events: none;
+  z-index: 6;
 }
 
 .overlay .notifications .notification {
-  width: 250px;
-  backdrop-filter: var(--liquid-ass);
-  -webkit-backdrop-filter: var(--liquid-ass);
-  border-radius: var(--radius-medium);
-  padding: 10px;
+  width: 100%;
+  padding: 14px 16px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
   color: var(--color-text-primary);
   fill: var(--color-text-primary);
   box-shadow: var(--shadow-soft);
-  animation: notification-fly-in var(--transition-time-long) ease-in-out
-    forwards;
+  animation: notification-fly-in var(--transition-time-long) ease-out forwards;
+  box-sizing: border-box;
 }
 
 @keyframes notification-fly-in {
   from {
-    transform: translateX(calc(100% + 10px));
+    transform: translateX(100%);
     opacity: 0;
   }
   to {
     transform: translateX(0);
     opacity: 1;
-  }
-}
-
-@keyframes notification-fly-out {
-  from {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateX(calc(100% + 10px));
-    opacity: 0;
   }
 }
 
@@ -599,38 +721,99 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 10px;
-  padding-right: 20px;
+  margin-bottom: 8px;
+  padding-right: 28px;
 }
 
 .overlay .notifications .notification .iconTitleWrapper .icon,
 .overlay .notifications .notification .iconTitleWrapper .icon svg {
-  width: 25px;
-  height: 25px;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 
 .overlay .notifications .notification .iconTitleWrapper .title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
+  line-height: 1.3;
 }
 
 .overlay .notifications .notification .timerBar {
-  height: 4px;
+  height: 3px;
   background-color: var(--color-info);
   border-radius: 2px;
   width: 100%;
 }
 
 .overlay .notifications .notification .close {
-  width: 25px;
-  height: 25px;
   position: absolute;
-  top: 0;
-  right: 0;
-  padding: 5px;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  padding: 4px;
   cursor: pointer;
-  fill: var(--color-text-primary);
-  transition: background-color var(--transition-time-short) ease;
-  border-radius: 0 var(--radius-medium) 0 var(--radius-medium);
+  fill: var(--color-text-primary-dimmed);
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-small);
   pointer-events: all;
+  transition: background-color var(--transition-time-short) ease;
+}
+
+.overlay .notifications .notification .close:hover {
+  background-color: var(--color-surface-elevated);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 700px) {
+  .sidebar {
+    width: 56px;
+    padding: 8px 0;
+  }
+
+  .taskbar .icons button.settings .settingsLabel {
+    display: none;
+  }
+
+  .taskbar .icons button.settings {
+    padding: 0;
+    min-width: 44px;
+  }
+
+  .sidebarBadge {
+    display: none;
+  }
+
+  .desktop .desktopItem .title {
+    display: none;
+  }
+
+  .desktop .desktopItem {
+    justify-content: center;
+    padding: 12px;
+  }
+
+  .desktop .desktopItem .icon {
+    margin: 0;
+  }
+
+  .taskbar .location {
+    display: none;
+  }
+
+  .overlay .settings {
+    width: min(380px, calc(100% - 16px));
+    right: 8px;
+  }
+
+  .overlay .windows .window {
+    min-width: 280px;
+  }
+}
+
+@media (max-width: 480px) {
+  .taskbarTitle {
+    display: none;
+  }
 }
