@@ -41,7 +41,13 @@ To build the plugin from source:
 
 ## Installation
 
-- Extract all files and folders from the ZIP into the GTA V main directory (the folder containing `GTA5.exe`).
+1. Extract all files and folders from the ZIP into the GTA V main directory (the folder containing `GTA5.exe`).
+
+Your GTA V folder should have:
+- `plugins/LSPDFR/MDTPro.dll`
+- `plugins/LSPDFR/System.Data.SQLite.dll`
+- `plugins/LSPDFR/x64/SQLite.Interop.dll`
+- `MDTPro/` folder (web UI)
 
 ## Updating
 

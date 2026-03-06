@@ -24,6 +24,7 @@ $mdtDest = Join-Path $release 'MDTPro'
 # SQLite dependency paths - check multiple locations:
 # 1. Dependencies folder (committed to repo for easy builds)
 # 2. NuGet packages folder (if restored)
+# 3. Build output folder (if copied during build)
 $depsFolder = Join-Path $root 'Dependencies'
 $sqlitePackage = Join-Path $root 'MDTProPlugin\packages\System.Data.SQLite.Core.1.0.119.0'
 
