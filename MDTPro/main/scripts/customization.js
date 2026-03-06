@@ -89,7 +89,7 @@ async function renderPluginsPage() {
   hint.style.marginTop = '16px'
   hint.style.color = 'var(--color-text-primary-half)'
   hint.style.fontSize = '13px'
-  hint.textContent = 'Activated plugins appear in the sidebar on the main MDT page. If you don\'t see them, open or refresh that page.'
+  hint.textContent = 'Activated plugins load on the main MDT page. Some add sidebar items; others (e.g. ALPR) run in the background. Refresh the main page after enabling.'
   pluginsWrapper.appendChild(hint)
   document.querySelector('.main').appendChild(pluginsWrapper)
 }

@@ -2,6 +2,7 @@
   const config = await getConfig()
   const language = await getLanguage()
   if (config.updateDomWithLanguageOnLoad) await updateDomWithLanguage('index')
+  applySettingsInfoTooltips(language)
   const version = await (await fetch('/version')).text()
   document.querySelector('.overlay .settings .version').innerHTML =
     `${language.index.settings.version}: ${version}`
@@ -235,7 +236,10 @@ async function openWindow(name, pluginId = null) {
   const url = pluginId
     ? `/plugin/${pluginId}/page/${name}.html`
     : `/page/${name}.html`
-  const size = [config.initialWindowWidth, config.initialWindowHeight]
+  let size = [config.initialWindowWidth, config.initialWindowHeight]
+  if (name === 'court') {
+    size = [Math.max(size[0], 720), Math.max(size[1], 420)]
+  }
   const windowDimensions = [window.innerWidth, window.innerHeight]
   const offset = [
     windowDimensions[0] / 2 - size[0] / 2,
@@ -366,7 +370,11 @@ async function openWindow(name, pluginId = null) {
   minimize.innerHTML = document.querySelector(
     '.iconAccess .minimizeWindow'
   ).innerHTML
-  minimize.addEventListener('click', function () {
+  minimize.addEventListener('mousedown', function (e) {
+    e.stopPropagation()
+  })
+  minimize.addEventListener('click', function (e) {
+    e.stopPropagation()
     windowElement.classList.toggle('minimized')
     if (!windowElement.classList.contains('minimized')) {
       focusWindow()
@@ -380,7 +388,11 @@ async function openWindow(name, pluginId = null) {
   maximize.innerHTML = document.querySelector(
     '.iconAccess .maximizeWindow'
   ).innerHTML
-  maximize.addEventListener('click', function () {
+  maximize.addEventListener('mousedown', function (e) {
+    e.stopPropagation()
+  })
+  maximize.addEventListener('click', function (e) {
+    e.stopPropagation()
     if (windowElement.classList.contains('maximized')) {
       windowElement.classList.remove('maximized')
       windowElement.style.width = lastSize[0]
@@ -417,7 +429,11 @@ async function openWindow(name, pluginId = null) {
   const close = document.createElement('div')
   close.classList.add('closeButton')
   close.innerHTML = document.querySelector('.iconAccess .closeWindow').innerHTML
-  close.addEventListener('click', async function () {
+  close.addEventListener('mousedown', function (e) {
+    e.stopPropagation()
+  })
+  close.addEventListener('click', async function (e) {
+    e.stopPropagation()
     windowElement.style.pointerEvents = 'none'
     taskbarIcon.style.pointerEvents = 'none'
     const CSSRootTransitionTimeLong = parseInt(
@@ -526,18 +542,77 @@ document
     ).json()
     applyOfficerInformationToDOM(officerInformation)
 
+    // Persist filled data so it's remembered across sessions
+    const payload = buildOfficerInformationPayload()
+    const response = await (
+      await fetch('post/updateOfficerInformationData', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+    ).text()
+    const language = await getLanguage()
+    if (response === 'OK') {
+      showNotification(
+        language.index.notifications.officerInformationSaved,
+        'checkMark'
+      )
+    }
+
     hideLoadingOnButton(this)
   })
+
+function applySettingsInfoTooltips(language) {
+  const base = language?.index?.static
+  if (!base) return
+  document.querySelectorAll('.overlay .settings [data-language-info]').forEach((el) => {
+    const key = el.getAttribute('data-language-info')
+    if (!key) return
+    const value = key.split('.').reduce((o, k) => o?.[k], base)
+    if (typeof value === 'string') {
+      el.title = value
+      el.setAttribute('aria-label', value)
+    }
+  })
+}
+
+const OFFICER_INFO_KEYS = [
+  'firstName',
+  'lastName',
+  'badgeNumber',
+  'rank',
+  'callSign',
+  'agency',
+]
 
 function applyOfficerInformationToDOM(officerInformation) {
   const inputWrapper = document.querySelector(
     '.overlay .settings .officerInformation .inputWrapper'
   )
-  for (const key in officerInformation) {
-    if (officerInformation[key]) {
-      inputWrapper.querySelector(`.${key} input`).value =
-        officerInformation[key]
-    }
+  if (!inputWrapper) return
+  for (const key of OFFICER_INFO_KEYS) {
+    const input = inputWrapper.querySelector(`.${key} input`)
+    if (!input) continue
+    const val = officerInformation[key]
+    input.value =
+      val === null || val === undefined ? '' : String(val)
+  }
+}
+
+function buildOfficerInformationPayload() {
+  const inputWrapper = document.querySelector(
+    '.overlay .settings .officerInformation .inputWrapper'
+  )
+  if (!inputWrapper) return {}
+  const v = (sel) => inputWrapper.querySelector(sel)?.value?.trim() ?? ''
+  const badgeRaw = v('.badgeNumber input')
+  return {
+    firstName: v('.firstName input') || null,
+    lastName: v('.lastName input') || null,
+    badgeNumber: badgeRaw === '' ? null : (parseInt(badgeRaw, 10) || null),
+    rank: v('.rank input') || null,
+    callSign: v('.callSign input') || null,
+    agency: v('.agency input') || null,
   }
 }
 
@@ -547,42 +622,13 @@ document
     if (this.classList.contains('loading')) return
     showLoadingOnButton(this)
 
-    const inputWrapper = document.querySelector(
-      '.overlay .settings .officerInformation .inputWrapper'
-    )
-
     const response = await (
       await fetch('post/updateOfficerInformationData', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          firstName:
-            inputWrapper.querySelector('.firstName input').value != ''
-              ? inputWrapper.querySelector('.firstName input').value
-              : null,
-          lastName:
-            inputWrapper.querySelector('.lastName input').value != ''
-              ? inputWrapper.querySelector('.lastName input').value
-              : null,
-          badgeNumber:
-            inputWrapper.querySelector('.badgeNumber input').value != ''
-              ? inputWrapper.querySelector('.badgeNumber input').value
-              : null,
-          rank:
-            inputWrapper.querySelector('.rank input').value != ''
-              ? inputWrapper.querySelector('.rank input').value
-              : null,
-          callSign:
-            inputWrapper.querySelector('.callSign input').value != ''
-              ? inputWrapper.querySelector('.callSign input').value
-              : null,
-          agency:
-            inputWrapper.querySelector('.agency input').value != ''
-              ? inputWrapper.querySelector('.agency input').value
-              : null,
-        }),
+        body: JSON.stringify(buildOfficerInformationPayload()),
       })
     ).text()
 
@@ -602,3 +648,10 @@ document
 
     hideLoadingOnButton(this)
   })
+
+document.querySelector('.overlay .settings .customization')?.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    window.open('/page/customization', '_blank')
+  }
+})

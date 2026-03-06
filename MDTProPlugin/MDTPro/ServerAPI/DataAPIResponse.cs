@@ -54,16 +54,24 @@ namespace MDTPro.ServerAPI {
                 contentType = "text/json";
             } else if (path == "specificPed") {
                 string body = Helper.GetRequestPostData(req);
-                string name = !string.IsNullOrEmpty(body) ? body : "";
-                string reversedName = string.Join(" ", name.Split(' ').Reverse());
+                string name = !string.IsNullOrEmpty(body) ? body.Trim() : "";
+                string reversedName = string.Join(" ", name.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Reverse());
 
                 MDTProPedData pedData = DataController.PedDatabase.FirstOrDefault(o => o.Name?.ToLower() == name.ToLower() || o.Name?.ToLower() == reversedName.ToLower());
+                if (pedData == null && (name == "context" || name == "%context" || name.Equals("current", StringComparison.OrdinalIgnoreCase))) {
+                    pedData = DataController.GetContextPedIfValid();
+                }
 
                 Database.SaveSearchHistoryEntry("ped", name, pedData?.Name);
                 if (pedData != null) {
                     DataController.KeepPedInDatabase(pedData);
                 }
 
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(pedData));
+                contentType = "text/json";
+                status = 200;
+            } else if (path == "contextPed") {
+                MDTProPedData pedData = DataController.GetContextPedIfValid();
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(pedData));
                 contentType = "text/json";
                 status = 200;

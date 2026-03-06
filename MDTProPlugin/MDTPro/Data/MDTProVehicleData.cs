@@ -61,5 +61,18 @@ namespace MDTPro.Data {
 
             BOLOs = CDFVehicleData.GetAllBOLOs();
         }
+
+        /// <summary>Apply persistent vehicle identity from a previously seen vehicle (same owner + model). Keeps current LicensePlate.</summary>
+        internal void ApplyPersistentVehicleIdentity(MDTProVehicleData source) {
+            if (source == null) return;
+            IsStolen = source.IsStolen;
+            Owner = source.Owner;
+            RegistrationStatus = source.RegistrationStatus;
+            RegistrationExpiration = source.RegistrationExpiration;
+            InsuranceStatus = source.InsuranceStatus;
+            InsuranceExpiration = source.InsuranceExpiration;
+            VehicleIdentificationNumber = source.VehicleIdentificationNumber;
+            BOLOs = source.BOLOs;
+        }
     }
 }
