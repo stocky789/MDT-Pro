@@ -7,11 +7,8 @@ A Police Computer Plugin for LSPDFR. MDT Pro runs a local web server when you go
 - **LSPDFR**
 - **CommonDataFramework (CDF)** — required; the plugin will not load without it.
 - **CalloutInterfaceAPI** — required (DLL in game root or `plugins/LSPDFR/`).
-
-Optional:
-
-- **CalloutInterface** — when installed, the *Active Call* page in the MDT shows live callout details (location, priority, messages). Without it, the page is still available but will not receive callout updates.
-- **PolicingRedefined (PR)** — when installed, citations can be issued to offenders directly from the ped menu in-game, and MDT Pro uses PR events for ped/vehicle stops and arrests.
+- **CalloutInterface** — required; the *Active Call* page uses it for live callout details (location, priority, messages). Integration is shallow but required.
+- **Policing Redefined (PR)** — required. A large portion of MDT Pro (roughly half to three-quarters) relies on the PR API for ped/vehicle stops, arrests, and citations. If you don’t run PR, you need to install it or this mod is not for you.
 
 ## Building (for developers)
 
