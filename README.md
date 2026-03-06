@@ -2,43 +2,42 @@
 
 A Police Computer Plugin for LSPDFR. MDT Pro runs a local web server when you go on duty, so you can use the MDT (Mobile Data Terminal) from any browser—on the same machine or over your network.
 
+![MDT Pro overview](Screenshots/Overview.png)
+
 ## Requirements
 
 - **LSPDFR**
 - **CommonDataFramework (CDF)** — required; the plugin will not load without it.
 - **CalloutInterfaceAPI** — required (DLL in game root or `plugins/LSPDFR/`).
-
-Optional:
-
-- **CalloutInterface** — when installed, the *Active Call* page in the MDT shows live callout details (location, priority, messages). Without it, the page is still available but will not receive callout updates.
-- **PolicingRedefined (PR)** — when installed, citations can be issued to offenders directly from the ped menu in-game, and MDT Pro uses PR events for ped/vehicle stops and arrests.
+- **CalloutInterface** — required; the *Active Call* page uses it for live callout details (location, priority, messages). Integration is shallow but required.
+- **Policing Redefined (PR)** — required. A large portion of MDT Pro (roughly half to three-quarters) relies on the PR API for ped/vehicle stops, arrests, and citations. If you don’t run PR, you need to install it or this mod is not for you.
 
 ## Building (for developers)
 
 To build the plugin from source:
 
-1. **Restore NuGet packages**  
+1. **Restore packages**  
    From repo root:  
-   `nuget restore MDTProPlugin\MDTPro.sln`  
-   (Or open the solution in Visual Studio and build; it will restore automatically.)
+   `dotnet restore MDTProPlugin\MDTPro.sln`  
+   (Or open the solution in Visual Studio; it restores automatically.)
 
-2. **Provide reference DLLs**  
+2. **Reference DLLs from game**  
    Create a `References` folder in the repo root and copy these from your GTA V install:
    - `plugins/LSPDFR/CalloutInterface.dll`
    - `plugins/LSPDFR/CalloutInterfaceAPI.dll` (or from game root)
-   - `plugins/LSPDFR/CommonDataFramework.dll`
    - `plugins/LSPDFR/PolicingRedefined.dll`
    - `plugins/LSPDFR/LSPD First Response.dll` (from `plugins/`)
    - `IPT.Common.dll` (game root)
-   - `Newtonsoft.Json.dll` (game root, or from NuGet)
-   - `System.Data.SQLite.dll` (from `plugins/LSPDFR/`; or ensure the NuGet package has the DLL in `packages/.../lib/net46/`)
 
-   `References` is in `.gitignore` (each dev uses their own game copy).
+   Other dependencies (CommonDataFramework, Newtonsoft.Json, System.Data.SQLite, etc.) come from NuGet. `References` is in `.gitignore` (each dev uses their own game copy).
 
 3. **Build**  
-   Open `MDTProPlugin/MDTPro.sln` in Visual Studio and build **Release**, or run  
-   `.\build-and-deploy.ps1`  
-   to build and deploy to a GTA V path (edit `$GamePath` in the script or pass `-GamePath "..."` for your install).
+   From repo root:  
+   `dotnet build MDTProPlugin\MDTPro.sln -c Release`  
+   Or open `MDTProPlugin\MDTPro.sln` in Visual Studio and build **Release**.  
+   Output is in `Release\plugins\lspdfr\MDTPro.dll` and `Release\MDTPro\` (web UI is copied automatically).
+
+   Optional: run `.\build.ps1` for a clean build; use `.\build.ps1 -Deploy` to build and copy into your GTA V folder (pass `-GamePath "D:\Games\GTA V"` if your install is elsewhere).
 
 ## Installation
 
@@ -209,7 +208,7 @@ function initTestPage(contentWindow) {
 
 ## Resetting data (optional)
 
-The **ClearMDTProData** utility (in the repo) can reset the SQLite database, legacy shift/court/peds JSON, etc. Run it from the directory that contains the `MDTPro` folder (e.g. GTA V main directory after install, or repo root when using the repo’s `MDTPro`). Use when you want a clean slate without deleting the whole `MDTPro` folder.
+The **ClearMDTProData** utility (in the repo, in the `ClearMDTProData` folder) can reset the SQLite database, legacy shift/court/peds JSON, etc. Build it first (e.g. open `ClearMDTProData/ClearMDTProData.sln` and build, or run `dotnet run` from the `ClearMDTProData` folder). Then run the executable from the directory that contains the `MDTPro` folder (e.g. GTA V main directory after install, or repo root when using the repo’s `MDTPro`). Use when you want a clean slate without deleting the whole `MDTPro` folder.
 
 ## License
 
