@@ -1511,7 +1511,7 @@ namespace MDTPro.Data {
         }
 
         private static int GetCourtRosterWindow(DateTime utcNow) {
-            DateTime epoch = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            DateTime epoch = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
             int days = (int)Math.Max(0, (utcNow - epoch).TotalDays);
             int rotationDays = SetupController.GetConfig().courtRosterRotationDays;
             if (rotationDays <= 0) rotationDays = DefaultCourtRosterRotationDays;
