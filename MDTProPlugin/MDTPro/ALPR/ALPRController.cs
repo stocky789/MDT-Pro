@@ -88,7 +88,7 @@ namespace MDTPro.ALPR {
                     // Cap vehicles considered for ALPR to keep iteration cheap (max 10)
                     int maxVehicles = Math.Min(10, Math.Max(3, cfg.maxNumberOfNearbyPedsOrVehicles));
                     float scanRangeMeters = Math.Max(10f, Math.Min(100f, cfg.alprScanRangeMeters));
-                    float readRangeMeters = Math.Max(2f, Math.Min(15f, cfg.alprReadRangeMeters));
+                    float readRangeMeters = Math.Max(2f, Math.Min(35f, cfg.alprReadRangeMeters));
                     float coneAngleDeg = Math.Max(10f, Math.Min(90f, cfg.alprConeAngleDegrees));
 
                     // ALPR only works when: (1) enabled in settings, (2) on duty (Start/Stop in Main), (3) in police vehicle
@@ -160,9 +160,19 @@ namespace MDTPro.ALPR {
                                 owner = vd.Owner ?? "";
                                 modelDisplayName = vd.ModelDisplayName ?? vd.ModelName ?? "";
                             } else {
-                                flags = new List<string> { "Not in database" };
-                                owner = "—";
-                                modelDisplayName = GetModelDisplayName(toScan);
+                                // No CDF data: check MDT database (stolen/expired from prior stops or saved data)
+                                MDTProVehicleData dbVehicle = DataController.GetVehicleByLicensePlate(plate);
+                                if (dbVehicle != null) {
+                                    flags = BuildFlags(dbVehicle);
+                                    owner = dbVehicle.Owner ?? "—";
+                                    modelDisplayName = dbVehicle.ModelDisplayName ?? dbVehicle.ModelName ?? "";
+                                } else {
+                                    flags = new List<string> { "Not in database" };
+                                    owner = "—";
+                                    modelDisplayName = "";
+                                }
+                                if (string.IsNullOrEmpty(modelDisplayName))
+                                    modelDisplayName = GetModelDisplayName(toScan);
                             }
 
                             if (string.IsNullOrEmpty(modelDisplayName))

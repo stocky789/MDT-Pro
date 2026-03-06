@@ -419,9 +419,12 @@ async function renderReports(reports, type) {
         if (report.OffenderPedName) textWrapper.appendChild(offenderElement)
         if (report.OffenderVehicleLicensePlate)
           textWrapper.appendChild(vehicleElement)
-        if (type === 'citation' && report.Status === 0 && report.FinalAmount != null) {
+        // FinalAmount is set only when a citation is closed (ReportStatus.Closed = 0)
+        if (type === 'citation' && report.Status == 0 && report.FinalAmount != null) {
           const finalAmountEl = document.createElement('div')
-          finalAmountEl.innerHTML = `${language.reports.list.finalAmount}: <span>${await getCurrencyString(report.FinalAmount)}</span>`
+          // Await before template; using await inside the literal can show "[object Promise]" in some environments
+          const formattedAmount = await getCurrencyString(report.FinalAmount)
+          finalAmountEl.innerHTML = `${language.reports.list.finalAmount}: <span>${formattedAmount}</span>`
           textWrapper.appendChild(finalAmountEl)
         }
         break

@@ -593,10 +593,11 @@ async function formatIsoDate(value) {
 async function getChargeDetailsString(fine, time) {
   const language = await getLanguage()
 
-  let fineString = `${language.court.fine}: ${await getCurrencyString(fine)}`
-  let timeString = `${language.court.incarceration}: ${
+  const fineFormatted = await getCurrencyString(fine)
+  let fineString = `${language.court.fine}: ${fineFormatted}`
+  const timeFormatted =
     time === null ? language.units.life : await convertDaysToYMD(time)
-  }`
+  let timeString = `${language.court.incarceration}: ${timeFormatted}`
 
   return time > 0 || time === null
     ? `${fineString} | ${timeString}`
