@@ -1,4 +1,3 @@
-Releases
 References
 MDTPro/MDTPro.log
 MDTPro/data/*.db
@@ -10,3 +9,4 @@ MDTProPlugin/MDTPro/.vs
 MDTProPlugin/MDTPro/bin
 MDTProPlugin/MDTPro/obj
 PR_DRAFT.md
+Release/*
