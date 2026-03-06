@@ -25,13 +25,13 @@ namespace MDTPro.Utility {
             MDTProPedData pedData = DataController.GetPedDataByName(pedName);
             if (pedData == null) {
                 string msg = SetupController.GetLanguage().inGame.handCitationPersonNotFound;
-                if (!string.IsNullOrWhiteSpace(msg)) RageNotification.Show(string.Format(msg, pedName), RageNotification.NotificationType.Warning);
+                if (!string.IsNullOrWhiteSpace(msg)) RageNotification.Show(string.Format(msg, pedName), RageNotification.NotificationType.Info);
                 return;
             }
             Ped ped = pedData.Holder;
             if (ped == null || !ped.IsValid()) {
                 string msg = SetupController.GetLanguage().inGame.handCitationPersonNotPresent;
-                if (!string.IsNullOrWhiteSpace(msg)) RageNotification.Show(msg, RageNotification.NotificationType.Warning);
+                if (!string.IsNullOrWhiteSpace(msg)) RageNotification.Show(msg, RageNotification.NotificationType.Info);
                 return;
             }
 

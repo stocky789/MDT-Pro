@@ -92,6 +92,7 @@ To build the plugin from source:
 
 - Search by name to see information about that person (from MDT Pro and, when available, CDF).
 - The **history** section lists citations and arrests. Click a citation or arrest entry to **create a new report** for that ped (pre-filled where applicable).
+- **Callout suspects:** Person records normally come from CDF (e.g. peds you stop, vehicle owners). Some callout packs generate a suspect name from evidence (e.g. “mobile phone associated with Joe Thomas”) but do *not* register that person with CDF, so they would not appear in Person Search. MDT Pro tries to add name-only “stub” records when it sees phrases like “associated with …”, “sightings of …”, etc. in the **Active Call** message or additional messages. You can turn this off in config with `addCalloutSuspectNamesFromMessages: false`. For full integration, callout authors can register suspects with CDF so they appear across all CDF-using plugins.
 
 ### Vehicle Lookup
 
@@ -117,6 +118,7 @@ To build the plugin from source:
 
 - Shows details of the **current callout** when **CalloutInterface** is installed: location (postal, street, area, county), priority, message, advisory, unit/callsign, and timestamps (displayed, accepted, finished).
 - Without CalloutInterface, the page opens but does not receive callout data.
+- When callout messages mention a suspect by name (e.g. “associated with Joe Thomas”), MDT Pro can add that name to Person Search so you can look them up; see [Person Lookup](#person-lookup-ped-search).
 
 ## Customization
 

@@ -419,6 +419,11 @@ async function renderReports(reports, type) {
         if (report.OffenderPedName) textWrapper.appendChild(offenderElement)
         if (report.OffenderVehicleLicensePlate)
           textWrapper.appendChild(vehicleElement)
+        if (type === 'citation' && report.Status === 0 && report.FinalAmount != null) {
+          const finalAmountEl = document.createElement('div')
+          finalAmountEl.innerHTML = `${language.reports.list.finalAmount}: <span>${await getCurrencyString(report.FinalAmount)}</span>`
+          textWrapper.appendChild(finalAmountEl)
+        }
         break
     }
 

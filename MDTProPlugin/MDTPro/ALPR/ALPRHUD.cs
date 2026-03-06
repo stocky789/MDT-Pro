@@ -30,9 +30,11 @@ namespace MDTPro.ALPR {
             TimeScanned = System.DateTime.UtcNow
         };
 
-        private const float BasePanelWidth = 320f;
+        private const float BasePanelWidth = 280f;
         private const float BasePadding = 10f;
         private const float BaseLineHeight = 18f;
+        /// <summary>Extra space below content so the hold bar and timer don't get clipped.</summary>
+        private const float BaseBottomMargin = 6f;
         // PreviewPanelHeight = BasePadding*2 + BaseLineHeight*3 for preview dummy
 
         private const string FontName = "Arial";
@@ -193,13 +195,15 @@ namespace MDTPro.ALPR {
             Color accentColor = isAlert ? AlertAccentColor : ScanAccentColor;
 
             int extraLines = Math.Max(0, hit.Flags?.Count ?? 0);
-            int contentLines = isScanning ? 2 : (2 + extraLines + 1); // plate + owner/model + flags + hold/status
+            // plate + owner + vehicle + flags + hold = 4 + extraLines
+            int contentLines = isScanning ? 2 : (4 + extraLines);
 
             int actualW = Game.Resolution.Width;
             int actualH = Game.Resolution.Height;
             int w = Math.Max(640, actualW);
             int h = Math.Max(480, actualH);
-            float panelH = topBandH + padding * 2 + lineHeight * contentLines + holdBarH;
+            float bottomMargin = BaseBottomMargin * scale;
+            float panelH = topBandH + padding * 2 + lineHeight * contentLines + bottomMargin + holdBarH;
 
             float x, y;
             ResolvePosition(anchor ?? "TopRight", offsetX, offsetY, w, h, panelW, panelH, out x, out y);

@@ -83,7 +83,7 @@
         "canRevokeLicense": true
       },
       {
-        "name": "Misdemeanor Evading Peace Officer",
+        "name": "Evading Peace Officer (VC 2800.1)",
         "minFine": 1000,
         "maxFine": 10000,
         "minDays": 0,
@@ -127,6 +127,16 @@
   {
     "name": "Felony Traffic",
     "charges": [
+      {
+        "name": "Reckless Evading Peace Officer (VC 2800.2)",
+        "minFine": 1000,
+        "maxFine": 10000,
+        "minDays": 180,
+        "maxDays": 1080,
+        "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": true
+      },
       {
         "name": "Felony Reckless Evading Causing Injury or Death",
         "minFine": 1000,
@@ -251,6 +261,26 @@
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
+      },
+      {
+        "name": "Possession Of Firearm With Altered/Removed Serial Number (PC 23920)",
+        "minFine": 100,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession Of Ammunition By Prohibited Person (PC 30305)",
+        "minFine": 100,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
       }
     ]
   },
@@ -268,12 +298,42 @@
         "canRevokeLicense": false
       },
       {
+        "name": "Discharging Firearm At Inhabited Dwelling (PC 246)",
+        "minFine": 1000,
+        "maxFine": 10000,
+        "minDays": 1080,
+        "maxDays": 2520,
+        "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession Of Short-Barreled Rifle Or Shotgun (PC 33215)",
+        "minFine": 1000,
+        "maxFine": 10000,
+        "minDays": 0,
+        "maxDays": 1080,
+        "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
         "name": "Possession Of Explosive Device",
         "minFine": 5000,
         "maxFine": 10000,
         "minDays": 720,
         "maxDays": 2160,
         "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Altering Or Removing Firearm Serial Number (PC 23900)",
+        "minFine": 1000,
+        "maxFine": 3000,
+        "minDays": 480,
+        "maxDays": 1080,
+        "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
@@ -603,12 +663,62 @@
         "canRevokeLicense": false
       },
       {
+        "name": "Under Influence Of Controlled Substance (HS 11550)",
+        "minFine": 250,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
         "name": "Trafficking / Sale Of Controlled Substance",
         "minFine": 10000,
         "maxFine": 50000,
         "minDays": 1080,
         "maxDays": 2880,
         "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession Of Controlled Substance For Sale (HS 11351/11378)",
+        "minFine": 1000,
+        "maxFine": 20000,
+        "minDays": 365,
+        "maxDays": 3240,
+        "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Transport Or Sale Of Methamphetamine (HS 11379)",
+        "minFine": 1000,
+        "maxFine": 20000,
+        "minDays": 720,
+        "maxDays": 1440,
+        "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Manufacturing Methamphetamine (HS 11379.6)",
+        "minFine": 1000,
+        "maxFine": 20000,
+        "minDays": 1080,
+        "maxDays": 2520,
+        "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Sale Or Transport Of Cannabis (HS 11360)",
+        "minFine": 500,
+        "maxFine": 5000,
+        "minDays": 0,
+        "maxDays": 1440,
+        "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },

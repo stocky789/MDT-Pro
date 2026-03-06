@@ -16,7 +16,7 @@ namespace MDTPro.Data {
         private static SQLiteConnection connection;
         private static readonly object dbLock = new object();
 
-        private const int CurrentSchemaVersion = 12;
+        private const int CurrentSchemaVersion = 13;
 
         internal static void Initialize() {
             lock (dbLock) {
@@ -266,7 +266,8 @@ namespace MDTPro.Data {
                     Notes                       TEXT,
                     OffenderPedName             TEXT,
                     OffenderVehicleLicensePlate TEXT,
-                    CourtCaseNumber             TEXT
+                    CourtCaseNumber             TEXT,
+                    FinalAmount                 INTEGER
                 );
 
                 CREATE TABLE IF NOT EXISTS citation_report_charges (
@@ -489,6 +490,15 @@ namespace MDTPro.Data {
                     cmd.ExecuteNonQuery();
                 }
                 Helper.Log("Database migrated to schema version 12 (evidence resisted from PR)");
+            }
+
+            if (fromVersion < 13) {
+                using (var cmd = new SQLiteCommand(@"
+                    ALTER TABLE citation_reports ADD COLUMN FinalAmount INTEGER;
+                ", connection)) {
+                    cmd.ExecuteNonQuery();
+                }
+                Helper.Log("Database migrated to schema version 13 (citation final amount)");
             }
 
             SetSchemaVersion(CurrentSchemaVersion);
@@ -861,7 +871,8 @@ namespace MDTPro.Data {
                                 Notes = reader["Notes"] as string,
                                 OffenderPedName = reader["OffenderPedName"] as string,
                                 OffenderVehicleLicensePlate = reader["OffenderVehicleLicensePlate"] as string,
-                                CourtCaseNumber = reader["CourtCaseNumber"] as string
+                                CourtCaseNumber = reader["CourtCaseNumber"] as string,
+                                FinalAmount = reader["FinalAmount"] is DBNull || reader["FinalAmount"] == null ? (int?)null : Convert.ToInt32(reader["FinalAmount"])
                             };
 
                             report.Charges = LoadCitationReportCharges(report.Id);
@@ -1432,18 +1443,19 @@ namespace MDTPro.Data {
                             OfficerCallSign, OfficerAgency, OfficerBadgeNumber,
                             LocationArea, LocationStreet, LocationCounty, LocationPostal,
                             TimeStamp, Status, Notes, OffenderPedName,
-                            OffenderVehicleLicensePlate, CourtCaseNumber
+                            OffenderVehicleLicensePlate, CourtCaseNumber, FinalAmount
                         ) VALUES (
                             @Id, @ShortYear, @OfficerFirstName, @OfficerLastName, @OfficerRank,
                             @OfficerCallSign, @OfficerAgency, @OfficerBadgeNumber,
                             @LocationArea, @LocationStreet, @LocationCounty, @LocationPostal,
                             @TimeStamp, @Status, @Notes, @OffenderPedName,
-                            @OffenderVehicleLicensePlate, @CourtCaseNumber
+                            @OffenderVehicleLicensePlate, @CourtCaseNumber, @FinalAmount
                         )", connection, transaction)) {
                         AddReportBaseParams(cmd, report);
                         cmd.Parameters.AddWithValue("@OffenderPedName", (object)report.OffenderPedName ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@OffenderVehicleLicensePlate", (object)report.OffenderVehicleLicensePlate ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@CourtCaseNumber", (object)report.CourtCaseNumber ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@FinalAmount", report.FinalAmount.HasValue ? (object)report.FinalAmount.Value : DBNull.Value);
                         cmd.ExecuteNonQuery();
                     }
 
@@ -1739,18 +1751,19 @@ namespace MDTPro.Data {
                                     OfficerCallSign, OfficerAgency, OfficerBadgeNumber,
                                     LocationArea, LocationStreet, LocationCounty, LocationPostal,
                                     TimeStamp, Status, Notes, OffenderPedName,
-                                    OffenderVehicleLicensePlate, CourtCaseNumber
+                                    OffenderVehicleLicensePlate, CourtCaseNumber, FinalAmount
                                 ) VALUES (
                                     @Id, @ShortYear, @OfficerFirstName, @OfficerLastName, @OfficerRank,
                                     @OfficerCallSign, @OfficerAgency, @OfficerBadgeNumber,
                                     @LocationArea, @LocationStreet, @LocationCounty, @LocationPostal,
                                     @TimeStamp, @Status, @Notes, @OffenderPedName,
-                                    @OffenderVehicleLicensePlate, @CourtCaseNumber
+                                    @OffenderVehicleLicensePlate, @CourtCaseNumber, @FinalAmount
                                 )", connection, transaction)) {
                                 AddReportBaseParams(cmd, report);
                                 cmd.Parameters.AddWithValue("@OffenderPedName", (object)report.OffenderPedName ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@OffenderVehicleLicensePlate", (object)report.OffenderVehicleLicensePlate ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@CourtCaseNumber", (object)report.CourtCaseNumber ?? DBNull.Value);
+                                cmd.Parameters.AddWithValue("@FinalAmount", report.FinalAmount.HasValue ? (object)report.FinalAmount.Value : DBNull.Value);
                                 cmd.ExecuteNonQuery();
                             }
 

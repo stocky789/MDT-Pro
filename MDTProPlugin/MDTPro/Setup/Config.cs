@@ -79,6 +79,8 @@ namespace MDTPro.Setup {
         public bool mapSmoothPlayerIcon = false;
 
         public bool showAgencyInCalloutInfo = true;
+        /// <summary>When true, names mentioned in callout additional messages (e.g. "associated with Joe Thomas") are added as stub person records so they appear in Person Search. Callout packs that use CDF to register suspects do not need this.</summary>
+        public bool addCalloutSuspectNamesFromMessages = true;
 
         /// <summary>
         /// Check for updates on load via GitHub Releases. Set to false to disable.
