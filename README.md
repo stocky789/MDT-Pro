@@ -14,28 +14,28 @@ A Police Computer Plugin for LSPDFR. MDT Pro runs a local web server when you go
 
 To build the plugin from source:
 
-1. **Restore NuGet packages**  
+1. **Restore packages**  
    From repo root:  
-   `nuget restore MDTProPlugin\MDTPro.sln`  
-   (Or open the solution in Visual Studio and build; it will restore automatically.)
+   `dotnet restore MDTProPlugin\MDTPro.sln`  
+   (Or open the solution in Visual Studio; it restores automatically.)
 
-2. **Provide reference DLLs**  
+2. **Reference DLLs from game**  
    Create a `References` folder in the repo root and copy these from your GTA V install:
    - `plugins/LSPDFR/CalloutInterface.dll`
    - `plugins/LSPDFR/CalloutInterfaceAPI.dll` (or from game root)
-   - `plugins/LSPDFR/CommonDataFramework.dll`
    - `plugins/LSPDFR/PolicingRedefined.dll`
    - `plugins/LSPDFR/LSPD First Response.dll` (from `plugins/`)
    - `IPT.Common.dll` (game root)
-   - `Newtonsoft.Json.dll` (game root, or from NuGet)
-   - `System.Data.SQLite.dll` (from `plugins/LSPDFR/`; or ensure the NuGet package has the DLL in `packages/.../lib/net46/`)
 
-   `References` is in `.gitignore` (each dev uses their own game copy).
+   Other dependencies (CommonDataFramework, Newtonsoft.Json, System.Data.SQLite, etc.) come from NuGet. `References` is in `.gitignore` (each dev uses their own game copy).
 
 3. **Build**  
-   Open `MDTProPlugin/MDTPro.sln` in Visual Studio and build **Release**, or run  
-   `.\build-and-deploy.ps1`  
-   to build and deploy to a GTA V path (edit `$GamePath` in the script or pass `-GamePath "..."` for your install).
+   From repo root:  
+   `dotnet build MDTProPlugin\MDTPro.sln -c Release`  
+   Or open `MDTProPlugin\MDTPro.sln` in Visual Studio and build **Release**.  
+   Output is in `Release\plugins\lspdfr\MDTPro.dll` and `Release\MDTPro\` (web UI is copied automatically).
+
+   Optional: run `.\build.ps1` for a clean build; use `.\build.ps1 -Deploy` to build and copy into your GTA V folder (pass `-GamePath "D:\Games\GTA V"` if your install is elsewhere).
 
 ## Installation
 
