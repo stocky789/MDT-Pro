@@ -12,6 +12,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace MDTPro.Data {
     public class DataController {
@@ -82,7 +83,7 @@ namespace MDTPro.Data {
         private static readonly TimeSpan ContextPedTtl = TimeSpan.FromSeconds(60);
 
         // Evidence trigger reliability (for UI: only show reliably tracked items in court breakdown):
-        // Reliable: HadWeapon (native at arrest), WasWanted (LSPDFR persona), AssaultedPed (damage native + player check), DamagedVehicle (damage native).
+        // Reliable: HadWeapon (native at arrest), WasWanted (LSPDFR persona or MDT ped IsWanted/WarrantText), AssaultedPed (damage native + player check), DamagedVehicle (damage native).
         // Resisted: from PR PedAPI.GetPedResistanceAction at arrest (Flee, Attack, Uncooperative = resisted).
         // Unreliable / conditional: WasPatDown (PR OnPedPatDown only; no LSPDFR), WasDrunk (IS_PED_DRUNK rarely set by game),
         // WasFleeing (only true if ped is fleeing at exact moment we run; chase-then-stop usually misses), HadIllegalWeapon (needs CDF permit data),
@@ -513,6 +514,26 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>Add a name-only stub so a callout-mentioned suspect appears in Person Search. Used when callouts do not register the suspect with CDF.</summary>
+        internal static void AddCalloutSuspectNameToDatabase(string fullName) {
+            if (string.IsNullOrWhiteSpace(fullName)) return;
+            fullName = fullName.Trim();
+            if (fullName.Length < 3) return;
+            MDTProPedData stub = null;
+            lock (_pedDbLock) {
+                if (pedDatabase.Any(x => x.Name != null && x.Name.Equals(fullName, StringComparison.OrdinalIgnoreCase))) return;
+                if (keepInPedDatabase.Any(x => x.Name != null && x.Name.Equals(fullName, StringComparison.OrdinalIgnoreCase))) return;
+                stub = new MDTProPedData { Name = fullName };
+                stub.Citations = new List<CitationGroup.Charge>();
+                stub.Arrests = new List<ArrestGroup.Charge>();
+                stub.IdentificationHistory = new List<MDTProPedData.IdentificationEntry>();
+                pedDatabase.Add(stub);
+                keepInPedDatabase.Add(stub);
+            }
+            KeepPedInDatabase(stub);
+            Database.SavePed(stub);
+        }
+
         internal static void UpdateVehicleData(MDTProVehicleData vehicleData) {
             lock (_vehicleDbLock) {
                 int index = vehicleDatabase.FindIndex(x => x.LicensePlate == vehicleData.LicensePlate);
@@ -570,14 +591,7 @@ namespace MDTPro.Data {
                 // Citations are resolved directly and should not create court cases.
                 citationReport.CourtCaseNumber = null;
 
-                int index = citationReports.FindIndex(x => x.Id == citationReport.Id);
-                if (index != -1) {
-                    citationReports[index] = citationReport;
-                } else {
-                    citationReports.Add(citationReport);
-                }
-                // Notify Policing Redefined so "Give Citation" shows in the ped menu (new or updated citation saved as closed)
-                if (Main.usePR && citationReport.Status == ReportStatus.Closed) {
+                if (citationReport.Status == ReportStatus.Closed && citationReport.Charges != null && citationReport.Charges.Count > 0) {
                     var chargesToHand = citationReport.Charges
                         .Select(charge => new PRHelper.CitationHandoutCharge {
                             Name = charge.name,
@@ -585,8 +599,19 @@ namespace MDTPro.Data {
                             IsArrestable = charge.isArrestable,
                         })
                         .ToList();
+                    citationReport.FinalAmount = chargesToHand.Sum(c => c.Fine);
+                    Database.SaveCitationReport(citationReport);
 
-                    PRHelper.GiveCitation(citationReport.OffenderPedName, chargesToHand);
+                    if (Main.usePR) {
+                        PRHelper.GiveCitation(citationReport.OffenderPedName, chargesToHand);
+                    }
+                }
+
+                int index = citationReports.FindIndex(x => x.Id == citationReport.Id);
+                if (index != -1) {
+                    citationReports[index] = citationReport;
+                } else {
+                    citationReports.Add(citationReport);
                 }
             } else if (report is ArrestReport arrestReport) {
                 if (!string.IsNullOrEmpty(arrestReport.OffenderPedName)) {
@@ -942,7 +967,9 @@ namespace MDTPro.Data {
 
                 // 0xA2719263 = WEAPON_UNARMED hash; GET_BEST_PED_WEAPON returns unarmed if ped has no weapon
                 bool hadWeapon = NativeFunction.Natives.GET_BEST_PED_WEAPON<uint>(ped, false) != 0xA2719263u;
-                bool wasWanted = persona.Wanted;
+                MDTProPedData dbPed = GetPedDataForPed(ped);
+                // Use both LSPDFR persona and MDT ped data: MDT is authoritative for warrants (IsWanted/WarrantText)
+                bool wasWanted = persona.Wanted || (dbPed != null && (dbPed.IsWanted || !string.IsNullOrWhiteSpace(dbPed.WarrantText)));
                 bool wasDrunk = NativeFunction.Natives.IS_PED_DRUNK<bool>(ped);
                 bool wasFleeing = NativeFunction.Natives.IS_PED_FLEEING<bool>(ped);
 
@@ -968,7 +995,6 @@ namespace MDTPro.Data {
                 // Also check probation/parole violation. Use Holder fallback for re-encounters.
                 bool hadIllegalWeapon = false;
                 bool violatedSupervision = false;
-                MDTProPedData dbPed = GetPedDataForPed(ped);
                 if (dbPed != null) {
                     if (hadWeapon && !string.IsNullOrEmpty(dbPed.WeaponPermitStatus)) {
                         hadIllegalWeapon = !dbPed.WeaponPermitStatus.Equals("Valid", StringComparison.OrdinalIgnoreCase);
@@ -1131,10 +1157,12 @@ namespace MDTPro.Data {
             convictionChance = Math.Max(10, Math.Min(90, convictionChance));
 
             if (courtData.IsJuryTrial && courtData.JurySize > 0) {
-                int votesForConviction = 0;
-                for (int i = 0; i < courtData.JurySize; i++) {
-                    if (Helper.GetRandomInt(1, 100) <= convictionChance) votesForConviction++;
-                }
+                // Mean votes for conviction from conviction chance; add spread so we see more 9-3, 8-4 etc. instead of mostly 11-1
+                float meanVotes = (convictionChance / 100f) * courtData.JurySize;
+                int spread = Math.Max(1, courtData.JurySize / 3);
+                int spreadAmount = Helper.GetRandomInt(-spread, spread);
+                int votesForConviction = Math.Max(0, Math.Min(courtData.JurySize,
+                    (int)Math.Round(meanVotes) + spreadAmount));
                 courtData.JuryVotesForConviction = votesForConviction;
                 courtData.JuryVotesForAcquittal = courtData.JurySize - votesForConviction;
             }
@@ -1221,6 +1249,16 @@ namespace MDTPro.Data {
                         if (ctx.HadIllegalWeapon) { score += config.courtEvidenceIllegalWeaponBonus; courtData.EvidenceIllegalWeapon = true; }
                         if (ctx.ViolatedSupervision) { score += config.courtEvidenceSupervisionViolationBonus; courtData.EvidenceViolatedSupervision = true; }
                         if (ctx.Resisted) { score += config.courtEvidenceResistedBonus; courtData.EvidenceResisted = true; }
+                    }
+                }
+                // Fallback: MDT is authoritative for warrants; if cache didn't set EvidenceWasWanted, set from ped record
+                if (!courtData.EvidenceWasWanted) {
+                    lock (_pedDbLock) {
+                        MDTProPedData pedData = pedDatabase.FirstOrDefault(p => p.Name?.ToLower() == courtData.PedName?.ToLower());
+                        if (pedData != null && (pedData.IsWanted || !string.IsNullOrWhiteSpace(pedData.WarrantText))) {
+                            score += config.courtEvidenceWantedBonus;
+                            courtData.EvidenceWasWanted = true;
+                        }
                     }
                 }
             }

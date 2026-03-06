@@ -396,6 +396,7 @@ namespace MDTPro.Setup {
                 public string involvedParties = "Involved Parties";
                 public string offender = "Offender";
                 public string vehicle = "Vehicle";
+                public string finalAmount = "Final Amount";
                 public Filter filter = new Filter();
 
                 public class Filter {
