@@ -280,7 +280,7 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   evidenceBreakdown.classList.add('evidenceBreakdown')
   evidenceBreakdown.style.display = 'none'
 
-  const hasAnyRealEvidence = courtCase.EvidenceHadWeapon || courtCase.EvidenceWasWanted || courtCase.EvidenceAssaultedPed || courtCase.EvidenceDamagedVehicle || courtCase.EvidenceResisted
+  const hasAnyRealEvidence = courtCase.EvidenceHadWeapon || courtCase.EvidenceWasWanted || courtCase.EvidenceAssaultedPed || courtCase.EvidenceDamagedVehicle || courtCase.EvidenceResisted || courtCase.EvidenceHadDrugs
   const noEvidenceNote = document.createElement('div')
   noEvidenceNote.classList.add('evidenceBreakdownNote')
   noEvidenceNote.innerText = hasAnyRealEvidence
@@ -323,6 +323,7 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
     { label: language.court.evidenceAssault || 'Assaulted Another Person', value: courtCase.EvidenceAssaultedPed, active: courtCase.EvidenceAssaultedPed },
     { label: language.court.evidenceVehicleDamage || 'Damaged Vehicle / Property', value: courtCase.EvidenceDamagedVehicle, active: courtCase.EvidenceDamagedVehicle },
     { label: language.court.evidenceResisted || 'Resisted Arrest', value: courtCase.EvidenceResisted, active: courtCase.EvidenceResisted },
+    { label: language.court.evidenceDrugs || 'Drugs Found on Person', value: courtCase.EvidenceHadDrugs, active: courtCase.EvidenceHadDrugs },
   ]
 
   for (const item of evidenceItems) {

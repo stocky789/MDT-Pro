@@ -67,6 +67,17 @@ namespace MDTPro.Utility {
             return reader.ReadToEnd();
         }
 
+        /// <summary>Extract string from request body. Handles both JSON string ("...") and plain text for Content-Type: application/json.</summary>
+        internal static string GetRequestBodyAsString(HttpListenerRequest req) {
+            string body = GetRequestPostData(req);
+            if (string.IsNullOrEmpty(body)) return "";
+            body = body.Trim();
+            if (body.Length >= 2 && body[0] == '"' && body[body.Length - 1] == '"') {
+                try { return JsonConvert.DeserializeObject<string>(body) ?? ""; } catch { }
+            }
+            return body;
+        }
+
         internal static string GetAgencyNameFromScriptName(string scriptName) {
             XmlDocument xmlDoc = new XmlDocument();
             if (!File.Exists("lspdfr/data/agency.xml")) {

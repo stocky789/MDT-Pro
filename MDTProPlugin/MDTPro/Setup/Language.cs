@@ -217,6 +217,7 @@ namespace MDTPro.Setup {
             public class Notifications {
                 public string emptySearchInput = "Enter serial number or owner name.";
                 public string notFound = "No firearm or owner found.";
+                public string searchError = "Search failed. Please try again.";
             }
         }
 
@@ -232,6 +233,13 @@ namespace MDTPro.Setup {
                 public string refreshNearby = "Refresh";
                 public string basicInfoTitle = "Basic Information";
                 public string documentsTitle = "Documents";
+                public string bolosTitle = "BOLOs (Be On the Look-Out)";
+                public string boloVehicleRequired = "Vehicle must be nearby to add or remove BOLOs.";
+                public string addBOLO = "Add BOLO";
+                public string removeBOLO = "Remove";
+                public string boloReasonPrompt = "Enter BOLO reason:";
+                public string boloExpiresPrompt = "Expires in how many days? (default 7):";
+                public string searchResultsTitle = "Search Results (Contraband)";
                 public Labels labels = new Labels();
 
                 public class Labels {
@@ -254,6 +262,8 @@ namespace MDTPro.Setup {
                 public string stolen = "WARNING";
                 public string vehicleStolen = "Vehicle";
                 public string reportedStolen = "is in the stolen vehicle database";
+                public string boloAdded = "BOLO added.";
+                public string boloRemoved = "BOLO removed.";
             }
         }
 
