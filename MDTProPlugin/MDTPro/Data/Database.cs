@@ -16,7 +16,7 @@ namespace MDTPro.Data {
         private static SQLiteConnection connection;
         private static readonly object dbLock = new object();
 
-        private const int CurrentSchemaVersion = 15;
+        private const int CurrentSchemaVersion = 16;
 
         internal static void Initialize() {
             lock (dbLock) {
@@ -127,6 +127,11 @@ namespace MDTPro.Data {
                     Owner                       TEXT,
                     Color                       TEXT,
                     VehicleIdentificationNumber TEXT,
+                    VinStatus                   TEXT,
+                    Make                        TEXT,
+                    Model                       TEXT,
+                    PrimaryColor                TEXT,
+                    SecondaryColor              TEXT,
                     RegistrationStatus          TEXT,
                     RegistrationExpiration      TEXT,
                     InsuranceStatus             TEXT,
@@ -159,6 +164,7 @@ namespace MDTPro.Data {
                     EvidenceIllegalWeapon   INTEGER NOT NULL DEFAULT 0,
                     EvidenceViolatedSupervision INTEGER NOT NULL DEFAULT 0,
                     EvidenceResisted         INTEGER NOT NULL DEFAULT 0,
+                    EvidenceHadDrugs         INTEGER NOT NULL DEFAULT 0,
                     ConvictionChance        INTEGER NOT NULL DEFAULT 0,
                     ResolveAtUtc            TEXT,
                     RepeatOffenderScore     INTEGER NOT NULL DEFAULT 0,
@@ -344,10 +350,46 @@ namespace MDTPro.Data {
                 );
                 CREATE INDEX IF NOT EXISTS idx_firearm_records_owner ON firearm_records(OwnerPedName);
                 CREATE INDEX IF NOT EXISTS idx_firearm_records_serial ON firearm_records(SerialNumber);
+
+                CREATE TABLE IF NOT EXISTS drug_records (
+                    Id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                    OwnerPedName        TEXT NOT NULL,
+                    DrugType            TEXT,
+                    DrugCategory        TEXT,
+                    Description         TEXT,
+                    Source              TEXT,
+                    FirstSeenAt         TEXT NOT NULL,
+                    LastSeenAt          TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_drug_records_owner ON drug_records(OwnerPedName);
+                CREATE INDEX IF NOT EXISTS idx_drug_records_drugtype ON drug_records(DrugType);
+
+                CREATE TABLE IF NOT EXISTS vehicle_search_records (
+                    Id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                    LicensePlate        TEXT NOT NULL,
+                    ItemType            TEXT,
+                    DrugType            TEXT,
+                    ItemLocation        TEXT,
+                    Description         TEXT,
+                    WeaponModelHash     INTEGER NOT NULL DEFAULT 0,
+                    WeaponModelId       TEXT,
+                    Source              TEXT,
+                    CapturedAt          TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_vehicle_search_records_plate ON vehicle_search_records(LicensePlate);
             ";
 
             using (var cmd = new SQLiteCommand(sql, connection)) {
                 cmd.ExecuteNonQuery();
+            }
+        }
+
+        private static bool GetBooleanFromReader(SQLiteDataReader reader, string columnName) {
+            try {
+                int ordinal = reader.GetOrdinal(columnName);
+                return !reader.IsDBNull(ordinal) && Convert.ToBoolean(reader[ordinal]);
+            } catch {
+                return false;
             }
         }
 
@@ -551,6 +593,52 @@ namespace MDTPro.Data {
                 }
             }
 
+            if (fromVersion < 16) {
+                using (var cmd = new SQLiteCommand(@"
+                    CREATE TABLE IF NOT EXISTS drug_records (
+                        Id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                        OwnerPedName        TEXT NOT NULL,
+                        DrugType            TEXT,
+                        DrugCategory        TEXT,
+                        Description         TEXT,
+                        Source              TEXT,
+                        FirstSeenAt         TEXT NOT NULL,
+                        LastSeenAt          TEXT NOT NULL
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_drug_records_owner ON drug_records(OwnerPedName);
+                    CREATE INDEX IF NOT EXISTS idx_drug_records_drugtype ON drug_records(DrugType);
+
+                    CREATE TABLE IF NOT EXISTS vehicle_search_records (
+                        Id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                        LicensePlate        TEXT NOT NULL,
+                        ItemType            TEXT,
+                        DrugType            TEXT,
+                        ItemLocation        TEXT,
+                        Description         TEXT,
+                        WeaponModelHash     INTEGER NOT NULL DEFAULT 0,
+                        WeaponModelId       TEXT,
+                        Source              TEXT,
+                        CapturedAt          TEXT NOT NULL
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_vehicle_search_records_plate ON vehicle_search_records(LicensePlate);
+                ", connection)) {
+                    cmd.ExecuteNonQuery();
+                }
+                foreach (string col in new[] { "VinStatus", "Make", "Model", "PrimaryColor", "SecondaryColor" }) {
+                    try {
+                        using (var cmd = new SQLiteCommand($"ALTER TABLE vehicles ADD COLUMN {col} TEXT", connection)) {
+                            cmd.ExecuteNonQuery();
+                        }
+                    } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+                }
+                try {
+                    using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN EvidenceHadDrugs INTEGER NOT NULL DEFAULT 0", connection)) {
+                        cmd.ExecuteNonQuery();
+                    }
+                } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+                Helper.Log("Database migrated to schema version 16 (drug records, vehicle search, vehicle schema, EvidenceHadDrugs)");
+            }
+
             SetSchemaVersion(CurrentSchemaVersion);
         }
 
@@ -679,6 +767,11 @@ namespace MDTPro.Data {
                                 Owner = reader["Owner"] as string,
                                 Color = reader["Color"] as string,
                                 VehicleIdentificationNumber = reader["VehicleIdentificationNumber"] as string,
+                                VinStatus = reader["VinStatus"] as string,
+                                Make = reader["Make"] as string,
+                                Model = reader["Model"] as string,
+                                PrimaryColor = reader["PrimaryColor"] as string,
+                                SecondaryColor = reader["SecondaryColor"] as string,
                                 RegistrationStatus = reader["RegistrationStatus"] as string,
                                 RegistrationExpiration = reader["RegistrationExpiration"] as string,
                                 InsuranceStatus = reader["InsuranceStatus"] as string,
@@ -737,6 +830,7 @@ namespace MDTPro.Data {
                                 EvidenceIllegalWeapon = reader["EvidenceIllegalWeapon"] is DBNull ? false : Convert.ToBoolean(reader["EvidenceIllegalWeapon"]),
                                 EvidenceViolatedSupervision = reader["EvidenceViolatedSupervision"] is DBNull ? false : Convert.ToBoolean(reader["EvidenceViolatedSupervision"]),
                                 EvidenceResisted = reader["EvidenceResisted"] is DBNull ? false : Convert.ToBoolean(reader["EvidenceResisted"]),
+                                EvidenceHadDrugs = GetBooleanFromReader(reader, "EvidenceHadDrugs"),
                                 ConvictionChance = reader["ConvictionChance"] is DBNull ? 0 : Convert.ToInt32(reader["ConvictionChance"]),
                                 ResolveAtUtc = reader["ResolveAtUtc"] as string,
                                 RepeatOffenderScore = Convert.ToInt32(reader["RepeatOffenderScore"]),
@@ -1205,11 +1299,13 @@ namespace MDTPro.Data {
             using (var cmd = new SQLiteCommand(@"
                 INSERT OR REPLACE INTO vehicles (
                     LicensePlate, ModelName, ModelDisplayName, IsStolen, Owner, Color,
-                    VehicleIdentificationNumber, RegistrationStatus, RegistrationExpiration,
+                    VehicleIdentificationNumber, VinStatus, Make, Model, PrimaryColor, SecondaryColor,
+                    RegistrationStatus, RegistrationExpiration,
                     InsuranceStatus, InsuranceExpiration, BOLOs
                 ) VALUES (
                     @LicensePlate, @ModelName, @ModelDisplayName, @IsStolen, @Owner, @Color,
-                    @VIN, @RegStatus, @RegExpiration, @InsStatus, @InsExpiration, @BOLOs
+                    @VIN, @VinStatus, @Make, @Model, @PrimaryColor, @SecondaryColor,
+                    @RegStatus, @RegExpiration, @InsStatus, @InsExpiration, @BOLOs
                 )", connection, transaction)) {
                 cmd.Parameters.AddWithValue("@LicensePlate", (object)vehicle.LicensePlate ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@ModelName", (object)vehicle.ModelName ?? DBNull.Value);
@@ -1218,6 +1314,11 @@ namespace MDTPro.Data {
                 cmd.Parameters.AddWithValue("@Owner", (object)vehicle.Owner ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@Color", (object)vehicle.Color ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@VIN", (object)vehicle.VehicleIdentificationNumber ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@VinStatus", (object)vehicle.VinStatus ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Make", (object)vehicle.Make ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Model", (object)vehicle.Model ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@PrimaryColor", (object)vehicle.PrimaryColor ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@SecondaryColor", (object)vehicle.SecondaryColor ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@RegStatus", (object)vehicle.RegistrationStatus ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@RegExpiration", (object)vehicle.RegistrationExpiration ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@InsStatus", (object)vehicle.InsuranceStatus ?? DBNull.Value);
@@ -1253,7 +1354,7 @@ namespace MDTPro.Data {
                     PriorCitationCount, PriorArrestCount, PriorConvictionCount, SeverityScore, EvidenceScore,
                     EvidenceHadWeapon, EvidenceWasWanted, EvidenceWasPatDown,
                     EvidenceWasDrunk, EvidenceWasFleeing, EvidenceAssaultedPed, EvidenceDamagedVehicle, EvidenceIllegalWeapon,
-                    EvidenceViolatedSupervision, EvidenceResisted, ConvictionChance, ResolveAtUtc,
+                    EvidenceViolatedSupervision, EvidenceResisted, EvidenceHadDrugs, ConvictionChance, ResolveAtUtc,
                     RepeatOffenderScore,
                     SentenceMultiplier, ProsecutionStrength, DefenseStrength, DocketPressure, PolicyAdjustment,
                     CourtDistrict, CourtName, CourtType, HasPublicDefender, Plea,
@@ -1265,7 +1366,7 @@ namespace MDTPro.Data {
                     @PriorCitationCount, @PriorArrestCount, @PriorConvictionCount, @SeverityScore, @EvidenceScore,
                     @EvidenceHadWeapon, @EvidenceWasWanted, @EvidenceWasPatDown,
                     @EvidenceWasDrunk, @EvidenceWasFleeing, @EvidenceAssaultedPed, @EvidenceDamagedVehicle, @EvidenceIllegalWeapon,
-                    @EvidenceViolatedSupervision, @EvidenceResisted, @ConvictionChance, @ResolveAtUtc,
+                    @EvidenceViolatedSupervision, @EvidenceResisted, @EvidenceHadDrugs, @ConvictionChance, @ResolveAtUtc,
                     @RepeatOffenderScore,
                     @SentenceMultiplier, @ProsecutionStrength, @DefenseStrength, @DocketPressure, @PolicyAdjustment,
                     @CourtDistrict, @CourtName, @CourtType, @HasPublicDefender, @Plea,
@@ -1297,6 +1398,7 @@ namespace MDTPro.Data {
                 cmd.Parameters.AddWithValue("@EvidenceIllegalWeapon", courtCase.EvidenceIllegalWeapon ? 1 : 0);
                 cmd.Parameters.AddWithValue("@EvidenceViolatedSupervision", courtCase.EvidenceViolatedSupervision ? 1 : 0);
                 cmd.Parameters.AddWithValue("@EvidenceResisted", courtCase.EvidenceResisted ? 1 : 0);
+                cmd.Parameters.AddWithValue("@EvidenceHadDrugs", courtCase.EvidenceHadDrugs ? 1 : 0);
                 cmd.Parameters.AddWithValue("@ConvictionChance", courtCase.ConvictionChance);
                 cmd.Parameters.AddWithValue("@ResolveAtUtc", (object)courtCase.ResolveAtUtc ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@RepeatOffenderScore", courtCase.RepeatOffenderScore);
@@ -1755,16 +1857,19 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>Loads firearms by owner name. Uses case-insensitive matching so "John Doe" matches "john doe".</summary>
         internal static List<FirearmRecord> LoadFirearmsByOwner(string ownerPedName, int limit = 50) {
             lock (dbLock) {
                 if (connection == null) return new List<FirearmRecord>();
+                string owner = (ownerPedName ?? "").Trim();
+                if (string.IsNullOrEmpty(owner)) return new List<FirearmRecord>();
                 var list = new List<FirearmRecord>();
                 using (var cmd = new SQLiteCommand(@"
                     SELECT Id, SerialNumber, OwnerPedName, WeaponModelId, WeaponDisplayName, WeaponModelHash, IsStolen, Description, Source, FirstSeenAt, LastSeenAt
-                    FROM firearm_records WHERE OwnerPedName = @owner ORDER BY LastSeenAt DESC LIMIT @limit
+                    FROM firearm_records WHERE OwnerPedName IS NOT NULL AND OwnerPedName != '' AND LOWER(TRIM(OwnerPedName)) = LOWER(@owner) ORDER BY LastSeenAt DESC LIMIT @limit
                 ", connection)) {
-                    cmd.Parameters.AddWithValue("@owner", ownerPedName ?? "");
-                    cmd.Parameters.AddWithValue("@limit", limit);
+                    cmd.Parameters.AddWithValue("@owner", owner);
+                    cmd.Parameters.AddWithValue("@limit", Math.Max(1, Math.Min(limit, 100)));
                     using (var rdr = cmd.ExecuteReader()) {
                         while (rdr.Read())
                             list.Add(ReadFirearmFromReader(rdr));
@@ -1827,6 +1932,147 @@ namespace MDTPro.Data {
                 FirstSeenAt = rdr["FirstSeenAt"] as string,
                 LastSeenAt = rdr["LastSeenAt"] as string
             };
+        }
+
+        #endregion
+
+        #region Drug Records
+
+        internal static void SaveDrugRecords(List<DrugRecord> records) {
+            if (records == null || records.Count == 0) return;
+            foreach (var r in records) UpsertDrugRecord(r);
+        }
+
+        private static void UpsertDrugRecord(DrugRecord r) {
+            if (r == null || string.IsNullOrWhiteSpace(r.OwnerPedName)) return;
+            lock (dbLock) {
+                if (connection == null) return;
+                string now = DateTime.UtcNow.ToString("o");
+                r.FirstSeenAt = r.FirstSeenAt ?? now;
+                r.LastSeenAt = r.LastSeenAt ?? now;
+                int? existingId = null;
+                using (var sel = new SQLiteCommand(@"
+                    SELECT Id FROM drug_records WHERE OwnerPedName = @owner AND DrugType = @drugType AND Source = @src LIMIT 1
+                ", connection)) {
+                    sel.Parameters.AddWithValue("@owner", r.OwnerPedName);
+                    sel.Parameters.AddWithValue("@drugType", (object)r.DrugType ?? DBNull.Value);
+                    sel.Parameters.AddWithValue("@src", (object)r.Source ?? DBNull.Value);
+                    object o = sel.ExecuteScalar();
+                    if (o != null) existingId = Convert.ToInt32(o);
+                }
+                if (existingId.HasValue) {
+                    using (var cmd = new SQLiteCommand("UPDATE drug_records SET LastSeenAt = @last WHERE Id = @id", connection)) {
+                        cmd.Parameters.AddWithValue("@last", r.LastSeenAt);
+                        cmd.Parameters.AddWithValue("@id", existingId.Value);
+                        cmd.ExecuteNonQuery();
+                    }
+                } else {
+                    using (var cmd = new SQLiteCommand(@"
+                        INSERT INTO drug_records (OwnerPedName, DrugType, DrugCategory, Description, Source, FirstSeenAt, LastSeenAt)
+                        VALUES (@owner, @drugType, @category, @desc, @src, @first, @last)
+                    ", connection)) {
+                        cmd.Parameters.AddWithValue("@owner", r.OwnerPedName);
+                        cmd.Parameters.AddWithValue("@drugType", (object)r.DrugType ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@category", (object)r.DrugCategory ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@desc", (object)r.Description ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@src", (object)r.Source ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@first", r.FirstSeenAt);
+                        cmd.Parameters.AddWithValue("@last", r.LastSeenAt);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+        }
+
+        internal static List<DrugRecord> LoadDrugsByOwner(string ownerPedName, int limit = 50) {
+            if (string.IsNullOrWhiteSpace(ownerPedName)) return new List<DrugRecord>();
+            lock (dbLock) {
+                if (connection == null) return new List<DrugRecord>();
+                var list = new List<DrugRecord>();
+                string owner = ownerPedName.Trim();
+                using (var cmd = new SQLiteCommand(@"
+                    SELECT Id, OwnerPedName, DrugType, DrugCategory, Description, Source, FirstSeenAt, LastSeenAt
+                    FROM drug_records WHERE LOWER(OwnerPedName) = LOWER(@owner) ORDER BY LastSeenAt DESC LIMIT @limit
+                ", connection)) {
+                    cmd.Parameters.AddWithValue("@owner", owner);
+                    cmd.Parameters.AddWithValue("@limit", limit);
+                    using (var rdr = cmd.ExecuteReader()) {
+                        while (rdr.Read())
+                            list.Add(new DrugRecord {
+                                Id = rdr.GetInt32(rdr.GetOrdinal("Id")),
+                                OwnerPedName = rdr["OwnerPedName"] as string ?? "",
+                                DrugType = rdr["DrugType"] as string,
+                                DrugCategory = rdr["DrugCategory"] as string,
+                                Description = rdr["Description"] as string,
+                                Source = rdr["Source"] as string,
+                                FirstSeenAt = rdr["FirstSeenAt"] as string,
+                                LastSeenAt = rdr["LastSeenAt"] as string
+                            });
+                    }
+                }
+                return list;
+            }
+        }
+
+        #endregion
+
+        #region Vehicle Search Records
+
+        internal static void SaveVehicleSearchRecords(List<VehicleSearchRecord> records) {
+            if (records == null || records.Count == 0) return;
+            lock (dbLock) {
+                if (connection == null) return;
+                foreach (var r in records) {
+                    if (string.IsNullOrWhiteSpace(r.LicensePlate)) continue;
+                    using (var cmd = new SQLiteCommand(@"
+                        INSERT INTO vehicle_search_records (LicensePlate, ItemType, DrugType, ItemLocation, Description, WeaponModelHash, WeaponModelId, Source, CapturedAt)
+                        VALUES (@plate, @itemType, @drugType, @location, @desc, @hash, @modelId, @src, @captured)
+                    ", connection)) {
+                        cmd.Parameters.AddWithValue("@plate", (object)r.LicensePlate ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@itemType", (object)r.ItemType ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@drugType", (object)r.DrugType ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@location", (object)r.ItemLocation ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@desc", (object)r.Description ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@hash", (int)r.WeaponModelHash);
+                        cmd.Parameters.AddWithValue("@modelId", (object)r.WeaponModelId ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@src", (object)r.Source ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@captured", (object)r.CapturedAt ?? DBNull.Value);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+        }
+
+        internal static List<VehicleSearchRecord> LoadVehicleSearchRecordsByPlate(string licensePlate, int limit = 100) {
+            if (string.IsNullOrWhiteSpace(licensePlate)) return new List<VehicleSearchRecord>();
+            lock (dbLock) {
+                if (connection == null) return new List<VehicleSearchRecord>();
+                var list = new List<VehicleSearchRecord>();
+                using (var cmd = new SQLiteCommand(@"
+                    SELECT Id, LicensePlate, ItemType, DrugType, ItemLocation, Description, WeaponModelHash, WeaponModelId, Source, CapturedAt
+                    FROM vehicle_search_records WHERE LicensePlate = @plate ORDER BY CapturedAt DESC LIMIT @limit
+                ", connection)) {
+                    cmd.Parameters.AddWithValue("@plate", licensePlate.Trim());
+                    cmd.Parameters.AddWithValue("@limit", limit);
+                    using (var rdr = cmd.ExecuteReader()) {
+                        while (rdr.Read()) {
+                            list.Add(new VehicleSearchRecord {
+                                Id = rdr.GetInt32(rdr.GetOrdinal("Id")),
+                                LicensePlate = rdr["LicensePlate"] as string ?? "",
+                                ItemType = rdr["ItemType"] as string,
+                                DrugType = rdr["DrugType"] as string,
+                                ItemLocation = rdr["ItemLocation"] as string,
+                                Description = rdr["Description"] as string,
+                                WeaponModelHash = (rdr["WeaponModelHash"] is DBNull || rdr["WeaponModelHash"] == null) ? 0u : Convert.ToUInt32(rdr["WeaponModelHash"]),
+                                WeaponModelId = rdr["WeaponModelId"] as string,
+                                Source = rdr["Source"] as string,
+                                CapturedAt = rdr["CapturedAt"] as string
+                            });
+                        }
+                    }
+                }
+                return list;
+            }
         }
 
         #endregion

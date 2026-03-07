@@ -97,11 +97,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Data\CourtData.cs" />
+    <Compile Include="Data\VehicleSearchRecord.cs" />
     <Compile Include="Data\MDTProPedData.cs" />
     <Compile Include="Data\Database.cs" />
     <Compile Include="Data\SearchHistoryEntry.cs" />
     <Compile Include="Data\DataController.cs" />
     <Compile Include="Data\ALPRHit.cs" />
+    <Compile Include="Data\DrugRecord.cs" />
     <Compile Include="Data\FirearmRecord.cs" />
     <Compile Include="Data\MDTProVehicleData.cs" />
     <Compile Include="Data\OfficerInformationData.cs" />
@@ -113,6 +115,7 @@
     <Compile Include="Plugins\PluginController.cs" />
     <Compile Include="Plugins\PluginInfo.cs" />
     <Compile Include="Utility\DependencyCheck.cs" />
+    <Compile Include="EventListeners\CDFEvents.cs" />
     <Compile Include="EventListeners\CalloutEvents.cs" />
     <Compile Include="EventListeners\LSPDFREvents.cs" />
     <Compile Include="EventListeners\PREvents.cs" />

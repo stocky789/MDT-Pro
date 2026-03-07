@@ -77,9 +77,9 @@ namespace MDTPro.ServerAPI {
                 status = 200;
             } else if (path == "specificVehicle") {
                 string body = Helper.GetRequestPostData(req);
-                string licensePlateOrVin = !string.IsNullOrEmpty(body) ? body : "";
+                string licensePlateOrVin = !string.IsNullOrEmpty(body) ? body.Trim() : "";
 
-                MDTProVehicleData vehicleData = DataController.VehicleDatabase.FirstOrDefault(o => o.LicensePlate?.ToLower() == licensePlateOrVin.ToLower() ||o.VehicleIdentificationNumber?.ToLower() == licensePlateOrVin.ToLower());
+                MDTProVehicleData vehicleData = DataController.GetVehicleByPlateOrVin(licensePlateOrVin);
 
                 Database.SaveSearchHistoryEntry("vehicle", licensePlateOrVin, vehicleData?.LicensePlate);
 
@@ -133,8 +133,8 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/json";
             } else if (path == "pedReports") {
-                string body = Helper.GetRequestPostData(req);
-                string pedName = !string.IsNullOrEmpty(body) ? body.ToLower() : "";
+                string pedName = Helper.GetRequestBodyAsString(req);
+                if (!string.IsNullOrEmpty(pedName)) pedName = pedName.ToLower();
 
                 var result = new {
                     citations = DataController.citationReports
@@ -153,8 +153,7 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/json";
             } else if (path == "pedVehicles") {
-                string body = Helper.GetRequestPostData(req);
-                string pedName = !string.IsNullOrEmpty(body) ? body : "";
+                string pedName = Helper.GetRequestBodyAsString(req);
 
                 var vehicles = DataController.VehicleDatabase
                     .Where(v => v.Owner != null && v.Owner.ToLower() == pedName.ToLower())
@@ -226,15 +225,13 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/json";
             } else if (path == "firearmsForPed") {
-                string body = Helper.GetRequestPostData(req);
-                string pedName = !string.IsNullOrEmpty(body) ? body.Trim() : "";
+                string pedName = Helper.GetRequestBodyAsString(req);
                 var firearms = Database.LoadFirearmsByOwner(pedName);
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(firearms));
                 status = 200;
                 contentType = "text/json";
             } else if (path == "firearmBySerial") {
-                string body = Helper.GetRequestPostData(req);
-                string serial = !string.IsNullOrEmpty(body) ? body.Trim() : "";
+                string serial = Helper.GetRequestBodyAsString(req);
                 var firearm = Database.LoadFirearmBySerial(serial);
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(firearm ?? new object()));
                 status = 200;
@@ -242,6 +239,17 @@ namespace MDTPro.ServerAPI {
             } else if (path == "recentFirearmOwners") {
                 var owners = Database.LoadRecentFirearmOwnerNames(12);
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(owners));
+                status = 200;
+                contentType = "text/json";
+            } else if (path == "drugsByOwner") {
+                string pedName = Helper.GetRequestBodyAsString(req);
+                var drugs = string.IsNullOrWhiteSpace(pedName) ? new System.Collections.Generic.List<DrugRecord>() : Database.LoadDrugsByOwner(pedName);
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(drugs ?? new System.Collections.Generic.List<DrugRecord>()));
+                status = 200;
+                contentType = "text/json";
+            } else if (path == "vehicleSearchByPlate") {
+                string plate = Helper.GetRequestBodyAsString(req);
+                var records = string.IsNullOrWhiteSpace(plate) ? new System.Collections.Generic.List<VehicleSearchRecord>() : Database.LoadVehicleSearchRecordsByPlate(plate);
                 status = 200;
                 contentType = "text/json";
             }
