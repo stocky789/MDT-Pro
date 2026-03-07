@@ -52,44 +52,57 @@ if (-not $Incremental) { $buildArgs += '--no-incremental' }
 dotnet build @buildArgs
 if ($LASTEXITCODE -ne 0) { Write-Error "Build failed."; exit $LASTEXITCODE }
 
-# 3) Find DLL (SDK can output to bin\Release\ or bin\Release\net48\)
+# 3) Find DLL (csproj may output directly to Release\, or to bin\Release\)
+$dllDirect = Join-Path $root 'Release\plugins\lspdfr\MDTPro.dll'
 $dllNet48 = Join-Path $root 'MDTProPlugin\MDTPro\bin\Release\net48\MDTPro.dll'
 $dllRelease = Join-Path $root 'MDTProPlugin\MDTPro\bin\Release\MDTPro.dll'
-if (Test-Path $dllNet48) { $dllSource = $dllNet48 }
-elseif (Test-Path $dllRelease) { $dllSource = $dllRelease }
-else {
-    Write-Error "MDTPro.dll not found in bin\Release\ or bin\Release\net48\"
+
+if (Test-Path $dllDirect) {
+    # DLL already in Release (csproj OutputPath)
+    $dllSource = $dllDirect
+    Write-Host "  -> $dllDest (built directly)"
+} elseif (Test-Path $dllNet48) {
+    $dllSource = $dllNet48
+    New-Item -ItemType Directory -Path $dllDestDir -Force | Out-Null
+    Copy-Item -Path $dllSource -Destination $dllDest -Force
+    Write-Host "  -> $dllDest"
+} elseif (Test-Path $dllRelease) {
+    $dllSource = $dllRelease
+    New-Item -ItemType Directory -Path $dllDestDir -Force | Out-Null
+    Copy-Item -Path $dllSource -Destination $dllDest -Force
+    Write-Host "  -> $dllDest"
+} else {
+    Write-Error "MDTPro.dll not found in Release\, bin\Release\, or bin\Release\net48\"
     exit 1
 }
 
-# 4) Copy plugin DLL and web folder to Release\
-New-Item -ItemType Directory -Path $dllDestDir -Force | Out-Null
-Copy-Item -Path $dllSource -Destination $dllDest -Force
-Write-Host "  -> $dllDest"
+# 4) Copy web folder to Release\
 
 if (Test-Path $mdtDest) { Remove-Item $mdtDest -Recurse -Force }
 Copy-Item -Path $mdtSource -Destination $mdtDest -Recurse -Force
 Write-Host "  -> $mdtDest (web MDT)"
 
-# 5) Copy SQLite dependencies to plugins\lspdfr\ (required for database functionality)
+# 5) Copy SQLite dependencies to GTA V root (native loader requires app directory, not plugins\LSPDFR)
 $sqliteDllPaths += (Join-Path (Split-Path $dllSource) 'System.Data.SQLite.dll')
 $sqliteInteropPaths += (Join-Path (Split-Path $dllSource) 'x64\SQLite.Interop.dll')
 
 $sqliteDllSource = $sqliteDllPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
 $sqliteInteropSource = $sqliteInteropPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
 
+$releaseRoot = $release
+$releaseX64 = Join-Path $releaseRoot 'x64'
+
 if ($sqliteDllSource) {
-    Copy-Item -Path $sqliteDllSource -Destination $dllDestDir -Force
-    Write-Host "  -> $(Join-Path $dllDestDir 'System.Data.SQLite.dll')"
+    Copy-Item -Path $sqliteDllSource -Destination $releaseRoot -Force
+    Write-Host "  -> $(Join-Path $releaseRoot 'System.Data.SQLite.dll')"
 } else {
     Write-Warning "System.Data.SQLite.dll not found. Place it in Dependencies\ or run NuGet restore."
 }
 
-$x64Dir = Join-Path $dllDestDir 'x64'
 if ($sqliteInteropSource) {
-    New-Item -ItemType Directory -Path $x64Dir -Force | Out-Null
-    Copy-Item -Path $sqliteInteropSource -Destination $x64Dir -Force
-    Write-Host "  -> $(Join-Path $x64Dir 'SQLite.Interop.dll')"
+    New-Item -ItemType Directory -Path $releaseX64 -Force | Out-Null
+    Copy-Item -Path $sqliteInteropSource -Destination $releaseX64 -Force
+    Write-Host "  -> $(Join-Path $releaseX64 'SQLite.Interop.dll')"
 } else {
     Write-Warning "SQLite.Interop.dll not found. Place it in Dependencies\x64\ or run NuGet restore."
 }
@@ -98,7 +111,7 @@ if ($sqliteInteropSource) {
 if ($Deploy) {
     $pluginsDest = Join-Path $GamePath 'plugins\LSPDFR'
     $mdtProDest = Join-Path $GamePath 'MDTPro'
-    $pluginsX64 = Join-Path $pluginsDest 'x64'
+    $gameRootX64 = Join-Path $GamePath 'x64'
     if (-not (Test-Path $pluginsDest)) { Write-Error "Game path not found: $pluginsDest"; exit 1 }
     
     # Backup user data
@@ -112,13 +125,13 @@ if ($Deploy) {
     if (Test-Path $mdtProDest) { Remove-Item $mdtProDest -Recurse -Force }
     Copy-Item $mdtDest $mdtProDest -Recurse -Force
     
-    # Deploy SQLite dependencies to plugins\LSPDFR\
+    # Deploy SQLite to GTA V root (native loader requires app directory)
     if ($sqliteDllSource) {
-        Copy-Item -Path $sqliteDllSource -Destination $pluginsDest -Force
+        Copy-Item -Path $sqliteDllSource -Destination $GamePath -Force
     }
     if ($sqliteInteropSource) {
-        if (-not (Test-Path $pluginsX64)) { New-Item -ItemType Directory -Path $pluginsX64 -Force | Out-Null }
-        Copy-Item -Path $sqliteInteropSource -Destination $pluginsX64 -Force
+        New-Item -ItemType Directory -Path $gameRootX64 -Force | Out-Null
+        Copy-Item -Path $sqliteInteropSource -Destination $gameRootX64 -Force
     }
     
     # Restore user data
@@ -128,6 +141,6 @@ if ($Deploy) {
 
 Write-Host "Done. Full mod release: $release"
 Write-Host "  Release\plugins\lspdfr\MDTPro.dll"
-Write-Host "  Release\plugins\lspdfr\System.Data.SQLite.dll"
-Write-Host "  Release\plugins\lspdfr\x64\SQLite.Interop.dll"
+Write-Host "  Release\System.Data.SQLite.dll (GTA V root)"
+Write-Host "  Release\x64\SQLite.Interop.dll (GTA V root\x64)"
 Write-Host "  Release\MDTPro\"
