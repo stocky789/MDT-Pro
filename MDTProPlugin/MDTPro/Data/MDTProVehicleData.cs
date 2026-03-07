@@ -62,17 +62,16 @@ namespace MDTPro.Data {
             BOLOs = CDFVehicleData.GetAllBOLOs();
         }
 
-        /// <summary>Apply persistent vehicle identity from a previously seen vehicle (same owner + model). Keeps current LicensePlate.</summary>
+        /// <summary>Apply persistent vehicle identity from a previously seen vehicle (same owner + model). Keeps current LicensePlate.
+        /// Registration and Insurance are NOT copied from source — CDF/PR is authoritative at stop time (revoked/expired can change).</summary>
         internal void ApplyPersistentVehicleIdentity(MDTProVehicleData source) {
             if (source == null) return;
             IsStolen = source.IsStolen;
             Owner = source.Owner;
-            RegistrationStatus = source.RegistrationStatus;
-            RegistrationExpiration = source.RegistrationExpiration;
-            InsuranceStatus = source.InsuranceStatus;
-            InsuranceExpiration = source.InsuranceExpiration;
             VehicleIdentificationNumber = source.VehicleIdentificationNumber;
             BOLOs = source.BOLOs;
+            // Do NOT overwrite RegistrationStatus, RegistrationExpiration, InsuranceStatus, InsuranceExpiration.
+            // PR populates CDF at stop time; re-encounter DB may have stale Valid when PR has since Revoked/Expired.
         }
     }
 }
