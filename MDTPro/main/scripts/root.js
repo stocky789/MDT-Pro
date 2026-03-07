@@ -239,8 +239,8 @@ async function openFirearmsSearch(serialOrOwner) {
       '.searchInputWrapper button'
     )
     if (input && btn) {
-      input.value = serialOrOwner
-      btn.click()
+      input.value = serialOrOwner != null && serialOrOwner !== '' ? String(serialOrOwner) : ''
+      if (input.value) btn.click()
     }
   }
 }

@@ -9,6 +9,16 @@
 - **Build script:** The `Dependencies` folder (including SQLite DLLs) is now copied into the Release folder so the full mod package includes all required files.
 - **UI:** Firearms Check menu icon updated to a pistol/sidearm icon.
 - **Fixed:** Bug fixes for ALPR and Policing Redefined event integration.
+- **Drug records** — Pat-down and dead-body search now capture `DrugItem` from PR `GetPedSearchItems`. Stored in `drug_records` table. Person Search shows "Substance History" when drugs are found.
+- **Vehicle search records** — Poll-based capture of vehicle search items (weapons, drugs, contraband) when PR reports a vehicle as searched. Stored in `vehicle_search_records`. Vehicle Search shows "Search Results (Contraband)".
+- **PR events** — Subscribed to `OnFootTrafficStopEnded`, `OnPedAskedToExitVehicle`, `OnDriverAskedToTurnOffEngine`. Procedural actions (e.g. "Asked to exit vehicle") added to Identification History.
+- **OnPedReleased safety** — Avoids dereferencing ped when PR reports released ped may no longer exist.
+- **CDF removal events** — Subscribes to `OnPedDataRemoved` and `OnVehicleDataRemoved` to prune in-memory lists when entities despawn (keeps SQLite/keepIn* intact).
+- **CDF sync** — Citations count and TimesStopped now sync to CDF when updating ped from MDT.
+- **Vehicle schema** — VIN Status (Valid/Scratched), Make, Model, PrimaryColor, SecondaryColor added to vehicles table and Person/Vehicle search UI.
+- **BOLO management** — New REST endpoints: `POST /post/addBOLO` and `POST /post/removeBOLO`. Requires vehicle to be in-world.
+- **Court evidence** — Drug possession adds `courtEvidenceDrugsBonus` and "Drugs Found on Person" in court case evidence breakdown.
+- **Schema 16** — Database migration for new tables and columns.
 
 ## [0.9.2.0] — 2026-03-07
 
