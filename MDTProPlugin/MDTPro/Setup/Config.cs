@@ -13,9 +13,10 @@ namespace MDTPro.Setup {
         public bool showSecondsInTaskbarClock = false;
         public int initialWindowWidth = 600;
         public int initialWindowHeight = 400;
-        public float hasPriorCitationsProbability = 0.8f;
-        public float hasPriorArrestsProbability = 0.2f;
-        public float hasPriorArrestsWithWarrantProbability = 0.8f;
+        // US stats: ~28% have prior citations, ~30% prior arrests, ~15% of those have warrants. Bumped for game variety.
+        public float hasPriorCitationsProbability = 0.40f;
+        public float hasPriorArrestsProbability = 0.40f;
+        public float hasPriorArrestsWithWarrantProbability = 0.28f;
         public float reEncounterChance = 0.08f;
         /// <summary>Base chance (0-1) for vehicle re-encounter when driver is unknown. Uses reEncounterChance if &lt;= 0.</summary>
         public float reEncounterVehicleChance = 0.08f;
@@ -33,7 +34,7 @@ namespace MDTPro.Setup {
         public int courtCaseNumberIndexPad = 6;
 
         public bool displayCurrencySymbolBeforeNumber = true;
-        public int courtDatabaseMaxEntries = 100;
+        public int courtDatabaseMaxEntries = 200;
         public int courtRosterRotationDays = 14;
         public int courtJurySeverityThreshold = 15;
         public float courtPriorCitationWeight = 1f;

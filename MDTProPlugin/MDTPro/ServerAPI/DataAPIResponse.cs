@@ -225,6 +225,25 @@ namespace MDTPro.ServerAPI {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(recentIds));
                 status = 200;
                 contentType = "text/json";
+            } else if (path == "firearmsForPed") {
+                string body = Helper.GetRequestPostData(req);
+                string pedName = !string.IsNullOrEmpty(body) ? body.Trim() : "";
+                var firearms = Database.LoadFirearmsByOwner(pedName);
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(firearms));
+                status = 200;
+                contentType = "text/json";
+            } else if (path == "firearmBySerial") {
+                string body = Helper.GetRequestPostData(req);
+                string serial = !string.IsNullOrEmpty(body) ? body.Trim() : "";
+                var firearm = Database.LoadFirearmBySerial(serial);
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(firearm ?? new object()));
+                status = 200;
+                contentType = "text/json";
+            } else if (path == "recentFirearmOwners") {
+                var owners = Database.LoadRecentFirearmOwnerNames(12);
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(owners));
+                status = 200;
+                contentType = "text/json";
             }
         }
     }

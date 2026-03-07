@@ -82,14 +82,31 @@ if (Test-Path $mdtDest) { Remove-Item $mdtDest -Recurse -Force }
 Copy-Item -Path $mdtSource -Destination $mdtDest -Recurse -Force
 Write-Host "  -> $mdtDest (web MDT)"
 
-# 5) Copy SQLite dependencies to GTA V root (native loader requires app directory, not plugins\LSPDFR)
+# 5) Copy Dependencies folder into Release (mirrors Dependencies\* to Release\ so SQLite and x64\ go to the right spots)
+$releaseRoot = $release
+if (Test-Path $depsFolder) {
+    Get-ChildItem -Path $depsFolder -Force | ForEach-Object {
+        $dest = Join-Path $releaseRoot $_.Name
+        if ($_.PSIsContainer) {
+            if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+            Copy-Item -Path $_.FullName -Destination $dest -Recurse -Force
+            Write-Host "  -> $dest (from Dependencies\$($_.Name))"
+        } else {
+            Copy-Item -Path $_.FullName -Destination $dest -Force
+            Write-Host "  -> $dest (from Dependencies\$($_.Name))"
+        }
+    }
+} else {
+    Write-Warning "Dependencies folder not found at $depsFolder"
+}
+
+# 6) If SQLite files weren't in Dependencies, try NuGet/build output and copy to Release root and Release\x64
 $sqliteDllPaths += (Join-Path (Split-Path $dllSource) 'System.Data.SQLite.dll')
 $sqliteInteropPaths += (Join-Path (Split-Path $dllSource) 'x64\SQLite.Interop.dll')
 
 $sqliteDllSource = $sqliteDllPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
 $sqliteInteropSource = $sqliteInteropPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
 
-$releaseRoot = $release
 $releaseX64 = Join-Path $releaseRoot 'x64'
 
 if ($sqliteDllSource) {
@@ -107,7 +124,7 @@ if ($sqliteInteropSource) {
     Write-Warning "SQLite.Interop.dll not found. Place it in Dependencies\x64\ or run NuGet restore."
 }
 
-# 6) Deploy to game if requested
+# 7) Deploy to game if requested
 if ($Deploy) {
     $pluginsDest = Join-Path $GamePath 'plugins\LSPDFR'
     $mdtProDest = Join-Path $GamePath 'MDTPro'

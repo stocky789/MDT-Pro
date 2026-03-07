@@ -1080,8 +1080,93 @@ namespace MDTPro.Data {
                     }
                     ctx.WasPatDown = true;
                 }
+                CaptureFirearmsFromPed(ped, "Pat-down");
             } catch (Exception e) {
                 Helper.Log($"PatDown capture failed: {e.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>Uses PR SearchItemsAPI.GetPedSearchItems to capture weapon/firearm items and persist to firearm_records.</summary>
+        internal static void CaptureFirearmsFromPed(Ped ped, string source = "Search") {
+            if (ped == null || !ped.IsValid() || !Main.usePR) return;
+            try {
+                string ownerName = GetPedDataForPed(ped)?.Name ?? LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped)?.FullName;
+                if (string.IsNullOrWhiteSpace(ownerName)) return;
+
+                Type searchApiType = Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined")
+                    ?? Type.GetType("PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined");
+                if (searchApiType == null) return;
+
+                MethodInfo getItems = searchApiType.GetMethod("GetPedSearchItems", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(Rage.Ped) }, null);
+                if (getItems == null) return;
+
+                object result = getItems.Invoke(null, new object[] { ped });
+                if (result == null) return;
+
+                System.Collections.IEnumerable list = result as System.Collections.IEnumerable;
+                if (list == null) return;
+
+                var records = new List<FirearmRecord>();
+                string now = DateTime.UtcNow.ToString("o");
+
+                foreach (object item in list) {
+                    if (item == null) continue;
+                    Type t = item.GetType();
+                    bool isWeapon = t.Name.Contains("WeaponItem") || t.Name.Contains("FirearmItem") || t.Name.Contains("Weapon") || t.Name.Contains("Firearm");
+                    if (!isWeapon) continue;
+
+                    uint hash = 0u;
+                    string modelId = null;
+                    bool isStolen = false;
+                    string description = null;
+                    string serial = null;
+
+                    foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
+                        try {
+                            object val = prop.GetValue(item);
+                            if (val == null) continue;
+                            string name = prop.Name;
+                            if (name == "WeaponModelHash" || name == "ModelHash") hash = Convert.ToUInt32(val);
+                            else if (name == "WeaponModelId" || name == "ModelId") modelId = val?.ToString();
+                            else if (name == "IsStolen") isStolen = Convert.ToBoolean(val);
+                            else if (name == "Value" || name == "Description") description = val?.ToString();
+                            else if (name == "SerialNumber") serial = val?.ToString();
+                        } catch { /* skip bad props */ }
+                    }
+                    if (hash == 0u) continue;
+
+                    string displayName = GetWeaponDisplayNameFromHash(hash);
+
+                    records.Add(new FirearmRecord {
+                        SerialNumber = string.IsNullOrWhiteSpace(serial) ? null : serial.Trim(),
+                        OwnerPedName = ownerName,
+                        WeaponModelId = modelId,
+                        WeaponDisplayName = displayName,
+                        WeaponModelHash = hash,
+                        IsStolen = isStolen,
+                        Description = description,
+                        Source = source,
+                        FirstSeenAt = now,
+                        LastSeenAt = now
+                    });
+                }
+
+                if (records.Count > 0)
+                    Database.SaveFirearmRecords(records);
+            } catch (Exception e) {
+                Helper.Log($"Firearm capture failed: {e.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>Gets in-game weapon display name from hash (matches what player sees). Uses GET_WEAPON_NAME_FROM_HASH + GetLabelText. Runs on game thread.</summary>
+        private static string GetWeaponDisplayNameFromHash(uint weaponHash) {
+            if (weaponHash == 0u) return null;
+            try {
+                string label = NativeFunction.Natives.GET_WEAPON_NAME_FROM_HASH<string>(weaponHash);
+                if (string.IsNullOrWhiteSpace(label)) return null;
+                return Game.GetLocalizedString(label);
+            } catch {
+                return null;
             }
         }
 

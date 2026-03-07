@@ -102,6 +102,7 @@
     <Compile Include="Data\SearchHistoryEntry.cs" />
     <Compile Include="Data\DataController.cs" />
     <Compile Include="Data\ALPRHit.cs" />
+    <Compile Include="Data\FirearmRecord.cs" />
     <Compile Include="Data\MDTProVehicleData.cs" />
     <Compile Include="Data\OfficerInformationData.cs" />
     <Compile Include="Data\Reports\ArrestReport.cs" />

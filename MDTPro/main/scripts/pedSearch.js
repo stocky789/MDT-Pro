@@ -332,6 +332,52 @@ async function performSearch(query) {
     }
   }
 
+  // Registered Firearms (from pat-down / dead body search)
+  const firearmsResponse = await (
+    await fetch('/data/firearmsForPed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: response.Name,
+    })
+  ).json()
+
+  document
+    .querySelectorAll(
+      '.searchResponseWrapper .registeredFirearms, .searchResponseWrapper .registeredFirearmsTitle'
+    )
+    .forEach((el) => el.remove())
+
+  if (firearmsResponse && firearmsResponse.length > 0) {
+    const sectionTitle = document.createElement('div')
+    sectionTitle.classList.add('searchResponseSectionTitle', 'registeredFirearmsTitle')
+    sectionTitle.innerHTML =
+      language.pedSearch?.static?.registeredFirearmsTitle || 'Registered Firearms'
+    document.querySelector('.searchResponseWrapper').appendChild(sectionTitle)
+
+    const firearmsSection = document.createElement('div')
+    firearmsSection.classList.add('inputWrapper', 'grid', 'registeredFirearms')
+    document.querySelector('.searchResponseWrapper').appendChild(firearmsSection)
+
+    for (const firearm of firearmsResponse) {
+      const el = document.createElement('div')
+      el.classList.add('clickable')
+      el.addEventListener('click', () =>
+        openFirearmsSearch(firearm.SerialNumber || response.Name)
+      )
+      const label = document.createElement('label')
+      label.innerHTML = firearm.SerialNumber || 'N/A'
+      const input = document.createElement('input')
+      input.type = 'text'
+      input.disabled = true
+      const name = firearm.WeaponDisplayName || firearm.Description || firearm.WeaponModelId || `Weapon (${firearm.WeaponModelHash})`
+      input.value = firearm.IsStolen ? `${name} [STOLEN]` : name
+      if (firearm.IsStolen) input.style.color = 'var(--color-error)'
+      el.appendChild(label)
+      el.appendChild(input)
+      firearmsSection.appendChild(el)
+    }
+  }
+
   // Reports involving this ped
   const reportsResponse = await (
     await fetch('/data/pedReports', {

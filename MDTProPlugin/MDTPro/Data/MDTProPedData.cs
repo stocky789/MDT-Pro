@@ -77,9 +77,11 @@ namespace MDTPro.Data {
             try {
                 LicenseStatus = CDFPedData.DriversLicenseState.ToString();
                 LicenseExpiration = CDFPedData.DriversLicenseExpiration?.ToString("s");
-                WeaponPermitStatus = CDFPedData.WeaponPermit.Status.ToString();
-                WeaponPermitExpiration = CDFPedData.WeaponPermit.ExpirationDate?.ToString("s");
-                WeaponPermitType = CDFPedData.WeaponPermit.PermitType.ToString();
+                if (CDFPedData.WeaponPermit != null) {
+                    WeaponPermitStatus = CDFPedData.WeaponPermit.Status.ToString();
+                    WeaponPermitExpiration = CDFPedData.WeaponPermit.ExpirationDate?.ToString("s");
+                    WeaponPermitType = GetWeaponPermitType(CDFPedData.WeaponPermit);
+                }
                 FishingPermitStatus = CDFPedData.FishingPermit.Status.ToString();
                 FishingPermitExpiration = CDFPedData.FishingPermit.ExpirationDate?.ToString("s");
                 HuntingPermitStatus = CDFPedData.HuntingPermit.Status.ToString();
@@ -120,6 +122,29 @@ namespace MDTPro.Data {
             CDFPedData.Citations = Citations.Count;
 
             TimesStopped = CDFPedData.TimesStopped;
+        }
+
+        /// <summary>Read weapon permit type from CDF, normalizing PR/CDF variations (e.g. "CCW Permit") to our language keys.</summary>
+        private static string GetWeaponPermitType(CommonDataFramework.Modules.PedDatabase.WeaponPermit weaponPermit) {
+            if (weaponPermit == null) return null;
+            string raw = null;
+            try {
+                raw = weaponPermit.PermitType.ToString();
+            } catch {
+                try {
+                    var prop = weaponPermit.GetType().GetProperty("PermitType", BindingFlags.Public | BindingFlags.Instance);
+                    if (prop != null) raw = prop.GetValue(weaponPermit)?.ToString();
+                } catch { }
+            }
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+            // Normalize PR/CDF values to our language keys; PR often shows "CCW Permit"
+            string lower = raw.Trim().ToLowerInvariant();
+            if (lower == "ccw permit" || lower == "ccw") return "CCWPermit";
+            if (lower.Contains("ccw") || lower == "concealed" || lower.Contains("concealed carry"))
+                return "CcwPermit";
+            if (lower.Contains("ffl") || lower == "federal firearms") return "FflPermit";
+            if (lower == "none" || lower == "invalid") return null;
+            return raw.Trim();
         }
 
         /// <summary>When CDF PedData is null, populate Name/Model from LSPDFR Persona so we can still resolve peds.</summary>

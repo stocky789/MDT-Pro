@@ -151,17 +151,21 @@ namespace MDTPro.ALPR {
                         string plateKey = plate.ToUpperInvariant();
                         try {
                             MDTProVehicleData vd = new MDTProVehicleData(toScan);
+                            MDTProVehicleData dbVehicle = DataController.GetVehicleByLicensePlate(plate);
                             List<string> flags;
                             string owner;
                             string modelDisplayName;
 
                             if (vd.CDFVehicleData?.Owner != null) {
                                 flags = BuildFlags(vd);
-                                owner = vd.Owner ?? "";
                                 modelDisplayName = vd.ModelDisplayName ?? vd.ModelName ?? "";
+                                // Prefer MDT DB owner over CDF for re-encounters: CDF assigns a fresh persona per spawn,
+                                // but our DB has the persistent identity (correct owner) from prior stops.
+                                owner = (dbVehicle != null && !string.IsNullOrEmpty(dbVehicle.Owner))
+                                    ? dbVehicle.Owner
+                                    : (vd.Owner ?? "");
                             } else {
-                                // No CDF data: check MDT database (stolen/expired from prior stops or saved data)
-                                MDTProVehicleData dbVehicle = DataController.GetVehicleByLicensePlate(plate);
+                                // No CDF data: use MDT database (stolen/expired from prior stops or saved data)
                                 if (dbVehicle != null) {
                                     flags = BuildFlags(dbVehicle);
                                     owner = dbVehicle.Owner ?? "—";
