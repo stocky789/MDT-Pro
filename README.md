@@ -41,7 +41,15 @@ To build the plugin from source:
 
 ## Installation
 
-- Extract all files and folders from the ZIP into the GTA V main directory (the folder containing `GTA5.exe`).
+1. Extract all files and folders from the ZIP into the GTA V main directory (the folder containing `GTA5.exe`).
+
+Your GTA V folder should have:
+- `plugins/LSPDFR/MDTPro.dll`
+- `System.Data.SQLite.dll` (in the GTA V root, same folder as `GTA5.exe`)
+- `x64/SQLite.Interop.dll` (in the `x64` folder inside the GTA V root)
+- `MDTPro/` folder (web UI)
+
+**SQLite placement:** The native loader looks in the application directory (GTA V root), not in `plugins/LSPDFR`. If you see "Could not load file or assembly 'System.Data.SQLite'" or `DllNotFoundException`, ensure both SQLite files are in the root (and `x64\` for the Interop).
 
 ## Updating
 
