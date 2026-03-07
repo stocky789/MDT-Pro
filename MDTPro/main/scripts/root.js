@@ -225,6 +225,26 @@ async function openInVehicleSearch(vehicleLicensePlate) {
   }
 }
 
+async function openFirearmsSearch(serialOrOwner) {
+  await topWindow.openWindow('firearmsSearch')
+  const iframe = topDoc
+    .querySelector('.overlay .windows')
+    .lastChild.querySelector('iframe')
+
+  iframe.onload = () => {
+    const input = iframe.contentWindow.document.querySelector(
+      '.searchInputWrapper #firearmsSearchInput'
+    )
+    const btn = iframe.contentWindow.document.querySelector(
+      '.searchInputWrapper button'
+    )
+    if (input && btn) {
+      input.value = serialOrOwner
+      btn.click()
+    }
+  }
+}
+
 async function checkForReportOnCreatePage() {
   for (const iframe of topDoc.querySelectorAll('.overlay .window iframe')) {
     if (iframe.contentWindow.reportIsOnCreatePage()) {

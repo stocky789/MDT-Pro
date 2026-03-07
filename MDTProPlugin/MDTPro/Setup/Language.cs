@@ -6,6 +6,7 @@ namespace MDTPro.Setup {
         public Index index = new Index();
         public PedSearch pedSearch = new PedSearch();
         public VehicleSearch vehicleSearch = new VehicleSearch();
+        public FirearmsSearch firearmsSearch = new FirearmsSearch();
         public Values values = new Values();
         public Reports reports = new Reports();
         public Units units = new Units();
@@ -53,6 +54,7 @@ namespace MDTPro.Setup {
                 public class Desktop {
                     public string pedSearch = "Person Search";
                     public string vehicleSearch = "Vehicle Search";
+                    public string firearmsSearch = "Firearms Check";
                     public string reports = "Reports";
                     public string shiftHistory = "Shift History";
                     public string court = "Court";
@@ -163,6 +165,9 @@ namespace MDTPro.Setup {
                 public string legalInfoTitle = "Legal Information";
                 public string licensesTitle = "Licenses & Permits";
                 public string historyTitle = "History";
+                public string vehiclesOwnedTitle = "Vehicles Owned";
+                public string registeredFirearmsTitle = "Registered Firearms";
+                public string reportsTitle = "Associated Reports";
                 public Labels labels = new Labels();
 
                 public class Labels {
@@ -194,6 +199,24 @@ namespace MDTPro.Setup {
             public class Notifications {
                 public string emptySearchInput = "Enter a name to search.";
                 public string pedNotFound = "No person found with that name.";
+            }
+        }
+
+        public class FirearmsSearch {
+            public Static @static = new Static();
+            public Notifications notifications = new Notifications();
+
+            public class Static {
+                public string title = "Firearms Check";
+                public string search = "Search";
+                public string searchInput = "Serial number or owner name";
+                public string resultTitle = "Result";
+                public string recentIdsTitle = "Recent IDs";
+            }
+
+            public class Notifications {
+                public string emptySearchInput = "Enter serial number or owner name.";
+                public string notFound = "No firearm or owner found.";
             }
         }
 
@@ -247,6 +270,7 @@ namespace MDTPro.Setup {
             public string Unlicensed = "Unlicensed";
             public string None = "None";
             public string CcwPermit = "Carrying a concealed weapon (CCW)";
+            public string CCWPermit = "CCW Permit";
             public string FflPermit = "Federal firearms license (FFL)";
             public string Government = "Government";
             public string LosSantos = "Los Santos";

@@ -119,6 +119,13 @@ namespace MDTPro.EventListeners {
                 }
             }
 
+            // OnDeadPedSearched (PedDelegate): fires when PR search finds ID on a corpse. Add to ID History and capture firearms.
+            if (eventName == "OnDeadPedSearched" && args.Length >= 1 && args[0] is Ped deadPed) {
+                DataController.AddIdentificationEvent(deadPed, "Dead body search");
+                DataController.CaptureFirearmsFromPed(deadPed, "Dead body search");
+                return;
+            }
+
             foreach (object value in args) {
                 ResolvePedFromValue(value, eventName);
             }
@@ -144,15 +151,22 @@ namespace MDTPro.EventListeners {
             }
         }
 
-        /// <summary>Maps PR's EGivenIdentification enum to our ID type strings. Returns null if unknown.</summary>
+        /// <summary>Maps PR's EGivenIdentification enum to our ID type strings. PR may have more than ID/DriversLicense (e.g. WeaponPermit); docs only list those two.</summary>
         private static string MapIdentificationEnum(object enumValue) {
             if (enumValue == null) return null;
             Type t = enumValue.GetType();
             if (!t.IsEnum) return null;
             string name = enumValue.ToString();
+            if (string.IsNullOrWhiteSpace(name)) return null;
             if (string.Equals(name, "ID", StringComparison.OrdinalIgnoreCase)) return "State ID";
             if (string.Equals(name, "DriversLicense", StringComparison.OrdinalIgnoreCase)) return "Driver's License";
-            return null;
+            if (string.Equals(name, "WeaponPermit", StringComparison.OrdinalIgnoreCase)) return "Weapon Permit";
+            if (string.Equals(name, "WeaponsPermit", StringComparison.OrdinalIgnoreCase)) return "Weapons Permit";
+            if (string.Equals(name, "FirearmsPermit", StringComparison.OrdinalIgnoreCase)) return "Firearms Permit";
+            if (string.Equals(name, "FishingPermit", StringComparison.OrdinalIgnoreCase)) return "Fishing Permit";
+            if (string.Equals(name, "HuntingPermit", StringComparison.OrdinalIgnoreCase)) return "Hunting Permit";
+            // Pass through any other PR identification type as human-readable (PascalCase -> Title Case)
+            return System.Text.RegularExpressions.Regex.Replace(name, "([a-z])([A-Z])", "$1 $2").Trim();
         }
 
         private static void ResolvePedFromValue(object value, string eventName) {
