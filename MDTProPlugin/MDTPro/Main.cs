@@ -98,6 +98,7 @@ namespace MDTPro {
                         if (usePR) {
                             EventListeners.PREvents.SubscribeToPREvents();
                         }
+                        EventListeners.CDFEvents.Subscribe();
                         // Always subscribe to LSPDFR OnPedArrested: PR's OnPedArrested only fires for arrests through PR.
                         // LSPDFR's fires for all arrests (including those done via LSPDFR or other plugins).
                         EventListeners.LSPDFREvents.SubscribeToLSPDFREvents();

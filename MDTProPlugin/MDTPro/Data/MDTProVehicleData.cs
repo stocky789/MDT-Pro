@@ -12,12 +12,25 @@ namespace MDTPro.Data {
         public bool IsStolen;
         public string Owner;
         public string Color;
+        public string VinStatus;
+        public string Make;
+        public string Model;
+        public string PrimaryColor;
+        public string SecondaryColor;
         public string VehicleIdentificationNumber;
         public string RegistrationStatus;
         public string RegistrationExpiration;
         public string InsuranceStatus;
         public string InsuranceExpiration;
         public VehicleBOLO[] BOLOs;
+
+        /// <summary>True when vehicle is in world and BOLOs can be added/removed via CDF.</summary>
+        public bool CanModifyBOLOs {
+            get {
+                if (Holder == null) return false;
+                try { return Holder.Exists(); } catch { return false; }
+            }
+        }
 
         internal MDTProVehicleData(Vehicle vehicle) {
             Holder = vehicle;
@@ -54,6 +67,19 @@ namespace MDTPro.Data {
             }
             Color = Rage.Native.NativeFunction.Natives.GET_VEHICLE_LIVERY<int>(Holder) == -1 ? $"{Holder.PrimaryColor.R}-{Holder.PrimaryColor.G}-{Holder.PrimaryColor.B}" : null;
             VehicleIdentificationNumber = CDFVehicleData.Vin?.Number;
+            try {
+                var vin = CDFVehicleData.Vin;
+                if (vin != null) {
+                    var statusProp = vin.GetType().GetProperty("Status");
+                    if (statusProp != null) VinStatus = statusProp.GetValue(vin)?.ToString();
+                }
+            } catch { VinStatus = null; }
+            try {
+                Make = CDFVehicleData.GetType().GetProperty("Make")?.GetValue(CDFVehicleData) as string;
+                Model = CDFVehicleData.GetType().GetProperty("Model")?.GetValue(CDFVehicleData) as string;
+                PrimaryColor = CDFVehicleData.GetType().GetProperty("PrimaryColor")?.GetValue(CDFVehicleData) as string;
+                SecondaryColor = CDFVehicleData.GetType().GetProperty("SecondaryColor")?.GetValue(CDFVehicleData) as string;
+            } catch { }
 
             string unlocalizedModelDisplayName = Rage.Native.NativeFunction.Natives.GET_DISPLAY_NAME_FROM_VEHICLE_MODEL<string>(Holder.Model.Hash);
 
@@ -69,6 +95,11 @@ namespace MDTPro.Data {
             IsStolen = source.IsStolen;
             Owner = source.Owner;
             VehicleIdentificationNumber = source.VehicleIdentificationNumber;
+            VinStatus = source.VinStatus;
+            Make = source.Make;
+            Model = source.Model;
+            PrimaryColor = source.PrimaryColor;
+            SecondaryColor = source.SecondaryColor;
             BOLOs = source.BOLOs;
             // Do NOT overwrite RegistrationStatus, RegistrationExpiration, InsuranceStatus, InsuranceExpiration.
             // PR populates CDF at stop time; re-encounter DB may have stale Valid when PR has since Revoked/Expired.

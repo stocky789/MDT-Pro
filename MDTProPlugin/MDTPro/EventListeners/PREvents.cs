@@ -23,7 +23,14 @@ namespace MDTPro.EventListeners {
             "OnPedSurrendered",
             "OnDeadPedSearched",
             "OnRequestVehicleCheck",
-            "OnVehicleRanThroughDispatch"
+            "OnVehicleRanThroughDispatch",
+            "OnPedAskedToExitVehicle",
+            "OnDriverAskedToTurnOffEngine"
+        };
+
+        private static readonly HashSet<string> trafficStopEventNames = new HashSet<string> {
+            "OnPedAskedToExitVehicle",
+            "OnDriverAskedToTurnOffEngine"
         };
 
         private static readonly Dictionary<string, string> identificationEventTypes = new Dictionary<string, string> {
@@ -53,6 +60,7 @@ namespace MDTPro.EventListeners {
                 }
 
                 SubscribeToOnFootTrafficStopStarted();
+                SubscribeToOnFootTrafficStopEnded();
                 subscribed = true;
             } catch (Exception e) {
                 Game.LogTrivial($"MDT Pro: [Warning] Failed to subscribe to PR events: {e.Message}");
@@ -70,6 +78,20 @@ namespace MDTPro.EventListeners {
                 eventInfo.AddEventHandler(null, handler);
             } catch (Exception e) {
                 Game.LogTrivial($"MDT Pro: [Warning] Failed to subscribe to PR OnFootTrafficStopStarted: {e.Message}");
+            }
+        }
+
+        private static void SubscribeToOnFootTrafficStopEnded() {
+            try {
+                Type apiType = Type.GetType("PolicingRedefined.API.OnFootTrafficStopAPI, PolicingRedefined");
+                if (apiType == null) return;
+                EventInfo eventInfo = apiType.GetEvent("OnFootTrafficStopEnded", BindingFlags.Public | BindingFlags.Static);
+                if (eventInfo == null) return;
+
+                Delegate handler = CreateForwardingDelegate(eventInfo.EventHandlerType, "OnFootTrafficStopEnded");
+                eventInfo.AddEventHandler(null, handler);
+            } catch (Exception e) {
+                Game.LogTrivial($"MDT Pro: [Warning] Failed to subscribe to PR OnFootTrafficStopEnded: {e.Message}");
             }
         }
 
@@ -110,6 +132,24 @@ namespace MDTPro.EventListeners {
                 return;
             }
 
+            if (eventName == "OnFootTrafficStopEnded") {
+                return;
+            }
+
+            if (trafficStopEventNames.Contains(eventName) && args.Length >= 2 && args[0] is Ped tsPed && args[1] is Vehicle tsVehicle) {
+                try {
+                    if (tsPed != null && tsPed.IsValid()) {
+                        DataController.ResolvePedForReEncounter(tsPed);
+                        DataController.AddIdentificationEvent(tsPed, eventName == "OnPedAskedToExitVehicle" ? "Procedural: Asked to exit vehicle" : "Procedural: Asked to turn off engine");
+                    }
+                    if (tsVehicle != null && tsVehicle.Exists())
+                        DataController.ResolveVehicleAndDriverForStop(tsVehicle);
+                } catch (Exception ex) {
+                    Game.LogTrivial($"MDT Pro: [Warning] {eventName} handler: {ex.Message}");
+                }
+                return;
+            }
+
             if (identificationEventTypes.ContainsKey(eventName) && args.Length >= 2 && args[0] is Ped idPed) {
                 string idType = MapIdentificationEnum(args[1]);
                 if (idType != null) {
@@ -119,7 +159,7 @@ namespace MDTPro.EventListeners {
                 }
             }
 
-            // OnDeadPedSearched (PedDelegate): fires when PR search finds ID on a corpse. Add to ID History and capture firearms.
+            // OnDeadPedSearched (PedDelegate): fires when PR search finds ID on a corpse. Add to ID History and capture firearms/drugs.
             if (eventName == "OnDeadPedSearched" && args.Length >= 1 && args[0] is Ped deadPed) {
                 DataController.AddIdentificationEvent(deadPed, "Dead body search");
                 DataController.CaptureFirearmsFromPed(deadPed, "Dead body search");
@@ -173,6 +213,11 @@ namespace MDTPro.EventListeners {
             if (value == null) return;
 
             if (value is Ped ped) {
+                if (eventName == "OnPedReleased") {
+                    try {
+                        if (ped == null || !ped.IsValid()) return;
+                    } catch { return; }
+                }
                 DataController.ResolvePedForReEncounter(ped);
                 if (eventName == "OnPedArrested") DataController.CaptureEvidenceForPed(ped);
                 else if (eventName == "OnPedPatDown") DataController.MarkPedPatDown(ped);

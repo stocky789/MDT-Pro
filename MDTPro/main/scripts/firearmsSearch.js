@@ -1,3 +1,10 @@
+function escapeHtml(s) {
+  if (s == null || s === undefined) return ''
+  const d = document.createElement('div')
+  d.textContent = String(s)
+  return d.innerHTML
+}
+
 ;(async function () {
   const config = await getConfig()
   if (config.updateDomWithLanguageOnLoad)
@@ -7,36 +14,46 @@
 })()
 
 const searchInput = document.querySelector('.searchInputWrapper #firearmsSearchInput')
+const searchButton = document.querySelector('.searchInputWrapper button')
 
-searchInput.addEventListener('keydown', async function (e) {
-  if (e.key == 'Enter') {
-    e.preventDefault()
-    document.querySelector('.searchInputWrapper button').click()
-  }
-})
+if (searchInput) {
+  searchInput.addEventListener('keydown', async function (e) {
+    if (e.key == 'Enter') {
+      e.preventDefault()
+      searchButton?.click()
+    }
+  })
+}
 
-document
-  .querySelector('.searchInputWrapper button')
-  .addEventListener('click', async function () {
+if (searchButton) {
+  searchButton.addEventListener('click', async function () {
     if (this.classList.contains('loading')) return
     showLoadingOnButton(this)
     this.blur()
-    await performSearch(searchInput.value.trim())
+    await performSearch(searchInput?.value?.trim() ?? '')
     hideLoadingOnButton(this)
   })
+}
 
 async function loadRecentOwners() {
-  const owners = await (await fetch('/data/recentFirearmOwners')).json()
+  let owners = []
+  try {
+    const resp = await fetch('/data/recentFirearmOwners')
+    if (resp.ok) owners = await resp.json()
+  } catch {
+    owners = []
+  }
   const wrapper = document.querySelector('.recentOwnersWrapper')
   const list = document.querySelector('.recentOwnersList')
+  if (!list) return
   list.innerHTML = ''
 
-  if (!owners || owners.length === 0) {
-    wrapper.classList.add('hidden')
+  if (!Array.isArray(owners) || owners.length === 0) {
+    if (wrapper) wrapper.classList.add('hidden')
     return
   }
 
-  wrapper.classList.remove('hidden')
+  if (wrapper) wrapper.classList.remove('hidden')
   for (const name of owners) {
     const item = document.createElement('button')
     item.textContent = name
@@ -64,28 +81,48 @@ async function performSearch(query) {
   resultEl.innerHTML = ''
 
   // Try serial first, then owner name
-  const bySerial = await (
-    await fetch('/data/firearmBySerial', {
+  let bySerial
+  try {
+    const resp = await fetch('/data/firearmBySerial', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: query,
+      body: JSON.stringify(query),
     })
-  ).json()
+    bySerial = await resp.json()
+    if (!resp.ok) bySerial = null
+  } catch (err) {
+    bySerial = null
+    topWindow.showNotification(
+      language.firearmsSearch?.notifications?.searchError || 'Search failed. Please try again.',
+      'warning'
+    )
+    return
+  }
 
-  if (bySerial && bySerial.Id) {
+  if (bySerial && (bySerial.Id > 0 || (bySerial.WeaponModelHash && bySerial.OwnerPedName))) {
     document.querySelector('.searchResponseWrapper').classList.remove('hidden')
     document.title = `Firearms Check: ${bySerial.SerialNumber || query}`
     renderFirearmCard(resultEl, bySerial)
     return
   }
 
-  const byOwner = await (
-    await fetch('/data/firearmsForPed', {
+  let byOwner
+  try {
+    const resp = await fetch('/data/firearmsForPed', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: query,
+      body: JSON.stringify(query),
     })
-  ).json()
+    byOwner = await resp.json()
+    if (!resp.ok) byOwner = null
+  } catch (err) {
+    byOwner = null
+    topWindow.showNotification(
+      language.firearmsSearch?.notifications?.searchError || 'Search failed. Please try again.',
+      'warning'
+    )
+    return
+  }
 
   if (byOwner && Array.isArray(byOwner) && byOwner.length > 0) {
     document.querySelector('.searchResponseWrapper').classList.remove('hidden')
@@ -107,38 +144,49 @@ async function performSearch(query) {
   }
 }
 
+function formatDateSafe(isoString) {
+  if (isoString == null || isoString === '') return '—'
+  const d = new Date(isoString)
+  return isNaN(d.getTime()) ? '—' : d.toLocaleString()
+}
+
+function sanitizeModelIdForUrl(modelId) {
+  if (modelId == null || typeof modelId !== 'string') return ''
+  return modelId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') || ''
+}
+
 function renderFirearmCard(container, f) {
   const card = document.createElement('div')
   card.className = 'firearmCard'
-  // Prefer API-provided WeaponDisplayName (from game native), fallback to PR Description, then WeaponModelId
-  const name = f.WeaponDisplayName || f.Description || f.WeaponModelId || `Weapon (${f.WeaponModelHash})`
+  const name = f.WeaponDisplayName || f.Description || f.WeaponModelId || `Weapon (${f.WeaponModelHash || 0})`
   const serial = f.SerialNumber || 'N/A'
   const stolen = f.IsStolen ? ' [STOLEN]' : ''
+  const ownerVal = f.OwnerPedName || ''
   card.innerHTML = `
     <div class="firearmRow firearmRowWithImage">
       <div class="firearmImageWrapper">
-        <img class="firearmImage" src="" alt="" data-model-id="${(f.WeaponModelId || '').replace(/"/g, '&quot;')}">
+        <img class="firearmImage" src="" alt="" data-model-id="">
       </div>
       <div class="firearmDetails">
         <div class="firearmRow">
           <label>Serial</label>
-          <span>${serial}</span>
+          <span>${escapeHtml(serial)}</span>
         </div>
         <div class="firearmRow">
           <label>Model</label>
-          <span class="${f.IsStolen ? 'stolen' : ''}">${name}${stolen}</span>
+          <span class="${f.IsStolen ? 'stolen' : ''}">${escapeHtml(name)}${escapeHtml(stolen)}</span>
         </div>
         <div class="firearmRow">
           <label>Owner</label>
-          <span class="clickable" data-owner="${f.OwnerPedName || ''}">${f.OwnerPedName || '—'}</span>
+          <span class="clickable" data-owner="${escapeHtml(ownerVal)}">${escapeHtml(ownerVal || '—')}</span>
         </div>
         <div class="firearmRow">
           <label>Source</label>
-          <span>${f.Source || '—'}</span>
+          <span>${escapeHtml(f.Source || '—')}</span>
         </div>
         <div class="firearmRow">
           <label>Last seen</label>
-          <span>${f.LastSeenAt ? new Date(f.LastSeenAt).toLocaleString() : '—'}</span>
+          <span>${escapeHtml(formatDateSafe(f.LastSeenAt))}</span>
         </div>
       </div>
     </div>
@@ -149,10 +197,10 @@ function renderFirearmCard(container, f) {
       openFirearmsSearch(ownerSpan.dataset.owner)
     )
   }
-  // Try FiveM weapon image URL (same pattern as vehicles); 404 → remove image
   const img = card.querySelector('.firearmImage')
-  const modelId = (f.WeaponModelId || '').trim().toLowerCase()
+  const modelId = sanitizeModelIdForUrl(f.WeaponModelId)
   if (img && modelId) {
+    img.dataset.modelId = modelId
     img.src = `https://docs.fivem.net/weapons/${modelId}.webp`
     img.onerror = () => { img.parentElement?.remove() }
   } else if (img) {
