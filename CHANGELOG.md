@@ -23,8 +23,22 @@
 - **Court evidence** — Drug possession adds `courtEvidenceDrugsBonus` and "Drugs Found on Person" in court case evidence breakdown.
 - **Schema 16** — Database migration for new tables and columns.
 - **Settings & Officer Profile** — Officer information, shift controls, and career stats moved to a separate "Officer Profile" taskbar button. Settings panel now focuses on Plugins & Config only.
+- **Officer status bar** — Header now shows a compact officer info strip to the right of the badge: First Name, Last Name, Badge Number, Rank, Call Sign, Department. Fills from Officer Profile; updates when you save.
 - **Config page improvements** — Plain-English labels and tooltips for all config options; grouped sections; preset dropdowns with optional custom values; filter search; collapsible sections; Revert button to discard unsaved changes; success/error feedback on save.
 - **RageHook compliance** — Cross-checked Ped/Vehicle usage against Rage Plugin Hook docs: `Vehicle.Driver` null-checked before use; `Exists()` used for pre-persist validation (handles null safely per Rage); all native calls (e.g. `GET_WEAPON_NAME_FROM_HASH`) run in GameFiber/game thread context; PR event handlers validate handleables before access.
+- **New: Department Styling plugin** — Choose an MDT theme based on your in-game department. Options: San Andreas Government (default), LSPD, SAFD, BCSO, LSSD, SAHP, FIB. Each theme applies department-specific colors, badge imagery, and animated backgrounds to the MDT. Enable in Config → Plugins; select theme in Settings → Department Theme.
+- **Department Styling: Animated backgrounds** — Replaced static wallpaper images with a canvas-based particle animation. Floating particles in the department accent color drift slowly across the desktop for a calm, modern look.
+- **Department Styling: Config page theming** — The Config and Plugins (customization) page now follows the selected department theme.
+- **Fixed: Overlay click targeting** — Window controls (close, minimize, maximize) and the Settings department dropdown were not clickable; clicks were hitting the sidebar badge instead. Fixed by ensuring the overlay stacks above main content.
+- **Firearms Check icon** — Updated to a rifle/sidearm icon (from SVG Repo) for clearer identification.
+- **Sidebar icon consistency** — All desktop menu icons (Person Search, Vehicle Search, Firearms Check, Reports, etc.) now use the same color.
+- **New: Court license revocations** — Upon conviction, the court now orders license revocations based on California law. Driver's license, firearms permit (CCW), and sport fishing privileges can be revoked depending on the charges. Revocations are stored in the court outcome and applied to the offender's ped record.
+- **License revocation rules (CA-based):** Driver's license revoked for charges with `canRevokeLicense` (DUI, reckless driving, hit-and-run, evading, etc.). Firearms permit: lifetime for felonies and domestic violence; 10 years for violent misdemeanors (assault, battery, brandishing). Sport fishing revoked for fish/wildlife code violations.
+- **Court UI** — Convicted cases display a "License Revocations Ordered" section listing all court-ordered revocations in the disposition.
+- **Ped persistence** — Revoked status is saved to SQLite and reflected in Person Search (License Status, Weapon Permit Status).
+- **CDF/PR sync** — Full bidirectional sync so Policing Redefined and Common Data Framework stay aligned with MDT data. Driver's license, weapon permit, fishing permit, and hunting permit status now sync from MDT to CDF on ped update, court conviction, and re-encounter.
+- **Re-encounter parity** — When a previously convicted person is re-encountered, their revoked licenses/permits are applied from our SQLite record to CDF/PR so traffic stops and ID checks show the correct status with no conflicts.
+- **Schema 18** — `LicenseRevocations` column added to `court_cases` table (JSON array of revocation strings).
 
 ## [0.9.2.0] — 2026-03-07
 

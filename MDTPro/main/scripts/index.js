@@ -595,13 +595,29 @@ function applyOfficerInformationToDOM(officerInformation) {
   const inputWrapper = document.querySelector(
     '.overlay .officerProfile .officerInformation .inputWrapper'
   )
-  if (!inputWrapper) return
-  for (const key of OFFICER_INFO_KEYS) {
-    const input = inputWrapper.querySelector(`.${key} input`)
-    if (!input) continue
-    const val = officerInformation[key]
-    input.value =
-      val === null || val === undefined ? '' : String(val)
+  if (inputWrapper) {
+    for (const key of OFFICER_INFO_KEYS) {
+      const input = inputWrapper.querySelector(`.${key} input`)
+      if (!input) continue
+      const val = officerInformation[key]
+      input.value =
+        val === null || val === undefined ? '' : String(val)
+    }
+  }
+
+  const taskbarStatus = document.querySelector('.taskbarOfficerStatus')
+  if (taskbarStatus) {
+    for (const key of OFFICER_INFO_KEYS) {
+      const item = taskbarStatus.querySelector(`.officerStatusItem[data-key="${key}"]`)
+      if (!item) continue
+      const valueEl = item.querySelector('.officerStatusValue')
+      if (!valueEl) continue
+      const val = officerInformation[key]
+      const display =
+        val === null || val === undefined ? '—' : String(val).trim()
+      valueEl.textContent = display || '—'
+      item.classList.toggle('hasValue', !!display && display !== '—')
+    }
   }
 }
 
@@ -641,6 +657,7 @@ document
     const language = await getLanguage()
 
     if (response == 'OK') {
+      applyOfficerInformationToDOM(buildOfficerInformationPayload())
       showNotification(
         language.index.notifications.officerInformationSaved,
         'checkMark'

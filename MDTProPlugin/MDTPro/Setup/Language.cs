@@ -523,6 +523,7 @@ namespace MDTPro.Setup {
             };
             public string outcomeNotes = "Outcome Notes";
             public string outcomeReasoning = "Outcome Reasoning";
+            public string licenseRevocations = "License Revocations Ordered";
             public Static @static = new Static();
 
             public class Static {
