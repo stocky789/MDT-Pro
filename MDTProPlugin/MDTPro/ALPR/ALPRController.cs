@@ -85,11 +85,11 @@ namespace MDTPro.ALPR {
                     // Minimum 1500 ms between scans to avoid FPS impact (max ~0.67 scans/sec)
                     intervalMs = Math.Max(1500, Math.Min(10000, cfg.alprScanIntervalMs));
                     int cooldownSec = Math.Max(10, Math.Min(300, cfg.alprCooldownSeconds));
-                    // Cap vehicles considered for ALPR to keep iteration cheap (max 10)
-                    int maxVehicles = Math.Min(10, Math.Max(3, cfg.maxNumberOfNearbyPedsOrVehicles));
-                    float scanRangeMeters = Math.Max(10f, Math.Min(100f, cfg.alprScanRangeMeters));
-                    float readRangeMeters = Math.Max(2f, Math.Min(35f, cfg.alprReadRangeMeters));
-                    float coneAngleDeg = Math.Max(10f, Math.Min(90f, cfg.alprConeAngleDegrees));
+                    // Cap vehicles for ALPR; use slightly higher limit than general nearby so we don't miss the car in front
+                    int maxVehicles = Math.Min(16, Math.Max(5, cfg.maxNumberOfNearbyPedsOrVehicles + 2));
+                    float scanRangeMeters = Math.Max(15f, Math.Min(100f, cfg.alprScanRangeMeters));
+                    float readRangeMeters = Math.Max(10f, Math.Min(50f, cfg.alprReadRangeMeters));
+                    float coneAngleDeg = Math.Max(15f, Math.Min(90f, cfg.alprConeAngleDegrees));
 
                     // ALPR only works when: (1) enabled in settings, (2) on duty (Start/Stop in Main), (3) in police vehicle
                     if (Main.Player == null || !Main.Player.Exists()) {
@@ -128,9 +128,10 @@ namespace MDTPro.ALPR {
                     foreach (Vehicle v in nearby) {
                         if (v == null || !v.Exists()) continue;
                         if (v == playerVehicle) continue;
-                        float dist = cruiserPos.DistanceTo(v.Position);
+                        Vector3 platePos = GetPlatePositionFacingCruiser(v, cruiserPos);
+                        float dist = cruiserPos.DistanceTo(platePos);
                         if (dist > scanRangeMeters) continue;
-                        if (!IsInCone(cruiserPos, forward, v.Position, coneAngleDeg)) continue;
+                        if (!IsInCone(cruiserPos, forward, platePos, coneAngleDeg)) continue;
                         string p = v.LicensePlate?.Trim();
                         if (string.IsNullOrEmpty(p)) continue;
                         InConeAndRangeBuffer.Add((v, dist));
@@ -293,6 +294,41 @@ namespace MDTPro.ALPR {
             float dot = Vector3.Dot(forwardHorizontal, toTarget);
             float angleDeg = (float)(Math.Acos(Math.Max(-1f, Math.Min(1f, dot))) * (180.0 / Math.PI));
             return angleDeg <= coneAngleDegrees;
+        }
+
+        /// <summary>Gets the world position of the license plate facing the cruiser (front or rear). Uses bone positions when available; otherwise approximates from vehicle center and facing. This ensures both front and rear plates can be read.</summary>
+        private static Vector3 GetPlatePositionFacingCruiser(Vehicle vehicle, Vector3 cruiserPos) {
+            try {
+                Vector3 vPos = vehicle.Position;
+                Vector3 vFwd = vehicle.ForwardVector;
+                vFwd.Z = 0f;
+                if (vFwd.LengthSquared() < 0.0001f) return vPos;
+                vFwd = Vector3.Normalize(vFwd);
+
+                Vector3 toCruiser = cruiserPos - vPos;
+                toCruiser.Z = 0f;
+                if (toCruiser.LengthSquared() < 0.0001f) return vPos;
+                toCruiser = Vector3.Normalize(toCruiser);
+
+                // Rear plate faces backward (-vFwd); we see it when we're behind (toCruiser aligns with +vFwd)
+                bool cruiserBehind = Vector3.Dot(toCruiser, vFwd) > 0.2f;
+                // Front plate faces forward (+vFwd); we see it when we're in front (toCruiser aligns with -vFwd)
+                bool cruiserInFront = Vector3.Dot(toCruiser, vFwd) < -0.2f;
+
+                float offset = 2f;
+                if (cruiserBehind) {
+                    int rearIdx = vehicle.GetBoneIndex("numberplate");
+                    if (rearIdx < 0) rearIdx = vehicle.GetBoneIndex("bumper_r");
+                    return rearIdx >= 0 ? vehicle.GetBonePosition(rearIdx) : vPos + vFwd * offset;
+                }
+                if (cruiserInFront) {
+                    int frontIdx = vehicle.GetBoneIndex("bumper_f");
+                    return frontIdx >= 0 ? vehicle.GetBonePosition(frontIdx) : vPos - vFwd * offset;
+                }
+                return vPos;
+            } catch {
+                return vehicle.Position;
+            }
         }
 
         private static void PruneExpiredCooldowns(int cooldownSec) {
