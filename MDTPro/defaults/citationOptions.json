@@ -411,13 +411,6 @@
         "isArrestable": false
       },
       {
-        "name": "VIN Tampering / Altered Or Defaced VIN (VC 10750)",
-        "minFine": 500,
-        "maxFine": 1000,
-        "canRevokeLicense": false,
-        "isArrestable": true
-      },
-      {
         "name": "License Not Carried",
         "minFine": 197,
         "maxFine": 250,
@@ -443,6 +436,18 @@
         "minFine": 300,
         "maxFine": 1000,
         "canRevokeLicense": true,
+        "isArrestable": true
+      }
+    ]
+  },
+  {
+    "name": "Stolen Possession",
+    "charges": [
+      {
+        "name": "VIN Tampering / Altered Or Defaced VIN (VC 10750)",
+        "minFine": 500,
+        "maxFine": 1000,
+        "canRevokeLicense": false,
         "isArrestable": true
       }
     ]

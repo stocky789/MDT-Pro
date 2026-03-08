@@ -25,6 +25,9 @@ namespace MDTPro.Utility {
             if (string.IsNullOrWhiteSpace(currentVersion)) return;
 
             try {
+                // GitHub API requires TLS 1.2; .NET Framework may default to TLS 1.0/1.1 otherwise.
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+
                 string url = string.Format(CultureInfo.InvariantCulture, ApiUrlTemplate, githubRepo.Trim());
                 var request = (HttpWebRequest)WebRequest.Create(url);
                 request.UserAgent = "MDTPro-Updater/1.0";
@@ -40,8 +43,13 @@ namespace MDTPro.Utility {
                         ParseAndNotify(json, currentVersion);
                     }
                 }
-            } catch {
-                // Fail silently: network issues, rate limits, invalid repo, etc.
+            } catch (WebException ex) {
+                if (ex.Response is HttpWebResponse httpRes)
+                    Helper.Log($"Update check failed: HTTP {(int)httpRes.StatusCode}", false, Helper.LogSeverity.Warning);
+                else
+                    Helper.Log($"Update check failed: {ex.Message}", false, Helper.LogSeverity.Warning);
+            } catch (Exception ex) {
+                Helper.Log($"Update check failed: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
         }
 
@@ -56,18 +64,27 @@ namespace MDTPro.Utility {
                 string latestVersion = NormalizeVersion(tagName);
                 if (string.IsNullOrEmpty(latestVersion)) return;
 
-                if (!IsNewer(latestVersion, currentVersion)) return;
-
-                string message = Setup.SetupController.GetLanguage().inGame.updateAvailable;
-                if (string.IsNullOrEmpty(message)) message = "Update available: v{0}";
-                message = string.Format(CultureInfo.InvariantCulture, message, latestVersion);
-
-                if (!string.IsNullOrEmpty(htmlUrl))
-                    message += $"~n~{htmlUrl}";
-
-                RageNotification.Show(message, RageNotification.NotificationType.Info, "Update available");
-            } catch {
-                // Invalid JSON or unexpected format
+                var lang = Setup.SetupController.GetLanguage().inGame;
+                string message;
+                string subtitle;
+                if (IsNewer(latestVersion, currentVersion)) {
+                    message = string.IsNullOrEmpty(lang.updateAvailable)
+                        ? "Installed Version: v{0}~n~Available Version: v{1} - Update Available"
+                        : lang.updateAvailable;
+                    message = string.Format(CultureInfo.InvariantCulture, message, currentVersion, latestVersion);
+                    if (!string.IsNullOrEmpty(htmlUrl))
+                        message += $"~n~{htmlUrl}";
+                    subtitle = "Update available";
+                } else {
+                    message = string.IsNullOrEmpty(lang.updateUpToDate)
+                        ? "Installed Version: v{0}~n~Available Version: v{0} - Up to Date"
+                        : lang.updateUpToDate;
+                    message = string.Format(CultureInfo.InvariantCulture, message, currentVersion);
+                    subtitle = "Up to date";
+                }
+                RageNotification.Show(message, RageNotification.NotificationType.Info, subtitle);
+            } catch (Exception ex) {
+                Helper.Log($"Update check parse failed: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
         }
 

@@ -31,7 +31,10 @@ namespace MDTPro.Setup {
             public string unloaded = "MDT Pro has been shut down.";
             public string listeningOnIpAddress = "MDT Pro is available at: ";
             public string serverFail = "Server failed to start. Restart the game and try again.";
-            public string updateAvailable = "A newer version (v{0}) is available. Download from GitHub releases.";
+            /// <summary>{0} = installed version, {1} = available version from GitHub. Shown when an update is available.</summary>
+            public string updateAvailable = "Installed Version: v{0}~n~Available Version: v{1} - Update Available";
+            /// <summary>{0} = version. Shown when already up to date.</summary>
+            public string updateUpToDate = "Installed Version: v{0}~n~Available Version: v{0} - Up to Date";
             /// <summary>Shown when a closed citation is saved so the officer can hand it to the suspect. {0} = ped full name.</summary>
             public string handCitationTo = "Hand citation to {0}";
             /// <summary>Shown when citation was saved but the person is not in range or was not identified this stop (e.g. vehicle stop / ID check).</summary>
