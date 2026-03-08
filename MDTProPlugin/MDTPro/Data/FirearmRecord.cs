@@ -3,6 +3,8 @@ namespace MDTPro.Data {
     public class FirearmRecord {
         public int Id { get; set; }
         public string SerialNumber { get; set; }
+        /// <summary>True when PR reports EFirearmState.ScratchedSN. Serial cannot be searched.</summary>
+        public bool IsSerialScratched { get; set; }
         public string OwnerPedName { get; set; }
         public string WeaponModelId { get; set; }
         /// <summary>In-game display name from native (matches what player sees). API-authoritative.</summary>

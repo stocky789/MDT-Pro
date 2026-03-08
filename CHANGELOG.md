@@ -2,10 +2,13 @@
 
 ## [0.9.3.0] — 2026-03-07
 
+- **Fixed: Court plea type reverting** — Plea selection (Guilty/Not Guilty/No Contest) was not being saved for pending cases. Added a "Save Plea & Notes" button so changes persist when closing the window. Force Resolve now also sends the current plea and outcome notes from the UI, so the selected plea is used when resolving.
+- **Clarification: Calendar and bundled plugins** — Calendar, Vehicle Search, and other bundled plugins only appear in the sidebar when enabled in Config → Plugins. If they were not visible, they were disabled—not missing due to a bug.
 - **New: Firearms Check** — New page to search firearms by serial number or owner name. Uses data from pat-downs and dead-body searches (Policing Redefined `GetPedSearchItems`).
 - **New: Registered Firearms** — Person Search now shows a "Registered Firearms" section listing weapons linked to the searched person.
 - **Firearm data:** Weapon names come from the game native (`GET_WEAPON_NAME_FROM_HASH`) so model names match what players see in-game.
 - **Firearm records** stored in SQLite (`firearm_records` table, schema 15). Upsert by owner + serial + weapon hash.
+- **Scratched serial numbers** — Firearms with PR `EFirearmState.ScratchedSN` are stored with `SerialNumber = null` and cannot be searched by serial; they appear in owner/Person Search as "Serial: Scratched". Schema 17 adds `IsSerialScratched`.
 - **Build script:** The `Dependencies` folder (including SQLite DLLs) is now copied into the Release folder so the full mod package includes all required files.
 - **UI:** Firearms Check menu icon updated to a pistol/sidearm icon.
 - **Fixed:** Bug fixes for ALPR and Policing Redefined event integration.
@@ -19,6 +22,9 @@
 - **BOLO management** — New REST endpoints: `POST /post/addBOLO` and `POST /post/removeBOLO`. Requires vehicle to be in-world.
 - **Court evidence** — Drug possession adds `courtEvidenceDrugsBonus` and "Drugs Found on Person" in court case evidence breakdown.
 - **Schema 16** — Database migration for new tables and columns.
+- **Settings & Officer Profile** — Officer information, shift controls, and career stats moved to a separate "Officer Profile" taskbar button. Settings panel now focuses on Plugins & Config only.
+- **Config page improvements** — Plain-English labels and tooltips for all config options; grouped sections; preset dropdowns with optional custom values; filter search; collapsible sections; Revert button to discard unsaved changes; success/error feedback on save.
+- **RageHook compliance** — Cross-checked Ped/Vehicle usage against Rage Plugin Hook docs: `Vehicle.Driver` null-checked before use; `Exists()` used for pre-persist validation (handles null safely per Rage); all native calls (e.g. `GET_WEAPON_NAME_FROM_HASH`) run in GameFiber/game thread context; PR event handlers validate handleables before access.
 
 ## [0.9.2.0] — 2026-03-07
 

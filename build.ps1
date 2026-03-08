@@ -130,18 +130,18 @@ if ($Deploy) {
     $mdtProDest = Join-Path $GamePath 'MDTPro'
     $gameRootX64 = Join-Path $GamePath 'x64'
     if (-not (Test-Path $pluginsDest)) { Write-Error "Game path not found: $pluginsDest"; exit 1 }
-    
+
     # Backup user data
     $dataBackup = Join-Path $env:TEMP ('MDTProDataBackup_' + [guid]::NewGuid().ToString('N'))
     if (Test-Path (Join-Path $mdtProDest 'data')) { Copy-Item (Join-Path $mdtProDest 'data') $dataBackup -Recurse }
-    
+
     # Deploy plugin DLL
     Copy-Item $dllDest (Join-Path $pluginsDest 'MDTPro.dll') -Force
-    
+
     # Deploy web folder
     if (Test-Path $mdtProDest) { Remove-Item $mdtProDest -Recurse -Force }
     Copy-Item $mdtDest $mdtProDest -Recurse -Force
-    
+
     # Deploy SQLite to GTA V root (native loader requires app directory)
     if ($sqliteDllSource) {
         Copy-Item -Path $sqliteDllSource -Destination $GamePath -Force
@@ -150,7 +150,7 @@ if ($Deploy) {
         New-Item -ItemType Directory -Path $gameRootX64 -Force | Out-Null
         Copy-Item -Path $sqliteInteropSource -Destination $gameRootX64 -Force
     }
-    
+
     # Restore user data
     if (Test-Path $dataBackup) { Copy-Item $dataBackup (Join-Path $mdtProDest 'data') -Recurse -Force; Remove-Item $dataBackup -Recurse -Force }
     Write-Host "Deployed to $GamePath"

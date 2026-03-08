@@ -16,7 +16,7 @@ namespace MDTPro.Data {
         private static SQLiteConnection connection;
         private static readonly object dbLock = new object();
 
-        private const int CurrentSchemaVersion = 16;
+        private const int CurrentSchemaVersion = 17;
 
         internal static void Initialize() {
             lock (dbLock) {
@@ -338,6 +338,7 @@ namespace MDTPro.Data {
                 CREATE TABLE IF NOT EXISTS firearm_records (
                     Id                  INTEGER PRIMARY KEY AUTOINCREMENT,
                     SerialNumber        TEXT,
+                    IsSerialScratched   INTEGER NOT NULL DEFAULT 0,
                     OwnerPedName        TEXT NOT NULL,
                     WeaponModelId       TEXT,
                     WeaponDisplayName   TEXT,
@@ -637,6 +638,15 @@ namespace MDTPro.Data {
                     }
                 } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
                 Helper.Log("Database migrated to schema version 16 (drug records, vehicle search, vehicle schema, EvidenceHadDrugs)");
+            }
+
+            if (fromVersion < 17) {
+                try {
+                    using (var cmd = new SQLiteCommand("ALTER TABLE firearm_records ADD COLUMN IsSerialScratched INTEGER NOT NULL DEFAULT 0", connection)) {
+                        cmd.ExecuteNonQuery();
+                    }
+                    Helper.Log("Database migrated to schema version 17 (firearm IsSerialScratched)");
+                } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             }
 
             SetSchemaVersion(CurrentSchemaVersion);
@@ -1828,8 +1838,9 @@ namespace MDTPro.Data {
                     if (o != null) existingId = Convert.ToInt32(o);
                 }
                 if (existingId.HasValue) {
-                    using (var cmd = new SQLiteCommand("UPDATE firearm_records SET IsStolen = @stolen, Description = COALESCE(@desc, Description), WeaponDisplayName = COALESCE(@displayName, WeaponDisplayName), LastSeenAt = @last WHERE Id = @id", connection)) {
+                    using (var cmd = new SQLiteCommand("UPDATE firearm_records SET IsStolen = @stolen, IsSerialScratched = @scratch, Description = COALESCE(@desc, Description), WeaponDisplayName = COALESCE(@displayName, WeaponDisplayName), LastSeenAt = @last WHERE Id = @id", connection)) {
                         cmd.Parameters.AddWithValue("@stolen", r.IsStolen ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@scratch", r.IsSerialScratched ? 1 : 0);
                         cmd.Parameters.AddWithValue("@desc", (object)r.Description ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@displayName", (object)r.WeaponDisplayName ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@last", r.LastSeenAt);
@@ -1838,10 +1849,11 @@ namespace MDTPro.Data {
                     }
                 } else {
                     using (var cmd = new SQLiteCommand(@"
-                        INSERT INTO firearm_records (SerialNumber, OwnerPedName, WeaponModelId, WeaponDisplayName, WeaponModelHash, IsStolen, Description, Source, FirstSeenAt, LastSeenAt)
-                        VALUES (@serial, @owner, @modelId, @displayName, @modelHash, @stolen, @desc, @src, @first, @last)
+                        INSERT INTO firearm_records (SerialNumber, IsSerialScratched, OwnerPedName, WeaponModelId, WeaponDisplayName, WeaponModelHash, IsStolen, Description, Source, FirstSeenAt, LastSeenAt)
+                        VALUES (@serial, @scratch, @owner, @modelId, @displayName, @modelHash, @stolen, @desc, @src, @first, @last)
                     ", connection)) {
                         cmd.Parameters.AddWithValue("@serial", string.IsNullOrEmpty(serial) ? DBNull.Value : (object)serial);
+                        cmd.Parameters.AddWithValue("@scratch", r.IsSerialScratched ? 1 : 0);
                         cmd.Parameters.AddWithValue("@owner", r.OwnerPedName);
                         cmd.Parameters.AddWithValue("@modelId", (object)r.WeaponModelId ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@displayName", (object)r.WeaponDisplayName ?? DBNull.Value);
@@ -1865,7 +1877,7 @@ namespace MDTPro.Data {
                 if (string.IsNullOrEmpty(owner)) return new List<FirearmRecord>();
                 var list = new List<FirearmRecord>();
                 using (var cmd = new SQLiteCommand(@"
-                    SELECT Id, SerialNumber, OwnerPedName, WeaponModelId, WeaponDisplayName, WeaponModelHash, IsStolen, Description, Source, FirstSeenAt, LastSeenAt
+                    SELECT Id, SerialNumber, IsSerialScratched, OwnerPedName, WeaponModelId, WeaponDisplayName, WeaponModelHash, IsStolen, Description, Source, FirstSeenAt, LastSeenAt
                     FROM firearm_records WHERE OwnerPedName IS NOT NULL AND OwnerPedName != '' AND LOWER(TRIM(OwnerPedName)) = LOWER(@owner) ORDER BY LastSeenAt DESC LIMIT @limit
                 ", connection)) {
                     cmd.Parameters.AddWithValue("@owner", owner);
@@ -1879,13 +1891,14 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>Loads a firearm by serial number. Returns null for scratched-serial firearms (cannot be looked up).</summary>
         internal static FirearmRecord LoadFirearmBySerial(string serialNumber) {
             if (string.IsNullOrWhiteSpace(serialNumber)) return null;
             lock (dbLock) {
                 if (connection == null) return null;
                 using (var cmd = new SQLiteCommand(@"
-                    SELECT Id, SerialNumber, OwnerPedName, WeaponModelId, WeaponDisplayName, WeaponModelHash, IsStolen, Description, Source, FirstSeenAt, LastSeenAt
-                    FROM firearm_records WHERE SerialNumber = @serial ORDER BY LastSeenAt DESC LIMIT 1
+                    SELECT Id, SerialNumber, IsSerialScratched, OwnerPedName, WeaponModelId, WeaponDisplayName, WeaponModelHash, IsStolen, Description, Source, FirstSeenAt, LastSeenAt
+                    FROM firearm_records WHERE SerialNumber IS NOT NULL AND SerialNumber = @serial ORDER BY LastSeenAt DESC LIMIT 1
                 ", connection)) {
                     cmd.Parameters.AddWithValue("@serial", serialNumber.Trim());
                     using (var rdr = cmd.ExecuteReader()) {
@@ -1893,6 +1906,23 @@ namespace MDTPro.Data {
                     }
                 }
                 return null;
+            }
+        }
+
+        /// <summary>Updates LastSeenAt to now for all firearm records with this owner. Call when owner's firearms are viewed (Person Search or Firearms Search) so they appear in Recent IDs.</summary>
+        internal static void TouchFirearmRecordsByOwner(string ownerPedName) {
+            if (string.IsNullOrWhiteSpace(ownerPedName)) return;
+            lock (dbLock) {
+                if (connection == null) return;
+                string now = DateTime.UtcNow.ToString("o");
+                using (var cmd = new SQLiteCommand(@"
+                    UPDATE firearm_records SET LastSeenAt = @now
+                    WHERE OwnerPedName IS NOT NULL AND OwnerPedName != '' AND LOWER(TRIM(OwnerPedName)) = LOWER(TRIM(@owner))
+                ", connection)) {
+                    cmd.Parameters.AddWithValue("@now", now);
+                    cmd.Parameters.AddWithValue("@owner", ownerPedName.Trim());
+                    cmd.ExecuteNonQuery();
+                }
             }
         }
 
@@ -1922,6 +1952,7 @@ namespace MDTPro.Data {
             return new FirearmRecord {
                 Id = rdr.GetInt32(rdr.GetOrdinal("Id")),
                 SerialNumber = rdr["SerialNumber"] as string,
+                IsSerialScratched = Convert.ToInt32(rdr["IsSerialScratched"] ?? 0) != 0,
                 OwnerPedName = rdr["OwnerPedName"] as string ?? "",
                 WeaponModelId = rdr["WeaponModelId"] as string,
                 WeaponDisplayName = rdr["WeaponDisplayName"] as string,

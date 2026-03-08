@@ -58,8 +58,8 @@ async function loadRecentOwners() {
     const item = document.createElement('button')
     item.textContent = name
     item.addEventListener('click', function () {
-      searchInput.value = name
-      document.querySelector('.searchInputWrapper button').click()
+      if (searchInput) searchInput.value = name
+      document.querySelector('.searchInputWrapper button')?.click()
     })
     list.appendChild(item)
   }
@@ -88,8 +88,7 @@ async function performSearch(query) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(query),
     })
-    bySerial = await resp.json()
-    if (!resp.ok) bySerial = null
+    bySerial = resp.ok ? await resp.json() : null
   } catch (err) {
     bySerial = null
     topWindow.showNotification(
@@ -113,8 +112,7 @@ async function performSearch(query) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(query),
     })
-    byOwner = await resp.json()
-    if (!resp.ok) byOwner = null
+    byOwner = resp.ok ? await resp.json() : null
   } catch (err) {
     byOwner = null
     topWindow.showNotification(
@@ -152,14 +150,14 @@ function formatDateSafe(isoString) {
 
 function sanitizeModelIdForUrl(modelId) {
   if (modelId == null || typeof modelId !== 'string') return ''
-  return modelId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') || ''
+  return modelId.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '') || ''
 }
 
 function renderFirearmCard(container, f) {
   const card = document.createElement('div')
   card.className = 'firearmCard'
   const name = f.WeaponDisplayName || f.Description || f.WeaponModelId || `Weapon (${f.WeaponModelHash || 0})`
-  const serial = f.SerialNumber || 'N/A'
+  const serial = f.IsSerialScratched ? 'Scratched' : (f.SerialNumber || 'N/A')
   const stolen = f.IsStolen ? ' [STOLEN]' : ''
   const ownerVal = f.OwnerPedName || ''
   card.innerHTML = `
@@ -201,10 +199,11 @@ function renderFirearmCard(container, f) {
   const modelId = sanitizeModelIdForUrl(f.WeaponModelId)
   if (img && modelId) {
     img.dataset.modelId = modelId
-    img.src = `https://docs.fivem.net/weapons/${modelId}.webp`
-    img.onerror = () => { img.parentElement?.remove() }
+    img.alt = name
+    img.src = `https://docs-backend.fivem.net/weapons/${modelId}.png`
+    img.onerror = () => { img.style.display = 'none' }
   } else if (img) {
-    img.parentElement?.remove()
+    img.style.display = 'none'
   }
   container.appendChild(card)
 }
