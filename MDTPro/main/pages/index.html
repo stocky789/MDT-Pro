@@ -13,6 +13,14 @@
     <header class="taskbar">
       <div class="taskbarBrand">
         <img src="/image/badge?v=7" alt="" class="taskbarLogo taskbarBadge" />
+        <div class="taskbarOfficerStatus" aria-label="Officer information">
+          <span class="officerStatusItem" data-key="firstName"><span class="officerStatusLabel" data-language="settings.officerInformation.firstName">First Name</span><span class="officerStatusValue">—</span></span>
+          <span class="officerStatusItem" data-key="lastName"><span class="officerStatusLabel" data-language="settings.officerInformation.lastName">Last Name</span><span class="officerStatusValue">—</span></span>
+          <span class="officerStatusItem" data-key="badgeNumber"><span class="officerStatusLabel" data-language="settings.officerInformation.badgeNumber">Badge</span><span class="officerStatusValue">—</span></span>
+          <span class="officerStatusItem" data-key="rank"><span class="officerStatusLabel" data-language="settings.officerInformation.rank">Rank</span><span class="officerStatusValue">—</span></span>
+          <span class="officerStatusItem" data-key="callSign"><span class="officerStatusLabel" data-language="settings.officerInformation.callSign">Call Sign</span><span class="officerStatusValue">—</span></span>
+          <span class="officerStatusItem" data-key="agency"><span class="officerStatusLabel" data-language="settings.officerInformation.agency">Department</span><span class="officerStatusValue">—</span></span>
+        </div>
         <span class="taskbarTitle">San Andreas Government</span>
       </div>
       <div class="location"></div>
@@ -58,6 +66,7 @@
       </div>
       <div class="time"></div>
     </header>
+    <div class="desktopWallpaper"></div>
     <main class="desktop">
       <nav class="sidebar">
         <div class="sidebarBadge">
@@ -76,8 +85,8 @@
           <span class="title" data-language="desktop.vehicleSearch">Vehicle Search</span>
         </button>
         <button class="desktopItem" data-name="firearmsSearch">
-          <span class="icon stroke">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h14l-1.5 6h-2l-1-4h-5l-1 4h-2L3 11z"/><path d="M10 11V8"/><path d="M10 8c0-1.5 1-2 2-2s2 .5 2 2v3"/></svg>
+          <span class="icon">
+            <img src="/image/firearms.svg" alt="" width="20" height="20" class="iconImg" />
           </span>
           <span class="title" data-language="desktop.firearmsSearch">Firearms Check</span>
         </button>
@@ -225,11 +234,7 @@
     </div>
     <div class="iconAccess hidden">
       <div class="firearmsSearch">
-        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" class="stroke" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 11h14l-1.5 6h-2l-1-4h-5l-1 4h-2L3 11z"/>
-          <path d="M10 11V8"/>
-          <path d="M10 8c0-1.5 1-2 2-2s2 .5 2 2v3"/>
-        </svg>
+        <img src="/image/firearms.svg" alt="" width="20" height="20" />
       </div>
       <div class="vehicleSearch">
         <svg viewBox="-4 0 32 32" xmlns="http://www.w3.org/2000/svg">

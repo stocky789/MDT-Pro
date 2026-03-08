@@ -163,6 +163,11 @@ const server = http.createServer((req, res) => {
   } else if (url === '/image/desktop' || url === '/image/desktop.png') {
     filePath = path.join(ROOT, 'img', 'desktop.png');
     contentType = 'image/png';
+  } else if (url === '/image/firearms' || url === '/image/firearms.svg') {
+    filePath = path.join(ROOT, 'img', 'firearms.svg');
+    contentType = 'image/svg+xml';
+    serveFile(res, filePath, contentType, true);
+    return;
   } else if (url === '/image/badge' || url === '/image/badge.png' || url === '/image/badge.svg') {
     const badgeSvg = path.join(ROOT, 'img', 'badge.svg');
     const badgePng = path.join(ROOT, 'img', 'badge.png');
@@ -227,12 +232,19 @@ const server = http.createServer((req, res) => {
     const parts = url.slice('/plugin/'.length).split('/');
     if (parts.length >= 3) {
       const [pluginId, type, fileName] = parts;
-      const ext = type === 'page' ? '.html' : type === 'script' ? '.js' : type === 'style' ? '.css' : null;
-      if (ext) {
-        const name = (fileName || '').replace(ext, '');
-        const subPath = type === 'page' ? 'pages' : type === 'script' ? 'scripts' : 'styles';
-        filePath = path.join(ROOT, 'plugins', pluginId, subPath, name + ext);
-        contentType = MIME[ext] || 'text/plain';
+      let ext = type === 'page' ? '.html' : type === 'script' ? '.js' : type === 'style' ? '.css' : null;
+      let subPath = type === 'page' ? 'pages' : type === 'script' ? 'scripts' : type === 'style' ? 'styles' : null;
+      let fullName;
+      if (type === 'image') {
+        subPath = 'images';
+        const imgName = (fileName || '').trim();
+        fullName = imgName && (imgName.endsWith('.png') || imgName.endsWith('.jpg') || imgName.endsWith('.svg')) ? imgName : imgName + '.png';
+      } else {
+        fullName = (fileName || '').replace(ext || '', '') + (ext || '');
+      }
+      if (subPath) {
+        filePath = path.join(ROOT, 'plugins', pluginId, subPath, fullName);
+        contentType = type === 'image' ? (fullName.endsWith('.svg') ? 'image/svg+xml' : fullName.endsWith('.jpg') ? 'image/jpeg' : 'image/png') : (MIME[ext] || 'text/plain');
         if (fs.existsSync(filePath) && path.resolve(filePath).startsWith(path.resolve(ROOT))) {
           serveFile(res, filePath, contentType);
           return;

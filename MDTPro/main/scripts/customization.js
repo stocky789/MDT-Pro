@@ -1,3 +1,23 @@
+;(async function loadDepartmentStylingIfEnabled() {
+  const activePlugins = typeof getActivePlugins === 'function' ? getActivePlugins() : JSON.parse(localStorage.getItem('activePlugins') || '[]')
+  if (!activePlugins.includes('DepartmentStyling')) return
+  const pluginInfo = await fetch('/pluginInfo').then((r) => r.json()).catch(() => [])
+  const plugin = pluginInfo.find((p) => p.id === 'DepartmentStyling')
+  if (!plugin) return
+  for (const pluginStyle of plugin.styles || []) {
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = `/plugin/DepartmentStyling/style/${pluginStyle}`
+    document.head.appendChild(link)
+  }
+  for (const pluginScript of plugin.scripts || []) {
+    const el = document.createElement('script')
+    el.src = `/plugin/DepartmentStyling/script/${pluginScript}`
+    el.dataset.pluginId = 'DepartmentStyling'
+    document.body.appendChild(el)
+  }
+})()
+
 ;(async function () {
   const config = await getConfig()
   if (config.updateDomWithLanguageOnLoad)
@@ -207,11 +227,14 @@ async function renderConfigPage() {
         let raw
         if (el.value === '__custom__') {
           const manualInput = el.closest('.configItemValue')?.querySelector('.configManualInput')
-          raw = manualInput ? manualInput.value : el.value
+          if (!manualInput) return // Skip: manual input missing, avoid saving invalid __custom__ or 0
+          raw = manualInput.value
         } else {
           raw = el.value
         }
         newConfig[key] = isNumber ? (parseFloat(raw) || 0) : raw
+      } else if (el.classList.contains('configPresetManualInput')) {
+        // Skip: preset companion input is handled by configPresetSelect (reads from it when __custom__)
       } else {
         const isNumber = el.dataset.valueType === 'number'
         const raw = el.value
