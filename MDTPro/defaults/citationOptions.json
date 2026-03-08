@@ -411,6 +411,13 @@
         "isArrestable": false
       },
       {
+        "name": "VIN Tampering / Altered Or Defaced VIN (VC 10750)",
+        "minFine": 500,
+        "maxFine": 1000,
+        "canRevokeLicense": false,
+        "isArrestable": true
+      },
+      {
         "name": "License Not Carried",
         "minFine": 197,
         "maxFine": 250,
@@ -435,6 +442,25 @@
         "name": "Driving On Suspended License",
         "minFine": 300,
         "maxFine": 1000,
+        "canRevokeLicense": true,
+        "isArrestable": true
+      }
+    ]
+  },
+  {
+    "name": "Evading / Pursuit",
+    "charges": [
+      {
+        "name": "Evading Peace Officer (VC 2800.1)",
+        "minFine": 500,
+        "maxFine": 1000,
+        "canRevokeLicense": true,
+        "isArrestable": true
+      },
+      {
+        "name": "Reckless Evading Peace Officer (VC 2800.2)",
+        "minFine": 1000,
+        "maxFine": 10000,
         "canRevokeLicense": true,
         "isArrestable": true
       }

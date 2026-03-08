@@ -963,6 +963,16 @@
         "canRevokeLicense": true
       },
       {
+        "name": "VIN Tampering / Altered Or Defaced VIN (VC 10750)",
+        "minFine": 500,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
         "name": "Possession Of Stolen Debit / Credit Card",
         "minFine": 500,
         "maxFine": 2000,

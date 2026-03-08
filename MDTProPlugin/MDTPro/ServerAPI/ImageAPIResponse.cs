@@ -33,6 +33,13 @@ namespace MDTPro.ServerAPI {
                     status = 200;
                     contentType = "image/png";
                 }
+            } else if (path == "firearms" || path == "firearms.svg") {
+                string firearmsPath = $"{SetupController.ImgDirPath}/firearms.svg";
+                if (File.Exists(firearmsPath)) {
+                    buffer = File.ReadAllBytes(firearmsPath);
+                    status = 200;
+                    contentType = "image/svg+xml";
+                }
             }
         }
     }

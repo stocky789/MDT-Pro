@@ -280,7 +280,7 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   evidenceBreakdown.classList.add('evidenceBreakdown')
   evidenceBreakdown.style.display = 'none'
 
-  const hasAnyRealEvidence = courtCase.EvidenceHadWeapon || courtCase.EvidenceWasWanted || courtCase.EvidenceAssaultedPed || courtCase.EvidenceDamagedVehicle || courtCase.EvidenceResisted || courtCase.EvidenceHadDrugs
+  const hasAnyRealEvidence = (courtCase.EvidenceHadWeapon ?? false) || (courtCase.EvidenceWasWanted ?? false) || (courtCase.EvidenceAssaultedPed ?? false) || (courtCase.EvidenceDamagedVehicle ?? false) || (courtCase.EvidenceResisted ?? false) || (courtCase.EvidenceHadDrugs ?? false)
   const noEvidenceNote = document.createElement('div')
   noEvidenceNote.classList.add('evidenceBreakdownNote')
   noEvidenceNote.innerText = hasAnyRealEvidence
@@ -318,12 +318,12 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
 
   // Scene evidence flags — only show items we can track reliably (see DataController PedEvidenceContext comment)
   const evidenceItems = [
-    { label: language.court.evidenceWeapon || 'Armed at Arrest', value: courtCase.EvidenceHadWeapon, active: courtCase.EvidenceHadWeapon },
-    { label: language.court.evidenceWanted || 'Active Warrant at Encounter', value: courtCase.EvidenceWasWanted, active: courtCase.EvidenceWasWanted },
-    { label: language.court.evidenceAssault || 'Assaulted Another Person', value: courtCase.EvidenceAssaultedPed, active: courtCase.EvidenceAssaultedPed },
-    { label: language.court.evidenceVehicleDamage || 'Damaged Vehicle / Property', value: courtCase.EvidenceDamagedVehicle, active: courtCase.EvidenceDamagedVehicle },
-    { label: language.court.evidenceResisted || 'Resisted Arrest', value: courtCase.EvidenceResisted, active: courtCase.EvidenceResisted },
-    { label: language.court.evidenceDrugs || 'Drugs Found on Person', value: courtCase.EvidenceHadDrugs, active: courtCase.EvidenceHadDrugs },
+    { label: language.court.evidenceWeapon || 'Armed at Arrest', value: courtCase.EvidenceHadWeapon ?? false, active: courtCase.EvidenceHadWeapon ?? false },
+    { label: language.court.evidenceWanted || 'Active Warrant at Encounter', value: courtCase.EvidenceWasWanted ?? false, active: courtCase.EvidenceWasWanted ?? false },
+    { label: language.court.evidenceAssault || 'Assaulted Another Person', value: courtCase.EvidenceAssaultedPed ?? false, active: courtCase.EvidenceAssaultedPed ?? false },
+    { label: language.court.evidenceVehicleDamage || 'Damaged Vehicle / Property', value: courtCase.EvidenceDamagedVehicle ?? false, active: courtCase.EvidenceDamagedVehicle ?? false },
+    { label: language.court.evidenceResisted || 'Resisted Arrest', value: courtCase.EvidenceResisted ?? false, active: courtCase.EvidenceResisted ?? false },
+    { label: language.court.evidenceDrugs || 'Drugs Found on Person', value: courtCase.EvidenceHadDrugs ?? false, active: courtCase.EvidenceHadDrugs ?? false },
   ]
 
   for (const item of evidenceItems) {
@@ -512,6 +512,7 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
         courtCase.Plea = pleaSelect.value
         courtCase.OutcomeNotes = notesInput.value
         topWindow.showNotification(language.court.saveCaseSuccess || 'Case updated.', 'success')
+        if (typeof refreshCourtList === 'function') await refreshCourtList()
       } else {
         topWindow.showNotification(language.court.saveCaseError || 'Failed to save case.', 'error')
       }
@@ -571,7 +572,7 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
             JuryVotesForAcquittal: courtCase.JuryVotesForAcquittal,
             HasPublicDefender: courtCase.HasPublicDefender,
             OutcomeNotes: notesInput.value,
-            OutcomeReasoning: '',
+            OutcomeReasoning: courtCase.OutcomeReasoning ?? '',
           }),
         })
       ).text()
@@ -583,6 +584,7 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
         currentStatusLabel.style.borderColor = `var(--color-${courtStatusColorMap[3]})`
         statusButtonWrapper.style.display = 'none'
         topWindow.showNotification(language.court.statusUpdated || 'Court case updated', 'success')
+        if (typeof refreshCourtList === 'function') await refreshCourtList()
       } else {
         topWindow.showNotification(language.court.statusUpdateError || 'Failed to update status', 'error')
       }
