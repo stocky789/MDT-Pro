@@ -129,10 +129,19 @@ namespace MDTPro.Setup {
         private static Config cachedConfig;
         internal static Config GetConfig() {
             if (cachedConfig == null) {
-                cachedConfig = Helper.ReadFromJsonFile<Config>(ConfigPath) ?? new Config();
+                var def = new Config();
+                cachedConfig = Helper.ReadFromJsonFile<Config>(ConfigPath) ?? def;
+                EnsureALPRDefaults(cachedConfig, def);
                 Helper.WriteToJsonFile(ConfigPath, cachedConfig);
             }
             return cachedConfig;
+        }
+
+        /// <summary>Ensures ALPR config values are sensible. Old configs may have 0/missing values from before ALPR was added.</summary>
+        private static void EnsureALPRDefaults(Config cfg, Config def) {
+            if (cfg.alprScanRangeMeters <= 0) cfg.alprScanRangeMeters = def.alprScanRangeMeters;
+            if (cfg.alprReadRangeMeters <= 0) cfg.alprReadRangeMeters = def.alprReadRangeMeters;
+            if (cfg.alprConeAngleDegrees <= 0) cfg.alprConeAngleDegrees = def.alprConeAngleDegrees;
         }
 
         internal static void ResetConfig() {
