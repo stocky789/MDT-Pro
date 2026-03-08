@@ -16,7 +16,7 @@ namespace MDTPro.Data {
         private static SQLiteConnection connection;
         private static readonly object dbLock = new object();
 
-        private const int CurrentSchemaVersion = 17;
+        private const int CurrentSchemaVersion = 18;
 
         internal static void Initialize() {
             lock (dbLock) {
@@ -185,7 +185,8 @@ namespace MDTPro.Data {
                     CreatedAtUtc            TEXT,
                     LastUpdatedUtc          TEXT,
                     OutcomeNotes            TEXT,
-                    OutcomeReasoning        TEXT
+                    OutcomeReasoning        TEXT,
+                    LicenseRevocations      TEXT
                 );
                 CREATE INDEX IF NOT EXISTS idx_court_cases_ped ON court_cases(PedName);
 
@@ -391,6 +392,16 @@ namespace MDTPro.Data {
                 return !reader.IsDBNull(ordinal) && Convert.ToBoolean(reader[ordinal]);
             } catch {
                 return false;
+            }
+        }
+
+        private static List<string> ParseLicenseRevocations(string json) {
+            if (string.IsNullOrWhiteSpace(json)) return new List<string>();
+            try {
+                var list = Newtonsoft.Json.JsonConvert.DeserializeObject<List<string>>(json);
+                return list ?? new List<string>();
+            } catch {
+                return new List<string>();
             }
         }
 
@@ -649,6 +660,15 @@ namespace MDTPro.Data {
                 } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             }
 
+            if (fromVersion < 18) {
+                try {
+                    using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN LicenseRevocations TEXT", connection)) {
+                        cmd.ExecuteNonQuery();
+                    }
+                    Helper.Log("Database migrated to schema version 18 (court LicenseRevocations)");
+                } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            }
+
             SetSchemaVersion(CurrentSchemaVersion);
         }
 
@@ -861,7 +881,8 @@ namespace MDTPro.Data {
                                 CreatedAtUtc = reader["CreatedAtUtc"] as string,
                                 LastUpdatedUtc = reader["LastUpdatedUtc"] as string,
                                 OutcomeNotes = reader["OutcomeNotes"] as string,
-                                OutcomeReasoning = reader["OutcomeReasoning"] as string
+                                OutcomeReasoning = reader["OutcomeReasoning"] as string,
+                                LicenseRevocations = ParseLicenseRevocations(reader["LicenseRevocations"] as string)
                             };
 
                             courtCase.Charges = LoadCourtCharges(courtCase.Number);
@@ -1369,7 +1390,7 @@ namespace MDTPro.Data {
                     SentenceMultiplier, ProsecutionStrength, DefenseStrength, DocketPressure, PolicyAdjustment,
                     CourtDistrict, CourtName, CourtType, HasPublicDefender, Plea,
                     JudgeName, ProsecutorName, DefenseAttorneyName,
-                    HearingDateUtc, CreatedAtUtc, LastUpdatedUtc, OutcomeNotes, OutcomeReasoning
+                    HearingDateUtc, CreatedAtUtc, LastUpdatedUtc, OutcomeNotes, OutcomeReasoning, LicenseRevocations
                 ) VALUES (
                     @Number, @PedName, @ReportId, @ShortYear, @Status,
                     @IsJuryTrial, @JurySize, @JuryVotesForConviction, @JuryVotesForAcquittal,
@@ -1381,7 +1402,7 @@ namespace MDTPro.Data {
                     @SentenceMultiplier, @ProsecutionStrength, @DefenseStrength, @DocketPressure, @PolicyAdjustment,
                     @CourtDistrict, @CourtName, @CourtType, @HasPublicDefender, @Plea,
                     @JudgeName, @ProsecutorName, @DefenseAttorneyName,
-                    @HearingDateUtc, @CreatedAtUtc, @LastUpdatedUtc, @OutcomeNotes, @OutcomeReasoning
+                    @HearingDateUtc, @CreatedAtUtc, @LastUpdatedUtc, @OutcomeNotes, @OutcomeReasoning, @LicenseRevocations
                 )",
                 connection, transaction)) {
                 cmd.Parameters.AddWithValue("@Number", (object)courtCase.Number ?? DBNull.Value);
@@ -1430,6 +1451,9 @@ namespace MDTPro.Data {
                 cmd.Parameters.AddWithValue("@LastUpdatedUtc", (object)courtCase.LastUpdatedUtc ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@OutcomeNotes", (object)courtCase.OutcomeNotes ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@OutcomeReasoning", (object)courtCase.OutcomeReasoning ?? DBNull.Value);
+                string revocationsJson = courtCase.LicenseRevocations != null && courtCase.LicenseRevocations.Count > 0
+                    ? Newtonsoft.Json.JsonConvert.SerializeObject(courtCase.LicenseRevocations) : null;
+                cmd.Parameters.AddWithValue("@LicenseRevocations", (object)revocationsJson ?? DBNull.Value);
                 cmd.ExecuteNonQuery();
             }
 

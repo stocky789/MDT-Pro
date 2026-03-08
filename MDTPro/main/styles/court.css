@@ -354,6 +354,21 @@ body {
   justify-content: flex-start;
 }
 
+.licenseRevocations {
+  border-left: 3px solid var(--color-error, #c62828);
+  padding-left: 10px;
+}
+
+.licenseRevocationsList {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+.licenseRevocationsList li {
+  margin-bottom: 4px;
+}
+
 @media (max-width: 900px) {
   .courtControls {
     grid-template-columns: 1fr;

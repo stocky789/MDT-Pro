@@ -1,0 +1,36 @@
+/* Department Styling plugin – theme switcher + backgrounds */
+
+/* Replace default wallpaper when themed – solid color, no effects */
+[data-mdt-theme] .desktopWallpaper {
+  background-image: none;
+}
+
+/* Ensure badge images never show transparency checkerboard – solid background on containers */
+.taskbarLogo.taskbarBadge,
+.taskbarBadge,
+.sidebarBadge,
+.sidebarBadge img {
+  background-color: var(--color-surface) !important;
+}
+
+#mdt-department-theme-section .departmentThemeRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+#mdt-department-theme-section .departmentThemeRow label {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+#mdt-department-theme-section .departmentThemeSelect {
+  max-width: 320px;
+}
+
+#mdt-department-theme-section .settingsHint {
+  font-size: 12px;
+  color: var(--color-text-primary-half);
+  margin: 0;
+}
