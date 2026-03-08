@@ -105,6 +105,7 @@
   transition: background-color var(--transition-time-short) ease;
 }
 
+.taskbar .icons button.officerProfile,
 .taskbar .icons button.settings {
   width: auto;
   min-width: 44px;
@@ -119,6 +120,9 @@
   letter-spacing: 0.02em;
 }
 
+.taskbar .icons button.officerProfile:hover,
+.taskbar .icons button.officerProfile:focus,
+.taskbar .icons button.officerProfile.focused,
 .taskbar .icons button.settings:hover,
 .taskbar .icons button.settings:focus,
 .taskbar .icons button.settings.focused {
@@ -127,6 +131,7 @@
   color: var(--color-text-primary);
 }
 
+.taskbar .icons button.officerProfile .officerProfileIcon,
 .taskbar .icons button.settings .settingsIcon {
   width: 24px;
   height: 24px;
@@ -137,11 +142,13 @@
   color: inherit;
 }
 
+.taskbar .icons button.officerProfile .officerProfileIcon svg,
 .taskbar .icons button.settings .settingsIcon svg {
   width: 24px;
   height: 24px;
 }
 
+.taskbar .icons button.officerProfile .officerProfileLabel,
 .taskbar .icons button.settings .settingsLabel {
   white-space: nowrap;
 }
@@ -152,8 +159,8 @@
   background-color: var(--color-surface-elevated);
 }
 
-.taskbar .icons button:not(.settings) > *,
-.taskbar .icons button:not(.settings) img {
+.taskbar .icons button:not(.officerProfile):not(.settings) > *,
+.taskbar .icons button:not(.officerProfile):not(.settings) img {
   width: 20px;
   height: 20px;
   fill: var(--color-accent);
@@ -472,7 +479,8 @@
   display: block;
 }
 
-/* ---------- Settings panel ---------- */
+/* ---------- Slide-in panels (Officer Profile, Settings) ---------- */
+.overlay .officerProfile,
 .overlay .settings {
   position: fixed;
   top: var(--tb-height);
@@ -490,8 +498,8 @@
   flex-direction: column;
 }
 
-.overlay .settings::before {
-  content: 'San Andreas Government — Control Panel';
+.overlay .officerProfile::before {
+  content: 'San Andreas Government — Officer Profile';
   flex-shrink: 0;
   padding: 16px 18px;
   border-bottom: 2px solid var(--color-accent-half);
@@ -502,17 +510,47 @@
   text-transform: uppercase;
 }
 
+.overlay .settings::before {
+  content: 'San Andreas Government — Settings';
+  flex-shrink: 0;
+  padding: 16px 18px;
+  border-bottom: 2px solid var(--color-accent-half);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-accent-secondary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.overlay .officerProfile.hide,
 .overlay .settings.hide {
   transform: translateX(100%);
 }
 
-.overlay .settings .officerInformation,
-.overlay .settings .currentShift,
-.overlay .settings .officerMetrics {
+.overlay .officerProfile .officerInformation,
+.overlay .officerProfile .currentShift,
+.overlay .officerProfile .officerMetrics {
   padding: 18px;
   border-bottom: 1px solid var(--color-border);
 }
 
+.overlay .settings .settingsContent {
+  flex: 1;
+  padding: 18px;
+}
+
+.overlay .settings .settingsSection {
+  margin-bottom: 16px;
+}
+
+.overlay .settings .settingsHint {
+  font-size: 12px;
+  color: var(--color-text-primary-dimmed);
+  margin: 12px 0 0;
+  line-height: 1.4;
+}
+
+.overlay .officerProfile .titleRow,
 .overlay .settings .titleRow {
   display: flex;
   align-items: center;
@@ -520,9 +558,10 @@
   margin-bottom: 12px;
 }
 
-.overlay .settings .titleRow .title,
-.overlay .settings .officerInformation .title,
-.overlay .settings .officerMetrics .title {
+.overlay .officerProfile .titleRow .title,
+.overlay .officerProfile .officerInformation .title,
+.overlay .officerProfile .officerMetrics .title,
+.overlay .settings .titleRow .title {
   font-size: 12px;
   font-weight: 600;
   color: var(--color-text-primary-dimmed);
@@ -532,6 +571,7 @@
   margin-bottom: 0;
 }
 
+.overlay .officerProfile .infoIcon,
 .overlay .settings .infoIcon {
   display: inline-flex;
   align-items: center;
@@ -548,18 +588,20 @@
   flex-shrink: 0;
 }
 
+.overlay .officerProfile .infoIcon:hover,
 .overlay .settings .infoIcon:hover {
   background: var(--color-accent);
   color: var(--color-surface);
 }
 
-.overlay .settings .officerInformation .inputWrapper > div label {
+.overlay .officerProfile .officerInformation .inputWrapper > div label {
   display: flex;
   align-items: center;
   gap: 5px;
   flex-wrap: wrap;
 }
 
+.overlay .officerProfile .buttonWithInfo,
 .overlay .settings .buttonWithInfo {
   display: inline-flex;
   align-items: center;
@@ -572,41 +614,41 @@
   gap: 6px;
 }
 
-.overlay .settings .officerInformation .inputWrapper {
+.overlay .officerProfile .officerInformation .inputWrapper {
   gap: 12px;
   margin-bottom: 14px;
 }
 
-.overlay .settings .officerInformation .inputWrapper > div {
+.overlay .officerProfile .officerInformation .inputWrapper > div {
   flex: 1 1 100%;
   min-width: 0;
 }
 
-.overlay .settings .officerInformation .inputWrapper > div label {
+.overlay .officerProfile .officerInformation .inputWrapper > div label {
   font-size: 12px;
   font-weight: 500;
   color: var(--color-text-primary-dimmed);
   margin-bottom: 4px;
 }
 
-.overlay .settings .officerInformation .inputWrapper > div input {
+.overlay .officerProfile .officerInformation .inputWrapper > div input {
   width: 100%;
   padding: 8px 10px;
   font-size: 14px;
 }
 
-.overlay .settings .officerInformation .buttonWrapper {
+.overlay .officerProfile .officerInformation .buttonWrapper {
   gap: 8px;
   margin-top: 4px;
 }
 
-.overlay .settings .officerInformation .buttonWrapper button {
+.overlay .officerProfile .officerInformation .buttonWrapper button {
   flex: 1 1 0;
   padding: 10px 12px;
   font-size: 13px;
 }
 
-.overlay .settings .currentShift .timeWrapper {
+.overlay .officerProfile .currentShift .timeWrapper {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -615,21 +657,21 @@
   color: var(--color-text-primary-dimmed);
 }
 
-.overlay .settings .currentShift .timeWrapper div {
+.overlay .officerProfile .currentShift .timeWrapper div {
   flex: none;
 }
 
-.overlay .settings .currentShift .buttonWrapper {
+.overlay .officerProfile .currentShift .buttonWrapper {
   gap: 8px;
 }
 
-.overlay .settings .currentShift .buttonWrapper button {
+.overlay .officerProfile .currentShift .buttonWrapper button {
   flex: 1 1 0;
   padding: 10px 12px;
   font-size: 13px;
 }
 
-.overlay .settings .officerMetrics .metricsContent {
+.overlay .officerProfile .officerMetrics .metricsContent {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px 20px;
@@ -637,12 +679,12 @@
   align-items: baseline;
 }
 
-.overlay .settings .officerMetrics .metricsContent .metricLabel {
+.overlay .officerProfile .officerMetrics .metricsContent .metricLabel {
   font-weight: 500;
   color: var(--color-text-primary-dimmed);
 }
 
-.overlay .settings .officerMetrics .metricsContent .metricValue {
+.overlay .officerProfile .officerMetrics .metricsContent .metricValue {
   font-weight: 600;
   text-align: right;
   color: var(--color-text-primary);
@@ -772,10 +814,12 @@
     padding: 8px 0;
   }
 
+  .taskbar .icons button.officerProfile .officerProfileLabel,
   .taskbar .icons button.settings .settingsLabel {
     display: none;
   }
 
+  .taskbar .icons button.officerProfile,
   .taskbar .icons button.settings {
     padding: 0;
     min-width: 44px;
@@ -802,6 +846,7 @@
     display: none;
   }
 
+  .overlay .officerProfile,
   .overlay .settings {
     width: min(380px, calc(100% - 16px));
     right: 8px;

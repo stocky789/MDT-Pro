@@ -18,14 +18,33 @@
       <div class="location"></div>
       <div class="icons">
         <button
+          class="officerProfile"
+          onclick="
+            document.querySelector('.overlay .officerProfile').classList.toggle('hide');
+            document.querySelector('.overlay .settings').classList.add('hide');
+            this.blur();
+          "
+          title="Officer Profile"
+          data-language-title="taskbar.officerProfile"
+        >
+          <span class="officerProfileIcon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+              <path d="M3 21v-2a4 4 0 0 1 4-4h4"/>
+              <circle cx="17" cy="5" r="2.5"/>
+            </svg>
+          </span>
+          <span class="officerProfileLabel" data-language="taskbar.officerProfile">Officer Profile</span>
+        </button>
+        <button
           class="settings"
           onclick="
-            document
-              .querySelector('.overlay .settings')
-              .classList.toggle('hide')
-            this.blur()
+            document.querySelector('.overlay .settings').classList.toggle('hide');
+            document.querySelector('.overlay .officerProfile').classList.add('hide');
+            this.blur();
           "
-          title="Control Panel"
+          title="Settings"
           data-language-title="taskbar.settings"
         >
           <span class="settingsIcon" aria-hidden="true">
@@ -96,7 +115,7 @@
     </main>
     <div class="overlay">
       <div class="windows"></div>
-      <div class="settings hide">
+      <div class="officerProfile hide">
         <div class="officerInformation">
           <div class="titleRow">
             <span class="title" data-language="settings.officerInformation.title">Officer Information</span>
@@ -184,12 +203,22 @@
           </div>
           <div class="metricsContent"></div>
         </div>
+      </div>
+      <div class="settings hide">
+        <div class="settingsContent">
+          <div class="settingsSection">
+            <div class="titleRow">
+              <span class="title" data-language="settings.pluginsAndConfig">Plugins &amp; Config</span>
+            </div>
+            <div class="customizationRow">
+              <span class="customization" data-language="settings.customization" onclick="window.open('/page/customization', '_blank')" role="button" tabindex="0">Config and Plugins</span>
+              <span class="infoIcon" data-language-info="settings.customizationInfo" role="img" aria-label="More information">?</span>
+            </div>
+            <p class="settingsHint" data-language="settings.customizationHint">Manage MDT plugins and configuration options. Opens in a new window.</p>
+          </div>
+        </div>
         <div class="versionCustomizationWrapper">
           <div class="version"></div>
-          <div class="customizationRow">
-            <span class="customization" data-language="settings.customization" onclick="window.open('/page/customization', '_blank')" role="button" tabindex="0">Config and Plugins</span>
-            <span class="infoIcon" data-language-info="settings.customizationInfo" role="img" aria-label="More information">?</span>
-          </div>
         </div>
       </div>
       <div class="notifications"></div>

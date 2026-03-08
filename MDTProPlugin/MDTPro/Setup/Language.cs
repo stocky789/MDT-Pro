@@ -481,6 +481,9 @@ namespace MDTPro.Setup {
             public string forceResolve = "Force Resolve";
             public string forceResolveSuccess = "Case resolved.";
             public string forceResolveError = "Could not resolve case.";
+            public string saveCase = "Save Plea & Notes";
+            public string saveCaseSuccess = "Case updated.";
+            public string saveCaseError = "Failed to save case.";
             public string searchPlaceholder = "Search by case #, name, or report";
             public string allStatuses = "All statuses";
             public string[] statusMap = {

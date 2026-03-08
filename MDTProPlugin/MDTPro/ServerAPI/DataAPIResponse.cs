@@ -227,12 +227,16 @@ namespace MDTPro.ServerAPI {
             } else if (path == "firearmsForPed") {
                 string pedName = Helper.GetRequestBodyAsString(req);
                 var firearms = Database.LoadFirearmsByOwner(pedName);
+                if (firearms != null && firearms.Count > 0)
+                    Database.TouchFirearmRecordsByOwner(pedName);
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(firearms));
                 status = 200;
                 contentType = "text/json";
             } else if (path == "firearmBySerial") {
                 string serial = Helper.GetRequestBodyAsString(req);
                 var firearm = Database.LoadFirearmBySerial(serial);
+                if (firearm != null && !string.IsNullOrWhiteSpace(firearm.OwnerPedName))
+                    Database.TouchFirearmRecordsByOwner(firearm.OwnerPedName);
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(firearm ?? new object()));
                 status = 200;
                 contentType = "text/json";

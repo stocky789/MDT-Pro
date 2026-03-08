@@ -1227,6 +1227,8 @@ namespace MDTPro.Data {
             if (ped == null || !ped.IsValid() || !Main.usePR) return;
             try {
                 string ownerName = (GetPedDataForPed(ped)?.Name ?? LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped)?.FullName)?.Trim();
+                if (string.IsNullOrWhiteSpace(ownerName))
+                    ownerName = source.Contains("Dead") ? "Unknown (unidentified body)" : "Unknown";
                 if (string.IsNullOrWhiteSpace(ownerName)) return;
 
                 Type searchApiType = Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined")
@@ -1287,13 +1289,14 @@ namespace MDTPro.Data {
                     bool isStolen = false;
                     string description = null;
                     string serial = null;
+                    bool isSerialScratched = false;
 
                     foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
                         try {
                             object val = prop.GetValue(item);
-                            if (val == null) continue;
                             string name = prop.Name;
                             if (name == "WeaponModelHash" || name == "ModelHash") {
+                                if (val == null) continue;
                                 if (val is int i) hash = unchecked((uint)i);
                                 else if (val is uint u) hash = u;
                                 else if (val is long l) hash = unchecked((uint)l);
@@ -1305,14 +1308,26 @@ namespace MDTPro.Data {
                                 else { try { isStolen = Convert.ToBoolean(val); } catch { } }
                             } else if (name == "Value" || name == "Description") description = val?.ToString();
                             else if (name == "SerialNumber") serial = val?.ToString();
+                            else if ((name == "State" || name == "FirearmState" || name == "SerialState") && val != null) {
+                                string stateStr = val.ToString();
+                                int stateInt = -1;
+                                if (int.TryParse(stateStr, out int si)) stateInt = si;
+                                if (string.Equals(stateStr, "ScratchedSN", StringComparison.OrdinalIgnoreCase) || stateInt == 1) {
+                                    isSerialScratched = true;
+                                    serial = null;
+                                }
+                            }
                         } catch { /* skip bad props */ }
                     }
                     if (hash == 0u) continue;
+
+                    if (isSerialScratched) serial = null;
 
                     string displayName = GetWeaponDisplayNameFromHash(hash) ?? description ?? modelId;
 
                     records.Add(new FirearmRecord {
                         SerialNumber = string.IsNullOrWhiteSpace(serial) ? null : serial.Trim(),
+                        IsSerialScratched = isSerialScratched,
                         OwnerPedName = ownerName.Trim(),
                         WeaponModelId = modelId,
                         WeaponDisplayName = displayName,
@@ -1326,7 +1341,7 @@ namespace MDTPro.Data {
                 }
 
                 if (records.Count > 0 || drugRecords.Count > 0) {
-                    if (!ped.IsValid()) return;
+                    if (!ped.Exists()) return;
                     if (records.Count > 0) Database.SaveFirearmRecords(records);
                     if (drugRecords.Count > 0) Database.SaveDrugRecords(drugRecords);
                 }
@@ -1339,10 +1354,16 @@ namespace MDTPro.Data {
         internal static void TryCaptureVehicleSearches() {
             if (!Main.usePR) return;
             try {
+                MethodInfo getHasSearched = null;
                 Type searchApiType = Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined")
                     ?? Type.GetType("PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined");
-                if (searchApiType == null) return;
-                MethodInfo getHasSearched = searchApiType.GetMethod("GetHasVehicleBeenSearched", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(Rage.Vehicle) }, null);
+                if (searchApiType != null)
+                    getHasSearched = searchApiType.GetMethod("GetHasVehicleBeenSearched", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(Rage.Vehicle) }, null);
+                if (getHasSearched == null) {
+                    Type vehicleApiType = Type.GetType("PolicingRedefined.API.VehicleAPI, PolicingRedefined");
+                    if (vehicleApiType != null)
+                        getHasSearched = vehicleApiType.GetMethod("GetHasVehicleBeenSearched", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(Rage.Vehicle) }, null);
+                }
                 if (getHasSearched == null) return;
 
                 List<MDTProVehicleData> vehiclesToCheck;
@@ -1379,12 +1400,14 @@ namespace MDTPro.Data {
             }
         }
 
-        /// <summary>Uses PR SearchItemsAPI.GetVehicleSearchItems to capture items and persist to vehicle_search_records.</summary>
+        /// <summary>Uses PR SearchItemsAPI.GetVehicleSearchItems to capture items and persist to vehicle_search_records. Also creates firearm_records for Weapon/FirearmItems so they appear in Firearms Check.</summary>
         internal static void CaptureVehicleSearchItems(Vehicle vehicle) {
             if (vehicle == null || !vehicle.Exists() || !Main.usePR) return;
             try {
                 string plate = vehicle.LicensePlate?.Trim();
                 if (string.IsNullOrEmpty(plate)) return;
+
+                string ownerForFirearms = GetVehicleDriverNameForFirearmOwner(vehicle, plate);
 
                 Type searchApiType = Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined")
                     ?? Type.GetType("PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined");
@@ -1398,6 +1421,7 @@ namespace MDTPro.Data {
                 if (list == null) return;
 
                 var records = new List<VehicleSearchRecord>();
+                var firearmRecords = new List<FirearmRecord>();
                 string now = DateTime.UtcNow.ToString("o");
 
                 foreach (object item in list) {
@@ -1409,6 +1433,9 @@ namespace MDTPro.Data {
                     string description = null;
                     uint weaponHash = 0u;
                     string weaponModelId = null;
+                    string serial = null;
+                    bool isStolen = false;
+                    bool isSerialScratched = false;
 
                     if (t.Name.Contains("DrugItem") || t.Name.Contains("Drug")) {
                         itemType = "Drug";
@@ -1427,11 +1454,35 @@ namespace MDTPro.Data {
                             try {
                                 object val = prop.GetValue(item);
                                 if (val == null) continue;
-                                if (prop.Name == "WeaponModelHash" || prop.Name == "ModelHash") weaponHash = Convert.ToUInt32(val);
-                                else if (prop.Name == "WeaponModelId" || prop.Name == "ModelId") weaponModelId = val?.ToString();
-                                else if (prop.Name == "Value" || prop.Name == "Description") description = val?.ToString();
-                                else if (prop.Name == "Location") itemLocation = val?.ToString();
+                                string pn = prop.Name;
+                                if (pn == "WeaponModelHash" || pn == "ModelHash") weaponHash = Convert.ToUInt32(val);
+                                else if (pn == "WeaponModelId" || pn == "ModelId") weaponModelId = val?.ToString();
+                                else if (pn == "Value" || pn == "Description") description = val?.ToString();
+                                else if (pn == "Location") itemLocation = val?.ToString();
+                                else if (pn == "SerialNumber") serial = val?.ToString();
+                                else if (pn == "IsStolen") { try { isStolen = Convert.ToBoolean(val); } catch { } }
+                                else if ((pn == "State" || pn == "FirearmState" || pn == "SerialState") && val != null) {
+                                    string stateStr = val.ToString();
+                                    if (string.Equals(stateStr, "ScratchedSN", StringComparison.OrdinalIgnoreCase) || (int.TryParse(stateStr, out int si) && si == 1))
+                                        isSerialScratched = true;
+                                }
                             } catch { }
+                        }
+                        if (weaponHash != 0u && ownerForFirearms != null) {
+                            string displayName = GetWeaponDisplayNameFromHash(weaponHash) ?? description ?? weaponModelId;
+                            firearmRecords.Add(new FirearmRecord {
+                                SerialNumber = isSerialScratched ? null : (string.IsNullOrWhiteSpace(serial) ? null : serial.Trim()),
+                                IsSerialScratched = isSerialScratched,
+                                OwnerPedName = ownerForFirearms,
+                                WeaponModelId = weaponModelId,
+                                WeaponDisplayName = displayName,
+                                WeaponModelHash = weaponHash,
+                                IsStolen = isStolen,
+                                Description = description,
+                                Source = "Vehicle search",
+                                FirstSeenAt = now,
+                                LastSeenAt = now
+                            });
                         }
                     } else {
                         foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
@@ -1458,9 +1509,24 @@ namespace MDTPro.Data {
                 }
                 if (records.Count > 0)
                     Database.SaveVehicleSearchRecords(records);
+                if (firearmRecords.Count > 0)
+                    Database.SaveFirearmRecords(firearmRecords);
             } catch (Exception e) {
                 Helper.Log($"CaptureVehicleSearchItems failed: {e.Message}", false, Helper.LogSeverity.Warning);
             }
+        }
+
+        /// <summary>Resolves driver name for firearm owner when firearm is found in vehicle. Returns driver full name, or "[Vehicle: PLATE]" if driver unknown.</summary>
+        private static string GetVehicleDriverNameForFirearmOwner(Vehicle vehicle, string plate) {
+            if (vehicle == null || !vehicle.Exists() || string.IsNullOrEmpty(plate)) return null;
+            try {
+                Ped driver = vehicle.Driver;
+                if (driver != null && driver.IsValid()) {
+                    string name = (GetPedDataForPed(driver)?.Name ?? LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(driver)?.FullName)?.Trim();
+                    if (!string.IsNullOrWhiteSpace(name)) return name;
+                }
+            } catch { }
+            return $"[Vehicle: {plate}]";
         }
 
         /// <summary>Gets in-game weapon display name from hash (matches what player sees). Uses GET_WEAPON_NAME_FROM_HASH + GetLabelText. Runs on game thread.</summary>
@@ -1812,10 +1878,15 @@ namespace MDTPro.Data {
         }
 
         /// <summary>Force-resolve a pending court case now (run trial/verdict logic immediately). Returns true if the case was found and was pending.</summary>
-        internal static bool ForceResolveCourtCase(string caseNumber) {
+        /// <param name="caseNumber">Court case number.</param>
+        /// <param name="plea">Optional plea to apply before resolving (e.g. from UI selection).</param>
+        /// <param name="outcomeNotes">Optional outcome notes to apply before resolving.</param>
+        internal static bool ForceResolveCourtCase(string caseNumber, string plea = null, string outcomeNotes = null) {
             if (string.IsNullOrWhiteSpace(caseNumber)) return false;
             CourtData courtCase = courtDatabase.Find(x => x.Number == caseNumber);
             if (courtCase == null || courtCase.Status != 0) return false;
+            if (!string.IsNullOrWhiteSpace(plea)) courtCase.Plea = plea;
+            if (outcomeNotes != null) courtCase.OutcomeNotes = outcomeNotes;
             ResolveCaseAuto(courtCase);
             return true;
         }

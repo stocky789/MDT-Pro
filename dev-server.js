@@ -99,6 +99,11 @@ const mockLanguage = {
   customization: {
     save: 'Save',
     reset: 'Reset',
+    revert: 'Revert',
+    revertTooltip: 'Discard unsaved changes and reload from server',
+    searchPlaceholder: 'Filter settings…',
+    saveSuccess: 'Config saved. Refreshing…',
+    saveError: 'Failed to save.',
     static: { title: 'Customization', sidebar: { plugins: 'Plugins', config: 'Config' } },
     plugins: { version: 'Version', author: 'Author', noPlugins: 'No plugins installed.' },
   },

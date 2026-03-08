@@ -163,14 +163,14 @@ namespace MDTPro.ServerAPI {
                     status = 404;
                 }
             } else if (path == "forceResolveCourtCase") {
-                var data = JsonConvert.DeserializeAnonymousType(body, new { Number = "" });
+                var data = JsonConvert.DeserializeAnonymousType(body, new { Number = "", Plea = "", OutcomeNotes = "" });
                 if (data == null || string.IsNullOrWhiteSpace(data.Number)) {
                     buffer = Encoding.UTF8.GetBytes("Bad Request");
                     contentType = "text/plain";
                     status = 400;
                     return;
                 }
-                if (DataController.ForceResolveCourtCase(data.Number)) {
+                if (DataController.ForceResolveCourtCase(data.Number, data.Plea, data.OutcomeNotes)) {
                     buffer = Encoding.UTF8.GetBytes("OK");
                     contentType = "text/plain";
                     status = 200;

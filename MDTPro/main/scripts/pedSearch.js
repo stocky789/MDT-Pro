@@ -402,11 +402,12 @@ async function performSearch(query) {
     for (const firearm of firearmsResponse) {
       const el = document.createElement('div')
       el.classList.add('clickable')
-      el.addEventListener('click', () =>
-        openFirearmsSearch(firearm.SerialNumber || firearm.OwnerPedName || response.Name)
-      )
+      el.addEventListener('click', () => {
+        const lookupKey = firearm.IsSerialScratched ? (firearm.OwnerPedName || response.Name) : (firearm.SerialNumber || firearm.OwnerPedName || response.Name)
+        openFirearmsSearch(lookupKey)
+      })
       const label = document.createElement('label')
-      label.textContent = firearm.SerialNumber || 'N/A'
+      label.textContent = firearm.IsSerialScratched ? 'Scratched' : (firearm.SerialNumber || 'N/A')
       const input = document.createElement('input')
       input.type = 'text'
       input.disabled = true

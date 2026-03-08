@@ -462,10 +462,45 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   currentStatusLabel.style.borderColor = `var(--color-${courtStatusColorMap[courtCase.Status] || 'info'})`
   statusWrapper.appendChild(currentStatusLabel)
 
-  // Only show Dismiss and Force Resolve when case is still pending
+  // Only show Save, Dismiss and Force Resolve when case is still pending
   if (courtCase.Status === 0) {
     const statusButtonWrapper = document.createElement('div')
     statusButtonWrapper.classList.add('buttonWrapper')
+
+    const saveCaseBtn = document.createElement('button')
+    saveCaseBtn.className = 'saveCaseBtn'
+    saveCaseBtn.innerText = language.court.saveCase || 'Save Plea & Notes'
+    saveCaseBtn.addEventListener('click', async function () {
+      if (saveCaseBtn.classList.contains('loading')) return
+      showLoadingOnButton(saveCaseBtn)
+      const response = await (
+        await fetch('/post/updateCourtCaseStatus', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            Number: courtCase.Number,
+            Status: 0,
+            Plea: pleaSelect.value,
+            IsJuryTrial: courtCase.IsJuryTrial,
+            JurySize: courtCase.JurySize,
+            JuryVotesForConviction: courtCase.JuryVotesForConviction,
+            JuryVotesForAcquittal: courtCase.JuryVotesForAcquittal,
+            HasPublicDefender: courtCase.HasPublicDefender,
+            OutcomeNotes: notesInput.value,
+            OutcomeReasoning: courtCase.OutcomeReasoning || '',
+          }),
+        })
+      ).text()
+      if (response === 'OK') {
+        courtCase.Plea = pleaSelect.value
+        courtCase.OutcomeNotes = notesInput.value
+        topWindow.showNotification(language.court.saveCaseSuccess || 'Case updated.', 'success')
+      } else {
+        topWindow.showNotification(language.court.saveCaseError || 'Failed to save case.', 'error')
+      }
+      hideLoadingOnButton(saveCaseBtn)
+    })
+    statusButtonWrapper.appendChild(saveCaseBtn)
 
     const forceResolveBtn = document.createElement('button')
     forceResolveBtn.className = 'forceResolveBtn'
@@ -479,7 +514,11 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
         const res = await fetch('/post/forceResolveCourtCase', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ Number: courtCase.Number }),
+          body: JSON.stringify({
+            Number: courtCase.Number,
+            Plea: pleaSelect.value,
+            OutcomeNotes: notesInput.value,
+          }),
         })
         responseText = await res.text()
       } catch (_) {
