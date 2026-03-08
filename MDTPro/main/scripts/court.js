@@ -454,6 +454,23 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   reasoningWrapper.appendChild(reasoningInput)
   if (courtCase.Status !== 0) inputWrapper.appendChild(reasoningWrapper)
 
+  if (courtCase.Status === 1 && courtCase.LicenseRevocations && courtCase.LicenseRevocations.length > 0) {
+    const revocationsWrapper = document.createElement('div')
+    revocationsWrapper.classList.add('courtNotes', 'licenseRevocations')
+    revocationsWrapper.appendChild(
+      createLabel(language.court.licenseRevocations || 'License Revocations Ordered')
+    )
+    const revocationsList = document.createElement('ul')
+    revocationsList.classList.add('licenseRevocationsList')
+    courtCase.LicenseRevocations.forEach((r) => {
+      const li = document.createElement('li')
+      li.textContent = r
+      revocationsList.appendChild(li)
+    })
+    revocationsWrapper.appendChild(revocationsList)
+    inputWrapper.appendChild(revocationsWrapper)
+  }
+
   const statusWrapper = document.createElement('div')
   statusWrapper.classList.add('courtStatusWrapper')
   statusWrapper.appendChild(createLabel(language.court.status || 'Status'))

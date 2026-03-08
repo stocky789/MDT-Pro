@@ -39,6 +39,16 @@ namespace MDTPro.ServerAPI {
                     status = 200;
                     contentType = "text/css";
                 }
+            } else if (pathArr[1] == "image") {
+                string imgName = pathArr[2];
+                if (string.IsNullOrEmpty(imgName)) return;
+                if (!imgName.EndsWith(".png") && !imgName.EndsWith(".jpg") && !imgName.EndsWith(".svg")) imgName += ".png";
+                string imgPath = $"{PluginsPath}/{pathArr[0]}/images/{imgName}";
+                if (File.Exists(imgPath)) {
+                    buffer = File.ReadAllBytes(imgPath);
+                    status = 200;
+                    contentType = imgName.EndsWith(".svg") ? "image/svg+xml" : (imgName.EndsWith(".jpg") ? "image/jpeg" : "image/png");
+                }
             }
         }
     }

@@ -387,25 +387,53 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>Sync MDT ped data to CDF so PR and other mods see correct license/permits. MDT SQLite is source of truth for court-ordered revocations.</summary>
         internal static void SyncPedDatabaseWithCDF() {
             foreach (MDTProPedData databasePed in PedDatabase) {
-                if (databasePed == null || databasePed.CDFPedData == null) continue;
-                try {
-                    databasePed.CDFPedData.Wanted = databasePed.IsWanted;
-                    databasePed.CDFPedData.IsOnProbation = databasePed.IsOnProbation;
-                    databasePed.CDFPedData.IsOnParole = databasePed.IsOnParole;
-                    databasePed.CDFPedData.Citations = databasePed.Citations?.Count ?? 0;
-                    databasePed.CDFPedData.TimesStopped = databasePed.TimesStopped;
-                    if (!string.IsNullOrEmpty(databasePed.LicenseStatus) && Enum.TryParse(databasePed.LicenseStatus, true, out ELicenseState licenseStatusValue)) {
-                        databasePed.CDFPedData.DriversLicenseState = licenseStatusValue;
-                    }
-                    try { databasePed.CDFPedData.AdvisoryText = databasePed.AdvisoryText ?? ""; } catch { }
-                    if (!string.IsNullOrEmpty(databasePed.LicenseExpiration) && DateTime.TryParse(databasePed.LicenseExpiration, out DateTime licenseExp)) {
-                        try { databasePed.CDFPedData.DriversLicenseExpiration = licenseExp; } catch { }
-                    }
-                } catch (Exception ex) {
-                    Helper.Log($"SyncPedDatabaseWithCDF skip ped: {ex.Message}", false, Helper.LogSeverity.Warning);
+                SyncSinglePedToCDF(databasePed);
+            }
+        }
+
+        /// <summary>Push a single ped's MDT data to CDF (DriversLicense, WeaponPermit, FishingPermit, etc.). Ensures CDF/PR reflect our persisted revocations.</summary>
+        private static void SyncSinglePedToCDF(MDTProPedData databasePed) {
+            if (databasePed == null || databasePed.CDFPedData == null) return;
+            try {
+                databasePed.CDFPedData.Wanted = databasePed.IsWanted;
+                databasePed.CDFPedData.IsOnProbation = databasePed.IsOnProbation;
+                databasePed.CDFPedData.IsOnParole = databasePed.IsOnParole;
+                databasePed.CDFPedData.Citations = databasePed.Citations?.Count ?? 0;
+                databasePed.CDFPedData.TimesStopped = databasePed.TimesStopped;
+                try { databasePed.CDFPedData.AdvisoryText = databasePed.AdvisoryText ?? ""; } catch { }
+
+                if (!string.IsNullOrEmpty(databasePed.LicenseStatus) && Enum.TryParse(databasePed.LicenseStatus, true, out ELicenseState licenseStatusValue)) {
+                    databasePed.CDFPedData.DriversLicenseState = licenseStatusValue;
                 }
+                if (!string.IsNullOrEmpty(databasePed.LicenseExpiration) && DateTime.TryParse(databasePed.LicenseExpiration, out DateTime licenseExp)) {
+                    try { databasePed.CDFPedData.DriversLicenseExpiration = licenseExp; } catch { }
+                }
+
+                if (databasePed.CDFPedData.WeaponPermit != null && !string.IsNullOrEmpty(databasePed.WeaponPermitStatus) && Enum.TryParse(databasePed.WeaponPermitStatus, true, out EDocumentStatus weaponStatus)) {
+                    try { databasePed.CDFPedData.WeaponPermit.Status = weaponStatus; } catch { }
+                }
+                if (databasePed.CDFPedData.WeaponPermit != null && !string.IsNullOrEmpty(databasePed.WeaponPermitExpiration) && DateTime.TryParse(databasePed.WeaponPermitExpiration, out DateTime weaponExp)) {
+                    try { databasePed.CDFPedData.WeaponPermit.ExpirationDate = weaponExp; } catch { }
+                }
+
+                if (databasePed.CDFPedData.FishingPermit != null && !string.IsNullOrEmpty(databasePed.FishingPermitStatus) && Enum.TryParse(databasePed.FishingPermitStatus, true, out EDocumentStatus fishingStatus)) {
+                    try { databasePed.CDFPedData.FishingPermit.Status = fishingStatus; } catch { }
+                }
+                if (databasePed.CDFPedData.FishingPermit != null && !string.IsNullOrEmpty(databasePed.FishingPermitExpiration) && DateTime.TryParse(databasePed.FishingPermitExpiration, out DateTime fishingExp)) {
+                    try { databasePed.CDFPedData.FishingPermit.ExpirationDate = fishingExp; } catch { }
+                }
+
+                if (databasePed.CDFPedData.HuntingPermit != null && !string.IsNullOrEmpty(databasePed.HuntingPermitStatus) && Enum.TryParse(databasePed.HuntingPermitStatus, true, out EDocumentStatus huntingStatus)) {
+                    try { databasePed.CDFPedData.HuntingPermit.Status = huntingStatus; } catch { }
+                }
+                if (databasePed.CDFPedData.HuntingPermit != null && !string.IsNullOrEmpty(databasePed.HuntingPermitExpiration) && DateTime.TryParse(databasePed.HuntingPermitExpiration, out DateTime huntingExp)) {
+                    try { databasePed.CDFPedData.HuntingPermit.ExpirationDate = huntingExp; } catch { }
+                }
+            } catch (Exception ex) {
+                Helper.Log($"SyncSinglePedToCDF skip ped: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
         }
 
@@ -888,6 +916,7 @@ namespace MDTPro.Data {
                 currentPedData.CDFPedData.Citations = currentPedData.Citations?.Count ?? 0;
                 currentPedData.CDFPedData.TimesStopped = currentPedData.TimesStopped;
                 currentPedData.TrySyncCDFPersonaToPersistentIdentity();
+                SyncSinglePedToCDF(currentPedData);
             }
 
             KeepPedInDatabase(currentPedData);
@@ -1067,6 +1096,119 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>Computes license revocations based on California law. Driver's license: canRevokeLicense charges. Firearms: felonies (lifetime), domestic violence/protective order (lifetime), violent misdemeanors (10 years). Fishing: wildlife violations only.</summary>
+        private static List<string> ComputeLicenseRevocations(CourtData courtData) {
+            var revocations = new List<string>();
+            if (courtData?.Charges == null || courtData.Charges.Count == 0) return revocations;
+
+            var arrestOptions = SetupController.GetArrestOptions();
+            var chargeLookup = new Dictionary<string, ArrestGroup.Charge>(StringComparer.OrdinalIgnoreCase);
+            if (arrestOptions != null) {
+                foreach (var group in arrestOptions) {
+                    if (group?.charges == null) continue;
+                    foreach (var c in group.charges) {
+                        if (!string.IsNullOrEmpty(c?.name)) chargeLookup[c.name] = c;
+                    }
+                }
+            }
+
+            bool driversLicenseRevoked = false;
+            bool firearmsRevoked = false;
+            string firearmsDuration = null; // "Lifetime" or "10 years"
+            bool fishingRevoked = false;
+
+            foreach (CourtData.Charge charge in courtData.Charges) {
+                if (string.IsNullOrEmpty(charge.Name)) continue;
+                string name = charge.Name.Trim();
+
+                // Driver's license: use canRevokeLicense from arrest options (CA: DUI, reckless driving, hit-and-run, evading, etc.)
+                if (!driversLicenseRevoked && chargeLookup.TryGetValue(name, out var arrestCharge) && arrestCharge.canRevokeLicense) {
+                    driversLicenseRevoked = true;
+                }
+
+                // Firearms: California PC 29805, 26202 — felonies = lifetime; domestic violence / protective order = lifetime; violent misdemeanors = 10 years
+                if (!firearmsRevoked) {
+                    bool isFelony = IsFelonyChargeName(name);
+                    bool isDomesticViolence = name.IndexOf("Domestic Violence", StringComparison.OrdinalIgnoreCase) >= 0
+                        || name.IndexOf("Violation Of Protective Order", StringComparison.OrdinalIgnoreCase) >= 0
+                        || name.IndexOf("Corporal Injury", StringComparison.OrdinalIgnoreCase) >= 0;
+                    bool isViolentMisdemeanor = IsViolentMisdemeanorChargeName(name);
+
+                    if (isFelony || isDomesticViolence) {
+                        firearmsRevoked = true;
+                        firearmsDuration = "Lifetime";
+                    } else if (isViolentMisdemeanor && firearmsDuration != "Lifetime") {
+                        firearmsRevoked = true;
+                        firearmsDuration = "10 years";
+                    }
+                }
+
+                // Fishing: only for fish/wildlife code violations (poaching, illegal take, etc.)
+                if (!fishingRevoked && (name.IndexOf("Fish", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("Wildlife", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("Poach", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("Game", StringComparison.OrdinalIgnoreCase) >= 0 && name.IndexOf("Grand Theft", StringComparison.OrdinalIgnoreCase) < 0)) {
+                    fishingRevoked = true;
+                }
+            }
+
+            if (driversLicenseRevoked) revocations.Add("Driver's License Revoked");
+            if (firearmsRevoked) revocations.Add(string.IsNullOrEmpty(firearmsDuration) ? "Firearms Permit Revoked" : $"Firearms Permit Revoked ({firearmsDuration})");
+            if (fishingRevoked) revocations.Add("Sport Fishing Privileges Revoked");
+
+            return revocations;
+        }
+
+        private static bool IsFelonyChargeName(string name) {
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.ToLowerInvariant();
+            // Felony categories from arrest options
+            return n.Contains("felony ") || n.Contains("murder") || n.Contains("manslaughter") || n.Contains("rape")
+                || n.Contains("kidnapping") || n.Contains("robbery") || n.Contains("carjacking") || n.Contains("home invasion")
+                || n.Contains("first degree burglary") || n.Contains("attempted murder") || n.Contains("mayhem")
+                || n.Contains("arson") || n.Contains("explosive") || n.Contains("possession of firearm by felon")
+                || n.Contains("assault weapon") || n.Contains("machine gun") || n.Contains("short-barreled")
+                || n.Contains("discharging firearm at inhabited") || n.Contains("trafficking") || n.Contains("manufacturing meth")
+                || n.Contains("for sale") || n.Contains("transport of meth") || n.Contains("aggravated kidnapping")
+                || n.Contains("dui causing") || n.Contains("hit and run causing") || n.Contains("street racing causing")
+                || n.Contains("felony reckless evading") || n.Contains("grand theft auto") || n.Contains("possession of stolen vehicle")
+                || n.Contains("assault with deadly weapon (firearm)") || n.Contains("altering or removing firearm serial");
+        }
+
+        private static bool IsViolentMisdemeanorChargeName(string name) {
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.ToLowerInvariant();
+            return n.Contains("brandishing") || n.Contains("simple assault") || n.Contains("aggravated assault")
+                || n.Contains("assault with deadly weapon") || n.Contains("simple battery") || n.Contains("battery on")
+                || n.Contains("battery causing") || n.Contains("battery with deadly") || n.Contains("malicious wounding")
+                || n.Contains("sexual battery") || n.Contains("assault on peace officer") || n.Contains("assault on firefighter")
+                || n.Contains("criminal threats") || n.Contains("negligent discharge") || n.Contains("shooting from vehicle")
+                || n.Contains("domestic violence") || n.Contains("corporal injury") || n.Contains("violation of protective order");
+        }
+
+        /// <summary>Applies court-ordered license revocations to ped data. Sets LicenseStatus, WeaponPermitStatus, FishingPermitStatus when applicable.</summary>
+        private static void ApplyLicenseRevocationsToPed(MDTProPedData pedData, List<string> revocations) {
+            if (pedData == null || revocations == null || revocations.Count == 0) return;
+            foreach (string r in revocations) {
+                if (r?.IndexOf("Driver", StringComparison.OrdinalIgnoreCase) >= 0) {
+                    pedData.LicenseStatus = "Revoked";
+                    break;
+                }
+            }
+            foreach (string r in revocations) {
+                if (r?.IndexOf("Firearm", StringComparison.OrdinalIgnoreCase) >= 0) {
+                    pedData.WeaponPermitStatus = "Revoked";
+                    break;
+                }
+            }
+            foreach (string r in revocations) {
+                if (r?.IndexOf("Fishing", StringComparison.OrdinalIgnoreCase) >= 0) {
+                    pedData.FishingPermitStatus = "Revoked";
+                    break;
+                }
+            }
+        }
+
         internal static bool UpdateCourtCaseOutcome(
             string number,
             int status,
@@ -1099,6 +1241,15 @@ namespace MDTPro.Data {
 
                     if (status == 1) {
                         UpdatePedIncarcerationFromCourtData(pedData, courtCase);
+                        courtCase.LicenseRevocations = ComputeLicenseRevocations(courtCase);
+                        ApplyLicenseRevocationsToPed(pedData, courtCase.LicenseRevocations);
+                        SyncSinglePedToCDF(pedData);
+                        if (courtCase.LicenseRevocations.Count > 0) {
+                            string revocationText = "The court further ordered: " + string.Join("; ", courtCase.LicenseRevocations) + ".";
+                            courtCase.OutcomeReasoning = string.IsNullOrEmpty(courtCase.OutcomeReasoning)
+                                ? revocationText
+                                : courtCase.OutcomeReasoning.TrimEnd('.', ' ') + ". " + revocationText;
+                        }
                         pedData.IsOnProbation = true;
                         pedData.IsWanted = false;
                     } else if (status == 2 || status == 3) {
@@ -1903,6 +2054,12 @@ namespace MDTPro.Data {
 
                 courtCase.Status = newStatus;
                 courtCase.OutcomeReasoning = BuildOutcomeReasoning(courtCase, courtCase.ConvictionChance, newStatus);
+                if (newStatus == 1) {
+                    courtCase.LicenseRevocations = ComputeLicenseRevocations(courtCase);
+                    if (courtCase.LicenseRevocations.Count > 0) {
+                        courtCase.OutcomeReasoning += " The court further ordered: " + string.Join("; ", courtCase.LicenseRevocations) + ".";
+                    }
+                }
                 courtCase.LastUpdatedUtc = DateTime.UtcNow.ToString("o");
 
                 if (!string.IsNullOrEmpty(courtCase.PedName)) {
@@ -1920,6 +2077,8 @@ namespace MDTPro.Data {
                         Config config = SetupController.GetConfig();
                         if (newStatus == 1) {
                             UpdatePedIncarcerationFromCourtData(pedData, courtCase, config);
+                            ApplyLicenseRevocationsToPed(pedData, courtCase.LicenseRevocations);
+                            SyncSinglePedToCDF(pedData);
                         }
                         pedData.IsWanted = false;
                         KeepPedInDatabase(pedData);
