@@ -61,6 +61,7 @@ namespace MDTPro.EventListeners {
 
                 SubscribeToOnFootTrafficStopStarted();
                 SubscribeToOnFootTrafficStopEnded();
+                SubscribeToOptionalWeaponFirearmEvents(eventsApiType);
                 subscribed = true;
             } catch (Exception e) {
                 Game.LogTrivial($"MDT Pro: [Warning] Failed to subscribe to PR events: {e.Message}");
@@ -78,6 +79,27 @@ namespace MDTPro.EventListeners {
                 eventInfo.AddEventHandler(null, handler);
             } catch (Exception e) {
                 Game.LogTrivial($"MDT Pro: [Warning] Failed to subscribe to PR OnFootTrafficStopStarted: {e.Message}");
+            }
+        }
+
+        /// <summary>Tries to subscribe to PR weapon/firearm check events if they exist (e.g. OnRequestWeaponCheck, OnWeaponRanThroughDispatch).</summary>
+        private static void SubscribeToOptionalWeaponFirearmEvents(Type eventsApiType) {
+            if (eventsApiType == null) return;
+            try {
+                string[] candidates = { "OnRequestWeaponCheck", "OnWeaponRanThroughDispatch", "OnFirearmCheckComplete", "OnWeaponCheckComplete", "OnRequestFirearmCheck", "OnFirearmRanThroughDispatch" };
+                foreach (string name in candidates) {
+                    EventInfo evt = eventsApiType.GetEvent(name, BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase);
+                    if (evt == null) continue;
+                    try {
+                        Delegate handler = CreateForwardingDelegate(evt.EventHandlerType, name);
+                        evt.AddEventHandler(null, handler);
+                        Game.LogTrivial($"[MDTPro] Subscribed to PR event: {name}");
+                    } catch (Exception ex) {
+                        Game.LogTrivial($"[MDTPro] Could not subscribe to {name}: {ex.Message}");
+                    }
+                }
+            } catch (Exception ex) {
+                Game.LogTrivial($"[MDTPro] Optional weapon event subscription failed: {ex.Message}");
             }
         }
 
@@ -124,7 +146,39 @@ namespace MDTPro.EventListeners {
 
             if (vehicleDispatchEventNames.Contains(eventName) && args[0] is Vehicle dispatchVehicle) {
                 DataController.ResolveVehicleAndDriverForStop(dispatchVehicle);
+                try {
+                    if (dispatchVehicle != null && dispatchVehicle.Exists())
+                        DataController.CaptureVehicleSearchItems(dispatchVehicle);
+                } catch (Exception ex) {
+                    Game.LogTrivial($"MDT Pro: [Warning] OnVehicleRanThroughDispatch capture: {ex.Message}");
+                }
                 return;
+            }
+
+            // OnPedRanThroughDispatch: when dispatch returns ped info (may include warrant/firearm results). Refresh wanted status from CDF so MDT Person Search shows warrants; capture firearms for Firearms Check.
+            if (eventName == "OnPedRanThroughDispatch" && args.Length >= 1 && args[0] is Ped dispatchPed) {
+                try {
+                    if (dispatchPed != null && dispatchPed.IsValid()) {
+                        DataController.RefreshPedWantedStatusFromCDF(dispatchPed);
+                        DataController.CaptureFirearmsFromPed(dispatchPed, "Firearm check (dispatch)");
+                    }
+                } catch (Exception ex) {
+                    Game.LogTrivial($"MDT Pro: [Warning] OnPedRanThroughDispatch capture: {ex.Message}");
+                }
+            }
+
+            // Optional weapon/firearm check events: if PR fires these, capture from the ped in args so firearm shows in MDT.
+            if ((eventName.Contains("Weapon") || eventName.Contains("Firearm")) && args != null) {
+                foreach (object arg in args) {
+                    if (arg is Ped wpnPed && wpnPed.IsValid()) {
+                        try {
+                            DataController.CaptureFirearmsFromPed(wpnPed, "Firearm check");
+                            break;
+                        } catch (Exception ex) {
+                            Game.LogTrivial($"MDT Pro: [Warning] {eventName} firearm capture: {ex.Message}");
+                        }
+                    }
+                }
             }
 
             if (eventName == "OnFootTrafficStopStarted" && args.Length > 0) {

@@ -25,28 +25,36 @@ namespace MDTPro.Utility {
             var chargesList = charges.ToList();
             if (chargesList.Count == 0) return;
 
-            // Lookup on caller thread (often HTTP); we only need ped handle for deferral.
+            // Lookup ped handle: Holder from ped data, or recently identified cache (e.g. when DB entry was loaded from file with no Holder).
+            Rage.PoolHandle? pedHandle = null;
             MDTProPedData pedData = DataController.GetPedDataByName(pedName);
-            if (pedData == null) {
-                string msg = SetupController.GetLanguage().inGame.handCitationPersonNotFound;
-                if (!string.IsNullOrWhiteSpace(msg)) RageNotification.Show(string.Format(msg, pedName), RageNotification.NotificationType.Info);
-                return;
+            if (pedData != null) {
+                Ped holder = pedData.Holder;
+                if (holder != null && holder.IsValid())
+                    pedHandle = holder.Handle;
             }
-            Ped holder = pedData.Holder;
-            if (holder == null || !holder.IsValid()) {
-                string msg = SetupController.GetLanguage().inGame.handCitationPersonNotPresent;
-                if (!string.IsNullOrWhiteSpace(msg)) RageNotification.Show(msg, RageNotification.NotificationType.Info);
+            if (!pedHandle.HasValue)
+                pedHandle = DataController.GetRecentlyIdentifiedPedHandle(pedName);
+
+            if (!pedHandle.HasValue) {
+                if (pedData == null) {
+                    string msg = SetupController.GetLanguage().inGame.handCitationPersonNotFound;
+                    if (!string.IsNullOrWhiteSpace(msg)) RageNotification.Show(string.Format(msg, pedName), RageNotification.NotificationType.Info);
+                } else {
+                    string msg = SetupController.GetLanguage().inGame.handCitationPersonNotPresent;
+                    if (!string.IsNullOrWhiteSpace(msg)) RageNotification.Show(msg, RageNotification.NotificationType.Info);
+                }
                 return;
             }
 
-            var pedHandle = holder.Handle;
+            var handleToUse = pedHandle.Value;
             string name = pedName;
 
             // PR API must run on game thread. Citation handout and ped menu are game-thread-only.
             if (GameFiber.CanSleepNow) {
-                GiveCitationOnGameThread(pedHandle, name, chargesList);
+                GiveCitationOnGameThread(handleToUse, name, chargesList);
             } else {
-                GameFiber.StartNew(() => GiveCitationOnGameThread(pedHandle, name, chargesList));
+                GameFiber.StartNew(() => GiveCitationOnGameThread(handleToUse, name, chargesList));
             }
         }
 
@@ -62,12 +70,14 @@ namespace MDTPro.Utility {
             }
 
             try {
-                // PR may require ped to be marked as stopped for the hand-citation menu option to be enabled.
+                // PR requires ped to be marked as stopped for the hand-citation menu option to be enabled. See PR Ped Detainment API.
                 var pedApiType = System.Type.GetType("PolicingRedefined.API.PedAPI, PolicingRedefined");
                 if (pedApiType != null) {
                     var setStopped = pedApiType.GetMethod("SetPedAsStopped", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
                     setStopped?.Invoke(null, new object[] { ped });
                 }
+                // Give PR a frame to process SetPedAsStopped before we add citations.
+                GameFiber.Yield();
             } catch {
                 // Ignore if SetPedAsStopped not available or fails
             }

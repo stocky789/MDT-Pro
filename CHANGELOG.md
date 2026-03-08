@@ -2,6 +2,7 @@
 
 ## [0.9.3.0] — 2026-03-07
 
+- **Fixed: Wanted status in Person Search** — Wanted status from PR dispatch now syncs to MDT (refresh on `OnPedRanThroughDispatch` and re-encounter). Clears correctly on arrest report and court resolution; synced to CDF so MDT and PR stay aligned.
 - **Fixed: Court plea type reverting** — Plea selection (Guilty/Not Guilty/No Contest) was not being saved for pending cases. Added a "Save Plea & Notes" button so changes persist when closing the window. Force Resolve now also sends the current plea and outcome notes from the UI, so the selected plea is used when resolving.
 - **Clarification: Calendar and bundled plugins** — Calendar, Vehicle Search, and other bundled plugins only appear in the sidebar when enabled in Config → Plugins. If they were not visible, they were disabled—not missing due to a bug.
 - **New: Firearms Check** — New page to search firearms by serial number or owner name. Uses data from pat-downs and dead-body searches (Policing Redefined `GetPedSearchItems`).

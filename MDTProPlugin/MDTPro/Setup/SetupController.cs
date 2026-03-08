@@ -87,6 +87,7 @@ namespace MDTPro.Setup {
                     DataController.SetDatabases();
                     DataController.CheckAndResolvePendingCases();
                     DataController.TryCaptureVehicleSearches();
+                    DataController.TryCapturePickupAndPlayerFirearms();
                     GameFiber.Wait(GetConfig().databaseUpdateInterval);
                 }
             }, "data-update-interval");
