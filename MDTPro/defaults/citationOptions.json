@@ -441,6 +441,72 @@
     ]
   },
   {
+    "name": "Stolen Possession",
+    "charges": [
+      {
+        "name": "Possession Of Stolen Vehicle",
+        "minFine": 1000,
+        "maxFine": 5000,
+        "canRevokeLicense": true,
+        "isArrestable": true
+      },
+      {
+        "name": "Possession Of Stolen Drivers License",
+        "minFine": 500,
+        "maxFine": 1000,
+        "canRevokeLicense": true,
+        "isArrestable": true
+      },
+      {
+        "name": "Possession Of Stolen License Plate",
+        "minFine": 500,
+        "maxFine": 1000,
+        "canRevokeLicense": true,
+        "isArrestable": true
+      },
+      {
+        "name": "VIN Tampering / Altered Or Defaced VIN",
+        "minFine": 500,
+        "maxFine": 1000,
+        "canRevokeLicense": false,
+        "isArrestable": true
+      },
+      {
+        "name": "Possession Of Stolen Debit / Credit Card",
+        "minFine": 500,
+        "maxFine": 2000,
+        "canRevokeLicense": false,
+        "isArrestable": true
+      },
+      {
+        "name": "Possession Of Stolen Property",
+        "minFine": 250,
+        "maxFine": 1000,
+        "canRevokeLicense": false,
+        "isArrestable": true
+      }
+    ]
+  },
+  {
+    "name": "Evading / Pursuit",
+    "charges": [
+      {
+        "name": "Evading Peace Officer",
+        "minFine": 1000,
+        "maxFine": 10000,
+        "canRevokeLicense": true,
+        "isArrestable": true
+      },
+      {
+        "name": "Reckless Evading Peace Officer",
+        "minFine": 1000,
+        "maxFine": 10000,
+        "canRevokeLicense": true,
+        "isArrestable": true
+      }
+    ]
+  },
+  {
     "name": "Other / Public Citations",
     "charges": [
       {

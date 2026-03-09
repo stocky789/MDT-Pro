@@ -37,6 +37,7 @@ namespace MDTPro.Data {
         public bool EvidenceIllegalWeapon = false;
         public bool EvidenceViolatedSupervision = false;
         public bool EvidenceResisted = false;
+        public bool EvidenceHadDrugs = false;
         public int RepeatOffenderScore = 0;
         public int ConvictionChance = 0;
         public string ResolveAtUtc;
@@ -58,6 +59,8 @@ namespace MDTPro.Data {
         public string LastUpdatedUtc;
         public string OutcomeNotes;
         public string OutcomeReasoning;
+        /// <summary>License revocations ordered by the court upon conviction (e.g. "Driver's License Revoked", "Firearms Permit Revoked (10 years)"). Based on California law.</summary>
+        public List<string> LicenseRevocations = new List<string>();
         public List<Charge> Charges = new List<Charge>();
 
         public class Charge {

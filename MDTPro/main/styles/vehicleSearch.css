@@ -59,3 +59,57 @@ body {
   padding: 5px;
   background-color: var(--color-border);
 }
+
+.boloSection {
+  margin: 0 10px 16px;
+}
+
+.boloSection .boloTitle {
+  margin-bottom: 6px;
+}
+
+.boloHint {
+  font-size: 12px;
+  color: var(--color-text-primary-half);
+  margin-bottom: 8px;
+}
+
+.boloList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.boloRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+
+.boloRow .boloInfo {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.boloRemoveBtn {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+.boloAddBtn {
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+.boloAddBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
