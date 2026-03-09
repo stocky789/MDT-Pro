@@ -492,8 +492,8 @@
     "charges": [
       {
         "name": "Evading Peace Officer",
-        "minFine": 500,
-        "maxFine": 1000,
+        "minFine": 1000,
+        "maxFine": 10000,
         "canRevokeLicense": true,
         "isArrestable": true
       },

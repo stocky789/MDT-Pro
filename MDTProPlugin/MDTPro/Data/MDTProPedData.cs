@@ -170,32 +170,33 @@ namespace MDTPro.Data {
             public string Timestamp;
         }
 
+        /// <summary>Apply persistent (SQLite) identity onto current ped. For string/identity fields, only overwrite when source has a value so we do not replace good CDF/current data with nulls from an old DB record.</summary>
         internal void ApplyPersistentIdentity(MDTProPedData source) {
             if (source == null) return;
 
             Name = source.Name;
-            FirstName = source.FirstName;
-            LastName = source.LastName;
-            Birthday = source.Birthday;
-            Gender = source.Gender;
-            Address = source.Address;
+            if (!string.IsNullOrEmpty(source.FirstName)) FirstName = source.FirstName;
+            if (!string.IsNullOrEmpty(source.LastName)) LastName = source.LastName;
+            if (!string.IsNullOrEmpty(source.Birthday)) Birthday = source.Birthday;
+            if (!string.IsNullOrEmpty(source.Gender)) Gender = source.Gender;
+            if (!string.IsNullOrEmpty(source.Address)) Address = source.Address;
             IsInGang = source.IsInGang;
-            AdvisoryText = source.AdvisoryText;
+            if (!string.IsNullOrEmpty(source.AdvisoryText)) AdvisoryText = source.AdvisoryText;
             TimesStopped = source.TimesStopped;
             IsWanted = source.IsWanted;
             WarrantText = source.WarrantText;
             IsOnProbation = source.IsOnProbation;
             IsOnParole = source.IsOnParole;
-            LicenseStatus = source.LicenseStatus;
-            LicenseExpiration = source.LicenseExpiration;
-            WeaponPermitStatus = source.WeaponPermitStatus;
-            WeaponPermitExpiration = source.WeaponPermitExpiration;
-            WeaponPermitType = source.WeaponPermitType;
-            FishingPermitStatus = source.FishingPermitStatus;
-            FishingPermitExpiration = source.FishingPermitExpiration;
-            HuntingPermitStatus = source.HuntingPermitStatus;
-            HuntingPermitExpiration = source.HuntingPermitExpiration;
-            IncarceratedUntil = source.IncarceratedUntil;
+            if (!string.IsNullOrEmpty(source.LicenseStatus)) LicenseStatus = source.LicenseStatus;
+            if (!string.IsNullOrEmpty(source.LicenseExpiration)) LicenseExpiration = source.LicenseExpiration;
+            if (!string.IsNullOrEmpty(source.WeaponPermitStatus)) WeaponPermitStatus = source.WeaponPermitStatus;
+            if (!string.IsNullOrEmpty(source.WeaponPermitExpiration)) WeaponPermitExpiration = source.WeaponPermitExpiration;
+            if (!string.IsNullOrEmpty(source.WeaponPermitType)) WeaponPermitType = source.WeaponPermitType;
+            if (!string.IsNullOrEmpty(source.FishingPermitStatus)) FishingPermitStatus = source.FishingPermitStatus;
+            if (!string.IsNullOrEmpty(source.FishingPermitExpiration)) FishingPermitExpiration = source.FishingPermitExpiration;
+            if (!string.IsNullOrEmpty(source.HuntingPermitStatus)) HuntingPermitStatus = source.HuntingPermitStatus;
+            if (!string.IsNullOrEmpty(source.HuntingPermitExpiration)) HuntingPermitExpiration = source.HuntingPermitExpiration;
+            if (!string.IsNullOrEmpty(source.IncarceratedUntil)) IncarceratedUntil = source.IncarceratedUntil;
 
             Citations = source.Citations?
                 .Select(charge => new CitationGroup.Charge {

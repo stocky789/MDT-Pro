@@ -32,6 +32,7 @@
         --color-surface-elevated: #262626;
         --color-surface-card: #141414;
         --color-accent: #ffffff;
+        --color-on-accent: #0d0d0d;
         --color-accent-dimmed: #ffffffbf;
         --color-accent-half: #ffffff66;
         --color-accent-glow: #ffffff22;
