@@ -1383,8 +1383,12 @@ namespace MDTPro.Data {
                 MDTProPedData dbPed = GetPedDataForPed(ped);
                 // Use both LSPDFR persona and MDT ped data: MDT is authoritative for warrants (IsWanted/WarrantText)
                 bool wasWanted = persona.Wanted || (dbPed != null && (dbPed.IsWanted || !string.IsNullOrWhiteSpace(dbPed.WarrantText)));
-                bool wasDrunk = NativeFunction.Natives.IS_PED_DRUNK<bool>(ped);
-                bool wasFleeing = NativeFunction.Natives.IS_PED_FLEEING<bool>(ped);
+                // IS_PED_DRUNK rarely set by game; fallback to TASK_MOTION_DRUNK (1160)
+                bool wasDrunk = NativeFunction.Natives.IS_PED_DRUNK<bool>(ped)
+                    || IsPedTaskActive(ped, 1160); // TASK_MOTION_DRUNK
+                // IS_PED_FLEEING only true at exact moment; also check flee-related task indices
+                bool wasFleeing = NativeFunction.Natives.IS_PED_FLEEING<bool>(ped)
+                    || IsPedFleeingTaskActive(ped);
 
                 // clearAfterRead: false so we don't clear damage state on first check (improves reliability)
                 Ped[] nearbyPeds = ped.GetNearbyPeds(50);
@@ -1446,6 +1450,25 @@ namespace MDTPro.Data {
             } catch (Exception e) {
                 Helper.Log($"Evidence capture failed: {e.Message}", false, Helper.LogSeverity.Warning);
             }
+        }
+
+        /// <summary>Returns true if the given task index is active on the ped. Uses GET_IS_TASK_ACTIVE.</summary>
+        private static bool IsPedTaskActive(Ped ped, int taskIndex) {
+            if (ped == null || !ped.IsValid()) return false;
+            try {
+                return NativeFunction.Natives.GET_IS_TASK_ACTIVE<bool>(ped, taskIndex);
+            } catch { return false; }
+        }
+
+        /// <summary>Returns true if the ped has any flee-related task active (chase-then-stop often misses IS_PED_FLEEING).</summary>
+        private static bool IsPedFleeingTaskActive(Ped ped) {
+            if (ped == null || !ped.IsValid()) return false;
+            // Task indices from eTaskTypes: SHOCKING_EVENT_FLEE 330, REACT_TO_PURSUIT 495, LEAVE_CAR_AND_FLEE 601,
+            // EXHAUSTED_FLEE 869, SCENARIO_FLEE 877, SMART_FLEE 881, REACT_AND_FLEE 1814, VEHICLE_FLEE 1941
+            int[] fleeTasks = { 330, 495, 601, 869, 877, 881, 1814, 1941 };
+            foreach (int idx in fleeTasks)
+                if (IsPedTaskActive(ped, idx)) return true;
+            return false;
         }
 
         internal static void MarkPedFleeing(Ped ped) {

@@ -275,6 +275,7 @@ namespace MDTPro.EventListeners {
                 DataController.ResolvePedForReEncounter(ped);
                 if (eventName == "OnPedArrested") DataController.CaptureEvidenceForPed(ped);
                 else if (eventName == "OnPedPatDown") DataController.MarkPedPatDown(ped);
+                else if (eventName == "OnPedSurrendered") DataController.MarkPedFleeing(ped);
                 else if (identificationEventTypes.TryGetValue(eventName, out string idType)) DataController.AddIdentificationEvent(ped, idType);
                 return;
             }
@@ -291,6 +292,7 @@ namespace MDTPro.EventListeners {
                         DataController.ResolvePedForReEncounter(nestedPed);
                         if (eventName == "OnPedArrested") DataController.CaptureEvidenceForPed(nestedPed);
                         else if (eventName == "OnPedPatDown") DataController.MarkPedPatDown(nestedPed);
+                        else if (eventName == "OnPedSurrendered") DataController.MarkPedFleeing(nestedPed);
                         else if (identificationEventTypes.TryGetValue(eventName, out string idType)) DataController.AddIdentificationEvent(nestedPed, idType);
                     }
                 } catch {

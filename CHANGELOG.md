@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.9.5.0] — 2026-03-09
+
+### Minor Features
+
+- **Court evidence: WasFleeing** — Fleeing detection improved. `OnPedSurrendered` now marks the ped as fleeing (surrendering implies prior flight). `GET_IS_TASK_ACTIVE` fallback added for flee-related tasks (e.g. TASK_REACT_TO_PURSUIT, TASK_SMART_FLEE, TASK_VEHICLE_FLEE) so chase-then-stop scenarios are captured even when `IS_PED_FLEEING` is no longer true at arrest.
+- **Court evidence: WasDrunk** — `IS_PED_DRUNK` rarely set by the game; fallback to `TASK_MOTION_DRUNK` (task index 1160) so drunk movement/animations are detected for court evidence.
+- **ALPR range** — Scan range doubled (25 m → 50 m); read range doubled (20 m → 40 m) for better plate detection at distance.
+- **In-game notifications** — Switched from LS Customs icon to police icon (CHAR_CALL_POLICE) for update checker, web address, and other MDT Pro notifications.
+- **Web favicon** — MDT Pro logo now used as the browser tab favicon.
+
 ## [0.9.3.0] — 2026-03-07
 
 ### Major Features
