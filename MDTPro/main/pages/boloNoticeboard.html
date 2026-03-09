@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title data-language="title">BOLO Noticeboard</title>
+    <link rel="stylesheet" href="/style/root.css" />
+    <link rel="stylesheet" href="/style/boloNoticeboard.css" />
+  </head>
+  <body>
+    <div class="boloNoticeboardHeader">
+      <h1 class="boloNoticeboardTitle" data-language="title">BOLO Noticeboard</h1>
+      <p class="boloNoticeboardSubtitle" data-language="subtitle">Be On the Look-Out — vehicles to watch for</p>
+      <button type="button" class="boloRefreshBtn" data-language="refresh">Refresh</button>
+    </div>
+    <div class="boloListWrapper">
+      <div class="boloEmpty hidden" data-language="noBolos">No active BOLOs. Add BOLOs from Vehicle Search when a vehicle is nearby.</div>
+      <div class="boloCardList"></div>
+    </div>
+  </body>
+  <script src="/script/root.js"></script>
+  <script src="/script/boloNoticeboard.js"></script>
+</html>

@@ -6,6 +6,7 @@ namespace MDTPro.Setup {
         public Index index = new Index();
         public PedSearch pedSearch = new PedSearch();
         public VehicleSearch vehicleSearch = new VehicleSearch();
+        public BoloNoticeboard boloNoticeboard = new BoloNoticeboard();
         public FirearmsSearch firearmsSearch = new FirearmsSearch();
         public Values values = new Values();
         public Reports reports = new Reports();
@@ -57,6 +58,7 @@ namespace MDTPro.Setup {
                 public class Desktop {
                     public string pedSearch = "Person Search";
                     public string vehicleSearch = "Vehicle Search";
+                    public string boloNoticeboard = "BOLOs";
                     public string firearmsSearch = "Firearms Check";
                     public string reports = "Reports";
                     public string shiftHistory = "Shift History";
@@ -267,6 +269,19 @@ namespace MDTPro.Setup {
                 public string reportedStolen = "is in the stolen vehicle database";
                 public string boloAdded = "BOLO added.";
                 public string boloRemoved = "BOLO removed.";
+            }
+        }
+
+        public class BoloNoticeboard {
+            public Static @static = new Static();
+            public string stolenBadge = "STOLEN";
+            public string viewInVehicleSearch = "View in Vehicle Search";
+            public string expires = "Expires";
+            public class Static {
+                public string title = "BOLO Noticeboard";
+                public string subtitle = "Be On the Look-Out — vehicles to watch for";
+                public string refresh = "Refresh";
+                public string noBolos = "No active BOLOs. Add BOLOs from Vehicle Search when a vehicle is nearby.";
             }
         }
 

@@ -186,7 +186,9 @@ namespace MDTPro.ServerAPI {
                 contentType = "text/plain";
                 status = 200;
             } else if (path == "updateConfig") {
-                Config config = JsonConvert.DeserializeObject<Config>(body);
+                // Merge body onto current config so keys not sent by the UI (e.g. alprSettingsVersion) are preserved.
+                Config config = SetupController.GetConfig();
+                JsonConvert.PopulateObject(body, config);
 
                 Helper.WriteToJsonFile(SetupController.ConfigPath, config);
 

@@ -140,24 +140,6 @@ const CONFIG_SECTIONS = [
       'githubReleasesRepo',
     ],
   },
-  {
-    title: 'ALPR (License Plate Scanner)',
-    keys: [
-      'alprEnabled',
-      'alprPopupDuration',
-      'alprScanIntervalMs',
-      'alprScanRangeMeters',
-      'alprReadRangeMeters',
-      'alprConeAngleDegrees',
-      'alprCooldownSeconds',
-      'alprPlaySoundOnHit',
-      'alprShowInGameNotification',
-      'alprHudAnchor',
-      'alprHudOffsetX',
-      'alprHudOffsetY',
-      'alprHudScale',
-    ],
-  },
 ]
 
 const PRESET_CUSTOM = { label: 'Custom...', value: '__custom__' }
@@ -499,107 +481,6 @@ const CONFIG_FIELD_META = {
   githubReleasesRepo: {
     label: 'GitHub repo for updates',
     tooltip: 'Repository in "owner/repo" format (e.g. stocky789/MDT-Pro). Leave empty to skip update checks.',
-  },
-  alprEnabled: {
-    label: 'Enable ALPR (license plate scanner)',
-    tooltip: 'Enable automatic license plate scanning when in a police cruiser and on duty. Scans for stolen, expired, and wanted vehicles.',
-  },
-  alprPopupDuration: {
-    label: 'ALPR popup auto-close (seconds)',
-    tooltip: 'Seconds until the ALPR hit popup in the MDT closes automatically. 0 = no auto-close (stays until dismissed).',
-    presets: [
-      { label: 'No auto-close (0)', value: 0 },
-      { label: '5 seconds', value: 5 },
-      { label: '10 seconds', value: 10 },
-      { label: '15 seconds', value: 15 },
-      PRESET_CUSTOM,
-    ],
-  },
-  alprScanIntervalMs: {
-    label: 'ALPR scan interval (ms)',
-    tooltip: 'Milliseconds between ALPR scans. Minimum 1500 ms enforced in-game to avoid FPS impact. Higher = less CPU.',
-    presets: [
-      { label: '1500 ms (min)', value: 1500 },
-      { label: '2000 ms (default)', value: 2000 },
-      { label: '3000 ms', value: 3000 },
-      { label: '5000 ms', value: 5000 },
-      PRESET_CUSTOM,
-    ],
-  },
-  alprScanRangeMeters: {
-    label: 'ALPR scan range (meters)',
-    tooltip: 'Maximum distance in meters to consider vehicles for scanning. Real mobile ALPR is typically 20–25 m.',
-    presets: [
-      { label: '18 m', value: 18 },
-      { label: '20 m', value: 20 },
-      { label: '25 m (default)', value: 25 },
-      { label: '30 m', value: 30 },
-      PRESET_CUSTOM,
-    ],
-  },
-  alprReadRangeMeters: {
-    label: 'ALPR read range (meters)',
-    tooltip: 'Only plates within this range (and in the cone) are read. Real systems use ~15–25 m (50–75 ft).',
-    presets: [
-      { label: '15 m', value: 15 },
-      { label: '20 m (default)', value: 20 },
-      { label: '25 m', value: 25 },
-      { label: '30 m', value: 30 },
-      PRESET_CUSTOM,
-    ],
-  },
-  alprConeAngleDegrees: {
-    label: 'ALPR cone angle (degrees)',
-    tooltip: 'Half-angle of the scan cone in front of your cruiser. Real LPR cameras use narrow FOV (~15–25°) for reliable plate capture.',
-  },
-  alprCooldownSeconds: {
-    label: 'ALPR per-plate cooldown (seconds)',
-    tooltip: 'Seconds before the same plate can trigger another alert. Reduces spam for vehicles you drive behind for a while.',
-    presets: [
-      { label: '30 seconds', value: 30 },
-      { label: '60 seconds', value: 60 },
-      { label: '90 seconds (default)', value: 90 },
-      { label: '120 seconds', value: 120 },
-      PRESET_CUSTOM,
-    ],
-  },
-  alprPlaySoundOnHit: {
-    label: 'Play sound on ALPR hit',
-    tooltip: 'Play an audio alert when ALPR flags a vehicle (stolen, expired, wanted).',
-  },
-  alprShowInGameNotification: {
-    label: 'Show in-game popup on ALPR hit',
-    tooltip: 'Show a GTA-style notification when ALPR flags a vehicle. If disabled, only the ALPR HUD panel in the MDT is updated.',
-  },
-  alprHudAnchor: {
-    label: 'ALPR HUD position',
-    tooltip: 'Where the in-game ALPR HUD is anchored: TopLeft, TopRight, BottomLeft, or BottomRight.',
-    presets: [
-      { label: 'Top Right (default)', value: 'TopRight' },
-      { label: 'Top Left', value: 'TopLeft' },
-      { label: 'Bottom Right', value: 'BottomRight' },
-      { label: 'Bottom Left', value: 'BottomLeft' },
-      PRESET_CUSTOM,
-    ],
-  },
-  alprHudOffsetX: {
-    label: 'ALPR HUD offset X (px)',
-    tooltip: 'Horizontal offset in pixels from the HUD anchor.',
-  },
-  alprHudOffsetY: {
-    label: 'ALPR HUD offset Y (px)',
-    tooltip: 'Vertical offset in pixels from the HUD anchor.',
-  },
-  alprHudScale: {
-    label: 'ALPR HUD scale',
-    tooltip: 'Scale factor for the ALPR HUD size. 1.0 = default; range 0.75–2.0.',
-    presets: [
-      { label: '0.75 (small)', value: 0.75 },
-      { label: '1.0 (default)', value: 1.0 },
-      { label: '1.25', value: 1.25 },
-      { label: '1.5', value: 1.5 },
-      PRESET_CUSTOM,
-    ],
   },
 }
 

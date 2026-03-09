@@ -12,6 +12,7 @@ using static MDTPro.Utility.Helper;
 namespace MDTPro.ALPR {
     /// <summary>
     /// Coordinates ALPR scanning, flag detection, and broadcasting to HUD/WebSocket.
+    /// Scan/read range, cone, interval, and cooldown are hardcoded to realistic values; only enable and HUD position are in config.
     /// </summary>
     internal static class ALPRController {
         private static GameFiber _scanFiber;
@@ -23,8 +24,16 @@ namespace MDTPro.ALPR {
         /// <summary>Reused each scan to avoid per-frame allocations (scan fiber only).</summary>
         private static readonly List<(Vehicle vehicle, float distance)> InConeAndRangeBuffer = new List<(Vehicle, float)>(16);
 
+        private const int ScanIntervalMs = 2000;
+        private const int CooldownSeconds = 90;
+        private const float ScanRangeMeters = 25f;
+        private const float ReadRangeMeters = 20f;
+        private const float ConeAngleDegrees = 22f;
+
         internal static ALPRHit CurrentHit { get; private set; }
         internal static bool IsRunning { get; private set; }
+        /// <summary>Cached by the scan loop so the HUD can read it from RawFrameRender without calling natives.</summary>
+        internal static bool IsInPoliceVehicleCached { get; private set; }
 
         private static readonly object StartLock = new object();
 
@@ -49,6 +58,7 @@ namespace MDTPro.ALPR {
 
         internal static void Stop() {
             IsRunning = false;
+            IsInPoliceVehicleCached = false;
             _scanFiber?.Abort();
             _scanFiber = null;
             ALPRHUD.Stop();
@@ -82,14 +92,12 @@ namespace MDTPro.ALPR {
                         GameFiber.Sleep(1000);
                         continue;
                     }
-                    // Minimum 1500 ms between scans to avoid FPS impact (max ~0.67 scans/sec)
-                    intervalMs = Math.Max(1500, Math.Min(10000, cfg.alprScanIntervalMs));
-                    int cooldownSec = Math.Max(10, Math.Min(300, cfg.alprCooldownSeconds));
-                    // Cap vehicles for ALPR; use slightly higher limit than general nearby so we don't miss the car in front
+                    intervalMs = ScanIntervalMs;
+                    int cooldownSec = CooldownSeconds;
                     int maxVehicles = Math.Min(16, Math.Max(5, cfg.maxNumberOfNearbyPedsOrVehicles + 2));
-                    float scanRangeMeters = Math.Max(15f, Math.Min(100f, cfg.alprScanRangeMeters));
-                    float readRangeMeters = Math.Max(10f, Math.Min(50f, cfg.alprReadRangeMeters));
-                    float coneAngleDeg = Math.Max(15f, Math.Min(90f, cfg.alprConeAngleDegrees));
+                    float scanRangeMeters = ScanRangeMeters;
+                    float readRangeMeters = ReadRangeMeters;
+                    float coneAngleDeg = ConeAngleDegrees;
 
                     // ALPR only works when: (1) enabled in settings, (2) on duty (Start/Stop in Main), (3) in police vehicle
                     if (Main.Player == null || !Main.Player.Exists()) {
@@ -101,6 +109,7 @@ namespace MDTPro.ALPR {
 
                     Vehicle playerVehicle = Main.Player.CurrentVehicle;
                     bool inPoliceVehicle = playerVehicle != null && playerVehicle.Exists() && playerVehicle.IsPoliceVehicle;
+                    IsInPoliceVehicleCached = inPoliceVehicle;
                     if (!inPoliceVehicle) {
                         CurrentHit = null;
                         _currentHitHoldUntilUtc = DateTime.MinValue;
@@ -183,6 +192,8 @@ namespace MDTPro.ALPR {
                             if (string.IsNullOrEmpty(modelDisplayName))
                                 modelDisplayName = GetModelDisplayName(toScan);
 
+                            string vehicleColor = GetVehicleColorDisplay(vd, dbVehicle);
+
                             bool shouldAlert;
                             lock (Lock) {
                                 shouldAlert = !AlertedPlates.Contains(plateKey);
@@ -196,17 +207,20 @@ namespace MDTPro.ALPR {
                                 Plate = vd.LicensePlate ?? plate,
                                 Owner = owner,
                                 ModelDisplayName = modelDisplayName,
+                                VehicleColor = vehicleColor,
                                 Flags = flags,
                                 TimeScanned = DateTime.Now
                             };
 
-                            if (ShouldReplaceDisplayedHit(hit)) {
+                            // Only show full vehicle info when there is at least one alert flag (stolen, no insurance, etc.). Otherwise HUD shows "Scanning".
+                            if (HasAlertFlags(hit) && ShouldReplaceDisplayedHit(hit)) {
                                 SetDisplayedHit(hit);
+                                if (shouldAlert)
+                                    PlayAlprHitSound();
                             }
                             processed++;
 
                             if (shouldAlert) {
-                                if (cfg.alprPlaySoundOnHit) { /* RPH: no built-in sound */ }
                                 var hitCopy = hit;
                                 System.Threading.ThreadPool.QueueUserWorkItem(_ =>
                                     ServerAPI.WebSocketHandler.BroadcastALPRHit(hitCopy));
@@ -222,6 +236,47 @@ namespace MDTPro.ALPR {
                 loopCount++;
                 GameFiber.Sleep(intervalMs);
             }
+        }
+
+        /// <summary>True if the hit has at least one real alert flag (stolen, no insurance, etc.), not just "Not in database".</summary>
+        private static bool HasAlertFlags(ALPRHit hit) {
+            if (hit?.Flags == null || hit.Flags.Count == 0) return false;
+            foreach (string f in hit.Flags) {
+                if (string.IsNullOrEmpty(f)) continue;
+                if (string.Equals(f.Trim(), "Not in database", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                return true;
+            }
+            return false;
+        }
+
+        private static void PlayAlprHitSound() {
+            try {
+                Rage.Native.NativeFunction.Natives.PLAY_SOUND_FRONTEND(-1, "SELECT", "HUD_FRONTEND_DEFAULT_SOUNDSET", false);
+            } catch {
+                // Ignore if native fails (e.g. different RPH version)
+            }
+        }
+
+        /// <summary>Builds a short color string for the ALPR HUD (e.g. "Black / White") from vehicle or DB data.</summary>
+        private static string GetVehicleColorDisplay(MDTProVehicleData vd, MDTProVehicleData dbVehicle) {
+            string primary = null;
+            string secondary = null;
+            if (vd != null && (vd.PrimaryColor != null || vd.SecondaryColor != null)) {
+                primary = vd.PrimaryColor?.Trim();
+                secondary = vd.SecondaryColor?.Trim();
+            }
+            if ((primary == null || secondary == null) && dbVehicle != null) {
+                if (string.IsNullOrEmpty(primary)) primary = dbVehicle.PrimaryColor?.Trim();
+                if (string.IsNullOrEmpty(secondary)) secondary = dbVehicle.SecondaryColor?.Trim();
+            }
+            if (!string.IsNullOrEmpty(primary) && !string.IsNullOrEmpty(secondary))
+                return primary + " / " + secondary;
+            if (!string.IsNullOrEmpty(primary)) return primary;
+            if (!string.IsNullOrEmpty(secondary)) return secondary;
+            if (vd?.Color != null && !string.IsNullOrWhiteSpace(vd.Color)) return vd.Color.Trim();
+            if (dbVehicle?.Color != null && !string.IsNullOrWhiteSpace(dbVehicle.Color)) return dbVehicle.Color.Trim();
+            return null;
         }
 
         private static List<string> BuildFlags(MDTProVehicleData vd) {

@@ -132,16 +132,35 @@ namespace MDTPro.Setup {
                 var def = new Config();
                 cachedConfig = Helper.ReadFromJsonFile<Config>(ConfigPath) ?? def;
                 EnsureALPRDefaults(cachedConfig, def);
+                EnsureCitationArrestOptionsFromDefaults(cachedConfig, def);
                 Helper.WriteToJsonFile(ConfigPath, cachedConfig);
             }
             return cachedConfig;
         }
 
-        /// <summary>Ensures ALPR config values are sensible. Old configs may have 0/missing values from before ALPR was added.</summary>
+        /// <summary>Ensures ALPR config values are sensible. Only enable, popup duration, and HUD position are in config; tuning is hardcoded.</summary>
         private static void EnsureALPRDefaults(Config cfg, Config def) {
-            if (cfg.alprScanRangeMeters <= 0) cfg.alprScanRangeMeters = def.alprScanRangeMeters;
-            if (cfg.alprReadRangeMeters <= 0) cfg.alprReadRangeMeters = def.alprReadRangeMeters;
-            if (cfg.alprConeAngleDegrees <= 0) cfg.alprConeAngleDegrees = def.alprConeAngleDegrees;
+            if (string.IsNullOrEmpty(cfg.alprHudAnchor)) cfg.alprHudAnchor = def.alprHudAnchor ?? "TopRight";
+        }
+
+        /// <summary>One-time migration: overwrite citation and arrest options from defaults so upgraders get updated charges (no VC/PC/HS in names, Stolen Possession, Evading, etc.). ALPR behavior is already hardcoded; this only updates the charge lists.</summary>
+        private static void EnsureCitationArrestOptionsFromDefaults(Config cfg, Config def) {
+            const int currentCitationArrestOptionsVersion = 2;
+            if (cfg.citationArrestOptionsVersion >= currentCitationArrestOptionsVersion) return;
+            try {
+                if (File.Exists(CitationOptionsDefaultsPath)) {
+                    File.WriteAllBytes(CitationOptionsPath, File.ReadAllBytes(CitationOptionsDefaultsPath));
+                    cachedCitationOptions = null;
+                }
+                if (File.Exists(ArrestOptionsDefaultsPath)) {
+                    File.WriteAllBytes(ArrestOptionsPath, File.ReadAllBytes(ArrestOptionsDefaultsPath));
+                    cachedArrestOptions = null;
+                }
+                cfg.citationArrestOptionsVersion = currentCitationArrestOptionsVersion;
+                Helper.Log("Citation and arrest options updated from defaults (version 2: plain charge names, Stolen Possession, Evading).", true, Helper.LogSeverity.Info);
+            } catch (Exception ex) {
+                Helper.Log($"Could not update citation/arrest options from defaults: {ex.Message}", true, Helper.LogSeverity.Warning);
+            }
         }
 
         internal static void ResetConfig() {

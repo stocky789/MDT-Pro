@@ -86,6 +86,11 @@ namespace MDTPro.ServerAPI {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(vehicleData));
                 contentType = "text/json";
                 status = 200;
+            } else if (path == "activeBolos") {
+                var bolos = DataController.GetActiveBOLOs();
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(bolos));
+                contentType = "text/json";
+                status = 200;
             } else if (path == "officerInformation") {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.OfficerInformation));
                 contentType = "text/json";
