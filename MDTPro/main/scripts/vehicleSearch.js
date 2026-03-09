@@ -263,67 +263,65 @@ async function performSearch(query) {
   boloTitle.innerHTML = language.vehicleSearch?.static?.bolosTitle || 'BOLOs (Be On the Look-Out)'
   boloSection.appendChild(boloTitle)
 
-  if (!canModifyBOLOs && bolos.length === 0) {
+  if (!canModifyBOLOs) {
     const hint = document.createElement('div')
     hint.classList.add('boloHint')
     hint.textContent = language.vehicleSearch?.static?.boloVehicleRequired || 'Vehicle must be nearby to add or remove BOLOs.'
     boloSection.appendChild(hint)
-  } else {
-    if (!canModifyBOLOs && bolos.length > 0) {
-      const hint = document.createElement('div')
-      hint.classList.add('boloHint')
-      hint.textContent = language.vehicleSearch?.static?.boloVehicleRequired || 'Vehicle must be nearby to add or remove BOLOs.'
-      boloSection.appendChild(hint)
-    }
-    if (bolos.length > 0) {
-      const boloList = document.createElement('div')
-      boloList.classList.add('boloList')
-      for (const b of bolos) {
-        const reason = b.Reason || 'Unknown'
-        const issuedBy = b.IssuedBy || ''
-        const exp = b.ExpirationDate || b.ExpiresAt || b.Expires
-        const expStr = exp ? new Date(exp).toLocaleDateString() : '-'
-        const row = document.createElement('div')
-        row.classList.add('boloRow')
-        const info = document.createElement('div')
-        info.classList.add('boloInfo')
-        info.innerHTML = `<strong>${escapeHtml(reason)}</strong>${issuedBy ? ` &mdash; ${escapeHtml(issuedBy)}` : ''} (expires ${escapeHtml(expStr)})`
-        row.appendChild(info)
-        if (canModifyBOLOs) {
-          const removeBtn = document.createElement('button')
-          removeBtn.type = 'button'
-          removeBtn.classList.add('boloRemoveBtn')
-          removeBtn.textContent = language.vehicleSearch?.static?.removeBOLO || 'Remove'
-          removeBtn.addEventListener('click', async () => {
-            removeBtn.disabled = true
-            const res = await (await fetch('/post/removeBOLO', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ LicensePlate: response.LicensePlate, Reason: reason })
-            })).json()
-            if (res && res.success) {
-              topWindow.showNotification(language.vehicleSearch?.notifications?.boloRemoved || 'BOLO removed.', 'checkMark')
-              await performSearch(response.LicensePlate)
-            } else {
-              topWindow.showNotification(res?.error || 'Failed to remove BOLO.', 'warning')
-              removeBtn.disabled = false
-            }
-          })
-          row.appendChild(removeBtn)
-        }
-        boloList.appendChild(row)
-      }
-      boloSection.appendChild(boloList)
-    }
-    if (canModifyBOLOs) {
-      const addBtn = document.createElement('button')
-      addBtn.type = 'button'
-      addBtn.classList.add('boloAddBtn')
-      addBtn.textContent = language.vehicleSearch?.static?.addBOLO || 'Add BOLO'
-      addBtn.addEventListener('click', () => showAddBOLOModal(response, language, performSearch))
-      boloSection.appendChild(addBtn)
-    }
   }
+
+  if (bolos.length > 0) {
+    const boloList = document.createElement('div')
+    boloList.classList.add('boloList')
+    for (const b of bolos) {
+      const reason = b.Reason || 'Unknown'
+      const issuedBy = b.IssuedBy || ''
+      const exp = b.ExpirationDate || b.ExpiresAt || b.Expires
+      const expStr = exp ? new Date(exp).toLocaleDateString() : '-'
+      const row = document.createElement('div')
+      row.classList.add('boloRow')
+      const info = document.createElement('div')
+      info.classList.add('boloInfo')
+      info.innerHTML = `<strong>${escapeHtml(reason)}</strong>${issuedBy ? ` &mdash; ${escapeHtml(issuedBy)}` : ''} (expires ${escapeHtml(expStr)})`
+      row.appendChild(info)
+      if (canModifyBOLOs) {
+        const removeBtn = document.createElement('button')
+        removeBtn.type = 'button'
+        removeBtn.classList.add('boloRemoveBtn')
+        removeBtn.textContent = language.vehicleSearch?.static?.removeBOLO || 'Remove'
+        removeBtn.addEventListener('click', async () => {
+          removeBtn.disabled = true
+          const res = await (await fetch('/post/removeBOLO', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ LicensePlate: response.LicensePlate, Reason: reason })
+          })).json()
+          if (res && res.success) {
+            topWindow.showNotification(language.vehicleSearch?.notifications?.boloRemoved || 'BOLO removed.', 'checkMark')
+            await performSearch(response.LicensePlate)
+          } else {
+            topWindow.showNotification(res?.error || 'Failed to remove BOLO.', 'warning')
+            removeBtn.disabled = false
+          }
+        })
+        row.appendChild(removeBtn)
+      }
+      boloList.appendChild(row)
+    }
+    boloSection.appendChild(boloList)
+  }
+
+  const addBtn = document.createElement('button')
+  addBtn.type = 'button'
+  addBtn.classList.add('boloAddBtn')
+  addBtn.textContent = language.vehicleSearch?.static?.addBOLO || 'Add BOLO'
+  addBtn.disabled = !canModifyBOLOs
+  if (canModifyBOLOs) {
+    addBtn.addEventListener('click', () => showAddBOLOModal(response, language, performSearch))
+  } else {
+    addBtn.title = language.vehicleSearch?.static?.boloVehicleRequired || 'Vehicle must be nearby to add or remove BOLOs.'
+  }
+  boloSection.appendChild(addBtn)
   if (boloPlaceholder) {
     boloPlaceholder.appendChild(boloSection)
   }

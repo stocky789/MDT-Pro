@@ -32,7 +32,7 @@ body {
   font-size: 12px;
   cursor: pointer;
   background: var(--color-accent, #2563eb);
-  color: #fff;
+  color: var(--color-on-accent, #fff);
   border: none;
   border-radius: 4px;
 }

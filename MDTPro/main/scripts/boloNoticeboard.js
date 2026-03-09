@@ -73,7 +73,7 @@
         if (parent && typeof parent.openWindow === 'function') {
           parent.openWindow('vehicleSearch')
         } else {
-          window.open('/page/vehicleSearch.html', '_blank')
+          window.open('/page/vehicleSearch', '_blank')
         }
       })
       actions.appendChild(viewBtn)
