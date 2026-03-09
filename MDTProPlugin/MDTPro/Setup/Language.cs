@@ -6,6 +6,8 @@ namespace MDTPro.Setup {
         public Index index = new Index();
         public PedSearch pedSearch = new PedSearch();
         public VehicleSearch vehicleSearch = new VehicleSearch();
+        public BoloNoticeboard boloNoticeboard = new BoloNoticeboard();
+        public FirearmsSearch firearmsSearch = new FirearmsSearch();
         public Values values = new Values();
         public Reports reports = new Reports();
         public Units units = new Units();
@@ -30,7 +32,10 @@ namespace MDTPro.Setup {
             public string unloaded = "MDT Pro has been shut down.";
             public string listeningOnIpAddress = "MDT Pro is available at: ";
             public string serverFail = "Server failed to start. Restart the game and try again.";
-            public string updateAvailable = "A newer version (v{0}) is available. Download from GitHub releases.";
+            /// <summary>{0} = installed version, {1} = available version from GitHub. Shown when an update is available.</summary>
+            public string updateAvailable = "Installed Version: v{0}~n~Available Version: v{1} - Update Available";
+            /// <summary>{0} = version. Shown when already up to date.</summary>
+            public string updateUpToDate = "Installed Version: v{0}~n~Available Version: v{0} - Up to Date";
             /// <summary>Shown when a closed citation is saved so the officer can hand it to the suspect. {0} = ped full name.</summary>
             public string handCitationTo = "Hand citation to {0}";
             /// <summary>Shown when citation was saved but the person is not in range or was not identified this stop (e.g. vehicle stop / ID check).</summary>
@@ -53,6 +58,8 @@ namespace MDTPro.Setup {
                 public class Desktop {
                     public string pedSearch = "Person Search";
                     public string vehicleSearch = "Vehicle Search";
+                    public string boloNoticeboard = "BOLOs";
+                    public string firearmsSearch = "Firearms Check";
                     public string reports = "Reports";
                     public string shiftHistory = "Shift History";
                     public string court = "Court";
@@ -163,6 +170,9 @@ namespace MDTPro.Setup {
                 public string legalInfoTitle = "Legal Information";
                 public string licensesTitle = "Licenses & Permits";
                 public string historyTitle = "History";
+                public string vehiclesOwnedTitle = "Vehicles Owned";
+                public string registeredFirearmsTitle = "Registered Firearms";
+                public string reportsTitle = "Associated Reports";
                 public Labels labels = new Labels();
 
                 public class Labels {
@@ -197,6 +207,25 @@ namespace MDTPro.Setup {
             }
         }
 
+        public class FirearmsSearch {
+            public Static @static = new Static();
+            public Notifications notifications = new Notifications();
+
+            public class Static {
+                public string title = "Firearms Check";
+                public string search = "Search";
+                public string searchInput = "Serial number or owner name";
+                public string resultTitle = "Result";
+                public string recentIdsTitle = "Recent IDs";
+            }
+
+            public class Notifications {
+                public string emptySearchInput = "Enter serial number or owner name.";
+                public string notFound = "No firearm or owner found.";
+                public string searchError = "Search failed. Please try again.";
+            }
+        }
+
         public class VehicleSearch {
             public Static @static = new Static();
             public Notifications notifications = new Notifications();
@@ -209,6 +238,13 @@ namespace MDTPro.Setup {
                 public string refreshNearby = "Refresh";
                 public string basicInfoTitle = "Basic Information";
                 public string documentsTitle = "Documents";
+                public string bolosTitle = "BOLOs (Be On the Look-Out)";
+                public string boloVehicleRequired = "Vehicle must be nearby to add or remove BOLOs.";
+                public string addBOLO = "Add BOLO";
+                public string removeBOLO = "Remove";
+                public string boloReasonPrompt = "Enter BOLO reason:";
+                public string boloExpiresPrompt = "Expires in how many days? (default 7):";
+                public string searchResultsTitle = "Search Results (Contraband)";
                 public Labels labels = new Labels();
 
                 public class Labels {
@@ -231,6 +267,21 @@ namespace MDTPro.Setup {
                 public string stolen = "WARNING";
                 public string vehicleStolen = "Vehicle";
                 public string reportedStolen = "is in the stolen vehicle database";
+                public string boloAdded = "BOLO added.";
+                public string boloRemoved = "BOLO removed.";
+            }
+        }
+
+        public class BoloNoticeboard {
+            public Static @static = new Static();
+            public string stolenBadge = "STOLEN";
+            public string viewInVehicleSearch = "View in Vehicle Search";
+            public string expires = "Expires";
+            public class Static {
+                public string title = "BOLO Noticeboard";
+                public string subtitle = "Be On the Look-Out — vehicles to watch for";
+                public string refresh = "Refresh";
+                public string noBolos = "No active BOLOs. Add BOLOs from Vehicle Search when a vehicle is nearby.";
             }
         }
 
@@ -247,6 +298,7 @@ namespace MDTPro.Setup {
             public string Unlicensed = "Unlicensed";
             public string None = "None";
             public string CcwPermit = "Carrying a concealed weapon (CCW)";
+            public string CCWPermit = "CCW Permit";
             public string FflPermit = "Federal firearms license (FFL)";
             public string Government = "Government";
             public string LosSantos = "Los Santos";
@@ -447,6 +499,9 @@ namespace MDTPro.Setup {
             public string forceResolve = "Force Resolve";
             public string forceResolveSuccess = "Case resolved.";
             public string forceResolveError = "Could not resolve case.";
+            public string saveCase = "Save Plea & Notes";
+            public string saveCaseSuccess = "Case updated.";
+            public string saveCaseError = "Failed to save case.";
             public string searchPlaceholder = "Search by case #, name, or report";
             public string allStatuses = "All statuses";
             public string[] statusMap = {
@@ -486,6 +541,7 @@ namespace MDTPro.Setup {
             };
             public string outcomeNotes = "Outcome Notes";
             public string outcomeReasoning = "Outcome Reasoning";
+            public string licenseRevocations = "License Revocations Ordered";
             public Static @static = new Static();
 
             public class Static {

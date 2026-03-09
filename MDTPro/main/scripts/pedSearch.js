@@ -238,7 +238,8 @@ async function performSearch(query) {
         )
         break
       case 'Citations':
-      case 'Arrests':
+      case 'Arrests': {
+        const arr = Array.isArray(response[key]) ? response[key] : []
         el.parentElement.classList.add('clickable')
         el.parentElement.onclick = () =>
           openPedAsOffenderInReport(
@@ -246,10 +247,11 @@ async function performSearch(query) {
             response.Name
           )
         el.innerHTML =
-          response[key].length > 0
-            ? response[key].map((item) => `<li>${item.name}</li>`).join('')
+          arr.length > 0
+            ? arr.map((item) => `<li>${item?.name ?? ''}</li>`).join('')
             : await getLanguageValue(null)
         break
+      }
       default:
         el.value = await getLanguageValue(response[key])
         el.style.color = getColorForValue(response[key])
@@ -287,6 +289,45 @@ async function performSearch(query) {
   document.querySelector('.searchResponseWrapper .createArrestBtn').onclick = () =>
     openPedAsOffenderInReport('arrest', response.Name)
 
+  // Drug records for this ped
+  const drugsResponse = await (
+    await fetch('/data/drugsByOwner', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(response.Name ?? ''),
+    })
+  ).json()
+
+  document
+    .querySelectorAll(
+      '.searchResponseWrapper .drugRecordsSection, .searchResponseWrapper .drugRecordsTitle'
+    )
+    .forEach((el) => el?.remove())
+
+  if (drugsResponse && drugsResponse.length > 0) {
+    const sectionTitle = document.createElement('div')
+    sectionTitle.classList.add('searchResponseSectionTitle', 'drugRecordsTitle')
+    sectionTitle.innerHTML =
+      language.pedSearch.static?.drugRecordsTitle || 'Substance History'
+    document.querySelector('.searchResponseWrapper').appendChild(sectionTitle)
+
+    const drugsSection = document.createElement('div')
+    drugsSection.classList.add('inputWrapper', 'grid', 'drugRecordsSection')
+    for (const d of drugsResponse) {
+      const el = document.createElement('div')
+      const label = document.createElement('label')
+      label.textContent = d.DrugType || 'Unknown'
+      const input = document.createElement('input')
+      input.type = 'text'
+      input.disabled = true
+      input.value = `${d.Source || ''} - ${d.Description || ''}`
+      el.appendChild(label)
+      el.appendChild(input)
+      drugsSection.appendChild(el)
+    }
+    document.querySelector('.searchResponseWrapper').appendChild(drugsSection)
+  }
+
   // Vehicles owned by this ped
   const vehiclesResponse = await (
     await fetch('/data/pedVehicles', {
@@ -302,7 +343,7 @@ async function performSearch(query) {
     )
     .forEach((el) => el.remove())
 
-  if (vehiclesResponse.length > 0) {
+  if (vehiclesResponse && vehiclesResponse.length > 0) {
     const sectionTitle = document.createElement('div')
     sectionTitle.classList.add('searchResponseSectionTitle', 'vehiclesOwnedTitle')
     sectionTitle.innerHTML =
@@ -332,6 +373,53 @@ async function performSearch(query) {
     }
   }
 
+  // Registered Firearms (from pat-down / dead body search)
+  const firearmsResponse = await (
+    await fetch('/data/firearmsForPed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(response.Name ?? ''),
+    })
+  ).json()
+
+  document
+    .querySelectorAll(
+      '.searchResponseWrapper .registeredFirearms, .searchResponseWrapper .registeredFirearmsTitle'
+    )
+    .forEach((el) => el.remove())
+
+  if (firearmsResponse && firearmsResponse.length > 0) {
+    const sectionTitle = document.createElement('div')
+    sectionTitle.classList.add('searchResponseSectionTitle', 'registeredFirearmsTitle')
+    sectionTitle.innerHTML =
+      language.pedSearch?.static?.registeredFirearmsTitle || 'Registered Firearms'
+    document.querySelector('.searchResponseWrapper').appendChild(sectionTitle)
+
+    const firearmsSection = document.createElement('div')
+    firearmsSection.classList.add('inputWrapper', 'grid', 'registeredFirearms')
+    document.querySelector('.searchResponseWrapper').appendChild(firearmsSection)
+
+    for (const firearm of firearmsResponse) {
+      const el = document.createElement('div')
+      el.classList.add('clickable')
+      el.addEventListener('click', () => {
+        const lookupKey = firearm.IsSerialScratched ? (firearm.OwnerPedName || response.Name) : (firearm.SerialNumber || firearm.OwnerPedName || response.Name)
+        openFirearmsSearch(lookupKey)
+      })
+      const label = document.createElement('label')
+      label.textContent = firearm.IsSerialScratched ? 'Scratched' : (firearm.SerialNumber || 'N/A')
+      const input = document.createElement('input')
+      input.type = 'text'
+      input.disabled = true
+      const name = firearm.WeaponDisplayName || firearm.Description || firearm.WeaponModelId || `Weapon (${firearm.WeaponModelHash})`
+      input.value = firearm.IsStolen ? `${name} [STOLEN]` : name
+      if (firearm.IsStolen) input.style.color = 'var(--color-error)'
+      el.appendChild(label)
+      el.appendChild(input)
+      firearmsSection.appendChild(el)
+    }
+  }
+
   // Reports involving this ped
   const reportsResponse = await (
     await fetch('/data/pedReports', {
@@ -347,10 +435,10 @@ async function performSearch(query) {
     )
     .forEach((el) => el.remove())
 
-  const totalReports =
-    reportsResponse.citations.length +
-    reportsResponse.arrests.length +
-    reportsResponse.incidents.length
+  const citations = Array.isArray(reportsResponse?.citations) ? reportsResponse.citations : []
+  const arrests = Array.isArray(reportsResponse?.arrests) ? reportsResponse.arrests : []
+  const incidents = Array.isArray(reportsResponse?.incidents) ? reportsResponse.incidents : []
+  const totalReports = citations.length + arrests.length + incidents.length
 
   if (totalReports > 0) {
     const sectionTitle = document.createElement('div')
@@ -364,9 +452,9 @@ async function performSearch(query) {
     document.querySelector('.searchResponseWrapper').appendChild(reportsSection)
 
     const allReports = [
-      ...reportsResponse.citations.map((r) => ({ ...r, type: 'citation' })),
-      ...reportsResponse.arrests.map((r) => ({ ...r, type: 'arrest' })),
-      ...reportsResponse.incidents.map((r) => ({ ...r, type: 'incident' })),
+      ...citations.map((r) => ({ ...r, type: 'citation' })),
+      ...arrests.map((r) => ({ ...r, type: 'arrest' })),
+      ...incidents.map((r) => ({ ...r, type: 'incident' })),
     ].sort((a, b) => new Date(b.TimeStamp) - new Date(a.TimeStamp))
 
     for (const report of allReports) {

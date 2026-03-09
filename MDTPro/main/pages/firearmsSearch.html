@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title data-language="title">Firearms Check</title>
+    <link rel="stylesheet" href="/style/root.css" />
+    <link rel="stylesheet" href="/style/firearmsSearch.css" />
+  </head>
+  <body>
+    <div class="searchInputWrapper">
+      <input
+        type="text"
+        id="firearmsSearchInput"
+        data-language-placeholder="searchInput"
+        placeholder="Serial number or owner name"
+        autocomplete="off"
+      />
+      <button data-language="search">Search</button>
+    </div>
+    <div class="recentOwnersWrapper hidden">
+      <div class="searchResponseSectionTitle" data-language="recentIdsTitle">
+        Recent IDs
+      </div>
+      <div class="recentOwnersList"></div>
+    </div>
+    <div class="searchResponseWrapper hidden">
+      <div class="searchResponseSectionTitle" data-language="resultTitle">
+        Result
+      </div>
+      <div class="firearmsResult"></div>
+    </div>
+  </body>
+  <script src="/script/root.js"></script>
+  <script src="/script/firearmsSearch.js"></script>
+</html>

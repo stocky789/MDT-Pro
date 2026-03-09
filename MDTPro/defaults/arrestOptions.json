@@ -83,7 +83,7 @@
         "canRevokeLicense": true
       },
       {
-        "name": "Evading Peace Officer (VC 2800.1)",
+        "name": "Evading Peace Officer",
         "minFine": 1000,
         "maxFine": 10000,
         "minDays": 0,
@@ -128,7 +128,7 @@
     "name": "Felony Traffic",
     "charges": [
       {
-        "name": "Reckless Evading Peace Officer (VC 2800.2)",
+        "name": "Reckless Evading Peace Officer",
         "minFine": 1000,
         "maxFine": 10000,
         "minDays": 180,
@@ -263,7 +263,7 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Possession Of Firearm With Altered/Removed Serial Number (PC 23920)",
+        "name": "Possession Of Firearm With Altered/Removed Serial Number",
         "minFine": 100,
         "maxFine": 1000,
         "minDays": 0,
@@ -273,7 +273,7 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Possession Of Ammunition By Prohibited Person (PC 30305)",
+        "name": "Possession Of Ammunition By Prohibited Person",
         "minFine": 100,
         "maxFine": 1000,
         "minDays": 0,
@@ -298,7 +298,7 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Discharging Firearm At Inhabited Dwelling (PC 246)",
+        "name": "Discharging Firearm At Inhabited Dwelling",
         "minFine": 1000,
         "maxFine": 10000,
         "minDays": 1080,
@@ -308,7 +308,7 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Possession Of Short-Barreled Rifle Or Shotgun (PC 33215)",
+        "name": "Possession Of Short-Barreled Rifle Or Shotgun",
         "minFine": 1000,
         "maxFine": 10000,
         "minDays": 0,
@@ -328,7 +328,7 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Altering Or Removing Firearm Serial Number (PC 23900)",
+        "name": "Altering Or Removing Firearm Serial Number",
         "minFine": 1000,
         "maxFine": 3000,
         "minDays": 480,
@@ -663,7 +663,7 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Under Influence Of Controlled Substance (HS 11550)",
+        "name": "Under Influence Of Controlled Substance",
         "minFine": 250,
         "maxFine": 1000,
         "minDays": 0,
@@ -683,7 +683,7 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Possession Of Controlled Substance For Sale (HS 11351/11378)",
+        "name": "Possession Of Controlled Substance For Sale",
         "minFine": 1000,
         "maxFine": 20000,
         "minDays": 365,
@@ -693,7 +693,7 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Transport Or Sale Of Methamphetamine (HS 11379)",
+        "name": "Transport Or Sale Of Methamphetamine",
         "minFine": 1000,
         "maxFine": 20000,
         "minDays": 720,
@@ -703,7 +703,7 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Manufacturing Methamphetamine (HS 11379.6)",
+        "name": "Manufacturing Methamphetamine",
         "minFine": 1000,
         "maxFine": 20000,
         "minDays": 1080,
@@ -713,7 +713,7 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Sale Or Transport Of Cannabis (HS 11360)",
+        "name": "Sale Or Transport Of Cannabis",
         "minFine": 500,
         "maxFine": 5000,
         "minDays": 0,
@@ -961,6 +961,16 @@
         "probation": 0.4,
         "canBeWarrant": false,
         "canRevokeLicense": true
+      },
+      {
+        "name": "VIN Tampering / Altered Or Defaced VIN",
+        "minFine": 500,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
       },
       {
         "name": "Possession Of Stolen Debit / Credit Card",

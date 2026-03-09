@@ -55,15 +55,15 @@ namespace MDTPro.ALPR {
 
         internal static void Start() {
             if (_subscribed) return;
-            // Use FrameRender so draw calls are queued with the game's renderer and stay visible
-            // (RawFrameRender draws too early and gets overdrawn by the game HUD)
-            Game.FrameRender += OnFrameRender;
+            // Use RawFrameRender for stable drawing without flicker (FrameRender queues draws and can flicker).
+            // Do not call natives in OnFrameRender; use ALPRController.IsInPoliceVehicleCached and GetConfig() cache only.
+            Game.RawFrameRender += OnFrameRender;
             _subscribed = true;
         }
 
         internal static void Stop() {
             if (!_subscribed) return;
-            Game.FrameRender -= OnFrameRender;
+            Game.RawFrameRender -= OnFrameRender;
             _subscribed = false;
         }
 
@@ -77,7 +77,7 @@ namespace MDTPro.ALPR {
                 }
                 // Only show ALPR HUD when: enabled in settings, on duty (ALPR only runs then), and in police vehicle.
                 if (cfg == null || !cfg.alprEnabled) return;
-                if (!IsPlayerInPoliceVehicle()) return;
+                if (!ALPRController.IsInPoliceVehicleCached) return;
                 DrawPanel(e.Graphics, ALPRController.CurrentHit ?? ScanningDummyHit, cfg);
             } catch (Exception) {
                 // Silently ignore draw errors (e.g. during unload)
@@ -162,12 +162,6 @@ namespace MDTPro.ALPR {
             offsetY = Math.Max(0, Math.Min(400, offsetY));
         }
 
-        private static bool IsPlayerInPoliceVehicle() {
-            if (Main.Player == null || !Main.Player.Exists()) return false;
-            Vehicle v = Main.Player.CurrentVehicle;
-            return v != null && v.Exists() && v.IsPoliceVehicle;
-        }
-
         private static void DrawPanel(Rage.Graphics g, ALPRHit hit, Config cfg) {
             if (hit == null || cfg == null) return;
             float scale = GetEffectiveScale(cfg);
@@ -195,8 +189,9 @@ namespace MDTPro.ALPR {
             Color accentColor = isAlert ? AlertAccentColor : ScanAccentColor;
 
             int extraLines = Math.Max(0, hit.Flags?.Count ?? 0);
-            // plate + owner + vehicle + flags + hold = 4 + extraLines
-            int contentLines = isScanning ? 2 : (4 + extraLines);
+            bool hasColorLine = !isScanning && !string.IsNullOrWhiteSpace(hit.VehicleColor);
+            // plate + owner + vehicle + [color] + flags + hold = 4 + (color?1:0) + extraLines
+            int contentLines = isScanning ? 2 : (4 + (hasColorLine ? 1 : 0) + extraLines);
 
             int actualW = Game.Resolution.Width;
             int actualH = Game.Resolution.Height;
@@ -240,11 +235,12 @@ namespace MDTPro.ALPR {
             g.DrawText(pillText, FontName, fontSizeSmall, new PointF(pillX + 6f * scale, pillY + 1f * scale), accentColor);
 
             // Plate/title line
-            string plateText = isScanning ? "SCANNING" : SafeTrim(hit.Plate, (int)(22 * scale));
-            g.DrawText(string.IsNullOrEmpty(plateText) ? "UNKNOWN" : plateText, FontName, fontSizeTitle, new PointF(contentX, lineY), TextColor);
+            string plateText = isScanning ? "Scanning" : SafeTrim(hit.Plate, (int)(22 * scale));
+            Color plateColor = isScanning ? TextMutedColor : TextColor;
+            g.DrawText(string.IsNullOrEmpty(plateText) ? "UNKNOWN" : plateText, FontName, isScanning ? fontSizeBody : fontSizeTitle, new PointF(contentX, lineY), plateColor);
             lineY += lineHeight;
 
-            // Owner + model/status line
+            // Owner + model + color + flags (or just "Scanning" when idle)
             if (isScanning) {
                 g.DrawText("Monitoring nearby plates", FontName, fontSizeBody, new PointF(contentX, lineY), TextMutedColor);
                 lineY += lineHeight;
@@ -255,6 +251,10 @@ namespace MDTPro.ALPR {
                 lineY += lineHeight;
                 g.DrawText("Vehicle: " + (string.IsNullOrEmpty(model) ? "Unknown" : model), FontName, fontSizeBody, new PointF(contentX, lineY), TextMutedColor);
                 lineY += lineHeight;
+                if (hasColorLine) {
+                    g.DrawText("Color: " + SafeTrim(hit.VehicleColor, (int)(28 * scale)), FontName, fontSizeBody, new PointF(contentX, lineY), TextMutedColor);
+                    lineY += lineHeight;
+                }
 
                 if (hit.Flags != null && hit.Flags.Count > 0) {
                     foreach (string f in hit.Flags) {

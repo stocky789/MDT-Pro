@@ -77,9 +77,11 @@ namespace MDTPro.Data {
             try {
                 LicenseStatus = CDFPedData.DriversLicenseState.ToString();
                 LicenseExpiration = CDFPedData.DriversLicenseExpiration?.ToString("s");
-                WeaponPermitStatus = CDFPedData.WeaponPermit.Status.ToString();
-                WeaponPermitExpiration = CDFPedData.WeaponPermit.ExpirationDate?.ToString("s");
-                WeaponPermitType = CDFPedData.WeaponPermit.PermitType.ToString();
+                if (CDFPedData.WeaponPermit != null) {
+                    WeaponPermitStatus = CDFPedData.WeaponPermit.Status.ToString();
+                    WeaponPermitExpiration = CDFPedData.WeaponPermit.ExpirationDate?.ToString("s");
+                    WeaponPermitType = GetWeaponPermitType(CDFPedData.WeaponPermit);
+                }
                 FishingPermitStatus = CDFPedData.FishingPermit.Status.ToString();
                 FishingPermitExpiration = CDFPedData.FishingPermit.ExpirationDate?.ToString("s");
                 HuntingPermitStatus = CDFPedData.HuntingPermit.Status.ToString();
@@ -122,6 +124,29 @@ namespace MDTPro.Data {
             TimesStopped = CDFPedData.TimesStopped;
         }
 
+        /// <summary>Read weapon permit type from CDF, normalizing PR/CDF variations (e.g. "CCW Permit") to our language keys.</summary>
+        private static string GetWeaponPermitType(CommonDataFramework.Modules.PedDatabase.WeaponPermit weaponPermit) {
+            if (weaponPermit == null) return null;
+            string raw = null;
+            try {
+                raw = weaponPermit.PermitType.ToString();
+            } catch {
+                try {
+                    var prop = weaponPermit.GetType().GetProperty("PermitType", BindingFlags.Public | BindingFlags.Instance);
+                    if (prop != null) raw = prop.GetValue(weaponPermit)?.ToString();
+                } catch { }
+            }
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+            // Normalize PR/CDF values to our language keys; PR often shows "CCW Permit"
+            string lower = raw.Trim().ToLowerInvariant();
+            if (lower == "ccw permit" || lower == "ccw") return "CCWPermit";
+            if (lower.Contains("ccw") || lower == "concealed" || lower.Contains("concealed carry"))
+                return "CcwPermit";
+            if (lower.Contains("ffl") || lower == "federal firearms") return "FflPermit";
+            if (lower == "none" || lower == "invalid") return null;
+            return raw.Trim();
+        }
+
         /// <summary>When CDF PedData is null, populate Name/Model from LSPDFR Persona so we can still resolve peds.</summary>
         private void PopulateFromLSPDFRPersonaFallback() {
             Citations = new List<CitationGroup.Charge>();
@@ -145,32 +170,33 @@ namespace MDTPro.Data {
             public string Timestamp;
         }
 
+        /// <summary>Apply persistent (SQLite) identity onto current ped. For string/identity fields, only overwrite when source has a value so we do not replace good CDF/current data with nulls from an old DB record.</summary>
         internal void ApplyPersistentIdentity(MDTProPedData source) {
             if (source == null) return;
 
             Name = source.Name;
-            FirstName = source.FirstName;
-            LastName = source.LastName;
-            Birthday = source.Birthday;
-            Gender = source.Gender;
-            Address = source.Address;
+            if (!string.IsNullOrEmpty(source.FirstName)) FirstName = source.FirstName;
+            if (!string.IsNullOrEmpty(source.LastName)) LastName = source.LastName;
+            if (!string.IsNullOrEmpty(source.Birthday)) Birthday = source.Birthday;
+            if (!string.IsNullOrEmpty(source.Gender)) Gender = source.Gender;
+            if (!string.IsNullOrEmpty(source.Address)) Address = source.Address;
             IsInGang = source.IsInGang;
-            AdvisoryText = source.AdvisoryText;
+            if (!string.IsNullOrEmpty(source.AdvisoryText)) AdvisoryText = source.AdvisoryText;
             TimesStopped = source.TimesStopped;
             IsWanted = source.IsWanted;
             WarrantText = source.WarrantText;
             IsOnProbation = source.IsOnProbation;
             IsOnParole = source.IsOnParole;
-            LicenseStatus = source.LicenseStatus;
-            LicenseExpiration = source.LicenseExpiration;
-            WeaponPermitStatus = source.WeaponPermitStatus;
-            WeaponPermitExpiration = source.WeaponPermitExpiration;
-            WeaponPermitType = source.WeaponPermitType;
-            FishingPermitStatus = source.FishingPermitStatus;
-            FishingPermitExpiration = source.FishingPermitExpiration;
-            HuntingPermitStatus = source.HuntingPermitStatus;
-            HuntingPermitExpiration = source.HuntingPermitExpiration;
-            IncarceratedUntil = source.IncarceratedUntil;
+            if (!string.IsNullOrEmpty(source.LicenseStatus)) LicenseStatus = source.LicenseStatus;
+            if (!string.IsNullOrEmpty(source.LicenseExpiration)) LicenseExpiration = source.LicenseExpiration;
+            if (!string.IsNullOrEmpty(source.WeaponPermitStatus)) WeaponPermitStatus = source.WeaponPermitStatus;
+            if (!string.IsNullOrEmpty(source.WeaponPermitExpiration)) WeaponPermitExpiration = source.WeaponPermitExpiration;
+            if (!string.IsNullOrEmpty(source.WeaponPermitType)) WeaponPermitType = source.WeaponPermitType;
+            if (!string.IsNullOrEmpty(source.FishingPermitStatus)) FishingPermitStatus = source.FishingPermitStatus;
+            if (!string.IsNullOrEmpty(source.FishingPermitExpiration)) FishingPermitExpiration = source.FishingPermitExpiration;
+            if (!string.IsNullOrEmpty(source.HuntingPermitStatus)) HuntingPermitStatus = source.HuntingPermitStatus;
+            if (!string.IsNullOrEmpty(source.HuntingPermitExpiration)) HuntingPermitExpiration = source.HuntingPermitExpiration;
+            if (!string.IsNullOrEmpty(source.IncarceratedUntil)) IncarceratedUntil = source.IncarceratedUntil;
 
             Citations = source.Citations?
                 .Select(charge => new CitationGroup.Charge {

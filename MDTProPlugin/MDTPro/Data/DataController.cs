@@ -1,5 +1,6 @@
 using CommonDataFramework.Modules;
 using CommonDataFramework.Modules.PedDatabase;
+using CommonDataFramework.Modules.VehicleDatabase;
 using MDTPro.Data.Reports;
 using MDTPro.Setup;
 using MDTPro.Utility;
@@ -82,6 +83,11 @@ namespace MDTPro.Data {
         private static DateTime _lastContextPedSetAt = DateTime.MinValue;
         private static readonly TimeSpan ContextPedTtl = TimeSpan.FromSeconds(60);
 
+        /// <summary>Maps ped name -> (handle, timestamp) for recently identified peds. Citation handout uses this when Holder is null (e.g. DB loaded from file, stub).</summary>
+        private static readonly Dictionary<string, (Rage.PoolHandle Handle, DateTime At)> recentlyIdentifiedPedHandles = new Dictionary<string, (Rage.PoolHandle, DateTime)>(StringComparer.OrdinalIgnoreCase);
+        private static readonly object _recentlyIdentifiedLock = new object();
+        private static readonly TimeSpan RecentlyIdentifiedTtl = TimeSpan.FromMinutes(5);
+
         // Evidence trigger reliability (for UI: only show reliably tracked items in court breakdown):
         // Reliable: HadWeapon (native at arrest), WasWanted (LSPDFR persona or MDT ped IsWanted/WarrantText), AssaultedPed (damage native + player check), DamagedVehicle (damage native).
         // Resisted: from PR PedAPI.GetPedResistanceAction at arrest (Flee, Attack, Uncooperative = resisted).
@@ -105,6 +111,13 @@ namespace MDTPro.Data {
         private static readonly Dictionary<string, PedEvidenceContext> pedEvidenceCache =
             new Dictionary<string, PedEvidenceContext>(StringComparer.OrdinalIgnoreCase);
         private static readonly object pedEvidenceLock = new object();
+
+        private static readonly HashSet<string> capturedVehicleSearchPlates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly object capturedVehicleSearchLock = new object();
+        private const int MaxCapturedVehicleSearchPlates = 100;
+
+        private static readonly object capturedPickupHandlesLock = new object();
+        private static readonly HashSet<uint> capturedPickupHandles = new HashSet<uint>();
 
         internal static List<CourtData> courtDatabase = new List<CourtData>();
         public static IReadOnlyList<CourtData> CourtDatabase => courtDatabase;
@@ -320,24 +333,207 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>Look up vehicle by plate or VIN. Checks both vehicleDatabase and keepInVehicleDatabase.</summary>
+        internal static MDTProVehicleData GetVehicleByPlateOrVin(string plateOrVin) {
+            if (string.IsNullOrWhiteSpace(plateOrVin)) return null;
+            string key = plateOrVin.Trim();
+            lock (_vehicleDbLock) {
+                var v = vehicleDatabase.FirstOrDefault(x =>
+                    string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(x.VehicleIdentificationNumber, key, StringComparison.OrdinalIgnoreCase));
+                if (v != null) return v;
+                return keepInVehicleDatabase.FirstOrDefault(x =>
+                    string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(x.VehicleIdentificationNumber, key, StringComparison.OrdinalIgnoreCase));
+            }
+        }
+
+        /// <summary>All vehicles that have at least one BOLO, for the BOLO noticeboard. In-world vehicles first (so CanModifyBOLOs is true when applicable); then persistent by plate, deduped.</summary>
+        internal static System.Collections.Generic.List<object> GetActiveBOLOs() {
+            var list = new System.Collections.Generic.List<object>();
+            var seenPlates = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            lock (_vehicleDbLock) {
+                foreach (var v in vehicleDatabase) {
+                    if (v?.BOLOs == null || v.BOLOs.Length == 0) continue;
+                    if (string.IsNullOrEmpty(v.LicensePlate)) continue;
+                    seenPlates.Add(v.LicensePlate);
+                    list.Add(new {
+                        v.LicensePlate,
+                        v.ModelDisplayName,
+                        v.IsStolen,
+                        BOLOs = v.BOLOs,
+                        CanModifyBOLOs = v.CanModifyBOLOs
+                    });
+                }
+                foreach (var v in keepInVehicleDatabase) {
+                    if (v?.BOLOs == null || v.BOLOs.Length == 0) continue;
+                    if (string.IsNullOrEmpty(v.LicensePlate)) continue;
+                    if (seenPlates.Contains(v.LicensePlate)) continue;
+                    seenPlates.Add(v.LicensePlate);
+                    list.Add(new {
+                        v.LicensePlate,
+                        v.ModelDisplayName,
+                        v.IsStolen,
+                        BOLOs = v.BOLOs,
+                        CanModifyBOLOs = false
+                    });
+                }
+            }
+            return list;
+        }
+
+        /// <summary>Called when CDF removes ped data (entity despawned). Removes from pedDatabase only; keepInPedDatabase and SQLite unchanged.</summary>
+        public static void OnCDFPedDataRemoved(Rage.Ped ped, PedData pedData) {
+            if (pedData == null) return;
+            string name = null;
+            try { name = pedData.FullName; } catch { }
+            uint? handle = null;
+            try { if (ped != null && ped.Exists()) handle = ped.Handle; } catch { }
+            lock (_pedDbLock) {
+                pedDatabase.RemoveAll(p => {
+                    if (p == null) return false;
+                    try {
+                        if (!string.IsNullOrEmpty(name) && string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)) {
+                            if (handle.HasValue && p.Holder != null && p.Holder.IsValid() && p.Holder.Handle == handle.Value) return true;
+                            if (p.Holder == null || !p.Holder.IsValid()) return true;
+                        }
+                        if (handle.HasValue && p.Holder != null && p.Holder.IsValid() && p.Holder.Handle == handle.Value) return true;
+                    } catch { /* Holder disposed */ }
+                    return false;
+                });
+            }
+        }
+
+        /// <summary>Called when CDF removes vehicle data (entity despawned). Removes from vehicleDatabase only; keepInVehicleDatabase and SQLite unchanged.</summary>
+        public static void OnCDFVehicleDataRemoved(Rage.Vehicle vehicle, VehicleData vehicleData) {
+            if (vehicleData == null) return;
+            string plate = null;
+            try {
+                if (vehicle != null && vehicle.Exists()) plate = vehicle.LicensePlate;
+                if (string.IsNullOrEmpty(plate) && vehicleData.Holder != null && vehicleData.Holder.Exists()) plate = vehicleData.Holder.LicensePlate;
+            } catch { }
+            uint? handle = null;
+            try { if (vehicle != null && vehicle.Exists()) handle = vehicle.Handle; } catch { }
+            lock (_vehicleDbLock) {
+                vehicleDatabase.RemoveAll(v => {
+                    if (v == null) return false;
+                    try {
+                        if (!string.IsNullOrEmpty(plate) && string.Equals(v.LicensePlate, plate, StringComparison.OrdinalIgnoreCase)) {
+                            if (handle.HasValue && v.Holder != null && v.Holder.Exists() && v.Holder.Handle == handle.Value) return true;
+                            if (v.Holder == null || !v.Holder.Exists()) return true;
+                        }
+                        if (handle.HasValue && v.Holder != null && v.Holder.Exists() && v.Holder.Handle == handle.Value) return true;
+                    } catch { /* Holder disposed */ }
+                    return false;
+                });
+            }
+        }
+
+        /// <summary>Sync MDT ped data to CDF so PR and other mods see correct license/permits. MDT SQLite is source of truth for court-ordered revocations.</summary>
         internal static void SyncPedDatabaseWithCDF() {
             foreach (MDTProPedData databasePed in PedDatabase) {
-                if (databasePed?.CDFPedData == null) continue;
-                try {
-                    databasePed.CDFPedData.Wanted = databasePed.IsWanted;
-                    databasePed.CDFPedData.IsOnProbation = databasePed.IsOnProbation;
-                    databasePed.CDFPedData.IsOnParole = databasePed.IsOnParole;
-                    if (Enum.TryParse(databasePed.LicenseStatus, out ELicenseState licenseStatusValue)) {
-                        databasePed.CDFPedData.DriversLicenseState = licenseStatusValue;
-                    }
-                } catch (Exception ex) {
-                    Helper.Log($"SyncPedDatabaseWithCDF skip ped: {ex.Message}", false, Helper.LogSeverity.Warning);
+                SyncSinglePedToCDF(databasePed);
+            }
+        }
+
+        /// <summary>Push a single ped's MDT data to CDF (DriversLicense, WeaponPermit, FishingPermit, etc.). Ensures CDF/PR reflect our persisted revocations.</summary>
+        private static void SyncSinglePedToCDF(MDTProPedData databasePed) {
+            if (databasePed == null || databasePed.CDFPedData == null) return;
+            try {
+                databasePed.CDFPedData.Wanted = databasePed.IsWanted;
+                databasePed.CDFPedData.IsOnProbation = databasePed.IsOnProbation;
+                databasePed.CDFPedData.IsOnParole = databasePed.IsOnParole;
+                databasePed.CDFPedData.Citations = databasePed.Citations?.Count ?? 0;
+                databasePed.CDFPedData.TimesStopped = databasePed.TimesStopped;
+                try { databasePed.CDFPedData.AdvisoryText = databasePed.AdvisoryText ?? ""; } catch { }
+
+                if (!string.IsNullOrEmpty(databasePed.LicenseStatus) && Enum.TryParse(databasePed.LicenseStatus, true, out ELicenseState licenseStatusValue)) {
+                    databasePed.CDFPedData.DriversLicenseState = licenseStatusValue;
                 }
+                if (!string.IsNullOrEmpty(databasePed.LicenseExpiration) && DateTime.TryParse(databasePed.LicenseExpiration, out DateTime licenseExp)) {
+                    try { databasePed.CDFPedData.DriversLicenseExpiration = licenseExp; } catch { }
+                }
+
+                if (databasePed.CDFPedData.WeaponPermit != null && !string.IsNullOrEmpty(databasePed.WeaponPermitStatus) && Enum.TryParse(databasePed.WeaponPermitStatus, true, out EDocumentStatus weaponStatus)) {
+                    try { databasePed.CDFPedData.WeaponPermit.Status = weaponStatus; } catch { }
+                }
+                if (databasePed.CDFPedData.WeaponPermit != null && !string.IsNullOrEmpty(databasePed.WeaponPermitExpiration) && DateTime.TryParse(databasePed.WeaponPermitExpiration, out DateTime weaponExp)) {
+                    try { databasePed.CDFPedData.WeaponPermit.ExpirationDate = weaponExp; } catch { }
+                }
+
+                if (databasePed.CDFPedData.FishingPermit != null && !string.IsNullOrEmpty(databasePed.FishingPermitStatus) && Enum.TryParse(databasePed.FishingPermitStatus, true, out EDocumentStatus fishingStatus)) {
+                    try { databasePed.CDFPedData.FishingPermit.Status = fishingStatus; } catch { }
+                }
+                if (databasePed.CDFPedData.FishingPermit != null && !string.IsNullOrEmpty(databasePed.FishingPermitExpiration) && DateTime.TryParse(databasePed.FishingPermitExpiration, out DateTime fishingExp)) {
+                    try { databasePed.CDFPedData.FishingPermit.ExpirationDate = fishingExp; } catch { }
+                }
+
+                if (databasePed.CDFPedData.HuntingPermit != null && !string.IsNullOrEmpty(databasePed.HuntingPermitStatus) && Enum.TryParse(databasePed.HuntingPermitStatus, true, out EDocumentStatus huntingStatus)) {
+                    try { databasePed.CDFPedData.HuntingPermit.Status = huntingStatus; } catch { }
+                }
+                if (databasePed.CDFPedData.HuntingPermit != null && !string.IsNullOrEmpty(databasePed.HuntingPermitExpiration) && DateTime.TryParse(databasePed.HuntingPermitExpiration, out DateTime huntingExp)) {
+                    try { databasePed.CDFPedData.HuntingPermit.ExpirationDate = huntingExp; } catch { }
+                }
+            } catch (Exception ex) {
+                Helper.Log($"SyncSinglePedToCDF skip ped: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>Add a BOLO to a vehicle. Returns true if vehicle was in world and BOLO was added. Vehicle must be in vehicleDatabase with valid Holder.</summary>
+        internal static bool TryAddBOLOToVehicle(string licensePlate, string reason, DateTime expiresAt, string issuedBy) {
+            if (string.IsNullOrWhiteSpace(licensePlate) || string.IsNullOrWhiteSpace(reason)) return false;
+            MDTProVehicleData vData;
+            lock (_vehicleDbLock) {
+                vData = vehicleDatabase.FirstOrDefault(v => v != null && v.Holder != null && v.Holder.Exists() && string.Equals(v.LicensePlate, licensePlate.Trim(), StringComparison.OrdinalIgnoreCase));
+            }
+            if (vData?.CDFVehicleData == null) return false;
+            try {
+                var bolo = new VehicleBOLO(reason.Trim(), DateTime.UtcNow, expiresAt, issuedBy ?? "LSPD");
+                vData.CDFVehicleData.AddBOLO(bolo);
+                vData.BOLOs = vData.CDFVehicleData.GetAllBOLOs();
+                KeepVehicleInDatabase(vData);
+                Database.SaveVehicle(vData);
+                return true;
+            } catch (Exception ex) {
+                Helper.Log($"TryAddBOLOToVehicle failed: {ex.Message}", false, Helper.LogSeverity.Warning);
+                return false;
+            }
+        }
+
+        /// <summary>Remove a BOLO from a vehicle by reason. Returns true if found and removed.</summary>
+        internal static bool TryRemoveBOLOFromVehicle(string licensePlate, string reason) {
+            if (string.IsNullOrWhiteSpace(licensePlate)) return false;
+            MDTProVehicleData vData;
+            lock (_vehicleDbLock) {
+                vData = vehicleDatabase.FirstOrDefault(v => v != null && v.Holder != null && v.Holder.Exists() && string.Equals(v.LicensePlate, licensePlate.Trim(), StringComparison.OrdinalIgnoreCase));
+            }
+            if (vData?.CDFVehicleData == null) return false;
+            var bolos = vData.CDFVehicleData.GetAllBOLOs();
+            if (bolos == null || bolos.Length == 0) return false;
+            VehicleBOLO toRemove = null;
+            string reasonTrim = (reason ?? "").Trim();
+            foreach (var b in bolos) {
+                if (string.Equals(b.Reason, reasonTrim, StringComparison.OrdinalIgnoreCase)) {
+                    toRemove = b;
+                    break;
+                }
+            }
+            if (toRemove == null) return false;
+            try {
+                vData.CDFVehicleData.RemoveBOLO(toRemove);
+                vData.BOLOs = vData.CDFVehicleData.GetAllBOLOs();
+                KeepVehicleInDatabase(vData);
+                Database.SaveVehicle(vData);
+                return true;
+            } catch (Exception ex) {
+                Helper.Log($"TryRemoveBOLOFromVehicle failed: {ex.Message}", false, Helper.LogSeverity.Warning);
+                return false;
             }
         }
 
         internal static void SyncVehicleDatabaseWithCDF() {
             foreach (MDTProVehicleData databaseVehicle in VehicleDatabase) {
+                if (databaseVehicle == null) continue;
                 SyncSingleVehicleToCDF(databaseVehicle);
             }
         }
@@ -347,15 +543,21 @@ namespace MDTPro.Data {
             if (databaseVehicle?.CDFVehicleData == null) return;
             try {
                 databaseVehicle.CDFVehicleData.IsStolen = databaseVehicle.IsStolen;
-                if (databaseVehicle.CDFVehicleData.Registration != null
-                    && !string.IsNullOrEmpty(databaseVehicle.RegistrationStatus)
-                    && Enum.TryParse(databaseVehicle.RegistrationStatus, out EDocumentStatus registrationStatusValue)) {
-                    databaseVehicle.CDFVehicleData.Registration.Status = registrationStatusValue;
+                if (databaseVehicle.CDFVehicleData.Registration != null) {
+                    if (!string.IsNullOrEmpty(databaseVehicle.RegistrationStatus) && Enum.TryParse(databaseVehicle.RegistrationStatus, true, out EDocumentStatus rs)) {
+                        try { databaseVehicle.CDFVehicleData.Registration.Status = rs; } catch { }
+                    }
+                    if (!string.IsNullOrEmpty(databaseVehicle.RegistrationExpiration) && DateTime.TryParse(databaseVehicle.RegistrationExpiration, out DateTime regExp)) {
+                        try { databaseVehicle.CDFVehicleData.Registration.ExpirationDate = regExp; } catch { }
+                    }
                 }
-                if (databaseVehicle.CDFVehicleData.Insurance != null
-                    && !string.IsNullOrEmpty(databaseVehicle.InsuranceStatus)
-                    && Enum.TryParse(databaseVehicle.InsuranceStatus, out EDocumentStatus insuranceStatusValue)) {
-                    databaseVehicle.CDFVehicleData.Insurance.Status = insuranceStatusValue;
+                if (databaseVehicle.CDFVehicleData.Insurance != null) {
+                    if (!string.IsNullOrEmpty(databaseVehicle.InsuranceStatus) && Enum.TryParse(databaseVehicle.InsuranceStatus, true, out EDocumentStatus ins)) {
+                        try { databaseVehicle.CDFVehicleData.Insurance.Status = ins; } catch { }
+                    }
+                    if (!string.IsNullOrEmpty(databaseVehicle.InsuranceExpiration) && DateTime.TryParse(databaseVehicle.InsuranceExpiration, out DateTime insExp)) {
+                        try { databaseVehicle.CDFVehicleData.Insurance.ExpirationDate = insExp; } catch { }
+                    }
                 }
             } catch (Exception ex) {
                 Helper.Log($"SyncSingleVehicleToCDF skip: {ex.Message}", false, Helper.LogSeverity.Warning);
@@ -404,6 +606,24 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>Refreshes our stored ped's wanted status from CDF so PR dispatch results (warrants) show in MDT Person Search. Call when PR runs a ped through dispatch.</summary>
+        internal static void RefreshPedWantedStatusFromCDF(Ped ped) {
+            if (ped == null || !ped.IsValid()) return;
+            try {
+                PedData cdf = ped.GetPedData();
+                if (cdf == null || string.IsNullOrWhiteSpace(cdf.FullName)) return;
+                string name = cdf.FullName.Trim();
+                MDTProPedData ourPed = GetPedDataByName(name);
+                if (ourPed == null) return;
+                ourPed.IsWanted = cdf.Wanted;
+                ourPed.WarrantText = cdf.Wanted ? CitationArrestHelper.GetRandomWarrantCharge().name : null;
+                KeepPedInDatabase(ourPed);
+                Database.SavePed(ourPed);
+            } catch (Exception ex) {
+                Helper.Log($"RefreshPedWantedStatusFromCDF: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
         internal static void AddIdentificationEvent(Ped ped, string eventType) {
             if (ped == null || !ped.IsValid()) return;
             string pedName = null;
@@ -415,6 +635,8 @@ namespace MDTPro.Data {
                 } catch { }
             }
             if (string.IsNullOrEmpty(pedName)) return;
+
+            StoreIdentifiedPedHandle(pedName, ped.Handle);
 
             MDTProPedData pedData;
             lock (_pedDbLock) {
@@ -491,15 +713,17 @@ namespace MDTPro.Data {
             return keepInVehicleDatabase;
         }
 
-        internal static void UpdatePedData(MDTProPedData pedData) {
+        internal static bool UpdatePedData(MDTProPedData pedData) {
+            if (pedData == null) return false;
             lock (_pedDbLock) {
-                int index = pedDatabase.FindIndex(x => x.Name == pedData.Name);
+                int index = pedDatabase.FindIndex(x => x != null && string.Equals(x.Name, pedData.Name, StringComparison.OrdinalIgnoreCase));
                 if (index == -1) {
-                    Helper.Log("Failed to update Ped database!", false, Helper.LogSeverity.Warning);
-                    return;
+                    Helper.Log("Failed to update Ped database - ped not in world.", false, Helper.LogSeverity.Warning);
+                    return false;
                 }
                 pedDatabase[index] = pedData;
             }
+            return true;
         }
 
         internal static void AddCDFPedDataPedToDatabase(PedData pedData) {
@@ -545,15 +769,17 @@ namespace MDTPro.Data {
             Database.SavePed(stub);
         }
 
-        internal static void UpdateVehicleData(MDTProVehicleData vehicleData) {
+        internal static bool UpdateVehicleData(MDTProVehicleData vehicleData) {
+            if (vehicleData == null) return false;
             lock (_vehicleDbLock) {
-                int index = vehicleDatabase.FindIndex(x => x.LicensePlate == vehicleData.LicensePlate);
+                int index = vehicleDatabase.FindIndex(x => x != null && string.Equals(x.LicensePlate, vehicleData.LicensePlate, StringComparison.OrdinalIgnoreCase));
                 if (index == -1) {
-                    Helper.Log("Failed to update Vehicle database!", false, Helper.LogSeverity.Warning);
-                    return;
+                    Helper.Log("Failed to update Vehicle database - vehicle not in world.", false, Helper.LogSeverity.Warning);
+                    return false;
                 }
                 vehicleDatabase[index] = vehicleData;
             }
+            return true;
         }
 
         internal static void StartCurrentShift() {
@@ -634,14 +860,16 @@ namespace MDTPro.Data {
                 }
             } else if (report is ArrestReport arrestReport) {
                 if (!string.IsNullOrEmpty(arrestReport.OffenderPedName)) {
-                    int pedIndex = pedDatabase.FindIndex(pedData => pedData.Name?.ToLower() == arrestReport.OffenderPedName.ToLower());
-                    if (pedIndex != -1) {
-                        MDTProPedData pedDataToAdd = pedDatabase[pedIndex];
-
+                    MDTProPedData pedDataToAdd = GetPedDataByName(arrestReport.OffenderPedName);
+                    if (pedDataToAdd != null) {
                         pedDataToAdd.Arrests.AddRange(arrestReport.Charges.Where(x => !x.addedByReportInEdit));
 
+                        // Arrest satisfies warrant: clear wanted status and sync to CDF so MDT and PR stay consistent
+                        pedDataToAdd.IsWanted = false;
+                        pedDataToAdd.WarrantText = null;
+                        SyncSinglePedToCDF(pedDataToAdd);
+
                         KeepPedInDatabase(pedDataToAdd);
-                        pedDatabase[pedIndex] = pedDataToAdd;
                     }
                 }
 
@@ -752,6 +980,7 @@ namespace MDTPro.Data {
                 currentPedData.CDFPedData.Citations = currentPedData.Citations?.Count ?? 0;
                 currentPedData.CDFPedData.TimesStopped = currentPedData.TimesStopped;
                 currentPedData.TrySyncCDFPersonaToPersistentIdentity();
+                SyncSinglePedToCDF(currentPedData);
             }
 
             KeepPedInDatabase(currentPedData);
@@ -770,23 +999,31 @@ namespace MDTPro.Data {
             MDTProPedData mdtProPedData = new MDTProPedData(ped);
             if (mdtProPedData == null || string.IsNullOrEmpty(mdtProPedData.Name)) return;
 
+            StoreIdentifiedPedHandle(mdtProPedData.Name, ped.Handle);
+
             MDTProPedData existingPed;
             lock (_pedDbLock) {
                 existingPed = pedDatabase.FirstOrDefault(x => x.Name == mdtProPedData.Name);
-                if (existingPed != null && existingPed.CDFPedData == null) {
-                    existingPed.LicenseStatus = mdtProPedData.LicenseStatus;
-                    existingPed.LicenseExpiration = mdtProPedData.LicenseExpiration;
-                    existingPed.WeaponPermitStatus = mdtProPedData.WeaponPermitStatus;
-                    existingPed.WeaponPermitExpiration = mdtProPedData.WeaponPermitExpiration;
-                    existingPed.WeaponPermitType = mdtProPedData.WeaponPermitType;
-                    existingPed.FishingPermitStatus = mdtProPedData.FishingPermitStatus;
-                    existingPed.FishingPermitExpiration = mdtProPedData.FishingPermitExpiration;
-                    existingPed.HuntingPermitStatus = mdtProPedData.HuntingPermitStatus;
-                    existingPed.HuntingPermitExpiration = mdtProPedData.HuntingPermitExpiration;
+                if (existingPed != null) {
+                    // Always refresh wanted status from CDF so PR dispatch results (warrants) show in MDT search
+                    existingPed.IsWanted = mdtProPedData.IsWanted;
+                    existingPed.WarrantText = mdtProPedData.WarrantText;
+                    if (existingPed.CDFPedData == null) {
+                        existingPed.LicenseStatus = mdtProPedData.LicenseStatus;
+                        existingPed.LicenseExpiration = mdtProPedData.LicenseExpiration;
+                        existingPed.WeaponPermitStatus = mdtProPedData.WeaponPermitStatus;
+                        existingPed.WeaponPermitExpiration = mdtProPedData.WeaponPermitExpiration;
+                        existingPed.WeaponPermitType = mdtProPedData.WeaponPermitType;
+                        existingPed.FishingPermitStatus = mdtProPedData.FishingPermitStatus;
+                        existingPed.FishingPermitExpiration = mdtProPedData.FishingPermitExpiration;
+                        existingPed.HuntingPermitStatus = mdtProPedData.HuntingPermitStatus;
+                        existingPed.HuntingPermitExpiration = mdtProPedData.HuntingPermitExpiration;
+                    }
                 }
             }
             if (existingPed != null) {
-                if (existingPed.CDFPedData == null) Database.SavePed(existingPed);
+                KeepPedInDatabase(existingPed);
+                Database.SavePed(existingPed);
                 SetContextPed(existingPed);
                 return;
             }
@@ -836,6 +1073,36 @@ namespace MDTPro.Data {
                 }
                 return _lastContextPedData;
             }
+        }
+
+        /// <summary>Store ped handle when we identify someone. Citation handout uses this when Holder is null.</summary>
+        internal static void StoreIdentifiedPedHandle(string pedName, Rage.PoolHandle handle) {
+            if (string.IsNullOrWhiteSpace(pedName)) return;
+            lock (_recentlyIdentifiedLock) {
+                recentlyIdentifiedPedHandles[pedName.Trim()] = (handle, DateTime.UtcNow);
+                PruneRecentlyIdentifiedHandles();
+            }
+        }
+
+        /// <summary>Get a recently identified ped's handle for citation handout when Holder is null.</summary>
+        internal static Rage.PoolHandle? GetRecentlyIdentifiedPedHandle(string pedName) {
+            if (string.IsNullOrWhiteSpace(pedName)) return null;
+            lock (_recentlyIdentifiedLock) {
+                if (!recentlyIdentifiedPedHandles.TryGetValue(pedName.Trim(), out var entry))
+                    return null;
+                if (DateTime.UtcNow - entry.At > RecentlyIdentifiedTtl) {
+                    recentlyIdentifiedPedHandles.Remove(pedName.Trim());
+                    return null;
+                }
+                return entry.Handle;
+            }
+        }
+
+        private static void PruneRecentlyIdentifiedHandles() {
+            if (recentlyIdentifiedPedHandles.Count < 200) return;
+            var cutoff = DateTime.UtcNow - RecentlyIdentifiedTtl;
+            foreach (var k in recentlyIdentifiedPedHandles.Where(x => x.Value.At < cutoff).Select(x => x.Key).ToList())
+                recentlyIdentifiedPedHandles.Remove(k);
         }
 
         private static MDTProPedData GetReEncounterCandidate(MDTProPedData currentPedData) {
@@ -931,6 +1198,120 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>Computes license revocations based on California law. Driver's license: canRevokeLicense charges. Firearms: felonies (lifetime), domestic violence/protective order (lifetime), violent misdemeanors (10 years). Fishing: wildlife violations only.</summary>
+        private static List<string> ComputeLicenseRevocations(CourtData courtData) {
+            var revocations = new List<string>();
+            if (courtData?.Charges == null || courtData.Charges.Count == 0) return revocations;
+
+            var arrestOptions = SetupController.GetArrestOptions();
+            var chargeLookup = new Dictionary<string, ArrestGroup.Charge>(StringComparer.OrdinalIgnoreCase);
+            if (arrestOptions != null) {
+                foreach (var group in arrestOptions) {
+                    if (group?.charges == null) continue;
+                    foreach (var c in group.charges) {
+                        if (!string.IsNullOrEmpty(c?.name)) chargeLookup[c.name] = c;
+                    }
+                }
+            }
+
+            bool driversLicenseRevoked = false;
+            bool firearmsRevoked = false;
+            string firearmsDuration = null; // "Lifetime" or "10 years"
+            bool fishingRevoked = false;
+
+            foreach (CourtData.Charge charge in courtData.Charges) {
+                if (string.IsNullOrEmpty(charge.Name)) continue;
+                string name = charge.Name.Trim();
+
+                // Driver's license: use canRevokeLicense from arrest options (CA: DUI, reckless driving, hit-and-run, evading, etc.)
+                if (!driversLicenseRevoked && chargeLookup.TryGetValue(name, out var arrestCharge) && arrestCharge.canRevokeLicense) {
+                    driversLicenseRevoked = true;
+                }
+
+                // Firearms: California PC 29805, 26202 — felonies = lifetime; domestic violence / protective order = lifetime; violent misdemeanors = 10 years
+                if (!firearmsRevoked) {
+                    bool isFelony = IsFelonyChargeName(name);
+                    bool isDomesticViolence = name.IndexOf("Domestic Violence", StringComparison.OrdinalIgnoreCase) >= 0
+                        || name.IndexOf("Violation Of Protective Order", StringComparison.OrdinalIgnoreCase) >= 0
+                        || name.IndexOf("Corporal Injury", StringComparison.OrdinalIgnoreCase) >= 0;
+                    bool isViolentMisdemeanor = IsViolentMisdemeanorChargeName(name);
+
+                    if (isFelony || isDomesticViolence) {
+                        firearmsRevoked = true;
+                        firearmsDuration = "Lifetime";
+                    } else if (isViolentMisdemeanor && firearmsDuration != "Lifetime") {
+                        firearmsRevoked = true;
+                        firearmsDuration = "10 years";
+                    }
+                }
+
+                // Fishing: only for fish/wildlife code violations (poaching, illegal take, etc.)
+                if (!fishingRevoked && (name.IndexOf("Fish", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("Wildlife", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("Poach", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("Game", StringComparison.OrdinalIgnoreCase) >= 0 && name.IndexOf("Grand Theft", StringComparison.OrdinalIgnoreCase) < 0)) {
+                    fishingRevoked = true;
+                }
+            }
+
+            if (driversLicenseRevoked) revocations.Add("Driver's License Revoked");
+            if (firearmsRevoked) revocations.Add(string.IsNullOrEmpty(firearmsDuration) ? "Firearms Permit Revoked" : $"Firearms Permit Revoked ({firearmsDuration})");
+            if (fishingRevoked) revocations.Add("Sport Fishing Privileges Revoked");
+
+            return revocations;
+        }
+
+        private static bool IsFelonyChargeName(string name) {
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.ToLowerInvariant();
+            // Felony categories from arrest options
+            return n.Contains("felony ") || n.Contains("murder") || n.Contains("manslaughter") || n.Contains("rape")
+                || n.Contains("kidnapping") || n.Contains("robbery") || n.Contains("carjacking") || n.Contains("home invasion")
+                || n.Contains("first degree burglary") || n.Contains("attempted murder") || n.Contains("mayhem")
+                || n.Contains("arson") || n.Contains("explosive") || n.Contains("possession of firearm by felon")
+                || n.Contains("assault weapon") || n.Contains("machine gun") || n.Contains("short-barreled")
+                || n.Contains("discharging firearm at inhabited") || n.Contains("trafficking") || n.Contains("manufacturing meth")
+                || n.Contains("for sale") || n.Contains("transport of meth") || n.Contains("aggravated kidnapping")
+                || n.Contains("dui causing") || n.Contains("hit and run causing") || n.Contains("street racing causing")
+                || n.Contains("felony reckless evading") || n.Contains("grand theft auto") || n.Contains("possession of stolen vehicle")
+                || n.Contains("assault with deadly weapon (firearm)") || n.Contains("altering or removing firearm serial");
+        }
+
+        private static bool IsViolentMisdemeanorChargeName(string name) {
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.ToLowerInvariant();
+            return n.Contains("brandishing") || n.Contains("simple assault") || n.Contains("aggravated assault")
+                || n.Contains("assault with deadly weapon") || n.Contains("simple battery") || n.Contains("battery on")
+                || n.Contains("battery causing") || n.Contains("battery with deadly") || n.Contains("malicious wounding")
+                || n.Contains("sexual battery") || n.Contains("assault on peace officer") || n.Contains("assault on firefighter")
+                || n.Contains("criminal threats") || n.Contains("negligent discharge") || n.Contains("shooting from vehicle")
+                || n.Contains("domestic violence") || n.Contains("corporal injury") || n.Contains("violation of protective order");
+        }
+
+        /// <summary>Applies court-ordered license revocations to ped data. Sets LicenseStatus, WeaponPermitStatus, FishingPermitStatus when applicable. Uses CDF/PR enums: DriversLicenseState (ELicenseState), WeaponPermit/FishingPermit.Status (EDocumentStatus) per https://policing-redefined.netlify.app/docs/developer-docs/cdf/peds/permits</summary>
+        private static void ApplyLicenseRevocationsToPed(MDTProPedData pedData, List<string> revocations) {
+            if (pedData == null || revocations == null || revocations.Count == 0) return;
+            foreach (string r in revocations) {
+                if (r?.IndexOf("Driver", StringComparison.OrdinalIgnoreCase) >= 0) {
+                    // CDF DriversLicenseState (ELicenseState); CDF docs don't list enum members; "Revoked" parses when ELicenseState includes it
+                    pedData.LicenseStatus = "Revoked";
+                    break;
+                }
+            }
+            foreach (string r in revocations) {
+                if (r?.IndexOf("Firearm", StringComparison.OrdinalIgnoreCase) >= 0) {
+                    pedData.WeaponPermitStatus = EDocumentStatus.Revoked.ToString();
+                    break;
+                }
+            }
+            foreach (string r in revocations) {
+                if (r?.IndexOf("Fishing", StringComparison.OrdinalIgnoreCase) >= 0) {
+                    pedData.FishingPermitStatus = EDocumentStatus.Revoked.ToString();
+                    break;
+                }
+            }
+        }
+
         internal static bool UpdateCourtCaseOutcome(
             string number,
             int status,
@@ -963,14 +1344,27 @@ namespace MDTPro.Data {
 
                     if (status == 1) {
                         UpdatePedIncarcerationFromCourtData(pedData, courtCase);
+                        courtCase.LicenseRevocations = ComputeLicenseRevocations(courtCase);
+                        ApplyLicenseRevocationsToPed(pedData, courtCase.LicenseRevocations);
+                        if (courtCase.LicenseRevocations.Count > 0) {
+                            string revocationText = "The court further ordered: " + string.Join("; ", courtCase.LicenseRevocations) + ".";
+                            courtCase.OutcomeReasoning = string.IsNullOrEmpty(courtCase.OutcomeReasoning)
+                                ? revocationText
+                                : courtCase.OutcomeReasoning.TrimEnd('.', ' ') + ". " + revocationText;
+                        }
                         pedData.IsOnProbation = true;
                         pedData.IsWanted = false;
+                        pedData.WarrantText = null;
+                        SyncSinglePedToCDF(pedData);
                     } else if (status == 2 || status == 3) {
                         pedData.IsWanted = false;
+                        pedData.WarrantText = null;
+                        SyncSinglePedToCDF(pedData);
                     }
 
                     KeepPedInDatabase(pedData);
                     pedDatabase[pedIndex] = pedData;
+                    Database.SavePed(pedData);
                 }
             }
 
@@ -1010,7 +1404,7 @@ namespace MDTPro.Data {
                     v.IsValid() &&
                     NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(v, ped, false));
 
-                // Illegal weapon carry: armed but weapon permit status is not valid (requires CDF data)
+                // Illegal weapon carry: armed but weapon permit status is not valid (uses CDF WeaponPermit when available)
                 // Also check probation/parole violation. Use Holder fallback for re-encounters.
                 bool hadIllegalWeapon = false;
                 bool violatedSupervision = false;
@@ -1018,9 +1412,15 @@ namespace MDTPro.Data {
                     if (hadWeapon && !string.IsNullOrEmpty(dbPed.WeaponPermitStatus)) {
                         hadIllegalWeapon = !dbPed.WeaponPermitStatus.Equals("Valid", StringComparison.OrdinalIgnoreCase);
                     }
-                    if (dbPed.IsOnProbation || dbPed.IsOnParole) {
-                        violatedSupervision = true;
-                    }
+                    if (dbPed.IsOnProbation || dbPed.IsOnParole) violatedSupervision = true;
+                }
+                // CDF fallback: when ped not yet in our DB (first stop), check CDF WeaponPermit directly
+                if (hadWeapon && !hadIllegalWeapon) {
+                    try {
+                        var cdfPed = ped.GetPedData();
+                        if (cdfPed?.WeaponPermit != null && cdfPed.WeaponPermit.Status != EDocumentStatus.Valid)
+                            hadIllegalWeapon = true;
+                    } catch { }
                 }
 
                 bool resisted = GetPedResistanceFromPR(ped);
@@ -1080,8 +1480,395 @@ namespace MDTPro.Data {
                     }
                     ctx.WasPatDown = true;
                 }
+                CaptureFirearmsFromPed(ped, "Pat-down");
             } catch (Exception e) {
                 Helper.Log($"PatDown capture failed: {e.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>Uses PR SearchItemsAPI.GetPedSearchItems to capture weapon/firearm items and persist to firearm_records.</summary>
+        internal static void CaptureFirearmsFromPed(Ped ped, string source = "Search") {
+            if (ped == null || !ped.IsValid() || !Main.usePR) return;
+            try {
+                string ownerName = (GetPedDataForPed(ped)?.Name ?? LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped)?.FullName)?.Trim();
+                if (string.IsNullOrWhiteSpace(ownerName))
+                    ownerName = source.Contains("Dead") ? "Unknown (unidentified body)" : "Unknown";
+                if (string.IsNullOrWhiteSpace(ownerName)) return;
+                CaptureFirearmsFromPedWithOwner(ped, ownerName, source);
+            } catch (Exception e) {
+                Helper.Log($"Firearm/drug capture failed: {e.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>Captures firearms from ped using an explicit owner (e.g. "Evidence (pickup)" for player-held weapons).</summary>
+        private static void CaptureFirearmsFromPedWithOwner(Ped ped, string ownerName, string source) {
+            if (ped == null || !ped.IsValid() || !Main.usePR || string.IsNullOrWhiteSpace(ownerName)) return;
+            try {
+                Type searchApiType = Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined")
+                    ?? Type.GetType("PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined");
+                if (searchApiType == null) return;
+
+                MethodInfo getItems = searchApiType.GetMethod("GetPedSearchItems", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(Rage.Ped) }, null);
+                if (getItems == null) return;
+
+                object result = getItems.Invoke(null, new object[] { ped });
+                if (result == null) return;
+
+                System.Collections.IEnumerable list = result as System.Collections.IEnumerable;
+                if (list == null) return;
+
+                var records = ExtractFirearmRecordsFromItemList(list, ownerName, source);
+                var drugRecords = new List<DrugRecord>();
+                string now = DateTime.UtcNow.ToString("o");
+
+                foreach (object item in list) {
+                    if (item == null) continue;
+                    Type t = item.GetType();
+                    bool isDrug = t.Name.Contains("DrugItem") || t.Name.Contains("Drug");
+                    if (!isDrug) continue;
+                    string drugType = null;
+                    string drugCategory = null;
+                    string drugDesc = null;
+                    foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
+                        try {
+                            object val = prop.GetValue(item);
+                            if (val == null) continue;
+                            if (prop.Name == "DrugType") drugType = val.ToString();
+                            else if (prop.Name == "Value" || prop.Name == "Description") drugDesc = val?.ToString();
+                        } catch { }
+                    }
+                    if (!string.IsNullOrEmpty(drugType)) {
+                        drugRecords.Add(new DrugRecord {
+                            OwnerPedName = ownerName,
+                            DrugType = drugType,
+                            DrugCategory = drugCategory,
+                            Description = drugDesc,
+                            Source = source,
+                            FirstSeenAt = now,
+                            LastSeenAt = now
+                        });
+                    }
+                }
+
+                if (records.Count > 0 || drugRecords.Count > 0) {
+                    if (!ped.Exists()) return;
+                    if (records.Count > 0) Database.SaveFirearmRecords(records);
+                    if (drugRecords.Count > 0) Database.SaveDrugRecords(drugRecords);
+                }
+            } catch (Exception e) {
+                Helper.Log($"Firearm/drug capture failed: {e.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>Poll-based: for vehicles in vehicleDatabase with valid Holder, if PR reports vehicle searched and we haven't captured yet, persist search items.</summary>
+        internal static void TryCaptureVehicleSearches() {
+            if (!Main.usePR) return;
+            try {
+                MethodInfo getHasSearched = null;
+                Type searchApiType = Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined")
+                    ?? Type.GetType("PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined");
+                if (searchApiType != null)
+                    getHasSearched = searchApiType.GetMethod("GetHasVehicleBeenSearched", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(Rage.Vehicle) }, null);
+                if (getHasSearched == null) {
+                    Type vehicleApiType = Type.GetType("PolicingRedefined.API.VehicleAPI, PolicingRedefined");
+                    if (vehicleApiType != null)
+                        getHasSearched = vehicleApiType.GetMethod("GetHasVehicleBeenSearched", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(Rage.Vehicle) }, null);
+                }
+                if (getHasSearched == null) return;
+
+                List<MDTProVehicleData> vehiclesToCheck;
+                lock (_vehicleDbLock) {
+                    vehiclesToCheck = vehicleDatabase.Where(v => v?.Holder != null && v.Holder.Exists() && !string.IsNullOrEmpty(v.LicensePlate)).ToList();
+                }
+                foreach (var vData in vehiclesToCheck) {
+                    Vehicle v = vData.Holder;
+                    if (v == null || !v.Exists()) continue;
+                    string plate = vData.LicensePlate?.Trim();
+                    if (string.IsNullOrEmpty(plate)) continue;
+                    bool alreadyCaptured;
+                    lock (capturedVehicleSearchLock) {
+                        alreadyCaptured = capturedVehicleSearchPlates.Contains(plate);
+                    }
+                    if (alreadyCaptured) continue;
+                    bool searched = false;
+                    try {
+                        object r = getHasSearched.Invoke(null, new object[] { v });
+                        searched = r is bool b && b;
+                    } catch { }
+                    if (!searched) continue;
+                    CaptureVehicleSearchItems(v);
+                    lock (capturedVehicleSearchLock) {
+                        capturedVehicleSearchPlates.Add(plate);
+                        if (capturedVehicleSearchPlates.Count > MaxCapturedVehicleSearchPlates) {
+                            var toRemove = capturedVehicleSearchPlates.Take(MaxCapturedVehicleSearchPlates / 2).ToList();
+                            foreach (var p in toRemove) capturedVehicleSearchPlates.Remove(p);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Helper.Log($"TryCaptureVehicleSearches failed: {e.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>Captures firearms from (1) player's held weapon when PR has run a check on it, (2) weapon pickups on the ground via GetPickupSearchItems if PR exposes it. Ground/pickup weapons use "Evidence (ground)" as owner.</summary>
+        internal static void TryCapturePickupAndPlayerFirearms() {
+            if (!Main.usePR || Main.Player == null || !Main.Player.IsValid()) return;
+            try {
+                // Try GetPedSearchItems on the player - when you pick up a weapon and run a firearm check, PR may add it to the player's search items. Use "Evidence (pickup)" as owner so it appears in Firearms Check.
+                CaptureFirearmsFromPedWithOwner(Main.Player, "Evidence (pickup)", "Evidence (pickup)");
+
+                // Try GetPickupSearchItems via reflection - PR may expose this for weapons on the ground. Use Object type for Rage compatibility.
+                Type searchApiType = Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined")
+                    ?? Type.GetType("PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined");
+                if (searchApiType == null) return;
+
+                MethodInfo getPickupItems = searchApiType.GetMethod("GetPickupSearchItems", BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase, null, new[] { typeof(Rage.Object) }, null);
+                if (getPickupItems == null) return;
+
+                try {
+                    var getAllPickups = typeof(Rage.World).GetMethod("GetAllPickupObjects", BindingFlags.Public | BindingFlags.Static);
+                    if (getAllPickups != null) {
+                        object pickupsObj = getAllPickups.Invoke(null, null);
+                        if (pickupsObj is System.Array pickups && pickups.Length > 0) {
+                            foreach (object obj in pickups) {
+                                if (obj == null) continue;
+                                if (!(obj is Rage.Entity ent) || !ent.Exists()) continue;
+                                if (Main.Player.DistanceTo(ent.Position) > 25f) continue;
+                                lock (capturedPickupHandlesLock) {
+                                    if (capturedPickupHandles.Contains(ent.Handle)) continue;
+                                }
+                                object result = null;
+                                try { result = getPickupItems.Invoke(null, new object[] { obj }); } catch { continue; }
+                                if (result == null) continue;
+                                if (!(result is System.Collections.IEnumerable list)) continue;
+                                var records = ExtractFirearmRecordsFromItemList(list, "Evidence (ground)", "Evidence (ground)");
+                                if (records.Count > 0) {
+                                    Database.SaveFirearmRecords(records);
+                                    lock (capturedPickupHandlesLock) {
+                                        capturedPickupHandles.Add(ent.Handle);
+                                        if (capturedPickupHandles.Count > 200) {
+                                            foreach (var h in capturedPickupHandles.Take(100).ToList())
+                                                capturedPickupHandles.Remove(h);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception ex) {
+                    Helper.Log($"TryCapturePickupAndPlayerFirearms pickup loop: {ex.Message}", false, Helper.LogSeverity.Warning);
+                }
+            } catch (Exception e) {
+                Helper.Log($"TryCapturePickupAndPlayerFirearms failed: {e.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>Extracts FirearmRecords from PR search item list. Shared by CaptureFirearmsFromPed and pickup/player capture.</summary>
+        private static List<FirearmRecord> ExtractFirearmRecordsFromItemList(System.Collections.IEnumerable list, string ownerName, string source) {
+            var records = new List<FirearmRecord>();
+            string now = DateTime.UtcNow.ToString("o");
+            foreach (object item in list) {
+                if (item == null) continue;
+                Type t = item.GetType();
+                bool isWeapon = t.Name.Contains("WeaponItem") || t.Name.Contains("FirearmItem") || t.Name.Contains("Weapon") || t.Name.Contains("Firearm");
+                if (!isWeapon) continue;
+                uint hash = 0u;
+                string modelId = null;
+                bool isStolen = false;
+                string description = null;
+                string serial = null;
+                bool isSerialScratched = false;
+                foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
+                    try {
+                        object val = prop.GetValue(item);
+                        string name = prop.Name;
+                        if (name == "WeaponModelHash" || name == "ModelHash") {
+                            if (val == null) continue;
+                            if (val is int i) hash = unchecked((uint)i);
+                            else if (val is uint u) hash = u;
+                            else if (val is long l) hash = unchecked((uint)l);
+                            else if (val is ulong ul) hash = (uint)Math.Min(ul, uint.MaxValue);
+                            else { try { hash = Convert.ToUInt32(val); } catch { } }
+                        } else if (name == "WeaponModelId" || name == "ModelId") modelId = val?.ToString();
+                        else if (name == "IsStolen") { try { isStolen = Convert.ToBoolean(val); } catch { } }
+                        else if (name == "Value" || name == "Description") description = val?.ToString();
+                        else if (name == "SerialNumber") serial = val?.ToString();
+                        else if ((name == "State" || name == "FirearmState" || name == "SerialState") && val != null) {
+                            string stateStr = val.ToString();
+                            if (string.Equals(stateStr, "ScratchedSN", StringComparison.OrdinalIgnoreCase) || (int.TryParse(stateStr, out int si) && si == 1)) {
+                                isSerialScratched = true;
+                                serial = null;
+                            }
+                        }
+                    } catch { }
+                }
+                if (hash == 0u) continue;
+                if (isSerialScratched) serial = null;
+                string displayName = GetWeaponDisplayNameFromHash(hash) ?? description ?? modelId;
+                records.Add(new FirearmRecord {
+                    SerialNumber = string.IsNullOrWhiteSpace(serial) ? null : serial.Trim(),
+                    IsSerialScratched = isSerialScratched,
+                    OwnerPedName = ownerName.Trim(),
+                    WeaponModelId = modelId,
+                    WeaponDisplayName = displayName,
+                    WeaponModelHash = hash,
+                    IsStolen = isStolen,
+                    Description = description,
+                    Source = source,
+                    FirstSeenAt = now,
+                    LastSeenAt = now
+                });
+            }
+            return records;
+        }
+
+        /// <summary>Uses PR SearchItemsAPI.GetVehicleSearchItems to capture items and persist to vehicle_search_records. Also creates firearm_records for Weapon/FirearmItems so they appear in Firearms Check.</summary>
+        internal static void CaptureVehicleSearchItems(Vehicle vehicle) {
+            if (vehicle == null || !vehicle.Exists() || !Main.usePR) return;
+            try {
+                string plate = vehicle.LicensePlate?.Trim();
+                if (string.IsNullOrEmpty(plate)) return;
+
+                string ownerForFirearms = GetVehicleDriverNameForFirearmOwner(vehicle, plate);
+
+                Type searchApiType = Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined")
+                    ?? Type.GetType("PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined");
+                if (searchApiType == null) return;
+                MethodInfo getItems = searchApiType.GetMethod("GetVehicleSearchItems", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(Rage.Vehicle) }, null);
+                if (getItems == null) return;
+
+                object result = getItems.Invoke(null, new object[] { vehicle });
+                if (result == null) return;
+                System.Collections.IEnumerable list = result as System.Collections.IEnumerable;
+                if (list == null) return;
+
+                var records = new List<VehicleSearchRecord>();
+                var firearmRecords = new List<FirearmRecord>();
+                string now = DateTime.UtcNow.ToString("o");
+
+                foreach (object item in list) {
+                    if (item == null) continue;
+                    Type t = item.GetType();
+                    string itemType = "Contraband";
+                    string drugType = null;
+                    string itemLocation = null;
+                    string description = null;
+                    uint weaponHash = 0u;
+                    string weaponModelId = null;
+                    string serial = null;
+                    bool isStolen = false;
+                    bool isSerialScratched = false;
+
+                    if (t.Name.Contains("DrugItem") || t.Name.Contains("Drug")) {
+                        itemType = "Drug";
+                        foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
+                            try {
+                                object val = prop.GetValue(item);
+                                if (val == null) continue;
+                                if (prop.Name == "DrugType") drugType = val.ToString();
+                                else if (prop.Name == "Value" || prop.Name == "Description") description = val?.ToString();
+                                else if (prop.Name == "Location") itemLocation = val?.ToString();
+                            } catch { }
+                        }
+                    } else if (t.Name.Contains("WeaponItem") || t.Name.Contains("FirearmItem")) {
+                        itemType = "Weapon";
+                        string itemOwner = null; // PR may expose registered owner (e.g. from dispatch firearm check)
+                        foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
+                            try {
+                                object val = prop.GetValue(item);
+                                if (val == null) continue;
+                                string pn = prop.Name;
+                                if (pn == "WeaponModelHash" || pn == "ModelHash") weaponHash = Convert.ToUInt32(val);
+                                else if (pn == "WeaponModelId" || pn == "ModelId") weaponModelId = val?.ToString();
+                                else if (pn == "Value" || pn == "Description") description = val?.ToString();
+                                else if (pn == "Location") itemLocation = val?.ToString();
+                                else if (pn == "SerialNumber" || pn == "Serial") serial = serial ?? val?.ToString();
+                                else if (pn == "Owner" || pn == "RegisteredOwner" || pn == "OwnerName" || pn == "OwnerPedName")
+                                    itemOwner = string.IsNullOrWhiteSpace(itemOwner) ? val?.ToString()?.Trim() : itemOwner;
+                                else if (pn == "IsStolen") { try { isStolen = Convert.ToBoolean(val); } catch { } }
+                                else if ((pn == "State" || pn == "FirearmState" || pn == "SerialState") && val != null) {
+                                    string stateStr = val.ToString();
+                                    if (string.Equals(stateStr, "ScratchedSN", StringComparison.OrdinalIgnoreCase) || (int.TryParse(stateStr, out int si) && si == 1))
+                                        isSerialScratched = true;
+                                }
+                            } catch { }
+                        }
+                        string firearmOwner = !string.IsNullOrWhiteSpace(itemOwner) ? itemOwner : ownerForFirearms;
+                        if (weaponHash != 0u && firearmOwner != null) {
+                            string displayName = GetWeaponDisplayNameFromHash(weaponHash) ?? description ?? weaponModelId;
+                            firearmRecords.Add(new FirearmRecord {
+                                SerialNumber = isSerialScratched ? null : (string.IsNullOrWhiteSpace(serial) ? null : serial.Trim()),
+                                IsSerialScratched = isSerialScratched,
+                                OwnerPedName = firearmOwner,
+                                WeaponModelId = weaponModelId,
+                                WeaponDisplayName = displayName,
+                                WeaponModelHash = weaponHash,
+                                IsStolen = isStolen,
+                                Description = description,
+                                Source = "Vehicle search",
+                                FirstSeenAt = now,
+                                LastSeenAt = now
+                            });
+                        }
+                    } else {
+                        foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
+                            try {
+                                object val = prop.GetValue(item);
+                                if (prop.Name == "Value" || prop.Name == "Description") description = val?.ToString();
+                                else if (prop.Name == "Location") itemLocation = val?.ToString();
+                            } catch { }
+                        }
+                    }
+                    if (itemType == "Contraband" && string.IsNullOrEmpty(description) && string.IsNullOrEmpty(drugType)) continue;
+
+                    records.Add(new VehicleSearchRecord {
+                        LicensePlate = plate,
+                        ItemType = itemType,
+                        DrugType = drugType,
+                        ItemLocation = itemLocation,
+                        Description = description,
+                        WeaponModelHash = weaponHash,
+                        WeaponModelId = weaponModelId,
+                        Source = "Vehicle search",
+                        CapturedAt = now
+                    });
+                }
+                if (records.Count > 0)
+                    Database.SaveVehicleSearchRecords(records);
+                if (firearmRecords.Count > 0)
+                    Database.SaveFirearmRecords(firearmRecords);
+            } catch (Exception e) {
+                Helper.Log($"CaptureVehicleSearchItems failed: {e.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>Resolves driver/owner name for firearm owner when firearm is found in vehicle. Tries driver, then CDF vehicle owner, then "[Vehicle: PLATE]".</summary>
+        private static string GetVehicleDriverNameForFirearmOwner(Vehicle vehicle, string plate) {
+            if (vehicle == null || !vehicle.Exists() || string.IsNullOrEmpty(plate)) return null;
+            try {
+                Ped driver = vehicle.Driver;
+                if (driver != null && driver.IsValid()) {
+                    string name = (GetPedDataForPed(driver)?.Name ?? LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(driver)?.FullName)?.Trim();
+                    if (!string.IsNullOrWhiteSpace(name)) return name;
+                }
+                var vData = vehicle.GetVehicleData();
+                if (vData?.Owner != null) {
+                    string ownerName = vData.Owner.FullName?.Trim();
+                    if (!string.IsNullOrWhiteSpace(ownerName)) return ownerName;
+                }
+            } catch { }
+            return $"[Vehicle: {plate}]";
+        }
+
+        /// <summary>Gets in-game weapon display name from hash (matches what player sees). Uses GET_WEAPON_NAME_FROM_HASH + GetLabelText. Runs on game thread.</summary>
+        private static string GetWeaponDisplayNameFromHash(uint weaponHash) {
+            if (weaponHash == 0u) return null;
+            try {
+                string label = NativeFunction.Natives.GET_WEAPON_NAME_FROM_HASH<string>(weaponHash);
+                if (string.IsNullOrWhiteSpace(label)) return null;
+                return Game.GetLocalizedString(label);
+            } catch {
+                return null;
             }
         }
 
@@ -1250,6 +2037,7 @@ namespace MDTPro.Data {
 
             float score = config.courtEvidenceBase;
             foreach (CourtData.Charge charge in courtData.Charges) {
+                if (charge == null) continue;
                 score += config.courtEvidencePerCharge;
                 if (charge.IsArrestable == true) score += config.courtEvidenceArrestableBonus;
                 if (charge.Time == null) score += config.courtEvidenceLifeSentenceBonus;
@@ -1268,6 +2056,14 @@ namespace MDTPro.Data {
                         if (ctx.HadIllegalWeapon) { score += config.courtEvidenceIllegalWeaponBonus; courtData.EvidenceIllegalWeapon = true; }
                         if (ctx.ViolatedSupervision) { score += config.courtEvidenceSupervisionViolationBonus; courtData.EvidenceViolatedSupervision = true; }
                         if (ctx.Resisted) { score += config.courtEvidenceResistedBonus; courtData.EvidenceResisted = true; }
+                    }
+                }
+                // Drug records come from DB (pat-down, dead body search) — always check regardless of cache
+                if (config.courtEvidenceDrugsBonus > 0) {
+                    var drugs = Database.LoadDrugsByOwner(courtData.PedName, 1);
+                    if (drugs != null && drugs.Count > 0) {
+                        score += config.courtEvidenceDrugsBonus;
+                        courtData.EvidenceHadDrugs = true;
                     }
                 }
                 // Fallback: MDT is authoritative for warrants; if cache didn't set EvidenceWasWanted, set from ped record (both pedDatabase and keepInPedDatabase)
@@ -1413,10 +2209,15 @@ namespace MDTPro.Data {
         }
 
         /// <summary>Force-resolve a pending court case now (run trial/verdict logic immediately). Returns true if the case was found and was pending.</summary>
-        internal static bool ForceResolveCourtCase(string caseNumber) {
+        /// <param name="caseNumber">Court case number.</param>
+        /// <param name="plea">Optional plea to apply before resolving (e.g. from UI selection).</param>
+        /// <param name="outcomeNotes">Optional outcome notes to apply before resolving.</param>
+        internal static bool ForceResolveCourtCase(string caseNumber, string plea = null, string outcomeNotes = null) {
             if (string.IsNullOrWhiteSpace(caseNumber)) return false;
             CourtData courtCase = courtDatabase.Find(x => x.Number == caseNumber);
             if (courtCase == null || courtCase.Status != 0) return false;
+            if (!string.IsNullOrWhiteSpace(plea)) courtCase.Plea = plea;
+            if (outcomeNotes != null) courtCase.OutcomeNotes = outcomeNotes;
             ResolveCaseAuto(courtCase);
             return true;
         }
@@ -1433,6 +2234,12 @@ namespace MDTPro.Data {
 
                 courtCase.Status = newStatus;
                 courtCase.OutcomeReasoning = BuildOutcomeReasoning(courtCase, courtCase.ConvictionChance, newStatus);
+                if (newStatus == 1) {
+                    courtCase.LicenseRevocations = ComputeLicenseRevocations(courtCase);
+                    if (courtCase.LicenseRevocations.Count > 0) {
+                        courtCase.OutcomeReasoning += " The court further ordered: " + string.Join("; ", courtCase.LicenseRevocations) + ".";
+                    }
+                }
                 courtCase.LastUpdatedUtc = DateTime.UtcNow.ToString("o");
 
                 if (!string.IsNullOrEmpty(courtCase.PedName)) {
@@ -1450,10 +2257,14 @@ namespace MDTPro.Data {
                         Config config = SetupController.GetConfig();
                         if (newStatus == 1) {
                             UpdatePedIncarcerationFromCourtData(pedData, courtCase, config);
+                            ApplyLicenseRevocationsToPed(pedData, courtCase.LicenseRevocations);
                         }
                         pedData.IsWanted = false;
+                        pedData.WarrantText = null;
+                        SyncSinglePedToCDF(pedData);
                         KeepPedInDatabase(pedData);
                         pedDatabase[pedIndex] = pedData;
+                        Database.SavePed(pedData);
                     }
                 }
 

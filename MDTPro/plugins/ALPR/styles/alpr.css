@@ -7,6 +7,13 @@
   overflow: hidden;
   pointer-events: auto;
   animation: alpr-popup-in 0.25s ease;
+  transition: opacity 1.5s ease, transform 1.5s ease;
+}
+
+.alpr-popup--fade-out {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.98);
+  pointer-events: none;
 }
 
 @keyframes alpr-popup-in {

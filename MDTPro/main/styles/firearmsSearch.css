@@ -1,0 +1,84 @@
+body {
+  background-color: var(--color-background);
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+.searchInputWrapper {
+  margin: 12px 10px;
+}
+
+.recentOwnersList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 10px;
+}
+
+.recentOwnersList button {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.firearmsResult {
+  padding: 0 10px 10px;
+}
+
+.firearmsOwnerTitle {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.firearmCard {
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.firearmRowWithImage {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.firearmImageWrapper {
+  flex-shrink: 0;
+}
+
+.firearmImage {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  background: var(--color-background-half, rgba(0,0,0,0.1));
+  border-radius: 4px;
+}
+
+.firearmDetails {
+  flex: 1;
+  min-width: 0;
+}
+
+.firearmRow {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.firearmRow label {
+  min-width: 70px;
+  color: var(--color-text-primary-half);
+}
+
+.firearmRow span.stolen {
+  color: var(--color-error);
+}
+
+.firearmRow span.clickable {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.firearmRow span.clickable:hover {
+  color: var(--color-primary);
+}

@@ -13,19 +13,46 @@
     <header class="taskbar">
       <div class="taskbarBrand">
         <img src="/image/badge?v=7" alt="" class="taskbarLogo taskbarBadge" />
+        <div class="taskbarOfficerStatus" aria-label="Officer information">
+          <span class="officerStatusItem" data-key="firstName"><span class="officerStatusLabel" data-language="settings.officerInformation.firstName">First Name</span><span class="officerStatusValue">—</span></span>
+          <span class="officerStatusItem" data-key="lastName"><span class="officerStatusLabel" data-language="settings.officerInformation.lastName">Last Name</span><span class="officerStatusValue">—</span></span>
+          <span class="officerStatusItem" data-key="badgeNumber"><span class="officerStatusLabel" data-language="settings.officerInformation.badgeNumber">Badge</span><span class="officerStatusValue">—</span></span>
+          <span class="officerStatusItem" data-key="rank"><span class="officerStatusLabel" data-language="settings.officerInformation.rank">Rank</span><span class="officerStatusValue">—</span></span>
+          <span class="officerStatusItem" data-key="callSign"><span class="officerStatusLabel" data-language="settings.officerInformation.callSign">Call Sign</span><span class="officerStatusValue">—</span></span>
+          <span class="officerStatusItem" data-key="agency"><span class="officerStatusLabel" data-language="settings.officerInformation.agency">Department</span><span class="officerStatusValue">—</span></span>
+        </div>
         <span class="taskbarTitle">San Andreas Government</span>
       </div>
       <div class="location"></div>
       <div class="icons">
         <button
+          class="officerProfile"
+          onclick="
+            document.querySelector('.overlay .officerProfile').classList.toggle('hide');
+            document.querySelector('.overlay .settings').classList.add('hide');
+            this.blur();
+          "
+          title="Officer Profile"
+          data-language-title="taskbar.officerProfile"
+        >
+          <span class="officerProfileIcon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+              <path d="M3 21v-2a4 4 0 0 1 4-4h4"/>
+              <circle cx="17" cy="5" r="2.5"/>
+            </svg>
+          </span>
+          <span class="officerProfileLabel" data-language="taskbar.officerProfile">Officer Profile</span>
+        </button>
+        <button
           class="settings"
           onclick="
-            document
-              .querySelector('.overlay .settings')
-              .classList.toggle('hide')
-            this.blur()
+            document.querySelector('.overlay .settings').classList.toggle('hide');
+            document.querySelector('.overlay .officerProfile').classList.add('hide');
+            this.blur();
           "
-          title="Control Panel"
+          title="Settings"
           data-language-title="taskbar.settings"
         >
           <span class="settingsIcon" aria-hidden="true">
@@ -39,6 +66,7 @@
       </div>
       <div class="time"></div>
     </header>
+    <div class="desktopWallpaper"></div>
     <main class="desktop">
       <nav class="sidebar">
         <div class="sidebarBadge">
@@ -55,6 +83,18 @@
             <svg viewBox="-4 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M19.938 7.188l3.563 7.156c0.063 0.094 0.094 0.219 0.125 0.313 0.219 0.563 0.375 1.344 0.375 1.844v3.406c0 1.063-0.719 1.938-1.719 2.188v2c0 0.969-0.781 1.719-1.719 1.719-0.969 0-1.719-0.75-1.719-1.719v-1.938h-13.688v1.938c0 0.969-0.75 1.719-1.719 1.719-0.938 0-1.719-0.75-1.719-1.719v-2c-1-0.25-1.719-1.125-1.719-2.188v-3.406c0-0.5 0.156-1.281 0.375-1.844 0.031-0.094 0.063-0.219 0.125-0.313l3.563-7.156c0.281-0.531 1.031-1.031 1.656-1.031h12.563c0.625 0 1.375 0.5 1.656 1.031zM5.531 9.344l-1.906 4.344c-0.094 0.156-0.094 0.344-0.094 0.469h16.938c0-0.125 0-0.313-0.094-0.469l-1.906-4.344c-0.25-0.563-1-1.063-1.594-1.063h-9.75c-0.594 0-1.344 0.5-1.594 1.063zM4.688 19.906c1 0 1.781-0.813 1.781-1.844 0-1-0.781-1.781-1.781-1.781s-1.844 0.781-1.844 1.781c0 1.031 0.844 1.844 1.844 1.844zM19.313 19.906c1 0 1.844-0.813 1.844-1.844 0-1-0.844-1.781-1.844-1.781s-1.781 0.781-1.781 1.781c0 1.031 0.781 1.844 1.781 1.844z"/></svg>
           </span>
           <span class="title" data-language="desktop.vehicleSearch">Vehicle Search</span>
+        </button>
+        <button class="desktopItem" data-name="boloNoticeboard">
+          <span class="icon stroke">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M12 5C5.636 5 2 12 2 12s3.636 7 10 7 10-7 10-7-3.636-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          </span>
+          <span class="title" data-language="desktop.boloNoticeboard">BOLOs</span>
+        </button>
+        <button class="desktopItem" data-name="firearmsSearch">
+          <span class="icon">
+            <img src="/image/firearms.svg" alt="" width="20" height="20" class="iconImg" />
+          </span>
+          <span class="title" data-language="desktop.firearmsSearch">Firearms Check</span>
         </button>
         <button class="desktopItem" data-name="reports">
           <span class="icon">
@@ -90,7 +130,7 @@
     </main>
     <div class="overlay">
       <div class="windows"></div>
-      <div class="settings hide">
+      <div class="officerProfile hide">
         <div class="officerInformation">
           <div class="titleRow">
             <span class="title" data-language="settings.officerInformation.title">Officer Information</span>
@@ -178,17 +218,33 @@
           </div>
           <div class="metricsContent"></div>
         </div>
+      </div>
+      <div class="settings hide">
+        <div class="settingsContent">
+          <div class="settingsSection">
+            <div class="titleRow">
+              <span class="title" data-language="settings.pluginsAndConfig">Plugins &amp; Config</span>
+            </div>
+            <div class="customizationRow">
+              <span class="customization" data-language="settings.customization" onclick="window.open('/page/customization', '_blank')" role="button" tabindex="0">Config and Plugins</span>
+              <span class="infoIcon" data-language-info="settings.customizationInfo" role="img" aria-label="More information">?</span>
+            </div>
+            <p class="settingsHint" data-language="settings.customizationHint">Manage MDT plugins and configuration options. Opens in a new window.</p>
+          </div>
+        </div>
         <div class="versionCustomizationWrapper">
           <div class="version"></div>
-          <div class="customizationRow">
-            <span class="customization" data-language="settings.customization" onclick="window.open('/page/customization', '_blank')" role="button" tabindex="0">Config and Plugins</span>
-            <span class="infoIcon" data-language-info="settings.customizationInfo" role="img" aria-label="More information">?</span>
-          </div>
         </div>
       </div>
       <div class="notifications"></div>
     </div>
     <div class="iconAccess hidden">
+      <div class="boloNoticeboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M12 5C5.636 5 2 12 2 12s3.636 7 10 7 10-7 10-7-3.636-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      </div>
+      <div class="firearmsSearch">
+        <img src="/image/firearms.svg" alt="" width="20" height="20" />
+      </div>
       <div class="vehicleSearch">
         <svg viewBox="-4 0 32 32" xmlns="http://www.w3.org/2000/svg">
           <path

@@ -14,7 +14,7 @@
 
   const metrics = await (await fetch('/data/officerMetrics')).json()
   const metricsContent = document.querySelector(
-    '.overlay .settings .officerMetrics .metricsContent'
+    '.overlay .officerProfile .officerMetrics .metricsContent'
   )
   const ml = language.index.settings?.officerMetrics || {}
   const avgDuration = await convertMsToTimeString(metrics.averageShiftDurationMs)
@@ -31,7 +31,11 @@
   const pluginInfo = await (await fetch('/pluginInfo')).json()
   let activePlugins = getActivePlugins()
   const isDev = /^localhost$|^127\.0\.0\.1$/i.test(location.hostname)
-  if (isDev && pluginInfo.length > 0) {
+  // When no plugins are enabled (fresh install or cleared storage), default to all bundled plugins so Calendar etc. appear
+  if (activePlugins.length === 0 && pluginInfo.length > 0) {
+    activePlugins = pluginInfo.map((p) => p.id)
+    localStorage.setItem('activePlugins', JSON.stringify(activePlugins))
+  } else if (isDev && pluginInfo.length > 0) {
     const serverIds = pluginInfo.map((p) => p.id)
     const missing = serverIds.filter((id) => !activePlugins.includes(id))
     if (missing.length > 0) {
@@ -95,7 +99,7 @@ timeWS.onmessage = async (event) => {
 }
 
 document
-  .querySelector('.overlay .settings .currentShift .buttonWrapper .startShift')
+  .querySelector('.overlay .officerProfile .currentShift .buttonWrapper .startShift')
   .addEventListener('click', async function () {
     if (this.classList.contains('loading')) return
     showLoadingOnButton(this)
@@ -134,7 +138,7 @@ document
   })
 
 document
-  .querySelector('.overlay .settings .currentShift .buttonWrapper .endShift')
+  .querySelector('.overlay .officerProfile .currentShift .buttonWrapper .endShift')
   .addEventListener('click', async function () {
     if (this.classList.contains('loading')) return
     showLoadingOnButton(this)
@@ -167,14 +171,14 @@ async function applyCurrentShiftToDOM(currentShift, currentDate) {
   const language = await getLanguage()
   if (currentShift.startTime) {
     document.querySelector(
-      '.overlay .settings .currentShift .buttonWrapper .startShift'
+      '.overlay .officerProfile .currentShift .buttonWrapper .startShift'
     ).disabled = true
     document.querySelector(
-      '.overlay .settings .currentShift .buttonWrapper .endShift'
+      '.overlay .officerProfile .currentShift .buttonWrapper .endShift'
     ).disabled = false
 
     document.querySelector(
-      '.overlay .settings .currentShift .startTime'
+      '.overlay .officerProfile .currentShift .startTime'
     ).innerHTML = `${
       language.index.settings.currentShift.startTime
     }: ${new Date(currentShift.startTime).toLocaleTimeString()}`
@@ -183,22 +187,22 @@ async function applyCurrentShiftToDOM(currentShift, currentDate) {
       currentDate.getTime() - new Date(currentShift.startTime).getTime()
     )
     document.querySelector(
-      '.overlay .settings .currentShift .duration'
+      '.overlay .officerProfile .currentShift .duration'
     ).innerHTML =
       `${language.index.settings.currentShift.duration}: ${duration}`
   } else {
     document.querySelector(
-      '.overlay .settings .currentShift .buttonWrapper .startShift'
+      '.overlay .officerProfile .currentShift .buttonWrapper .startShift'
     ).disabled = false
     document.querySelector(
-      '.overlay .settings .currentShift .buttonWrapper .endShift'
+      '.overlay .officerProfile .currentShift .buttonWrapper .endShift'
     ).disabled = true
 
     document.querySelector(
-      '.overlay .settings .currentShift .startTime'
+      '.overlay .officerProfile .currentShift .startTime'
     ).innerHTML = language.index.settings.currentShift.offDuty
     document.querySelector(
-      '.overlay .settings .currentShift .duration'
+      '.overlay .officerProfile .currentShift .duration'
     ).innerHTML = ''
   }
 }
@@ -361,6 +365,7 @@ async function openWindow(name, pluginId = null) {
 
     iframe.contentWindow.addEventListener('mousedown', focusWindow)
     iframe.contentWindow.addEventListener('mousedown', function () {
+      document.querySelector('.overlay .officerProfile').classList.add('hide')
       document.querySelector('.overlay .settings').classList.add('hide')
     })
   })
@@ -498,18 +503,19 @@ async function openWindow(name, pluginId = null) {
 }
 
 document.addEventListener('mousedown', function (e) {
-  const taskbarIcon = document.querySelector('.taskbar .icons .settings')
+  const officerProfileBtn = document.querySelector('.taskbar .icons .officerProfile')
+  const settingsBtn = document.querySelector('.taskbar .icons .settings')
+  const officerProfileEl = document.querySelector('.overlay .officerProfile')
   const settingsEl = document.querySelector('.overlay .settings')
-  if (
-    e.target == taskbarIcon ||
-    taskbarIcon.contains(e.target) ||
-    settingsEl.classList.contains('hide') ||
-    e.target == settingsEl ||
-    settingsEl.contains(e.target)
-  ) {
+  const clickedProfile = e.target === officerProfileBtn || officerProfileBtn?.contains(e.target)
+  const clickedSettings = e.target === settingsBtn || settingsBtn?.contains(e.target)
+  const clickedProfilePanel = e.target === officerProfileEl || officerProfileEl?.contains(e.target)
+  const clickedSettingsPanel = e.target === settingsEl || settingsEl?.contains(e.target)
+  if (clickedProfile || clickedSettings || clickedProfilePanel || clickedSettingsPanel) {
     return
   }
-  settingsEl.classList.add('hide')
+  officerProfileEl?.classList.add('hide')
+  settingsEl?.classList.add('hide')
 })
 
 new MutationObserver(() => {
@@ -532,7 +538,7 @@ function setMinWidthOnTaskbar() {
 }
 
 document
-  .querySelector('.overlay .settings .officerInformation .autoFill')
+  .querySelector('.overlay .officerProfile .officerInformation .autoFill')
   .addEventListener('click', async function () {
     if (this.classList.contains('loading')) return
     showLoadingOnButton(this)
@@ -565,7 +571,7 @@ document
 function applySettingsInfoTooltips(language) {
   const base = language?.index?.static
   if (!base) return
-  document.querySelectorAll('.overlay .settings [data-language-info]').forEach((el) => {
+  document.querySelectorAll('.overlay .officerProfile [data-language-info], .overlay .settings [data-language-info]').forEach((el) => {
     const key = el.getAttribute('data-language-info')
     if (!key) return
     const value = key.split('.').reduce((o, k) => o?.[k], base)
@@ -587,21 +593,37 @@ const OFFICER_INFO_KEYS = [
 
 function applyOfficerInformationToDOM(officerInformation) {
   const inputWrapper = document.querySelector(
-    '.overlay .settings .officerInformation .inputWrapper'
+    '.overlay .officerProfile .officerInformation .inputWrapper'
   )
-  if (!inputWrapper) return
-  for (const key of OFFICER_INFO_KEYS) {
-    const input = inputWrapper.querySelector(`.${key} input`)
-    if (!input) continue
-    const val = officerInformation[key]
-    input.value =
-      val === null || val === undefined ? '' : String(val)
+  if (inputWrapper) {
+    for (const key of OFFICER_INFO_KEYS) {
+      const input = inputWrapper.querySelector(`.${key} input`)
+      if (!input) continue
+      const val = officerInformation[key]
+      input.value =
+        val === null || val === undefined ? '' : String(val)
+    }
+  }
+
+  const taskbarStatus = document.querySelector('.taskbarOfficerStatus')
+  if (taskbarStatus) {
+    for (const key of OFFICER_INFO_KEYS) {
+      const item = taskbarStatus.querySelector(`.officerStatusItem[data-key="${key}"]`)
+      if (!item) continue
+      const valueEl = item.querySelector('.officerStatusValue')
+      if (!valueEl) continue
+      const val = officerInformation[key]
+      const display =
+        val === null || val === undefined ? '—' : String(val).trim()
+      valueEl.textContent = display || '—'
+      item.classList.toggle('hasValue', !!display && display !== '—')
+    }
   }
 }
 
 function buildOfficerInformationPayload() {
   const inputWrapper = document.querySelector(
-    '.overlay .settings .officerInformation .inputWrapper'
+    '.overlay .officerProfile .officerInformation .inputWrapper'
   )
   if (!inputWrapper) return {}
   const v = (sel) => inputWrapper.querySelector(sel)?.value?.trim() ?? ''
@@ -617,7 +639,7 @@ function buildOfficerInformationPayload() {
 }
 
 document
-  .querySelector('.overlay .settings .officerInformation .save')
+  .querySelector('.overlay .officerProfile .officerInformation .save')
   .addEventListener('click', async function () {
     if (this.classList.contains('loading')) return
     showLoadingOnButton(this)
@@ -635,6 +657,7 @@ document
     const language = await getLanguage()
 
     if (response == 'OK') {
+      applyOfficerInformationToDOM(buildOfficerInformationPayload())
       showNotification(
         language.index.notifications.officerInformationSaved,
         'checkMark'

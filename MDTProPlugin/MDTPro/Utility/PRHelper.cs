@@ -1,6 +1,7 @@
 // Policing Redefined integration (citations, ped menu).
 // API: GiveCitationToPed(Ped, Citation) — https://policing-redefined.netlify.app/docs/developer-docs/pr/ped-api/ped-detain-resist
 // Docs require the Citation's Ped to match the GiveCitationToPed ped parameter; we use the same ped for both.
+// Must run on game thread: PR API and ped menu expect game-thread execution.
 using MDTPro.Data;
 using MDTPro.Setup;
 using PolicingRedefined.Interaction.Assets.PedAttributes;
@@ -17,28 +18,73 @@ namespace MDTPro.Utility {
             public bool IsArrestable;
         }
 
+        /// <summary>Queues citation handoff to the specified ped. Safe to call from any thread; PR API runs on game thread.</summary>
         internal static void GiveCitation(string pedName, IEnumerable<CitationHandoutCharge> charges) {
             if (string.IsNullOrWhiteSpace(pedName) || charges == null) return;
 
-            // Case-insensitive lookup in both active and persistent ped DB so citation handout works
-            // even when name casing differs or the person is in keepInPedDatabase (e.g. from a prior stop).
+            var chargesList = charges.ToList();
+            if (chargesList.Count == 0) return;
+
+            // Lookup ped handle: Holder from ped data, or recently identified cache (e.g. when DB entry was loaded from file with no Holder).
+            Rage.PoolHandle? pedHandle = null;
             MDTProPedData pedData = DataController.GetPedDataByName(pedName);
-            if (pedData == null) {
-                string msg = SetupController.GetLanguage().inGame.handCitationPersonNotFound;
-                if (!string.IsNullOrWhiteSpace(msg)) RageNotification.Show(string.Format(msg, pedName), RageNotification.NotificationType.Info);
+            if (pedData != null) {
+                Ped holder = pedData.Holder;
+                if (holder != null && holder.IsValid())
+                    pedHandle = holder.Handle;
+            }
+            if (!pedHandle.HasValue)
+                pedHandle = DataController.GetRecentlyIdentifiedPedHandle(pedName);
+
+            if (!pedHandle.HasValue) {
+                if (pedData == null) {
+                    string msg = SetupController.GetLanguage().inGame.handCitationPersonNotFound;
+                    if (!string.IsNullOrWhiteSpace(msg)) RageNotification.Show(string.Format(msg, pedName), RageNotification.NotificationType.Info);
+                } else {
+                    string msg = SetupController.GetLanguage().inGame.handCitationPersonNotPresent;
+                    if (!string.IsNullOrWhiteSpace(msg)) RageNotification.Show(msg, RageNotification.NotificationType.Info);
+                }
                 return;
             }
-            Ped ped = pedData.Holder;
+
+            var handleToUse = pedHandle.Value;
+            string name = pedName;
+
+            // PR API must run on game thread. Citation handout and ped menu are game-thread-only.
+            if (GameFiber.CanSleepNow) {
+                GiveCitationOnGameThread(handleToUse, name, chargesList);
+            } else {
+                GameFiber.StartNew(() => GiveCitationOnGameThread(handleToUse, name, chargesList));
+            }
+        }
+
+        private static void GiveCitationOnGameThread(Rage.PoolHandle pedHandle, string pedName, List<CitationHandoutCharge> charges) {
+            Ped ped = null;
+            try {
+                ped = Rage.World.GetEntityByHandle<Ped>(pedHandle);
+            } catch { }
             if (ped == null || !ped.IsValid()) {
                 string msg = SetupController.GetLanguage().inGame.handCitationPersonNotPresent;
                 if (!string.IsNullOrWhiteSpace(msg)) RageNotification.Show(msg, RageNotification.NotificationType.Info);
                 return;
             }
 
+            try {
+                // PR requires ped to be marked as stopped for the hand-citation menu option to be enabled. See PR Ped Detainment API.
+                var pedApiType = System.Type.GetType("PolicingRedefined.API.PedAPI, PolicingRedefined");
+                if (pedApiType != null) {
+                    var setStopped = pedApiType.GetMethod("SetPedAsStopped", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                    setStopped?.Invoke(null, new object[] { ped });
+                }
+                // Give PR a frame to process SetPedAsStopped before we add citations.
+                GameFiber.Yield();
+            } catch {
+                // Ignore if SetPedAsStopped not available or fails
+            }
+
             foreach (CitationHandoutCharge charge in charges) {
                 if (charge == null || string.IsNullOrWhiteSpace(charge.Name)) continue;
 
-                // Citation(ped, ...) and GiveCitationToPed(ped, citation) — same ped per PR Ped API docs.
                 Citation citation = new Citation(ped, charge.Name, charge.Fine, SetupController.GetLanguage().units.currencySymbol, SetupController.GetConfig().displayCurrencySymbolBeforeNumber, charge.IsArrestable);
                 PolicingRedefined.API.PedAPI.GiveCitationToPed(ped, citation);
             }

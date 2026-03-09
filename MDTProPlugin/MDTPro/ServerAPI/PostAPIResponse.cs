@@ -1,5 +1,6 @@
 using MDTPro.Data;
 using MDTPro.Data.Reports;
+using System;
 using MDTPro.Setup;
 using MDTPro.Utility;
 using Newtonsoft.Json;
@@ -28,25 +29,39 @@ namespace MDTPro.ServerAPI {
                 return;
             } else if (path == "updatePedData") {
                 MDTProPedData pedData = JsonConvert.DeserializeObject<MDTProPedData>(body);
-
-                DataController.UpdatePedData(pedData);
-
+                if (pedData == null) {
+                    buffer = Encoding.UTF8.GetBytes("Bad Request - Invalid ped data");
+                    contentType = "text/plain";
+                    status = 400;
+                    return;
+                }
+                if (!DataController.UpdatePedData(pedData)) {
+                    buffer = Encoding.UTF8.GetBytes("Ped not found or not in world - update requires ped to be nearby");
+                    contentType = "text/plain";
+                    status = 404;
+                    return;
+                }
                 DataController.SyncPedDatabaseWithCDF();
-
                 Database.SavePed(pedData);
-
                 buffer = Encoding.UTF8.GetBytes("OK");
                 contentType = "text/plain";
                 status = 200;
             } else if (path == "updateVehicleData") {
                 MDTProVehicleData vehicleData = JsonConvert.DeserializeObject<MDTProVehicleData>(body);
-
-                DataController.UpdateVehicleData(vehicleData);
-
+                if (vehicleData == null) {
+                    buffer = Encoding.UTF8.GetBytes("Bad Request - Invalid vehicle data");
+                    contentType = "text/plain";
+                    status = 400;
+                    return;
+                }
+                if (!DataController.UpdateVehicleData(vehicleData)) {
+                    buffer = Encoding.UTF8.GetBytes("Vehicle not found or not in world - update requires vehicle to be nearby");
+                    contentType = "text/plain";
+                    status = 404;
+                    return;
+                }
                 DataController.SyncVehicleDatabaseWithCDF();
-
                 Database.SaveVehicle(vehicleData);
-
                 buffer = Encoding.UTF8.GetBytes("OK");
                 contentType = "text/plain";
                 status = 200;
@@ -148,14 +163,14 @@ namespace MDTPro.ServerAPI {
                     status = 404;
                 }
             } else if (path == "forceResolveCourtCase") {
-                var data = JsonConvert.DeserializeAnonymousType(body, new { Number = "" });
+                var data = JsonConvert.DeserializeAnonymousType(body, new { Number = "", Plea = "", OutcomeNotes = "" });
                 if (data == null || string.IsNullOrWhiteSpace(data.Number)) {
                     buffer = Encoding.UTF8.GetBytes("Bad Request");
                     contentType = "text/plain";
                     status = 400;
                     return;
                 }
-                if (DataController.ForceResolveCourtCase(data.Number)) {
+                if (DataController.ForceResolveCourtCase(data.Number, data.Plea, data.OutcomeNotes)) {
                     buffer = Encoding.UTF8.GetBytes("OK");
                     contentType = "text/plain";
                     status = 200;
@@ -171,7 +186,9 @@ namespace MDTPro.ServerAPI {
                 contentType = "text/plain";
                 status = 200;
             } else if (path == "updateConfig") {
-                Config config = JsonConvert.DeserializeObject<Config>(body);
+                // Merge body onto current config so keys not sent by the UI (e.g. alprSettingsVersion) are preserved.
+                Config config = SetupController.GetConfig();
+                JsonConvert.PopulateObject(body, config);
 
                 Helper.WriteToJsonFile(SetupController.ConfigPath, config);
 
@@ -180,6 +197,41 @@ namespace MDTPro.ServerAPI {
                 buffer = Encoding.UTF8.GetBytes("OK");
                 contentType = "text/plain";
                 status = 200;
+            } else if (path == "addBOLO") {
+                var data = JsonConvert.DeserializeAnonymousType(body, new { LicensePlate = "", Reason = "", ExpiresAt = default(DateTime), IssuedBy = "LSPD" });
+                if (data == null || string.IsNullOrWhiteSpace(data.LicensePlate) || string.IsNullOrWhiteSpace(data.Reason)) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "License plate and reason are required." }));
+                    contentType = "text/json";
+                    status = 400;
+                    return;
+                }
+                var expires = data.ExpiresAt != default(DateTime) ? data.ExpiresAt : System.DateTime.UtcNow.AddDays(7);
+                if (DataController.TryAddBOLOToVehicle(data.LicensePlate.Trim(), data.Reason.Trim(), expires, data.IssuedBy ?? "LSPD")) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = true }));
+                    contentType = "text/json";
+                    status = 200;
+                } else {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "Vehicle not found or not in world. The vehicle must be nearby to add a BOLO." }));
+                    contentType = "text/json";
+                    status = 400;
+                }
+            } else if (path == "removeBOLO") {
+                var data = JsonConvert.DeserializeAnonymousType(body, new { LicensePlate = "", Reason = "" });
+                if (data == null || string.IsNullOrWhiteSpace(data.LicensePlate)) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "License plate is required." }));
+                    contentType = "text/json";
+                    status = 400;
+                    return;
+                }
+                if (DataController.TryRemoveBOLOFromVehicle(data.LicensePlate.Trim(), data.Reason ?? "")) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = true }));
+                    contentType = "text/json";
+                    status = 200;
+                } else {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "Vehicle not found, not in world, or BOLO not found." }));
+                    contentType = "text/json";
+                    status = 404;
+                }
             }
         }
     }

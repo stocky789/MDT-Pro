@@ -13,9 +13,10 @@ namespace MDTPro.Setup {
         public bool showSecondsInTaskbarClock = false;
         public int initialWindowWidth = 600;
         public int initialWindowHeight = 400;
-        public float hasPriorCitationsProbability = 0.8f;
-        public float hasPriorArrestsProbability = 0.2f;
-        public float hasPriorArrestsWithWarrantProbability = 0.8f;
+        // US stats: ~28% have prior citations, ~30% prior arrests, ~15% of those have warrants. Bumped for game variety.
+        public float hasPriorCitationsProbability = 0.40f;
+        public float hasPriorArrestsProbability = 0.40f;
+        public float hasPriorArrestsWithWarrantProbability = 0.28f;
         public float reEncounterChance = 0.08f;
         /// <summary>Base chance (0-1) for vehicle re-encounter when driver is unknown. Uses reEncounterChance if &lt;= 0.</summary>
         public float reEncounterVehicleChance = 0.08f;
@@ -33,7 +34,7 @@ namespace MDTPro.Setup {
         public int courtCaseNumberIndexPad = 6;
 
         public bool displayCurrencySymbolBeforeNumber = true;
-        public int courtDatabaseMaxEntries = 100;
+        public int courtDatabaseMaxEntries = 200;
         public int courtRosterRotationDays = 14;
         public int courtJurySeverityThreshold = 15;
         public float courtPriorCitationWeight = 1f;
@@ -59,6 +60,7 @@ namespace MDTPro.Setup {
         public float courtEvidenceIllegalWeaponBonus = 18f;
         public float courtEvidenceSupervisionViolationBonus = 22f;
         public float courtEvidenceResistedBonus = 15f;
+        public float courtEvidenceDrugsBonus = 12f;
         public float courtCaseResolutionMinBase = 20f;
         public float courtCaseResolutionMaxMinutes = 300f;
         public float courtCaseResolutionSeverityScale = 12f;
@@ -93,25 +95,14 @@ namespace MDTPro.Setup {
         /// </summary>
         public string githubReleasesRepo = "stocky789/MDT-Pro";
 
+        /// <summary>Citation/arrest options schema version. When &lt; 2, citationOptions.json and arrestOptions.json are overwritten from defaults on load so upgraders get updated charges (no VC/PC/HS codes, Stolen Possession, Evading, etc.). Do not edit.</summary>
+        public int citationArrestOptionsVersion = 2;
+
         // ---- ALPR ----
-        /// <summary>Enable ALPR scanning and HUD in-game. Only active when in a police cruiser and on duty.</summary>
+        /// <summary>Enable ALPR scanning and HUD in-game. Only active when in a police cruiser and on duty. Tuning (range, cone, interval) is hardcoded with realistic values.</summary>
         public bool alprEnabled = false;
-        /// <summary>ALPR popup auto-close in MDT (seconds). 0 = no auto-close. Used by ALPR plugin.</summary>
+        /// <summary>ALPR popup auto-close in MDT (seconds). 0 = no auto-close. Used by ALPR web plugin.</summary>
         public int alprPopupDuration = 0;
-        /// <summary>Scan interval in milliseconds. Enforced minimum 1500 ms in code to avoid FPS impact.</summary>
-        public int alprScanIntervalMs = 2000;
-        /// <summary>Maximum distance in meters to consider vehicles (candidates). Real mobile ALPR typically 20–25 m.</summary>
-        public float alprScanRangeMeters = 25f;
-        /// <summary>Effective read range in meters. Only vehicles within this range and in cone are read. Real systems ~15–25 m (e.g. 50–75 ft).</summary>
-        public float alprReadRangeMeters = 20f;
-        /// <summary>Cone angle in degrees (±) from cruiser forward. Real LPR cameras use narrow FOV (~15–25° half-angle) for reliable plate capture.</summary>
-        public float alprConeAngleDegrees = 22f;
-        /// <summary>Per-plate cooldown before re-alerting (seconds).</summary>
-        public int alprCooldownSeconds = 90;
-        /// <summary>Play sound on flagged hit.</summary>
-        public bool alprPlaySoundOnHit = true;
-        /// <summary>Show in-game popup notification on flagged hit. If false, only the ALPR HUD panel is shown.</summary>
-        public bool alprShowInGameNotification = false;
         /// <summary>HUD anchor: TopLeft, TopRight, BottomLeft, BottomRight.</summary>
         public string alprHudAnchor = "TopRight";
         /// <summary>HUD offset X in pixels from anchor.</summary>
