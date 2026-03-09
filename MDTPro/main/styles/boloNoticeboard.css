@@ -1,0 +1,146 @@
+body {
+  background-color: var(--color-background);
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+.boloNoticeboardHeader {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.boloNoticeboardTitle {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.boloNoticeboardSubtitle {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary, #888);
+  width: 100%;
+}
+
+.boloRefreshBtn {
+  margin-left: auto;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  background: var(--color-accent, #2563eb);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+}
+
+.boloRefreshBtn:hover {
+  opacity: 0.9;
+}
+
+.boloListWrapper {
+  padding: 10px 14px;
+  overflow-y: auto;
+  max-height: calc(100vh - 120px);
+}
+
+.boloEmpty {
+  text-align: center;
+  padding: 24px 16px;
+  color: var(--color-text-secondary, #888);
+  font-size: 0.9rem;
+}
+
+.boloCardList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.boloCard {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  background: var(--color-background-half, rgba(255,255,255,0.03));
+}
+
+.boloCard.stolen {
+  border-color: var(--color-warning, #eab308);
+  background: rgba(234, 179, 8, 0.08);
+}
+
+.boloCardHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.boloCardPlate {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.boloCardModel {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary, #888);
+}
+
+.boloCardStolenBadge {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: var(--color-warning, #eab308);
+  color: #000;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.boloCardActions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.boloCardActions button {
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-background);
+  color: var(--color-text-primary);
+}
+
+.boloCardActions button:hover {
+  background: var(--color-background-half, rgba(255,255,255,0.06));
+}
+
+.boloEntryList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.boloEntry {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.9rem;
+}
+
+.boloEntry:last-child {
+  border-bottom: none;
+}
+
+.boloEntryReason {
+  font-weight: 600;
+}
+
+.boloEntryMeta {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #888);
+  margin-top: 2px;
+}

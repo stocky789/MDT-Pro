@@ -9,6 +9,8 @@ namespace MDTPro.Data {
         public string Plate { get; set; }
         public string Owner { get; set; }
         public string ModelDisplayName { get; set; }
+        /// <summary>Vehicle color for display (e.g. "Black / White").</summary>
+        public string VehicleColor { get; set; }
         public List<string> Flags { get; set; } = new List<string>();
         public DateTime TimeScanned { get; set; }
 

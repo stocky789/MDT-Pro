@@ -63,9 +63,9 @@
     const container = document.querySelector('.overlay .notifications') || document.body
     container.appendChild(wrapper)
 
-    // Keep only the most recent 4 ALPR popups in the MDT
+    // Keep only the most recent 8 ALPR popups; older ones are removed by the 2-minute auto-dismiss
     const popups = container.querySelectorAll('.alpr-popup')
-    const maxAlprPopups = 4
+    const maxAlprPopups = 8
     if (popups.length > maxAlprPopups) {
       for (let i = 0; i < popups.length - maxAlprPopups; i++) {
         popups[i].remove()
@@ -78,8 +78,21 @@
         timer.style.transition = `width ${duration}ms linear`
         requestAnimationFrame(() => { timer.style.width = '100%' })
       }
-      setTimeout(() => wrapper.remove(), duration)
+      setTimeout(() => {
+        if (wrapper.parentNode) wrapper.remove()
+      }, duration)
     }
+
+    // Auto-dismiss after 2 minutes with a slow fade so the list doesn't fill the screen and new alerts stay visible
+    const autoDismissMs = 2 * 60 * 1000
+    const fadeOutMs = 1500
+    setTimeout(() => {
+      if (!wrapper.parentNode) return
+      wrapper.classList.add('alpr-popup--fade-out')
+      setTimeout(() => {
+        if (wrapper.parentNode) wrapper.remove()
+      }, fadeOutMs)
+    }, autoDismissMs)
   }
 
   async function checkInGameAlprStatus() {

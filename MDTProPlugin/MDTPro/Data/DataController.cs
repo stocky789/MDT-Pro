@@ -348,6 +348,40 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>All vehicles that have at least one BOLO, for the BOLO noticeboard. In-world vehicles first (so CanModifyBOLOs is true when applicable); then persistent by plate, deduped.</summary>
+        internal static System.Collections.Generic.List<object> GetActiveBOLOs() {
+            var list = new System.Collections.Generic.List<object>();
+            var seenPlates = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            lock (_vehicleDbLock) {
+                foreach (var v in vehicleDatabase) {
+                    if (v?.BOLOs == null || v.BOLOs.Length == 0) continue;
+                    if (string.IsNullOrEmpty(v.LicensePlate)) continue;
+                    seenPlates.Add(v.LicensePlate);
+                    list.Add(new {
+                        v.LicensePlate,
+                        v.ModelDisplayName,
+                        v.IsStolen,
+                        BOLOs = v.BOLOs,
+                        CanModifyBOLOs = v.CanModifyBOLOs
+                    });
+                }
+                foreach (var v in keepInVehicleDatabase) {
+                    if (v?.BOLOs == null || v.BOLOs.Length == 0) continue;
+                    if (string.IsNullOrEmpty(v.LicensePlate)) continue;
+                    if (seenPlates.Contains(v.LicensePlate)) continue;
+                    seenPlates.Add(v.LicensePlate);
+                    list.Add(new {
+                        v.LicensePlate,
+                        v.ModelDisplayName,
+                        v.IsStolen,
+                        BOLOs = v.BOLOs,
+                        CanModifyBOLOs = false
+                    });
+                }
+            }
+            return list;
+        }
+
         /// <summary>Called when CDF removes ped data (entity despawned). Removes from pedDatabase only; keepInPedDatabase and SQLite unchanged.</summary>
         public static void OnCDFPedDataRemoved(Rage.Ped ped, PedData pedData) {
             if (pedData == null) return;

@@ -18,6 +18,8 @@
 
 ### Minor Features
 
+- **ALPR behavior** — Tuning (read range, cone, plate position) is now hardcoded with realistic values; only Enable and HUD position remain in config. Sound plays when a flagged vehicle is read. Full vehicle details shown only when the vehicle has alert flags; "Scanning" otherwise. Vehicle color shown on ALPR card. HUD uses RawFrameRender to prevent flicker when in a police vehicle. Config save merges with existing config so internal keys (e.g. ALPR) are not lost when saving from the Config page.
+- **ALPR MDT notifications** — Notifications auto-dismiss after 2 minutes with a short fade; maximum of 8 popups shown at once.
 - **Clarification: Calendar and bundled plugins** — Calendar, Vehicle Search, and other bundled plugins only appear in the sidebar when enabled in Config → Plugins. If they were not visible, they were disabled—not missing due to a bug.
 - **Firearm data:** Weapon names come from the game native (`GET_WEAPON_NAME_FROM_HASH`) so model names match what players see in-game.
 - **Firearm records** stored in SQLite (`firearm_records` table, schema 15). Upsert by owner + serial + weapon hash.
