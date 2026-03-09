@@ -1254,24 +1254,25 @@ namespace MDTPro.Data {
                 || n.Contains("domestic violence") || n.Contains("corporal injury") || n.Contains("violation of protective order");
         }
 
-        /// <summary>Applies court-ordered license revocations to ped data. Sets LicenseStatus, WeaponPermitStatus, FishingPermitStatus when applicable.</summary>
+        /// <summary>Applies court-ordered license revocations to ped data. Sets LicenseStatus, WeaponPermitStatus, FishingPermitStatus when applicable. Uses CDF/PR enums: DriversLicenseState (ELicenseState), WeaponPermit/FishingPermit.Status (EDocumentStatus) per https://policing-redefined.netlify.app/docs/developer-docs/cdf/peds/permits</summary>
         private static void ApplyLicenseRevocationsToPed(MDTProPedData pedData, List<string> revocations) {
             if (pedData == null || revocations == null || revocations.Count == 0) return;
             foreach (string r in revocations) {
                 if (r?.IndexOf("Driver", StringComparison.OrdinalIgnoreCase) >= 0) {
+                    // CDF DriversLicenseState (ELicenseState); CDF docs don't list enum members; "Revoked" parses when ELicenseState includes it
                     pedData.LicenseStatus = "Revoked";
                     break;
                 }
             }
             foreach (string r in revocations) {
                 if (r?.IndexOf("Firearm", StringComparison.OrdinalIgnoreCase) >= 0) {
-                    pedData.WeaponPermitStatus = "Revoked";
+                    pedData.WeaponPermitStatus = EDocumentStatus.Revoked.ToString();
                     break;
                 }
             }
             foreach (string r in revocations) {
                 if (r?.IndexOf("Fishing", StringComparison.OrdinalIgnoreCase) >= 0) {
-                    pedData.FishingPermitStatus = "Revoked";
+                    pedData.FishingPermitStatus = EDocumentStatus.Revoked.ToString();
                     break;
                 }
             }
@@ -1329,6 +1330,7 @@ namespace MDTPro.Data {
 
                     KeepPedInDatabase(pedData);
                     pedDatabase[pedIndex] = pedData;
+                    Database.SavePed(pedData);
                 }
             }
 
@@ -2228,6 +2230,7 @@ namespace MDTPro.Data {
                         SyncSinglePedToCDF(pedData);
                         KeepPedInDatabase(pedData);
                         pedDatabase[pedIndex] = pedData;
+                        Database.SavePed(pedData);
                     }
                 }
 
