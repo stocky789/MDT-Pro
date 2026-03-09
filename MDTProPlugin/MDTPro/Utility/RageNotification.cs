@@ -10,7 +10,6 @@ namespace MDTPro.Utility {
     internal static class RageNotification {
         private const string TexturePolice = "CHAR_CALL_POLICE";
         private const string TextureError = "CHAR_BLOCKED";
-        private const string TextureComputer = "CHAR_LS_CUSTOMS";
         private const string TitlePrefix = "MDT Pro";
 
         /// <summary>
@@ -67,11 +66,10 @@ namespace MDTPro.Utility {
         }
 
         private static (string dict, string name) GetTextureForType(NotificationType type) {
+            // All use CHAR_CALL_POLICE except errors. Replace char_call_police.ytd in game files with MDT Pro logo for custom icon.
             return type switch {
                 NotificationType.Error => (TextureError, TextureError),
-                NotificationType.Success => (TexturePolice, TexturePolice),
-                NotificationType.Info => (TextureComputer, TextureComputer),
-                _ => (TextureComputer, TextureComputer),
+                _ => (TexturePolice, TexturePolice),
             };
         }
 

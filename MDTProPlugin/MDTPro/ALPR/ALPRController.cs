@@ -26,8 +26,8 @@ namespace MDTPro.ALPR {
 
         private const int ScanIntervalMs = 2000;
         private const int CooldownSeconds = 90;
-        private const float ScanRangeMeters = 25f;
-        private const float ReadRangeMeters = 20f;
+        private const float ScanRangeMeters = 50f;
+        private const float ReadRangeMeters = 40f;
         private const float ConeAngleDegrees = 22f;
 
         internal static ALPRHit CurrentHit { get; private set; }
