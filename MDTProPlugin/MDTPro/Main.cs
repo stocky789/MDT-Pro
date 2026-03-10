@@ -23,6 +23,7 @@ namespace MDTPro {
         }
 
         public override void Finally() {
+            InjuryDataService.Stop();
             UI.SettingsMenu.Stop();
             ALPR.ALPRController.Stop();
             Data.DataController.EndCurrentShift();
@@ -113,6 +114,7 @@ namespace MDTPro {
 
                         ALPR.ALPRController.Start();
                         UI.SettingsMenu.Start();
+                        InjuryDataService.Start();
 
                         var cfg = GetConfig();
                         if (cfg.checkForUpdates && !string.IsNullOrWhiteSpace(cfg.githubReleasesRepo)) {

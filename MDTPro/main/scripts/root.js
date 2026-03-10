@@ -270,48 +270,76 @@ async function openPedAsOffenderInReport(type, pedName = '') {
 
     await iframe.contentWindow.onCreatePageTypeSelectorButtonClick(type)
 
-    iframe.contentWindow.document.querySelector(
+    const pedInput = iframe.contentWindow.document.querySelector(
       '.createPage #offenderSectionPedNameInput'
-    ).value = pedName
+    )
+    if (pedInput) pedInput.value = pedName || ''
   }
 }
 
+/**
+ * Open Reports window with prefill data from sessionStorage.
+ * Used by Vehicle Search (impound), Person Search (injury), etc.
+ * @param {string} reportType - 'impound' | 'injury' | 'trafficIncident' | 'citation' | 'arrest' | 'incident'
+ * @param {object} prefillData - { source, pedName?, vehiclePlate?, vehicleData?, pedData? }
+ */
+async function openReportWithPrefill(reportType, prefillData) {
+  if (await checkForReportOnCreatePage()) return
+  try {
+    sessionStorage.setItem('mdtproReportPrefill', JSON.stringify({
+      source: prefillData.source || 'unknown',
+      reportType,
+      expires: Date.now() + 60000,
+      data: prefillData
+    }))
+  } catch (_) {}
+  await topWindow.openWindow('reports')
+}
+
 async function openIdInReport(id, type = null) {
+  if (!id) return
   await topWindow.openWindow('reports')
   const iframe = topDoc
     .querySelector('.overlay .windows')
-    .lastChild.querySelector('iframe')
+    .lastChild?.querySelector('iframe')
+  if (!iframe) return
 
-  let found = false
-
-  iframe.onload = async () => {
-    iframe.contentWindow.document.addEventListener(
-      'pageLoaded',
-      async function () {
-        if (type) {
-          await performSearch(type)
-          return
-        }
-        const reportTypes = ['citation', 'arrest', 'incident']
-        for (const reportType of reportTypes) {
-          if (!found) await performSearch(reportType)
-        }
-      }
-    )
-  }
-
-  async function performSearch(reportType) {
-    await iframe.contentWindow.onListPageTypeSelectorButtonClick(reportType)
-
-    for (const listElement of iframe.contentWindow.document.querySelectorAll(
-      '.listPage .reportsList .listElement'
-    )) {
-      if (listElement.dataset.id == id) {
-        listElement.querySelector('.viewButton').click()
-        found = true
-        return
+  async function performSearch(win, reportType) {
+    if (typeof win.onListPageTypeSelectorButtonClick !== 'function') return false
+    await win.onListPageTypeSelectorButtonClick(reportType)
+    const list = win.document.querySelectorAll('.listPage .reportsList .listElement')
+    for (const listElement of list) {
+      if ((listElement.dataset.id || '') === String(id)) {
+        const viewBtn = listElement.querySelector('.viewButton')
+        if (viewBtn) viewBtn.click()
+        return true
       }
     }
+    return false
+  }
+
+  async function runOpenReportLogic() {
+    const win = iframe.contentWindow
+    if (!win) return
+    let found = false
+    if (type) {
+      found = await performSearch(win, type)
+    } else {
+      const reportTypes = ['citation', 'arrest', 'incident', 'impound', 'trafficIncident', 'injury']
+      for (const reportType of reportTypes) {
+        found = await performSearch(win, reportType)
+        if (found) break
+      }
+    }
+    if (!found && typeof win.showNotification === 'function') {
+      win.showNotification('Report not found.', 'warning')
+    }
+  }
+
+  iframe.onload = runOpenReportLogic
+
+  if (iframe.contentDocument?.readyState === 'complete') {
+    runOpenReportLogic()
   }
 }
 

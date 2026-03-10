@@ -981,6 +981,11 @@
   stroke: none;
 }
 
+.quickActionsBar .qabBtn.qabNotepad svg {
+  fill: currentColor;
+  stroke: none;
+}
+
 .quickActionsBar .qabBtn.qabPanic {
   color: var(--color-error);
   border-color: var(--color-error-half);
@@ -1102,6 +1107,140 @@
 
 .quickActionsBar .qabBackupMenu button[role="menuitem"]:hover {
   background-color: var(--color-accent-half);
+}
+
+/* ---------- Notepad popup ---------- */
+.notepadPopup {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition-time-short) ease, visibility var(--transition-time-short) ease;
+}
+
+.notepadPopup.open {
+  pointer-events: all;
+  opacity: 1;
+  visibility: visible;
+}
+
+.notepadPopupBackdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.notepadPopupPanel {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-medium);
+}
+
+.notepadPopupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.notepadPopupTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.notepadPopupClose {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color var(--transition-time-short) ease, background-color var(--transition-time-short) ease;
+}
+
+.notepadPopupClose:hover {
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-elevated);
+}
+
+.notepadPopupText {
+  flex: 1;
+  min-height: 200px;
+  margin: 0;
+  padding: 12px 16px;
+  border: none;
+  resize: vertical;
+  font-family: var(--font-family);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-elevated);
+}
+
+.notepadPopupText:focus {
+  outline: none;
+}
+
+.notepadPopupText::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.notepadPopupActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.notepadPopupActions button {
+  padding: 8px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background-color: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: background-color var(--transition-time-short) ease, border-color var(--transition-time-short) ease;
+}
+
+.notepadPopupActions button:hover {
+  background-color: var(--color-accent-half);
+  border-color: var(--color-accent);
+}
+
+.notepadPopupSave {
+  background-color: var(--color-accent-half) !important;
+  border-color: var(--color-accent) !important;
+  color: var(--color-accent) !important;
+}
+
+.notepadPopupSave:hover {
+  background-color: var(--color-accent) !important;
+  color: var(--color-surface) !important;
 }
 
 @media (max-width: 700px) {

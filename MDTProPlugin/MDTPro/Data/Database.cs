@@ -16,7 +16,7 @@ namespace MDTPro.Data {
         private static SQLiteConnection connection;
         private static readonly object dbLock = new object();
 
-        private const int CurrentSchemaVersion = 18;
+        private const int CurrentSchemaVersion = 23;
 
         internal static void Initialize() {
             lock (dbLock) {
@@ -90,8 +90,24 @@ namespace MDTPro.Data {
                     HuntingPermitStatus     TEXT,
                     HuntingPermitExpiration TEXT,
                     IncarceratedUntil       TEXT,
-                    IdentificationHistory   TEXT
+                    IdentificationHistory   TEXT,
+                    IsDeceased              INTEGER NOT NULL DEFAULT 0,
+                    DeceasedAt              TEXT
                 );
+
+                CREATE TABLE IF NOT EXISTS damage_cache (
+                    Id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                    VictimName          TEXT NOT NULL,
+                    Damage              INTEGER NOT NULL DEFAULT 0,
+                    ArmourDamage        INTEGER NOT NULL DEFAULT 0,
+                    WeaponType          TEXT,
+                    WeaponGroup         TEXT,
+                    BodyRegion          TEXT,
+                    VictimAlive         INTEGER NOT NULL DEFAULT 1,
+                    AtUtc               TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_damage_cache_victim ON damage_cache(VictimName);
+                CREATE INDEX IF NOT EXISTS idx_damage_cache_at ON damage_cache(AtUtc);
 
                 CREATE TABLE IF NOT EXISTS ped_citations (
                     Id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -186,6 +202,7 @@ namespace MDTPro.Data {
                     LastUpdatedUtc          TEXT,
                     OutcomeNotes            TEXT,
                     OutcomeReasoning        TEXT,
+                    SentenceReasoning       TEXT,
                     LicenseRevocations      TEXT
                 );
                 CREATE INDEX IF NOT EXISTS idx_court_cases_ped ON court_cases(PedName);
@@ -307,7 +324,13 @@ namespace MDTPro.Data {
                     Notes                       TEXT,
                     OffenderPedName             TEXT,
                     OffenderVehicleLicensePlate TEXT,
-                    CourtCaseNumber             TEXT
+                    CourtCaseNumber             TEXT,
+                    UseOfForceType              TEXT,
+                    UseOfForceTypeOther         TEXT,
+                    UseOfForceJustification     TEXT,
+                    UseOfForceInjurySuspect     INTEGER NOT NULL DEFAULT 0,
+                    UseOfForceInjuryOfficer     INTEGER NOT NULL DEFAULT 0,
+                    UseOfForceWitnesses         TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS arrest_report_charges (
@@ -366,6 +389,32 @@ namespace MDTPro.Data {
                 CREATE INDEX IF NOT EXISTS idx_drug_records_owner ON drug_records(OwnerPedName);
                 CREATE INDEX IF NOT EXISTS idx_drug_records_drugtype ON drug_records(DrugType);
 
+                CREATE TABLE IF NOT EXISTS traffic_incident_reports (
+                    Id TEXT PRIMARY KEY, ShortYear INTEGER NOT NULL, OfficerFirstName TEXT, OfficerLastName TEXT,
+                    OfficerRank TEXT, OfficerCallSign TEXT, OfficerAgency TEXT, OfficerBadgeNumber INTEGER,
+                    LocationArea TEXT, LocationStreet TEXT, LocationCounty TEXT, LocationPostal TEXT,
+                    TimeStamp TEXT NOT NULL, Status INTEGER NOT NULL DEFAULT 1, Notes TEXT,
+                    DriverNames TEXT, PassengerNames TEXT, PedestrianNames TEXT,
+                    VehiclePlates TEXT, VehicleModels TEXT, InjuryReported INTEGER NOT NULL DEFAULT 0,
+                    InjuryDetails TEXT, CollisionType TEXT
+                );
+                CREATE TABLE IF NOT EXISTS injury_reports (
+                    Id TEXT PRIMARY KEY, ShortYear INTEGER NOT NULL, OfficerFirstName TEXT, OfficerLastName TEXT,
+                    OfficerRank TEXT, OfficerCallSign TEXT, OfficerAgency TEXT, OfficerBadgeNumber INTEGER,
+                    LocationArea TEXT, LocationStreet TEXT, LocationCounty TEXT, LocationPostal TEXT,
+                    TimeStamp TEXT NOT NULL, Status INTEGER NOT NULL DEFAULT 1, Notes TEXT,
+                    InjuredPartyName TEXT, InjuryType TEXT, Severity TEXT, Treatment TEXT,
+                    IncidentContext TEXT, LinkedReportId TEXT
+                );
+                CREATE TABLE IF NOT EXISTS impound_reports (
+                    Id TEXT PRIMARY KEY, ShortYear INTEGER NOT NULL, OfficerFirstName TEXT, OfficerLastName TEXT,
+                    OfficerRank TEXT, OfficerCallSign TEXT, OfficerAgency TEXT, OfficerBadgeNumber INTEGER,
+                    LocationArea TEXT, LocationStreet TEXT, LocationCounty TEXT, LocationPostal TEXT,
+                    TimeStamp TEXT NOT NULL, Status INTEGER NOT NULL DEFAULT 1, Notes TEXT,
+                    LicensePlate TEXT, VehicleModel TEXT, Owner TEXT, Vin TEXT, ImpoundReason TEXT,
+                    TowCompany TEXT, ImpoundLot TEXT
+                );
+
                 CREATE TABLE IF NOT EXISTS vehicle_search_records (
                     Id                  INTEGER PRIMARY KEY AUTOINCREMENT,
                     LicensePlate        TEXT NOT NULL,
@@ -392,6 +441,15 @@ namespace MDTPro.Data {
                 return !reader.IsDBNull(ordinal) && Convert.ToBoolean(reader[ordinal]);
             } catch {
                 return false;
+            }
+        }
+
+        private static string ReaderOptionalString(SQLiteDataReader reader, string columnName) {
+            try {
+                int ordinal = reader.GetOrdinal(columnName);
+                return reader.IsDBNull(ordinal) ? null : (reader[ordinal] as string);
+            } catch {
+                return null;
             }
         }
 
@@ -669,6 +727,112 @@ namespace MDTPro.Data {
                 } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             }
 
+            if (fromVersion < 19) {
+                foreach (string col in new[] { "UseOfForceType", "UseOfForceTypeOther", "UseOfForceJustification", "UseOfForceWitnesses" }) {
+                    try {
+                        using (var cmd = new SQLiteCommand($"ALTER TABLE arrest_reports ADD COLUMN {col} TEXT", connection)) {
+                            cmd.ExecuteNonQuery();
+                        }
+                    } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+                }
+                foreach (string col in new[] { "UseOfForceInjurySuspect", "UseOfForceInjuryOfficer" }) {
+                    try {
+                        using (var cmd = new SQLiteCommand($"ALTER TABLE arrest_reports ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0", connection)) {
+                            cmd.ExecuteNonQuery();
+                        }
+                    } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+                }
+                try {
+                    using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN EvidenceUseOfForce INTEGER NOT NULL DEFAULT 0", connection)) {
+                        cmd.ExecuteNonQuery();
+                    }
+                } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+                try {
+                    using (var cmd = new SQLiteCommand(@"
+                        CREATE TABLE IF NOT EXISTS impound_reports (
+                            Id TEXT PRIMARY KEY, ShortYear INTEGER NOT NULL, OfficerFirstName TEXT, OfficerLastName TEXT,
+                            OfficerRank TEXT, OfficerCallSign TEXT, OfficerAgency TEXT, OfficerBadgeNumber INTEGER,
+                            LocationArea TEXT, LocationStreet TEXT, LocationCounty TEXT, LocationPostal TEXT,
+                            TimeStamp TEXT NOT NULL, Status INTEGER NOT NULL DEFAULT 1, Notes TEXT,
+                            LicensePlate TEXT, VehicleModel TEXT, Owner TEXT, Vin TEXT, ImpoundReason TEXT,
+                            TowCompany TEXT, ImpoundLot TEXT
+                        )", connection)) {
+                        cmd.ExecuteNonQuery();
+                    }
+                } catch { }
+                Helper.Log("Database migrated to schema version 19 (Use of Force, EvidenceUseOfForce, impound_reports)");
+            }
+
+            if (fromVersion < 20) {
+                try {
+                    using (var cmd = new SQLiteCommand(@"
+                        CREATE TABLE IF NOT EXISTS traffic_incident_reports (
+                            Id TEXT PRIMARY KEY, ShortYear INTEGER NOT NULL, OfficerFirstName TEXT, OfficerLastName TEXT,
+                            OfficerRank TEXT, OfficerCallSign TEXT, OfficerAgency TEXT, OfficerBadgeNumber INTEGER,
+                            LocationArea TEXT, LocationStreet TEXT, LocationCounty TEXT, LocationPostal TEXT,
+                            TimeStamp TEXT NOT NULL, Status INTEGER NOT NULL DEFAULT 1, Notes TEXT,
+                            DriverNames TEXT, PassengerNames TEXT, PedestrianNames TEXT,
+                            VehiclePlates TEXT, VehicleModels TEXT, InjuryReported INTEGER NOT NULL DEFAULT 0,
+                            InjuryDetails TEXT, CollisionType TEXT
+                        );
+                        CREATE TABLE IF NOT EXISTS injury_reports (
+                            Id TEXT PRIMARY KEY, ShortYear INTEGER NOT NULL, OfficerFirstName TEXT, OfficerLastName TEXT,
+                            OfficerRank TEXT, OfficerCallSign TEXT, OfficerAgency TEXT, OfficerBadgeNumber INTEGER,
+                            LocationArea TEXT, LocationStreet TEXT, LocationCounty TEXT, LocationPostal TEXT,
+                            TimeStamp TEXT NOT NULL, Status INTEGER NOT NULL DEFAULT 1, Notes TEXT,
+                            InjuredPartyName TEXT, InjuryType TEXT, Severity TEXT, Treatment TEXT,
+                            IncidentContext TEXT, LinkedReportId TEXT
+                        )", connection)) {
+                        cmd.ExecuteNonQuery();
+                    }
+                    Helper.Log("Database migrated to schema version 20 (traffic_incident_reports, injury_reports)");
+                } catch { }
+            }
+            if (fromVersion < 21) {
+                try {
+                    using (var cmd = new SQLiteCommand("ALTER TABLE injury_reports ADD COLUMN GameInjurySnapshot TEXT", connection)) {
+                        cmd.ExecuteNonQuery();
+                    }
+                    Helper.Log("Database migrated to schema version 21 (injury_reports GameInjurySnapshot)");
+                } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            }
+            if (fromVersion < 22) {
+                try {
+                    using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN SentenceReasoning TEXT", connection)) {
+                        cmd.ExecuteNonQuery();
+                    }
+                    Helper.Log("Database migrated to schema version 22 (court_cases SentenceReasoning)");
+                } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            }
+            if (fromVersion < 23) {
+                try {
+                    using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN IsDeceased INTEGER NOT NULL DEFAULT 0", connection)) {
+                        cmd.ExecuteNonQuery();
+                    }
+                    using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN DeceasedAt TEXT", connection)) {
+                        cmd.ExecuteNonQuery();
+                    }
+                    using (var cmd = new SQLiteCommand(@"
+                        CREATE TABLE IF NOT EXISTS damage_cache (
+                            Id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                            VictimName          TEXT NOT NULL,
+                            Damage              INTEGER NOT NULL DEFAULT 0,
+                            ArmourDamage        INTEGER NOT NULL DEFAULT 0,
+                            WeaponType          TEXT,
+                            WeaponGroup         TEXT,
+                            BodyRegion          TEXT,
+                            VictimAlive         INTEGER NOT NULL DEFAULT 1,
+                            AtUtc               TEXT NOT NULL
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_damage_cache_victim ON damage_cache(VictimName);
+                        CREATE INDEX IF NOT EXISTS idx_damage_cache_at ON damage_cache(AtUtc);
+                    ", connection)) {
+                        cmd.ExecuteNonQuery();
+                    }
+                    Helper.Log("Database migrated to schema version 23 (peds IsDeceased/DeceasedAt, damage_cache)");
+                } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true || ex.Message?.Contains("already exists") == true) { }
+            }
+
             SetSchemaVersion(CurrentSchemaVersion);
         }
 
@@ -728,7 +892,9 @@ namespace MDTPro.Data {
                 IncarceratedUntil = reader["IncarceratedUntil"] as string,
                 IdentificationHistory = reader["IdentificationHistory"] is string idJson && !string.IsNullOrEmpty(idJson)
                     ? JsonConvert.DeserializeObject<List<MDTProPedData.IdentificationEntry>>(idJson)
-                    : new List<MDTProPedData.IdentificationEntry>()
+                    : new List<MDTProPedData.IdentificationEntry>(),
+                IsDeceased = reader["IsDeceased"] is DBNull || reader["IsDeceased"] == null ? false : Convert.ToBoolean(reader["IsDeceased"]),
+                DeceasedAt = reader["DeceasedAt"] as string
             };
         }
 
@@ -861,6 +1027,7 @@ namespace MDTPro.Data {
                                 EvidenceViolatedSupervision = reader["EvidenceViolatedSupervision"] is DBNull ? false : Convert.ToBoolean(reader["EvidenceViolatedSupervision"]),
                                 EvidenceResisted = reader["EvidenceResisted"] is DBNull ? false : Convert.ToBoolean(reader["EvidenceResisted"]),
                                 EvidenceHadDrugs = GetBooleanFromReader(reader, "EvidenceHadDrugs"),
+                                EvidenceUseOfForce = GetBooleanFromReader(reader, "EvidenceUseOfForce"),
                                 ConvictionChance = reader["ConvictionChance"] is DBNull ? 0 : Convert.ToInt32(reader["ConvictionChance"]),
                                 ResolveAtUtc = reader["ResolveAtUtc"] as string,
                                 RepeatOffenderScore = Convert.ToInt32(reader["RepeatOffenderScore"]),
@@ -882,6 +1049,7 @@ namespace MDTPro.Data {
                                 LastUpdatedUtc = reader["LastUpdatedUtc"] as string,
                                 OutcomeNotes = reader["OutcomeNotes"] as string,
                                 OutcomeReasoning = reader["OutcomeReasoning"] as string,
+                                SentenceReasoning = ReaderOptionalString(reader, "SentenceReasoning"),
                                 LicenseRevocations = ParseLicenseRevocations(reader["LicenseRevocations"] as string)
                             };
 
@@ -1104,6 +1272,19 @@ namespace MDTPro.Data {
                                 OffenderVehicleLicensePlate = reader["OffenderVehicleLicensePlate"] as string,
                                 CourtCaseNumber = reader["CourtCaseNumber"] as string
                             };
+                            try {
+                                string uofType = reader["UseOfForceType"] as string;
+                                if (!string.IsNullOrEmpty(uofType)) {
+                                    report.UseOfForce = new ArrestReport.UseOfForceData {
+                                        Type = uofType,
+                                        TypeOther = reader["UseOfForceTypeOther"] as string,
+                                        Justification = reader["UseOfForceJustification"] as string,
+                                        InjuryToSuspect = GetBooleanFromReader(reader, "UseOfForceInjurySuspect"),
+                                        InjuryToOfficer = GetBooleanFromReader(reader, "UseOfForceInjuryOfficer"),
+                                        Witnesses = reader["UseOfForceWitnesses"] as string
+                                    };
+                                }
+                            } catch { /* columns may not exist on older schema */ }
 
                             report.Charges = LoadArrestReportCharges(report.Id);
                             reports.Add(report);
@@ -1113,6 +1294,117 @@ namespace MDTPro.Data {
 
                 return reports;
             }
+        }
+
+        internal static List<ImpoundReport> LoadImpoundReports() {
+            lock (dbLock) {
+                if (connection == null) return null;
+
+                var reports = new List<ImpoundReport>();
+
+                try {
+                    using (var cmd = new SQLiteCommand("SELECT * FROM impound_reports", connection)) {
+                        using (var reader = cmd.ExecuteReader()) {
+                            while (reader.Read()) {
+                                var report = new ImpoundReport {
+                                    Id = reader["Id"] as string,
+                                    ShortYear = Convert.ToInt32(reader["ShortYear"]),
+                                    OfficerInformation = ReadOfficerFromRow(reader),
+                                    Location = ReadLocationFromRow(reader),
+                                    TimeStamp = DateTime.Parse((string)reader["TimeStamp"], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                                    Status = (ReportStatus)Convert.ToInt32(reader["Status"]),
+                                    Notes = reader["Notes"] as string,
+                                    LicensePlate = reader["LicensePlate"] as string,
+                                    VehicleModel = reader["VehicleModel"] as string,
+                                    Owner = reader["Owner"] as string,
+                                    Vin = reader["Vin"] as string,
+                                    ImpoundReason = reader["ImpoundReason"] as string,
+                                    TowCompany = reader["TowCompany"] as string,
+                                    ImpoundLot = reader["ImpoundLot"] as string
+                                };
+                                reports.Add(report);
+                            }
+                        }
+                    }
+                } catch { }
+
+                return reports;
+            }
+        }
+
+        internal static List<TrafficIncidentReport> LoadTrafficIncidentReports() {
+            lock (dbLock) {
+                if (connection == null) return null;
+                var reports = new List<TrafficIncidentReport>();
+                try {
+                    using (var cmd = new SQLiteCommand("SELECT * FROM traffic_incident_reports", connection)) {
+                        using (var reader = cmd.ExecuteReader()) {
+                            while (reader.Read()) {
+                                var r = new TrafficIncidentReport {
+                                    Id = reader["Id"] as string,
+                                    ShortYear = Convert.ToInt32(reader["ShortYear"]),
+                                    OfficerInformation = ReadOfficerFromRow(reader),
+                                    Location = ReadLocationFromRow(reader),
+                                    TimeStamp = DateTime.Parse((string)reader["TimeStamp"], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                                    Status = (ReportStatus)Convert.ToInt32(reader["Status"]),
+                                    Notes = reader["Notes"] as string,
+                                    DriverNames = ParseStringArray(reader["DriverNames"] as string),
+                                    PassengerNames = ParseStringArray(reader["PassengerNames"] as string),
+                                    PedestrianNames = ParseStringArray(reader["PedestrianNames"] as string),
+                                    VehiclePlates = ParseStringArray(reader["VehiclePlates"] as string),
+                                    VehicleModels = ParseStringArray(reader["VehicleModels"] as string),
+                                    InjuryReported = GetBooleanFromReader(reader, "InjuryReported"),
+                                    InjuryDetails = reader["InjuryDetails"] as string,
+                                    CollisionType = reader["CollisionType"] as string
+                                };
+                                reports.Add(r);
+                            }
+                        }
+                    }
+                } catch { }
+                return reports;
+            }
+        }
+
+        internal static List<InjuryReport> LoadInjuryReports() {
+            lock (dbLock) {
+                if (connection == null) return null;
+                var reports = new List<InjuryReport>();
+                try {
+                    using (var cmd = new SQLiteCommand("SELECT * FROM injury_reports", connection)) {
+                        using (var reader = cmd.ExecuteReader()) {
+                            while (reader.Read()) {
+                                var r = new InjuryReport {
+                                    Id = reader["Id"] as string,
+                                    ShortYear = Convert.ToInt32(reader["ShortYear"]),
+                                    OfficerInformation = ReadOfficerFromRow(reader),
+                                    Location = ReadLocationFromRow(reader),
+                                    TimeStamp = DateTime.Parse((string)reader["TimeStamp"], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                                    Status = (ReportStatus)Convert.ToInt32(reader["Status"]),
+                                    Notes = reader["Notes"] as string,
+                                    InjuredPartyName = reader["InjuredPartyName"] as string,
+                                    InjuryType = reader["InjuryType"] as string,
+                                    Severity = reader["Severity"] as string,
+                                    Treatment = reader["Treatment"] as string,
+                                    IncidentContext = reader["IncidentContext"] as string,
+                                    LinkedReportId = reader["LinkedReportId"] as string,
+                                    GameInjurySnapshot = ReaderOptionalString(reader, "GameInjurySnapshot")
+                                };
+                                reports.Add(r);
+                            }
+                        }
+                    }
+                } catch { }
+                return reports;
+            }
+        }
+
+        private static string[] ParseStringArray(string json) {
+            if (string.IsNullOrWhiteSpace(json)) return new string[0];
+            try {
+                var list = JsonConvert.DeserializeObject<List<string>>(json);
+                return list?.ToArray() ?? new string[0];
+            } catch { return new string[0]; }
         }
 
         private static List<ArrestReport.Charge> LoadArrestReportCharges(string reportId) {
@@ -1204,7 +1496,7 @@ namespace MDTPro.Data {
                     WeaponPermitStatus, WeaponPermitExpiration, WeaponPermitType,
                     FishingPermitStatus, FishingPermitExpiration,
                     HuntingPermitStatus, HuntingPermitExpiration, IncarceratedUntil,
-                    IdentificationHistory
+                    IdentificationHistory, IsDeceased, DeceasedAt
                 ) VALUES (
                     @Name, @FirstName, @LastName, @ModelHash, @ModelName, @Birthday, @Gender, @Address,
                     @IsInGang, @AdvisoryText, @TimesStopped, @IsWanted, @WarrantText,
@@ -1212,7 +1504,7 @@ namespace MDTPro.Data {
                     @WeaponPermitStatus, @WeaponPermitExpiration, @WeaponPermitType,
                     @FishingPermitStatus, @FishingPermitExpiration,
                     @HuntingPermitStatus, @HuntingPermitExpiration, @IncarceratedUntil,
-                    @IdentificationHistory
+                    @IdentificationHistory, @IsDeceased, @DeceasedAt
                 )", connection, transaction)) {
                 cmd.Parameters.AddWithValue("@Name", (object)ped.Name ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@FirstName", (object)ped.FirstName ?? DBNull.Value);
@@ -1243,6 +1535,8 @@ namespace MDTPro.Data {
                     ? JsonConvert.SerializeObject(ped.IdentificationHistory)
                     : null;
                 cmd.Parameters.AddWithValue("@IdentificationHistory", (object)idHistoryJson ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@IsDeceased", ped.IsDeceased ? 1 : 0);
+                cmd.Parameters.AddWithValue("@DeceasedAt", (object)ped.DeceasedAt ?? DBNull.Value);
                 cmd.ExecuteNonQuery();
             }
 
@@ -1290,6 +1584,79 @@ namespace MDTPro.Data {
                         cmd.Parameters.AddWithValue("@probation", charge.probation);
                         cmd.Parameters.AddWithValue("@canBeWarrant", charge.canBeWarrant ? 1 : 0);
                         cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+        }
+
+        /// <summary>Marks a ped as deceased. Persists to DB and updates in-memory ped if present.</summary>
+        internal static void MarkPedDeceased(string pedName, string deceasedAtUtc = null) {
+            if (string.IsNullOrWhiteSpace(pedName)) return;
+            if (string.IsNullOrWhiteSpace(deceasedAtUtc)) deceasedAtUtc = DateTime.UtcNow.ToString("o");
+
+            lock (dbLock) {
+                if (connection == null) return;
+                using (var cmd = new SQLiteCommand("UPDATE peds SET IsDeceased = 1, DeceasedAt = @at WHERE Name = @name", connection)) {
+                    cmd.Parameters.AddWithValue("@at", deceasedAtUtc);
+                    cmd.Parameters.AddWithValue("@name", pedName);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        /// <summary>Saves a damage cache entry to SQL for permanent injury report lookup.</summary>
+        internal static void SaveDamageCacheEntry(string victimName, int damage, int armourDamage, string weaponType, string weaponGroup, string bodyRegion, bool victimAlive, DateTime atUtc) {
+            if (string.IsNullOrWhiteSpace(victimName)) return;
+
+            lock (dbLock) {
+                if (connection == null) return;
+                using (var cmd = new SQLiteCommand(@"
+                    INSERT INTO damage_cache (VictimName, Damage, ArmourDamage, WeaponType, WeaponGroup, BodyRegion, VictimAlive, AtUtc)
+                    VALUES (@VictimName, @Damage, @ArmourDamage, @WeaponType, @WeaponGroup, @BodyRegion, @VictimAlive, @AtUtc)", connection)) {
+                    cmd.Parameters.AddWithValue("@VictimName", victimName);
+                    cmd.Parameters.AddWithValue("@Damage", damage);
+                    cmd.Parameters.AddWithValue("@ArmourDamage", armourDamage);
+                    cmd.Parameters.AddWithValue("@WeaponType", (object)weaponType ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@WeaponGroup", (object)weaponGroup ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@BodyRegion", (object)bodyRegion ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@VictimAlive", victimAlive ? 1 : 0);
+                    cmd.Parameters.AddWithValue("@AtUtc", atUtc.ToString("o"));
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        /// <summary>Loads the most recent damage cache entry for a victim (permanent, from SQL). Returns null if none.</summary>
+        internal static (int Damage, int ArmourDamage, string WeaponType, string WeaponGroup, string BodyRegion, bool VictimAlive, DateTime At)? LoadDamageCacheByVictimName(string victimName) {
+            if (string.IsNullOrWhiteSpace(victimName)) return null;
+
+            lock (dbLock) {
+                if (connection == null) return null;
+                using (var cmd = new SQLiteCommand(@"
+                    SELECT Damage, ArmourDamage, WeaponType, WeaponGroup, BodyRegion, VictimAlive, AtUtc 
+                    FROM damage_cache 
+                    WHERE VictimName = @name 
+                    ORDER BY 
+                        CASE WHEN UPPER(COALESCE(WeaponGroup,'')) LIKE '%BULLET%' 
+                                  OR UPPER(COALESCE(WeaponType,'')) LIKE '%PISTOL%' 
+                                  OR UPPER(COALESCE(WeaponType,'')) LIKE '%RIFLE%'
+                                  OR UPPER(COALESCE(WeaponType,'')) LIKE '%GUN%'
+                                  OR UPPER(COALESCE(WeaponType,'')) LIKE '%SHOTGUN%'
+                             THEN 0 ELSE 1 END,
+                        AtUtc DESC 
+                    LIMIT 1", connection)) {
+                    cmd.Parameters.AddWithValue("@name", victimName);
+                    using (var reader = cmd.ExecuteReader()) {
+                        if (!reader.Read()) return null;
+                        return (
+                            Convert.ToInt32(reader["Damage"]),
+                            Convert.ToInt32(reader["ArmourDamage"]),
+                            reader["WeaponType"] as string,
+                            reader["WeaponGroup"] as string,
+                            reader["BodyRegion"] as string,
+                            Convert.ToBoolean(reader["VictimAlive"]),
+                            DateTime.Parse(reader["AtUtc"] as string ?? "", null, System.Globalization.DateTimeStyles.RoundtripKind)
+                        );
                     }
                 }
             }
@@ -1385,24 +1752,24 @@ namespace MDTPro.Data {
                     PriorCitationCount, PriorArrestCount, PriorConvictionCount, SeverityScore, EvidenceScore,
                     EvidenceHadWeapon, EvidenceWasWanted, EvidenceWasPatDown,
                     EvidenceWasDrunk, EvidenceWasFleeing, EvidenceAssaultedPed, EvidenceDamagedVehicle, EvidenceIllegalWeapon,
-                    EvidenceViolatedSupervision, EvidenceResisted, EvidenceHadDrugs, ConvictionChance, ResolveAtUtc,
+                    EvidenceViolatedSupervision, EvidenceResisted, EvidenceHadDrugs, EvidenceUseOfForce, ConvictionChance, ResolveAtUtc,
                     RepeatOffenderScore,
                     SentenceMultiplier, ProsecutionStrength, DefenseStrength, DocketPressure, PolicyAdjustment,
                     CourtDistrict, CourtName, CourtType, HasPublicDefender, Plea,
                     JudgeName, ProsecutorName, DefenseAttorneyName,
-                    HearingDateUtc, CreatedAtUtc, LastUpdatedUtc, OutcomeNotes, OutcomeReasoning, LicenseRevocations
+                    HearingDateUtc, CreatedAtUtc, LastUpdatedUtc, OutcomeNotes, OutcomeReasoning, SentenceReasoning, LicenseRevocations
                 ) VALUES (
                     @Number, @PedName, @ReportId, @ShortYear, @Status,
                     @IsJuryTrial, @JurySize, @JuryVotesForConviction, @JuryVotesForAcquittal,
                     @PriorCitationCount, @PriorArrestCount, @PriorConvictionCount, @SeverityScore, @EvidenceScore,
                     @EvidenceHadWeapon, @EvidenceWasWanted, @EvidenceWasPatDown,
                     @EvidenceWasDrunk, @EvidenceWasFleeing, @EvidenceAssaultedPed, @EvidenceDamagedVehicle, @EvidenceIllegalWeapon,
-                    @EvidenceViolatedSupervision, @EvidenceResisted, @EvidenceHadDrugs, @ConvictionChance, @ResolveAtUtc,
+                    @EvidenceViolatedSupervision, @EvidenceResisted, @EvidenceHadDrugs, @EvidenceUseOfForce, @ConvictionChance, @ResolveAtUtc,
                     @RepeatOffenderScore,
                     @SentenceMultiplier, @ProsecutionStrength, @DefenseStrength, @DocketPressure, @PolicyAdjustment,
                     @CourtDistrict, @CourtName, @CourtType, @HasPublicDefender, @Plea,
                     @JudgeName, @ProsecutorName, @DefenseAttorneyName,
-                    @HearingDateUtc, @CreatedAtUtc, @LastUpdatedUtc, @OutcomeNotes, @OutcomeReasoning, @LicenseRevocations
+                    @HearingDateUtc, @CreatedAtUtc, @LastUpdatedUtc, @OutcomeNotes, @OutcomeReasoning, @SentenceReasoning, @LicenseRevocations
                 )",
                 connection, transaction)) {
                 cmd.Parameters.AddWithValue("@Number", (object)courtCase.Number ?? DBNull.Value);
@@ -1430,6 +1797,7 @@ namespace MDTPro.Data {
                 cmd.Parameters.AddWithValue("@EvidenceViolatedSupervision", courtCase.EvidenceViolatedSupervision ? 1 : 0);
                 cmd.Parameters.AddWithValue("@EvidenceResisted", courtCase.EvidenceResisted ? 1 : 0);
                 cmd.Parameters.AddWithValue("@EvidenceHadDrugs", courtCase.EvidenceHadDrugs ? 1 : 0);
+                cmd.Parameters.AddWithValue("@EvidenceUseOfForce", courtCase.EvidenceUseOfForce ? 1 : 0);
                 cmd.Parameters.AddWithValue("@ConvictionChance", courtCase.ConvictionChance);
                 cmd.Parameters.AddWithValue("@ResolveAtUtc", (object)courtCase.ResolveAtUtc ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@RepeatOffenderScore", courtCase.RepeatOffenderScore);
@@ -1451,6 +1819,7 @@ namespace MDTPro.Data {
                 cmd.Parameters.AddWithValue("@LastUpdatedUtc", (object)courtCase.LastUpdatedUtc ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@OutcomeNotes", (object)courtCase.OutcomeNotes ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@OutcomeReasoning", (object)courtCase.OutcomeReasoning ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@SentenceReasoning", (object)courtCase.SentenceReasoning ?? DBNull.Value);
                 string revocationsJson = courtCase.LicenseRevocations != null && courtCase.LicenseRevocations.Count > 0
                     ? Newtonsoft.Json.JsonConvert.SerializeObject(courtCase.LicenseRevocations) : null;
                 cmd.Parameters.AddWithValue("@LicenseRevocations", (object)revocationsJson ?? DBNull.Value);
@@ -1686,18 +2055,29 @@ namespace MDTPro.Data {
                             OfficerCallSign, OfficerAgency, OfficerBadgeNumber,
                             LocationArea, LocationStreet, LocationCounty, LocationPostal,
                             TimeStamp, Status, Notes, OffenderPedName,
-                            OffenderVehicleLicensePlate, CourtCaseNumber
+                            OffenderVehicleLicensePlate, CourtCaseNumber,
+                            UseOfForceType, UseOfForceTypeOther, UseOfForceJustification,
+                            UseOfForceInjurySuspect, UseOfForceInjuryOfficer, UseOfForceWitnesses
                         ) VALUES (
                             @Id, @ShortYear, @OfficerFirstName, @OfficerLastName, @OfficerRank,
                             @OfficerCallSign, @OfficerAgency, @OfficerBadgeNumber,
                             @LocationArea, @LocationStreet, @LocationCounty, @LocationPostal,
                             @TimeStamp, @Status, @Notes, @OffenderPedName,
-                            @OffenderVehicleLicensePlate, @CourtCaseNumber
+                            @OffenderVehicleLicensePlate, @CourtCaseNumber,
+                            @UseOfForceType, @UseOfForceTypeOther, @UseOfForceJustification,
+                            @UseOfForceInjurySuspect, @UseOfForceInjuryOfficer, @UseOfForceWitnesses
                         )", connection, transaction)) {
                         AddReportBaseParams(cmd, report);
                         cmd.Parameters.AddWithValue("@OffenderPedName", (object)report.OffenderPedName ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@OffenderVehicleLicensePlate", (object)report.OffenderVehicleLicensePlate ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@CourtCaseNumber", (object)report.CourtCaseNumber ?? DBNull.Value);
+                        var uof = report.UseOfForce;
+                        cmd.Parameters.AddWithValue("@UseOfForceType", (object)uof?.Type ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@UseOfForceTypeOther", (object)uof?.TypeOther ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@UseOfForceJustification", (object)uof?.Justification ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@UseOfForceInjurySuspect", uof?.InjuryToSuspect == true ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@UseOfForceInjuryOfficer", uof?.InjuryToOfficer == true ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@UseOfForceWitnesses", (object)uof?.Witnesses ?? DBNull.Value);
                         cmd.ExecuteNonQuery();
                     }
 
@@ -1732,6 +2112,111 @@ namespace MDTPro.Data {
                         }
                     }
 
+                    transaction.Commit();
+                }
+            }
+        }
+
+        internal static void SaveImpoundReport(ImpoundReport report) {
+            if (report?.Id == null) return;
+
+            lock (dbLock) {
+                if (connection == null) return;
+
+                using (var transaction = connection.BeginTransaction()) {
+                    using (var cmd = new SQLiteCommand(@"
+                        INSERT OR REPLACE INTO impound_reports (
+                            Id, ShortYear, OfficerFirstName, OfficerLastName, OfficerRank,
+                            OfficerCallSign, OfficerAgency, OfficerBadgeNumber,
+                            LocationArea, LocationStreet, LocationCounty, LocationPostal,
+                            TimeStamp, Status, Notes,
+                            LicensePlate, VehicleModel, Owner, Vin, ImpoundReason, TowCompany, ImpoundLot
+                        ) VALUES (
+                            @Id, @ShortYear, @OfficerFirstName, @OfficerLastName, @OfficerRank,
+                            @OfficerCallSign, @OfficerAgency, @OfficerBadgeNumber,
+                            @LocationArea, @LocationStreet, @LocationCounty, @LocationPostal,
+                            @TimeStamp, @Status, @Notes,
+                            @LicensePlate, @VehicleModel, @Owner, @Vin, @ImpoundReason, @TowCompany, @ImpoundLot
+                        )", connection, transaction)) {
+                        AddReportBaseParams(cmd, report);
+                        cmd.Parameters.AddWithValue("@LicensePlate", (object)report.LicensePlate ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@VehicleModel", (object)report.VehicleModel ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@Owner", (object)report.Owner ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@Vin", (object)report.Vin ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@ImpoundReason", (object)report.ImpoundReason ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@TowCompany", (object)report.TowCompany ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@ImpoundLot", (object)report.ImpoundLot ?? DBNull.Value);
+                        cmd.ExecuteNonQuery();
+                    }
+                    transaction.Commit();
+                }
+            }
+        }
+
+        internal static void SaveTrafficIncidentReport(TrafficIncidentReport report) {
+            if (report?.Id == null) return;
+            lock (dbLock) {
+                if (connection == null) return;
+                using (var transaction = connection.BeginTransaction()) {
+                    using (var cmd = new SQLiteCommand(@"
+                        INSERT OR REPLACE INTO traffic_incident_reports (
+                            Id, ShortYear, OfficerFirstName, OfficerLastName, OfficerRank,
+                            OfficerCallSign, OfficerAgency, OfficerBadgeNumber,
+                            LocationArea, LocationStreet, LocationCounty, LocationPostal,
+                            TimeStamp, Status, Notes, DriverNames, PassengerNames, PedestrianNames,
+                            VehiclePlates, VehicleModels, InjuryReported, InjuryDetails, CollisionType
+                        ) VALUES (
+                            @Id, @ShortYear, @OfficerFirstName, @OfficerLastName, @OfficerRank,
+                            @OfficerCallSign, @OfficerAgency, @OfficerBadgeNumber,
+                            @LocationArea, @LocationStreet, @LocationCounty, @LocationPostal,
+                            @TimeStamp, @Status, @Notes, @DriverNames, @PassengerNames, @PedestrianNames,
+                            @VehiclePlates, @VehicleModels, @InjuryReported, @InjuryDetails, @CollisionType
+                        )", connection, transaction)) {
+                        AddReportBaseParams(cmd, report);
+                        cmd.Parameters.AddWithValue("@DriverNames", report.DriverNames != null ? JsonConvert.SerializeObject(report.DriverNames) : (object)DBNull.Value);
+                        cmd.Parameters.AddWithValue("@PassengerNames", report.PassengerNames != null ? JsonConvert.SerializeObject(report.PassengerNames) : (object)DBNull.Value);
+                        cmd.Parameters.AddWithValue("@PedestrianNames", report.PedestrianNames != null ? JsonConvert.SerializeObject(report.PedestrianNames) : (object)DBNull.Value);
+                        cmd.Parameters.AddWithValue("@VehiclePlates", report.VehiclePlates != null ? JsonConvert.SerializeObject(report.VehiclePlates) : (object)DBNull.Value);
+                        cmd.Parameters.AddWithValue("@VehicleModels", report.VehicleModels != null ? JsonConvert.SerializeObject(report.VehicleModels) : (object)DBNull.Value);
+                        cmd.Parameters.AddWithValue("@InjuryReported", report.InjuryReported ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@InjuryDetails", (object)report.InjuryDetails ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@CollisionType", (object)report.CollisionType ?? DBNull.Value);
+                        cmd.ExecuteNonQuery();
+                    }
+                    transaction.Commit();
+                }
+            }
+        }
+
+        internal static void SaveInjuryReport(InjuryReport report) {
+            if (report?.Id == null) return;
+            lock (dbLock) {
+                if (connection == null) return;
+                using (var transaction = connection.BeginTransaction()) {
+                    using (var cmd = new SQLiteCommand(@"
+                        INSERT OR REPLACE INTO injury_reports (
+                            Id, ShortYear, OfficerFirstName, OfficerLastName, OfficerRank,
+                            OfficerCallSign, OfficerAgency, OfficerBadgeNumber,
+                            LocationArea, LocationStreet, LocationCounty, LocationPostal,
+                            TimeStamp, Status, Notes, InjuredPartyName, InjuryType, Severity,
+                            Treatment, IncidentContext, LinkedReportId, GameInjurySnapshot
+                        ) VALUES (
+                            @Id, @ShortYear, @OfficerFirstName, @OfficerLastName, @OfficerRank,
+                            @OfficerCallSign, @OfficerAgency, @OfficerBadgeNumber,
+                            @LocationArea, @LocationStreet, @LocationCounty, @LocationPostal,
+                            @TimeStamp, @Status, @Notes, @InjuredPartyName, @InjuryType, @Severity,
+                            @Treatment, @IncidentContext, @LinkedReportId, @GameInjurySnapshot
+                        )", connection, transaction)) {
+                        AddReportBaseParams(cmd, report);
+                        cmd.Parameters.AddWithValue("@InjuredPartyName", (object)report.InjuredPartyName ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@InjuryType", (object)report.InjuryType ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@Severity", (object)report.Severity ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@Treatment", (object)report.Treatment ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@IncidentContext", (object)report.IncidentContext ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@LinkedReportId", (object)report.LinkedReportId ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@GameInjurySnapshot", (object)report.GameInjurySnapshot ?? DBNull.Value);
+                        cmd.ExecuteNonQuery();
+                    }
                     transaction.Commit();
                 }
             }

@@ -63,6 +63,9 @@ namespace MDTPro.Setup {
             DataController.incidentReports = Database.LoadIncidentReports() ?? new List<IncidentReport>();
             DataController.citationReports = Database.LoadCitationReports() ?? new List<CitationReport>();
             DataController.arrestReports = Database.LoadArrestReports() ?? new List<ArrestReport>();
+            DataController.impoundReports = Database.LoadImpoundReports() ?? new List<ImpoundReport>();
+            DataController.trafficIncidentReports = Database.LoadTrafficIncidentReports() ?? new List<TrafficIncidentReport>();
+            DataController.injuryReports = Database.LoadInjuryReports() ?? new List<InjuryReport>();
 
             DataController.LoadPedDatabaseFromFile();
             DataController.LoadVehicleDatabaseFromFile();
@@ -171,9 +174,19 @@ namespace MDTPro.Setup {
         internal static Language GetLanguage() {
             if (cachedLanguage == null) {
                 cachedLanguage = Helper.ReadFromJsonFile<Language>(LanguagePath) ?? new Language();
+                EnsureIdTypeMapDefaults(cachedLanguage);
                 Helper.WriteToJsonFile(LanguagePath, cachedLanguage);
             }
             return cachedLanguage;
+        }
+
+        /// <summary>Ensures IdTypeMap has prefixes for all report types (handles language.json from before impound/trafficIncident/injury were added).</summary>
+        private static void EnsureIdTypeMapDefaults(Language lang) {
+            if (lang?.reports?.idTypeMap == null) return;
+            var map = lang.reports.idTypeMap;
+            if (string.IsNullOrEmpty(map.impound)) map.impound = "IMP";
+            if (string.IsNullOrEmpty(map.trafficIncident)) map.trafficIncident = "TIR";
+            if (string.IsNullOrEmpty(map.injury)) map.injury = "INJ";
         }
 
         private static List<CitationGroup> cachedCitationOptions;

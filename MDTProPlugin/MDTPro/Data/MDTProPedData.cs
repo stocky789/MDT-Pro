@@ -38,6 +38,8 @@ namespace MDTPro.Data {
         public string HuntingPermitStatus;
         public string HuntingPermitExpiration;
         public string IncarceratedUntil;
+        public bool IsDeceased;
+        public string DeceasedAt;
         public List<CitationGroup.Charge> Citations;
         public List<ArrestGroup.Charge> Arrests;
         public List<IdentificationEntry> IdentificationHistory;
@@ -197,6 +199,8 @@ namespace MDTPro.Data {
             if (!string.IsNullOrEmpty(source.HuntingPermitStatus)) HuntingPermitStatus = source.HuntingPermitStatus;
             if (!string.IsNullOrEmpty(source.HuntingPermitExpiration)) HuntingPermitExpiration = source.HuntingPermitExpiration;
             if (!string.IsNullOrEmpty(source.IncarceratedUntil)) IncarceratedUntil = source.IncarceratedUntil;
+            IsDeceased = source.IsDeceased;
+            DeceasedAt = source.DeceasedAt;
 
             Citations = source.Citations?
                 .Select(charge => new CitationGroup.Charge {

@@ -65,6 +65,47 @@ function applyDraft(draft) {
   }
 }
 
+async function applyReportPrefill(type) {
+  try {
+    const raw = sessionStorage.getItem('mdtproReportPrefill')
+    if (!raw) return
+    const prefill = JSON.parse(raw)
+    if (prefill.reportType !== type || (prefill.expires && Date.now() > prefill.expires)) return
+    const d = prefill.data || {}
+    const el = document.querySelector('.createPage .reportInformation')
+    if (!el) return
+
+    const pedInput = el.querySelector('#offenderSectionPedNameInput')
+    const vehicleInput = el.querySelector('#offenderSectionVehicleLicensePlateInput')
+    if (d.pedName && pedInput) pedInput.value = d.pedName
+    if (d.vehiclePlate && vehicleInput) vehicleInput.value = d.vehiclePlate
+    if (d.vehicleData) {
+      const v = d.vehicleData
+      if (v.LicensePlate && vehicleInput) vehicleInput.value = v.LicensePlate
+      const impoundPlate = el.querySelector('#impoundSectionPlateInput')
+      const impoundModel = el.querySelector('#impoundSectionModelInput')
+      const impoundOwner = el.querySelector('#impoundSectionOwnerInput')
+      const impoundVin = el.querySelector('#impoundSectionVinInput')
+      if (impoundPlate) impoundPlate.value = v.LicensePlate || ''
+      if (impoundModel) impoundModel.value = v.ModelDisplayName || v.ModelName || ''
+      if (impoundOwner) impoundOwner.value = v.Owner || ''
+      if (impoundVin) impoundVin.value = v.VehicleIdentificationNumber || v.VinStatus || ''
+    }
+
+    const injuredInput = el.querySelector('#injurySectionInjuredPartyInput')
+    if (d.pedName && injuredInput) injuredInput.value = d.pedName
+
+    sessionStorage.removeItem('mdtproReportPrefill')
+    const lang = await getLanguage()
+    const msg = d.source === 'vehicleSearch'
+      ? (lang.reports?.notifications?.prefilledFromVehicleSearch || 'Prefilled from Vehicle Search')
+      : (lang.reports?.notifications?.prefilledFromPersonSearch || 'Prefilled from Person Search')
+    if (typeof topWindow !== 'undefined' && topWindow.showNotification) {
+      topWindow.showNotification(msg, 'info')
+    }
+  } catch (_) {}
+}
+
 function startAutosave() {
   if (autosaveInterval) clearInterval(autosaveInterval)
   autosaveInterval = setInterval(serializeDraft, 5000)
@@ -90,10 +131,19 @@ async function onCreateButtonClick() {
   document.querySelector('.createPage .listWrapper').style.display = 'grid'
   document.querySelector('.createPage .typeSelector').classList.remove('hidden')
 
+  let type = document.querySelector('.listPage .typeSelector .selected')?.dataset?.type
+  try {
+    const prefillRaw = sessionStorage.getItem('mdtproReportPrefill')
+    if (prefillRaw) {
+      const prefill = JSON.parse(prefillRaw)
+      if (prefill.reportType && ['impound', 'injury', 'trafficIncident'].includes(prefill.reportType)) {
+        type = prefill.reportType
+      }
+    }
+  } catch (_) {}
   const draft = getDraft()
-  const type = draft
-    ? draft.type
-    : document.querySelector('.listPage .typeSelector .selected').dataset.type
+  if (draft) type = draft.type
+  if (!type) type = 'incident'
 
   await onCreatePageTypeSelectorButtonClick(type)
 
@@ -147,8 +197,17 @@ async function onListPageTypeSelectorButtonClick(type) {
 
   document.querySelector('.listPage .reportsList').innerHTML = ''
 
-  let reports = await (await fetch(`/data/${type}Reports`)).json()
-  reports = reports.reverse()
+  let reports = []
+  try {
+    const res = await fetch(`/data/${type}Reports`)
+    if (res.ok) {
+      const data = await res.json()
+      reports = Array.isArray(data) ? data : []
+    }
+  } catch (_) {
+    reports = []
+  }
+  reports = reports.slice().reverse()
 
   const filterElement = document.createElement('div')
   filterElement.classList.add('filter')
@@ -288,20 +347,24 @@ async function onListPageTypeSelectorButtonClick(type) {
       if (dateFrom && reportDate < dateFrom) continue
       if (dateTo && reportDate > dateTo) continue
 
-      // Text search across fields
+      // Text search across fields (optional chaining for types that omit some fields, e.g. impound)
+      const loc = report.Location
+      const locationStr = loc ? `${loc.Postal || ''} ${loc.Street || ''} ${loc.Area || ''}`.toLowerCase() : ''
       if (
         report.OffenderPedName?.toLowerCase().includes(searchText) ||
         report.OffenderVehicleLicensePlate?.toLowerCase().includes(searchText) ||
-        report.Id.toLowerCase().includes(searchText) ||
-        new Date(report.TimeStamp)
-          .toLocaleDateString()
-          .toLowerCase()
-          .includes(searchText) ||
-        `${report.Location.Postal} ${report.Location.Street}`
-          .toLowerCase()
-          .includes(searchText) ||
-        report.Location.Area.toLowerCase().includes(searchText) ||
-        (report.Notes && report.Notes.toLowerCase().includes(searchText))
+        report.LicensePlate?.toLowerCase().includes(searchText) ||
+        report.Owner?.toLowerCase().includes(searchText) ||
+        report.VehicleModel?.toLowerCase().includes(searchText) ||
+        report.InjuredPartyName?.toLowerCase().includes(searchText) ||
+        report.InjuryType?.toLowerCase().includes(searchText) ||
+        (report.Id && report.Id.toLowerCase().includes(searchText)) ||
+        (report.TimeStamp && new Date(report.TimeStamp).toLocaleDateString().toLowerCase().includes(searchText)) ||
+        locationStr.includes(searchText) ||
+        (report.Notes && report.Notes.toLowerCase().includes(searchText)) ||
+        report.ImpoundReason?.toLowerCase().includes(searchText) ||
+        report.TowCompany?.toLowerCase().includes(searchText) ||
+        report.ImpoundLot?.toLowerCase().includes(searchText)
       ) {
         addToNewReports(report)
       }
@@ -331,6 +394,17 @@ async function onListPageTypeSelectorButtonClick(type) {
             addToNewReports(report)
             break
           }
+        }
+      }
+
+      if (report.DriverNames) {
+        for (const n of report.DriverNames) {
+          if (n?.toLowerCase().includes(searchText)) { addToNewReports(report); break }
+        }
+      }
+      if (report.VehiclePlates) {
+        for (const p of report.VehiclePlates) {
+          if (p?.toLowerCase().includes(searchText)) { addToNewReports(report); break }
         }
       }
 
@@ -386,7 +460,9 @@ async function renderReports(reports, type) {
     ).toLocaleDateString()}</span>`
 
     const locationElement = document.createElement('div')
-    locationElement.innerHTML = `${language.reports.list.location}: <span>${report.Location.Postal} ${report.Location.Street}, ${report.Location.Area}</span>`
+    const loc = report.Location
+    const locationStr = loc ? `${loc.Postal || ''} ${loc.Street || ''}, ${loc.Area || ''}`.trim() || '—' : '—'
+    locationElement.innerHTML = `${language.reports.list.location}: <span>${locationStr}</span>`
 
     const textWrapper = document.createElement('div')
     textWrapper.appendChild(iDElement)
@@ -422,10 +498,43 @@ async function renderReports(reports, type) {
         // FinalAmount is set only when a citation is closed (ReportStatus.Closed = 0)
         if (type === 'citation' && report.Status == 0 && report.FinalAmount != null) {
           const finalAmountEl = document.createElement('div')
-          // Await before template; using await inside the literal can show "[object Promise]" in some environments
           const formattedAmount = await getCurrencyString(report.FinalAmount)
           finalAmountEl.innerHTML = `${language.reports.list.finalAmount}: <span>${formattedAmount}</span>`
           textWrapper.appendChild(finalAmountEl)
+        }
+        break
+      case 'impound':
+        const impoundVehicleEl = document.createElement('div')
+        impoundVehicleEl.innerHTML = `${language.reports?.list?.vehicle || 'Vehicle'}: <span>${report.LicensePlate || '—'}${report.VehicleModel ? ` (${report.VehicleModel})` : ''}</span>`
+        textWrapper.appendChild(impoundVehicleEl)
+        if (report.Owner) {
+          const ownerEl = document.createElement('div')
+          ownerEl.innerHTML = `${language.reports?.sections?.impound?.owner || 'Owner'}: <span>${report.Owner}</span>`
+          textWrapper.appendChild(ownerEl)
+        }
+        break
+      case 'trafficIncident':
+        const drivers = (report.DriverNames || []).join(', ')
+        const plates = (report.VehiclePlates || []).join(', ')
+        if (drivers || plates) {
+          const trafficEl = document.createElement('div')
+          trafficEl.innerHTML = `${language.reports?.list?.involvedParties || 'Parties'}: <span>${drivers || '—'}${plates ? ` | ${plates}` : ''}</span>`
+          textWrapper.appendChild(trafficEl)
+        }
+        if (report.InjuryReported) {
+          const injuryEl = document.createElement('div')
+          injuryEl.innerHTML = `${language.reports?.sections?.trafficIncident?.injuryReported || 'Injury reported'}: <span>Yes</span>`
+          textWrapper.appendChild(injuryEl)
+        }
+        break
+      case 'injury':
+        const injuredEl = document.createElement('div')
+        injuredEl.innerHTML = `${language.reports?.sections?.injury?.injuredParty || 'Injured party'}: <span>${report.InjuredPartyName || '—'}</span>`
+        textWrapper.appendChild(injuredEl)
+        if (report.InjuryType) {
+          const typeEl = document.createElement('div')
+          typeEl.innerHTML = `${language.reports?.sections?.injury?.injuryType || 'Type'}: <span>${report.InjuryType}</span>`
+          textWrapper.appendChild(typeEl)
         }
         break
     }
@@ -599,6 +708,59 @@ async function renderReportInformation(report, type, isList) {
       }
       if (type === 'arrest' && report.CourtCaseNumber)
         reportInformationEl.dataset.courtCaseNumber = report.CourtCaseNumber
+      if (type === 'arrest' && (!isList || (report.UseOfForce && report.UseOfForce.Type))) {
+        reportInformationEl.appendChild(
+          await getUseOfForceSection(report.UseOfForce || {}, isList)
+        )
+      }
+      break
+    case 'impound':
+      reportInformationEl.appendChild(
+        await getImpoundSection(
+          {
+            LicensePlate: report.LicensePlate,
+            VehicleModel: report.VehicleModel,
+            Owner: report.Owner,
+            Vin: report.Vin,
+            ImpoundReason: report.ImpoundReason,
+            TowCompany: report.TowCompany,
+            ImpoundLot: report.ImpoundLot
+          },
+          isList
+        )
+      )
+      break
+    case 'trafficIncident':
+      reportInformationEl.appendChild(
+        await getTrafficIncidentSection(
+          {
+            DriverNames: report.DriverNames || [],
+            PassengerNames: report.PassengerNames || [],
+            PedestrianNames: report.PedestrianNames || [],
+            VehiclePlates: report.VehiclePlates || [],
+            VehicleModels: report.VehicleModels || [],
+            InjuryReported: report.InjuryReported || false,
+            InjuryDetails: report.InjuryDetails,
+            CollisionType: report.CollisionType
+          },
+          isList
+        )
+      )
+      break
+    case 'injury':
+      reportInformationEl.appendChild(
+        await getInjurySection(
+          {
+            InjuredPartyName: report.InjuredPartyName,
+            InjuryType: report.InjuryType,
+            Severity: report.Severity,
+            Treatment: report.Treatment,
+            IncidentContext: report.IncidentContext,
+            LinkedReportId: report.LinkedReportId
+          },
+          isList
+        )
+      )
       break
   }
 
@@ -676,6 +838,16 @@ async function onCreatePageTypeSelectorButtonClick(type) {
   }
 
   await renderReportInformation(fakeReport, button.dataset.type, false)
+  await applyReportPrefill(type)
+
+  if (type === 'injury') {
+    setTimeout(function () {
+      const importBtn = document.querySelector('.createPage .injurySection .importInjuryFromGameBtn')
+      if (importBtn && document.querySelector('#injurySectionInjuredPartyInput')?.value?.trim()) {
+        importBtn.click()
+      }
+    }, 300)
+  }
 
   const fillFromPriorBtn = document.createElement('button')
   fillFromPriorBtn.innerHTML =
@@ -684,9 +856,12 @@ async function onCreatePageTypeSelectorButtonClick(type) {
   fillFromPriorBtn.addEventListener('click', async function () {
     if (fillFromPriorBtn.classList.contains('loading')) return
     showLoadingOnButton(fillFromPriorBtn)
-    const reports = await (
-      await fetch(`/data/${button.dataset.type}Reports`)
-    ).json()
+    let reports = []
+    try {
+      const res = await fetch(`/data/${button.dataset.type}Reports`)
+      if (res.ok) reports = await res.json()
+    } catch (_) {}
+    if (!Array.isArray(reports)) reports = []
     if (reports.length === 0) {
       topWindow.showNotification(
         language.reports.notifications?.noPriorReport ||
@@ -697,16 +872,17 @@ async function onCreatePageTypeSelectorButtonClick(type) {
       return
     }
     const latest = reports[reports.length - 1]
+    const loc = latest?.Location
     const el = document.querySelector('.createPage .reportInformation')
     const fields = {
-      '#locationSectionAreaInput': latest.Location.Area,
-      '#locationSectionStreetInput': latest.Location.Street,
-      '#locationSectionCountyInput': latest.Location.County,
-      '#locationSectionPostalInput': latest.Location.Postal,
+      '#locationSectionAreaInput': loc?.Area ?? '',
+      '#locationSectionStreetInput': loc?.Street ?? '',
+      '#locationSectionCountyInput': loc?.County ?? '',
+      '#locationSectionPostalInput': loc?.Postal ?? '',
     }
     for (const [selector, value] of Object.entries(fields)) {
       const input = el.querySelector(selector)
-      if (input) input.value = value || ''
+      if (input) input.value = value != null ? value : ''
     }
     hideLoadingOnButton(fillFromPriorBtn)
   })
@@ -716,7 +892,18 @@ async function onCreatePageTypeSelectorButtonClick(type) {
 
 const pageLoadedEvent = new Event('pageLoaded')
 document.addEventListener('DOMContentLoaded', async function () {
-  await onListPageTypeSelectorButtonClick('incident')
+  let initialType = 'incident'
+  try {
+    const prefillRaw = sessionStorage.getItem('mdtproReportPrefill')
+    if (prefillRaw) {
+      const prefill = JSON.parse(prefillRaw)
+      if (prefill.reportType && ['impound', 'injury', 'trafficIncident'].includes(prefill.reportType)) {
+        initialType = prefill.reportType
+        document.querySelector('.listPage .createButton')?.click()
+      }
+    }
+  } catch (_) {}
+  await onListPageTypeSelectorButtonClick(initialType)
   document.dispatchEvent(pageLoadedEvent)
 })
 
@@ -729,9 +916,11 @@ async function generateReportId(type) {
   for (const report of reports) {
     if (report.ShortYear == shortYear) index++
   }
-  const typeMap = language.reports.idTypeMap
+  const typeMap = language.reports?.idTypeMap || {}
+  const defaultPrefixes = { impound: 'IMP', trafficIncident: 'TIR', injury: 'INJ' }
+  const typePrefix = typeMap[type] ?? defaultPrefixes[type] ?? type?.slice(0, 3)?.toUpperCase() ?? 'RPT'
   let id = config.reportIdFormat
-  id = id.replace('{type}', typeMap[type])
+  id = id.replace('{type}', typePrefix)
   id = id.replace('{shortYear}', shortYear)
   id = id.replace('{year}', new Date().getFullYear())
   id = id.replace('{month}', new Date().getMonth() + 1)
@@ -908,6 +1097,18 @@ async function saveReport(type) {
 
       report.CourtCaseNumber = el.dataset.courtCaseNumber ?? null
 
+      const uofType = el.querySelector('#useOfForceTypeSelect')?.value?.trim()
+      if (uofType) {
+        report.UseOfForce = {
+          Type: uofType,
+          TypeOther: uofType === 'Other' ? (el.querySelector('#useOfForceTypeOtherInput')?.value?.trim() || null) : null,
+          Justification: el.querySelector('#useOfForceJustificationInput')?.value?.trim() || null,
+          InjuryToSuspect: el.querySelector('#useOfForceInjurySuspect')?.checked === true,
+          InjuryToOfficer: el.querySelector('#useOfForceInjuryOfficer')?.checked === true,
+          Witnesses: el.querySelector('#useOfForceWitnessesInput')?.value?.trim() || null
+        }
+      }
+
       response = await (
         await fetch('/post/createArrestReport', {
           method: 'POST',
@@ -918,6 +1119,67 @@ async function saveReport(type) {
         })
       ).text()
       break
+    case 'impound':
+      report.LicensePlate = el.querySelector('#impoundSectionPlateInput')?.value?.trim() || ''
+      report.VehicleModel = el.querySelector('#impoundSectionModelInput')?.value?.trim() || ''
+      report.Owner = el.querySelector('#impoundSectionOwnerInput')?.value?.trim() || ''
+      report.Vin = el.querySelector('#impoundSectionVinInput')?.value?.trim() || ''
+      report.ImpoundReason = el.querySelector('#impoundSectionReasonInput')?.value?.trim() || ''
+      report.TowCompany = el.querySelector('#impoundSectionTowInput')?.value?.trim() || ''
+      report.ImpoundLot = el.querySelector('#impoundSectionLotInput')?.value?.trim() || ''
+      response = await (
+        await fetch('/post/createImpoundReport', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(report),
+        })
+      ).text()
+      break
+    case 'trafficIncident': {
+      const tiLabels = language.reports?.sections?.trafficIncident || {}
+      const collectNames = (title) => {
+        const section = el.querySelector(`[data-title="${title}"]`)
+        if (!section) return []
+        const inputs = section.querySelectorAll('.inputWrapper input[type="text"]')
+        const arr = []
+        inputs.forEach((inp) => { if (inp.value?.trim()) arr.push(inp.value.trim()) })
+        return arr
+      }
+      report.DriverNames = collectNames(tiLabels.drivers || 'Drivers')
+      report.PassengerNames = collectNames(tiLabels.passengers || 'Passengers')
+      report.PedestrianNames = collectNames(tiLabels.pedestrians || 'Pedestrians')
+      report.VehiclePlates = collectNames(tiLabels.vehicles || 'Vehicles')
+      report.VehicleModels = collectNames(tiLabels.vehicleModels || 'Vehicle Models')
+      report.InjuryReported = el.querySelector('#trafficIncidentInjuryCheck')?.checked === true
+      report.InjuryDetails = el.querySelector('#trafficIncidentInjuryDetailsInput')?.value?.trim() || null
+      report.CollisionType = el.querySelector('#trafficIncidentCollisionInput')?.value?.trim() || null
+      response = await (
+        await fetch('/post/createTrafficIncidentReport', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(report),
+        })
+      ).text()
+      break
+    }
+    case 'injury': {
+      const injurySection = el.querySelector('.injurySection')
+      report.InjuredPartyName = el.querySelector('#injurySectionInjuredPartyInput')?.value?.trim() || ''
+      report.InjuryType = el.querySelector('#injurySectionInjuryTypeInput')?.value?.trim() || null
+      report.Severity = el.querySelector('#injurySectionSeverityInput')?.value?.trim() || null
+      report.Treatment = el.querySelector('#injurySectionTreatmentInput')?.value?.trim() || null
+      report.IncidentContext = el.querySelector('#injurySectionContextInput')?.value?.trim() || null
+      report.LinkedReportId = el.querySelector('#injurySectionLinkedReportInput')?.value?.trim() || null
+      report.GameInjurySnapshot = injurySection?.dataset?.gameInjurySnapshot || null
+      response = await (
+        await fetch('/post/createInjuryReport', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(report),
+        })
+      ).text()
+      break
+    }
   }
 
   if (response != 'OK') {

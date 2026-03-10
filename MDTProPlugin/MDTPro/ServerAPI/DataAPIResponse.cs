@@ -3,9 +3,11 @@ using MDTPro.Data.Reports;
 using MDTPro.Utility;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Specialized;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Web;
 
 namespace MDTPro.ServerAPI {
     internal class DataAPIResponse : APIResponse {
@@ -123,6 +125,33 @@ namespace MDTPro.ServerAPI {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.arrestReports));
                 status = 200;
                 contentType = "text/json";
+            } else if (path == "impoundReports") {
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.impoundReports));
+                status = 200;
+                contentType = "text/json";
+            } else if (path == "trafficIncidentReports") {
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.trafficIncidentReports));
+                status = 200;
+                contentType = "text/json";
+            } else if (path == "injuryReports") {
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.injuryReports));
+                status = 200;
+                contentType = "text/json";
+            } else if (path == "injuryGameData") {
+                string pedName = null;
+                if (!string.IsNullOrEmpty(req.Url.Query)) {
+                    NameValueCollection q = HttpUtility.ParseQueryString(req.Url.Query);
+                    pedName = q["pedName"]?.Trim();
+                }
+                if (string.IsNullOrEmpty(pedName)) {
+                    var contextData = InjuryDataService.GetInjuryGameDataForContext();
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(contextData ?? (object)new { }));
+                } else {
+                    var gameData = InjuryDataService.GetInjuryGameDataForPed(pedName);
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(gameData ?? (object)new { }));
+                }
+                status = 200;
+                contentType = "text/json";
             } else if (path == "playerLocation") {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.PlayerLocation));
                 status = 200;
@@ -222,10 +251,10 @@ namespace MDTPro.ServerAPI {
             } else if (path == "recentIds") {
                 var recentIds = DataController.PedDatabase
                     .Where(p => p.IdentificationHistory != null && p.IdentificationHistory.Count > 0)
-                    .Select(p => new { p.Name, Latest = p.IdentificationHistory[0] })
+                    .Select(p => new { p.Name, Latest = p.IdentificationHistory[0], p.IsDeceased })
                     .OrderByDescending(x => x.Latest.Timestamp)
                     .Take(8)
-                    .Select(x => new { x.Name, x.Latest.Type, x.Latest.Timestamp });
+                    .Select(x => new { x.Name, x.Latest.Type, x.Latest.Timestamp, x.IsDeceased });
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(recentIds));
                 status = 200;
                 contentType = "text/json";
@@ -258,7 +287,40 @@ namespace MDTPro.ServerAPI {
                 contentType = "text/json";
             } else if (path == "vehicleSearchByPlate") {
                 string plate = Helper.GetRequestBodyAsString(req);
-                var records = string.IsNullOrWhiteSpace(plate) ? new System.Collections.Generic.List<VehicleSearchRecord>() : Database.LoadVehicleSearchRecordsByPlate(plate);
+                var records = string.IsNullOrWhiteSpace(plate)
+                    ? new System.Collections.Generic.List<VehicleSearchRecord>()
+                    : Database.LoadVehicleSearchRecordsByPlate(plate);
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(records ?? new System.Collections.Generic.List<VehicleSearchRecord>()));
+                status = 200;
+                contentType = "text/json";
+            } else if (path == "impoundReportsByPlate") {
+                string plate = Helper.GetRequestBodyAsString(req);
+                plate = plate?.Trim();
+                var source = DataController.impoundReports ?? new System.Collections.Generic.List<ImpoundReport>();
+                System.Collections.Generic.IEnumerable<ImpoundReport> reports;
+
+                if (string.IsNullOrWhiteSpace(plate)) {
+                    reports = new System.Collections.Generic.List<ImpoundReport>();
+                } else {
+                    string plateLower = plate.ToLower();
+                    reports = source
+                        .Where(r => r != null && !string.IsNullOrEmpty(r.LicensePlate) && r.LicensePlate.Trim().ToLower() == plateLower)
+                        .OrderByDescending(r => r.TimeStamp);
+                }
+
+                var result = reports.Select(r => new {
+                    r.Id,
+                    r.TimeStamp,
+                    r.Status,
+                    r.LicensePlate,
+                    r.VehicleModel,
+                    r.Owner,
+                    r.ImpoundReason,
+                    r.TowCompany,
+                    r.ImpoundLot
+                });
+
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(result));
                 status = 200;
                 contentType = "text/json";
             }

@@ -54,8 +54,39 @@
         })
       })
     }
-    // Panic, ALPR and other qabBtn (excluding backup which has its own handler)
-    quickActionsBar.querySelectorAll('.qabBtn:not(.qabBackupMain)').forEach((btn) => {
+    // Notepad: open popup (excluded from loading/API flow below)
+    const notepadBtn = quickActionsBar.querySelector('.qabBtn[data-action="notepad"]')
+    const notepadPopup = document.getElementById('notepadPopup')
+    const notepadText = document.getElementById('notepadText')
+    const NOTEPAD_STORAGE_KEY = 'mdt-notepad'
+    if (notepadBtn && notepadPopup && notepadText) {
+      const openNotepad = () => {
+        notepadText.value = localStorage.getItem(NOTEPAD_STORAGE_KEY) || ''
+        notepadPopup.classList.add('open')
+        notepadPopup.setAttribute('aria-hidden', 'false')
+        notepadText.focus()
+      }
+      const closeNotepad = () => {
+        notepadPopup.classList.remove('open')
+        notepadPopup.setAttribute('aria-hidden', 'true')
+      }
+      notepadBtn.addEventListener('click', function () {
+        openNotepad()
+      })
+      notepadPopup.querySelectorAll('[data-notepad-close]').forEach((el) => {
+        el.addEventListener('click', closeNotepad)
+      })
+      notepadPopup.querySelector('.notepadPopupSave')?.addEventListener('click', function () {
+        localStorage.setItem(NOTEPAD_STORAGE_KEY, notepadText.value)
+        topWindow.showNotification(language.quickActions?.notepadSaved || 'Notepad saved.', 'checkMark')
+      })
+      notepadPopup.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeNotepad()
+      })
+    }
+
+    // Panic, ALPR and other qabBtn (excluding backup and notepad which have their own handlers)
+    quickActionsBar.querySelectorAll('.qabBtn:not(.qabBackupMain):not([data-action="notepad"])').forEach((btn) => {
       btn.addEventListener('click', async function () {
         const action = this.dataset.action
         if (!action) return
@@ -315,8 +346,21 @@ locationWS.onclose = async () => {
 const desktopItems = document.querySelectorAll('.desktop .desktopItem')
 
 for (const desktopItem of desktopItems) {
-  desktopItem.addEventListener('click', function () {
-    openWindow(this.dataset.name)
+  desktopItem.addEventListener('click', async function () {
+    const name = this.dataset.name
+    if (!name) return
+    try {
+      await openWindow(name)
+    } catch (e) {
+      const msg = e?.message || String(e)
+      console.error('openWindow failed:', name, e)
+      if (typeof topWindow.showNotification === 'function') {
+        topWindow.showNotification(
+          (await getLanguage()).index?.notifications?.errorLoadingPage || 'Failed to open: ' + name + (msg ? ' — ' + msg : ''),
+          'error'
+        )
+      }
+    }
   })
 }
 

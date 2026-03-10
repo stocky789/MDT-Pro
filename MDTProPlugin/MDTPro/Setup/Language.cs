@@ -170,6 +170,7 @@ namespace MDTPro.Setup {
         public class PedSearch {
             public Static @static = new Static();
             public Notifications notifications = new Notifications();
+            public string createInjuryReport = "New Injury Report";
 
             public class Static {
                 public string title = "Person Search";
@@ -254,6 +255,8 @@ namespace MDTPro.Setup {
                 public string boloReasonPrompt = "Enter BOLO reason:";
                 public string boloExpiresPrompt = "Expires in how many days? (default 7):";
                 public string searchResultsTitle = "Search Results (Contraband)";
+                public string impoundReportsTitle = "Impound Reports";
+                public string createImpoundReport = "Create Impound Report";
                 public Labels labels = new Labels();
 
                 public class Labels {
@@ -355,6 +358,9 @@ namespace MDTPro.Setup {
                         public string incident = "Incident Reports";
                         public string citation = "Citation Reports";
                         public string arrest = "Arrest Reports";
+                        public string impound = "Impound Reports";
+                        public string trafficIncident = "Traffic Incident Reports";
+                        public string injury = "Injury Reports";
                     }
                 }
 
@@ -368,6 +374,9 @@ namespace MDTPro.Setup {
                         public string incident = "Incident Report";
                         public string citation = "Citation Report";
                         public string arrest = "Arrest Report";
+                        public string impound = "Impound Report";
+                        public string trafficIncident = "Traffic Incident Report";
+                        public string injury = "Injury Report";
                     }
                 }
             }
@@ -383,6 +392,8 @@ namespace MDTPro.Setup {
                 public string invalidDate = "Invalid date.";
                 public string noCharges = "Add at least one charge.";
                 public string noOffender = "Offender name required.";
+                public string prefilledFromPersonSearch = "Prefilled from Person Search";
+                public string prefilledFromVehicleSearch = "Prefilled from Vehicle Search";
             }
 
             public class Sections {
@@ -449,12 +460,88 @@ namespace MDTPro.Setup {
                     public string title = "Arrest Charges";
                     public string searchChargesPlaceholder = "Search charges";
                 }
+
+                public UseOfForce useOfForce = new UseOfForce();
+
+                public Impound impound = new Impound();
+                public TrafficIncident trafficIncident = new TrafficIncident();
+                public Injury injury = new Injury();
+
+                public class Impound {
+                    public string title = "Vehicle & Impound Details";
+                    public string licensePlate = "License Plate";
+                    public string model = "Model";
+                    public string owner = "Owner";
+                    public string vin = "VIN";
+                    public string impoundReason = "Impound Reason";
+                    public string towCompany = "Tow Company";
+                    public string impoundLot = "Impound Lot";
+                }
+
+                public class TrafficIncident {
+                    public string title = "Traffic Incident Details";
+                    public string drivers = "Drivers";
+                    public string driver = "Driver";
+                    public string addDriver = "Add driver";
+                    public string removeDriver = "Remove";
+                    public string passengers = "Passengers";
+                    public string passenger = "Passenger";
+                    public string addPassenger = "Add passenger";
+                    public string removePassenger = "Remove";
+                    public string pedestrians = "Pedestrians";
+                    public string pedestrian = "Pedestrian";
+                    public string addPedestrian = "Add pedestrian";
+                    public string removePedestrian = "Remove";
+                    public string vehicles = "Vehicles";
+                    public string vehiclePlate = "Plate";
+                    public string addVehicle = "Add vehicle";
+                    public string removeVehicle = "Remove";
+                    public string vehicleModels = "Vehicle Models";
+                    public string model = "Model";
+                    public string addModel = "Add model";
+                    public string removeModel = "Remove";
+                    public string injuryReported = "Injury reported";
+                    public string injuryDetails = "Injury details";
+                    public string collisionType = "Collision type";
+                }
+
+                public class Injury {
+                    public string title = "Injury Details";
+                    public string injuredParty = "Injured party";
+                    public string injuryType = "Injury type";
+                    public string severity = "Severity";
+                    public string treatment = "Treatment";
+                    public string incidentContext = "Incident context";
+                    public string linkedReportId = "Linked report ID";
+                    public string importFromGame = "Import from game";
+                    public string basedOnDamageTracker = "Based on in-game damage (DamageTrackerFramework).";
+                    public string basedOnHealth = "Based on current health/armor.";
+                    public string noGameData = "No in-game data for this person. Ensure they are nearby or use DamageTrackerFramework.";
+                    public string importError = "Could not load game data.";
+                    public string selectFromRecentIds = "Select injured party (Recent IDs)";
+                    public string noRecentIds = "No recent IDs. Collect an ID from a ped (e.g. traffic stop) to show them here.";
+                    public string recentIdsError = "Could not load Recent IDs.";
+                }
+
+                public class UseOfForce {
+                    public string title = "Use of Force";
+                    public string type = "Type";
+                    public string typeOther = "Type (if Other)";
+                    public string justification = "Justification";
+                    public string justificationPlaceholder = "Describe circumstances requiring use of force";
+                    public string injuryToSuspect = "Injury to suspect";
+                    public string injuryToOfficer = "Injury to officer";
+                    public string witnesses = "Witnesses";
+                }
             }
 
             public class IdTypeMap {
                 public string incident = "I";
                 public string citation = "C";
                 public string arrest = "A";
+                public string impound = "IMP";
+                public string trafficIncident = "TIR";
+                public string injury = "INJ";
             }
 
             public class List {
@@ -544,7 +631,18 @@ namespace MDTPro.Setup {
             public string judge = "Judge";
             public string severityScore = "Severity Score";
             public string evidenceScore = "Evidence Score";
+            public string evidenceWeapon = "Armed at Arrest";
+            public string evidenceWanted = "Active Warrant at Encounter";
+            public string evidenceAssault = "Assaulted Another Person";
+            public string evidenceVehicleDamage = "Damaged Vehicle / Property";
             public string evidenceResisted = "Resisted Arrest";
+            public string evidenceDrugs = "Drugs Found on Person";
+            public string evidenceUseOfForce = "Use of Force Documented";
+            public string evidenceDrunk = "Intoxicated at Encounter";
+            public string evidenceFleeing = "Attempted to Flee";
+            public string evidenceSupervision = "Supervision Violation";
+            public string evidencePatDown = "Pat-Down / Search";
+            public string evidenceIllegalWeapon = "Illegal Weapon";
             public string prosecutionStrength = "Prosecution Strength";
             public string defenseStrength = "Defense Strength";
             public string docketPressure = "Docket Pressure";
@@ -559,7 +657,8 @@ namespace MDTPro.Setup {
                 "No Contest"
             };
             public string outcomeNotes = "Outcome Notes";
-            public string outcomeReasoning = "Outcome Reasoning";
+            public string outcomeReasoning = "Verdict & Outcome Reasoning";
+            public string sentenceReasoning = "Sentencing Rationale";
             public string licenseRevocations = "License Revocations Ordered";
             public Static @static = new Static();
 
