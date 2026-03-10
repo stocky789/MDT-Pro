@@ -602,9 +602,17 @@ namespace MDTPro.Setup {
 
         public class Callout {
             public string defaultPriority = "Code 2";
+            public string noActiveCall = "No active callout";
             public Static @static = new Static();
             public CalloutInfo calloutInfo = new CalloutInfo();
+            public Actions actions = new Actions();
             public Status status = new Status();
+
+            public class Actions {
+                public string setGps = "Set GPS";
+                public string gpsSuccess = "GPS set to callout.";
+                public string error = "Action failed.";
+            }
 
             public class Status {
                 public string pending = "Pending";
@@ -628,6 +636,8 @@ namespace MDTPro.Setup {
                 public string unit = "Unit ";
                 public string acceptedTime = " — Assigned ";
                 public string finishedTime = "Cleared ";
+                public string message = "Message";
+                public string advisory = "Advisory";
             }
         }
     }

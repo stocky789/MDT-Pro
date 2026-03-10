@@ -6,12 +6,11 @@
 #   .\build.ps1 -Incremental       Faster build (no wipe, incremental)
 #   .\build.ps1 -Deploy            Build then copy to GTA V (use -GamePath if not default)
 #   .\build.ps1 -Deploy -GamePath "D:\Games\GTA V"
-#   .\build.ps1 -CreateOiv         Build and create OpenIV package (Release\MDTPro-x.x.x.oiv)
+#   OpenIV packages (install + uninstall) are always created in Release\
 
 param(
     [switch]$Incremental,
     [switch]$Deploy,
-    [switch]$CreateOiv,
     [string]$GamePath = 'C:\Program Files\Rockstar Games\Grand Theft Auto V'
 )
 
@@ -158,8 +157,7 @@ if ($Deploy) {
     Write-Host "Deployed to $GamePath"
 }
 
-# 8) Create OpenIV package if requested
-if ($CreateOiv) {
+# 8) Create OpenIV package (always)
     Write-Host "Creating OpenIV package..."
     $asmInfo = Join-Path $root 'MDTProPlugin\MDTPro\Properties\AssemblyInfo.cs'
     $versionMatch = Select-String -Path $asmInfo -Pattern '^\s*\[assembly:\s*AssemblyVersion\("([^"]+)"\)' | Select-Object -First 1
@@ -321,7 +319,6 @@ $deleteXml
     Remove-Item -Path $oivUninstallDir -Recurse -Force
     Remove-Item -Path $oivDir -Recurse -Force
     Write-Host "  -> $oivUninstallOut (OpenIV uninstaller)"
-}
 
 Write-Host "Done. Full mod release: $release"
 Write-Host "  Release\plugins\lspdfr\MDTPro.dll"

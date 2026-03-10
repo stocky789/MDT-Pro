@@ -4,14 +4,14 @@
 
 ### Major Features
 
-- **Quick Actions Bar** — New floating action bar (bottom-right) with one-click buttons: Panic (request panic backup), Backup (request local patrol), Set GPS (set in-game waypoint to active callout), Clear ALPR. Requires Policing Redefined for backup actions. Toggle on/off in Config → Quick Actions Bar.
+- **Quick Actions Bar** — New floating action bar (bottom-right) with one-click buttons: Panic (request panic backup), Backup (request local patrol), Clear ALPR. Requires Policing Redefined for backup actions. Toggle on/off in Config → Quick Actions Bar.
 - **Request Backup from MDT** — Request Policing Redefined backup (panic, local patrol, traffic stop, transport, tow) via `POST /post/requestBackup` with `{ "action": "panic" | "localPatrol" | "trafficStop" | "transport" | "tow" }`.
-- **Set GPS to Callout** — New `POST /post/setGpsWaypoint` endpoint sets the in-game map waypoint. With empty body, uses active callout coordinates. Accepts `{ "x": float, "y": float }` for custom coords.
 - **Active Call enhancements** — Status badge (Pending, Accepted, En Route, Finished) and timeline (Displayed • Accepted • Finished) on the Active Call page for clearer callout flow.
+
 
 ### Minor Features
 
-- **GpsHelper** — Uses GTA native `SET_NEW_WAYPOINT` for in-game waypoint.
+- **GpsHelper** — Uses GTA native `SET_NEW_WAYPOINT` for in-game waypoint (used by `setGpsWaypoint` API).
 - **BackupHelper** — Wraps Policing Redefined Backup API via reflection so the plugin loads without PR; backup actions no-op when PR is not installed.
 
 ### API Verification (cross-checked)

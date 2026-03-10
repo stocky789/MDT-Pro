@@ -10,22 +10,57 @@ namespace MDTPro.Utility {
     internal static class BackupHelper {
         private static Type _backupApiType;
         private static Type _onFootApiType;
+        private static Type _eBackupUnitType;
+        private static Type _eBackupResponseCodeType;
         private static bool _initialized;
         private static bool _prAvailable;
 
         private static void EnsureInitialized() {
             if (_initialized) return;
-            _backupApiType = Type.GetType("PolicingRedefined.API.BackupAPI, PolicingRedefined");
-            _onFootApiType = Type.GetType("PolicingRedefined.API.OnFootTrafficStopAPI, PolicingRedefined");
+            _backupApiType = FindTypeInLoadedAssemblies("PolicingRedefined.API.BackupAPI")
+                ?? Type.GetType("PolicingRedefined.API.BackupAPI, PolicingRedefined");
+            _onFootApiType = _backupApiType != null
+                ? _backupApiType.Assembly.GetType("PolicingRedefined.API.OnFootTrafficStopAPI")
+                : FindTypeInLoadedAssemblies("PolicingRedefined.API.OnFootTrafficStopAPI");
             _prAvailable = _backupApiType != null;
             _initialized = true;
         }
 
-        /// <summary>Resolve enum type from PR assembly; tries common namespaces.</summary>
+        /// <summary>Search loaded assemblies for a type by full name (fixes Type.GetType failures when PR loads from game folder).</summary>
+        private static Type FindTypeInLoadedAssemblies(string fullName) {
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies()) {
+                if (asm.IsDynamic) continue;
+                try {
+                    var t = asm.GetType(fullName);
+                    if (t != null) return t;
+                } catch { /* ignore */ }
+            }
+            return null;
+        }
+
+        /// <summary>Resolve EBackupUnit and EBackupResponseCode from RequestBackup method params (bulletproof regardless of PR namespace).</summary>
+        private static void EnsureEnumTypesResolved() {
+            if (_eBackupUnitType != null && _eBackupResponseCodeType != null) return;
+            if (_backupApiType == null) return;
+            foreach (var m in _backupApiType.GetMethods(BindingFlags.Public | BindingFlags.Static)) {
+                if (m.Name != "RequestBackup") continue;
+                var ps = m.GetParameters();
+                if (ps.Length >= 2 && ps[2].ParameterType == typeof(bool)) {
+                    _eBackupUnitType = ps[0].ParameterType;
+                    _eBackupResponseCodeType = ps[1].ParameterType;
+                    break;
+                }
+            }
+        }
+
+        /// <summary>Resolve enum type from PR assembly; prefers method param types, falls back to namespace search.</summary>
         private static Type GetPROpenType(string typeName) {
+            EnsureEnumTypesResolved();
+            if (typeName == "EBackupUnit" && _eBackupUnitType != null) return _eBackupUnitType;
+            if (typeName == "EBackupResponseCode" && _eBackupResponseCodeType != null) return _eBackupResponseCodeType;
             if (_backupApiType?.Assembly == null) return null;
             var asm = _backupApiType.Assembly;
-            foreach (var ns in new[] { "PolicingRedefined", "PolicingRedefined.Enums" }) {
+            foreach (var ns in new[] { "PolicingRedefined.API", "PolicingRedefined.Enums", "PolicingRedefined" }) {
                 var t = asm.GetType(ns + "." + typeName);
                 if (t != null) return t;
             }
