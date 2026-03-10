@@ -468,7 +468,7 @@
         "name": "VIN Tampering / Altered Or Defaced VIN",
         "minFine": 500,
         "maxFine": 1000,
-        "canRevokeLicense": false,
+        "canRevokeLicense": true,
         "isArrestable": true
       },
       {
@@ -476,6 +476,20 @@
         "minFine": 500,
         "maxFine": 2000,
         "canRevokeLicense": false,
+        "isArrestable": true
+      },
+      {
+        "name": "Possession Of Credit Card Scanning Device",
+        "minFine": 500,
+        "maxFine": 1000,
+        "canRevokeLicense": false,
+        "isArrestable": true
+      },
+      {
+        "name": "Possession Of Defaced VIN Plate",
+        "minFine": 500,
+        "maxFine": 1000,
+        "canRevokeLicense": true,
         "isArrestable": true
       },
       {

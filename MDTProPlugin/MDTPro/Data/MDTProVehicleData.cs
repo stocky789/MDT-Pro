@@ -1,5 +1,6 @@
 using CommonDataFramework.Modules.VehicleDatabase;
 using Rage;
+using System.Drawing;
 
 namespace MDTPro.Data {
     public class MDTProVehicleData {
@@ -65,7 +66,7 @@ namespace MDTPro.Data {
                 InsuranceStatus = CDFVehicleData.Insurance.Status.ToString();
                 InsuranceExpiration = CDFVehicleData.Insurance.ExpirationDate?.ToString("s");
             }
-            Color = Rage.Native.NativeFunction.Natives.GET_VEHICLE_LIVERY<int>(Holder) == -1 ? $"{Holder.PrimaryColor.R}-{Holder.PrimaryColor.G}-{Holder.PrimaryColor.B}" : null;
+            Color = Rage.Native.NativeFunction.Natives.GET_VEHICLE_LIVERY<int>(Holder) == -1 ? GetColorDisplay(Holder.PrimaryColor, Holder.SecondaryColor) : null;
             VehicleIdentificationNumber = CDFVehicleData.Vin?.Number;
             try {
                 var vin = CDFVehicleData.Vin;
@@ -86,6 +87,19 @@ namespace MDTPro.Data {
             ModelDisplayName = Game.GetLocalizedString(unlocalizedModelDisplayName);
 
             BOLOs = CDFVehicleData.GetAllBOLOs();
+        }
+
+        /// <summary>Converts vehicle primary/secondary colors to a readable display string (e.g. "Black / White") using CalloutInterfaceAPI.</summary>
+        private static string GetColorDisplay(System.Drawing.Color primary, System.Drawing.Color secondary) {
+            try {
+                string p = CalloutInterfaceAPI.Functions.GetColorName(primary);
+                string s = CalloutInterfaceAPI.Functions.GetColorName(secondary);
+                if (!string.IsNullOrEmpty(p) && !string.IsNullOrEmpty(s) && p != s)
+                    return p + " / " + s;
+                if (!string.IsNullOrEmpty(p)) return p;
+                if (!string.IsNullOrEmpty(s)) return s;
+            } catch { }
+            return $"{primary.R}-{primary.G}-{primary.B}";
         }
 
         /// <summary>Apply persistent vehicle identity from a previously seen vehicle (same owner + model). Keeps current LicensePlate.

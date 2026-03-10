@@ -479,7 +479,40 @@ namespace MDTPro.Data {
             }
         }
 
-        /// <summary>Add a BOLO to a vehicle. Returns true if vehicle was in world and BOLO was added. Vehicle must be in vehicleDatabase with valid Holder.</summary>
+        /// <summary>Add a BOLO to a vehicle. Works for in-world vehicles (via CDF) or persistent/stub records. Accepts optional modelDisplayName for new stubs.</summary>
+        internal static bool TryAddBOLOByPlate(string licensePlate, string reason, DateTime expiresAt, string issuedBy, string modelDisplayName = null) {
+            if (string.IsNullOrWhiteSpace(licensePlate) || string.IsNullOrWhiteSpace(reason)) return false;
+            var plate = licensePlate.Trim();
+            var bolo = new VehicleBOLO(reason.Trim(), DateTime.UtcNow, expiresAt, issuedBy ?? "LSPD");
+            // 1. Try in-world vehicle first
+            if (TryAddBOLOToVehicle(plate, reason, expiresAt, issuedBy)) return true;
+            // 2. Look up in keepInVehicleDatabase or create stub
+            MDTProVehicleData vData;
+            lock (_vehicleDbLock) {
+                vData = keepInVehicleDatabase.FirstOrDefault(v => v != null && string.Equals(v.LicensePlate, plate, StringComparison.OrdinalIgnoreCase));
+            }
+            if (vData == null) {
+                vData = new MDTProVehicleData {
+                    LicensePlate = plate,
+                    ModelDisplayName = modelDisplayName?.Trim(),
+                    BOLOs = new[] { bolo }
+                };
+            } else {
+                var list = new List<VehicleBOLO>(vData.BOLOs ?? Array.Empty<VehicleBOLO>());
+                list.Add(bolo);
+                vData.BOLOs = list.ToArray();
+            }
+            try {
+                KeepVehicleInDatabase(vData);
+                Database.SaveVehicle(vData);
+                return true;
+            } catch (Exception ex) {
+                Helper.Log($"TryAddBOLOByPlate failed: {ex.Message}", false, Helper.LogSeverity.Warning);
+                return false;
+            }
+        }
+
+        /// <summary>Add a BOLO to a vehicle in world. Returns true if vehicle was in world and BOLO was added. Vehicle must be in vehicleDatabase with valid Holder.</summary>
         internal static bool TryAddBOLOToVehicle(string licensePlate, string reason, DateTime expiresAt, string issuedBy) {
             if (string.IsNullOrWhiteSpace(licensePlate) || string.IsNullOrWhiteSpace(reason)) return false;
             MDTProVehicleData vData;
@@ -500,35 +533,59 @@ namespace MDTPro.Data {
             }
         }
 
-        /// <summary>Remove a BOLO from a vehicle by reason. Returns true if found and removed.</summary>
-        internal static bool TryRemoveBOLOFromVehicle(string licensePlate, string reason) {
+        /// <summary>Remove a BOLO from a vehicle by reason. Works for in-world vehicles and persistent/stub records.</summary>
+        internal static bool TryRemoveBOLOFromVehicleOrStub(string licensePlate, string reason) {
             if (string.IsNullOrWhiteSpace(licensePlate)) return false;
+            var plate = licensePlate.Trim();
+            var reasonTrim = (reason ?? "").Trim();
             MDTProVehicleData vData;
             lock (_vehicleDbLock) {
-                vData = vehicleDatabase.FirstOrDefault(v => v != null && v.Holder != null && v.Holder.Exists() && string.Equals(v.LicensePlate, licensePlate.Trim(), StringComparison.OrdinalIgnoreCase));
+                vData = vehicleDatabase.FirstOrDefault(v => v != null && v.Holder != null && v.Holder.Exists() && string.Equals(v.LicensePlate, plate, StringComparison.OrdinalIgnoreCase));
+                if (vData == null)
+                    vData = keepInVehicleDatabase.FirstOrDefault(v => v != null && string.Equals(v.LicensePlate, plate, StringComparison.OrdinalIgnoreCase));
             }
-            if (vData?.CDFVehicleData == null) return false;
-            var bolos = vData.CDFVehicleData.GetAllBOLOs();
-            if (bolos == null || bolos.Length == 0) return false;
-            VehicleBOLO toRemove = null;
-            string reasonTrim = (reason ?? "").Trim();
-            foreach (var b in bolos) {
-                if (string.Equals(b.Reason, reasonTrim, StringComparison.OrdinalIgnoreCase)) {
-                    toRemove = b;
-                    break;
+            if (vData == null) return false;
+            if (vData.CDFVehicleData != null) {
+                var bolos = vData.CDFVehicleData.GetAllBOLOs();
+                if (bolos != null && bolos.Length > 0) {
+                    VehicleBOLO toRemove = null;
+                    foreach (var b in bolos) {
+                        if (b != null && string.Equals(b.Reason, reasonTrim, StringComparison.OrdinalIgnoreCase)) {
+                            toRemove = b;
+                            break;
+                        }
+                    }
+                    if (toRemove != null) {
+                        try {
+                            vData.CDFVehicleData.RemoveBOLO(toRemove);
+                            vData.BOLOs = vData.CDFVehicleData.GetAllBOLOs();
+                            KeepVehicleInDatabase(vData);
+                            Database.SaveVehicle(vData);
+                            return true;
+                        } catch (Exception ex) {
+                            Helper.Log($"TryRemoveBOLOFromVehicleOrStub failed: {ex.Message}", false, Helper.LogSeverity.Warning);
+                            return false;
+                        }
+                    }
                 }
             }
-            if (toRemove == null) return false;
+            if (vData.BOLOs == null || vData.BOLOs.Length == 0) return false;
+            var list = vData.BOLOs.Where(b => b == null || !string.Equals(b.Reason, reasonTrim, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (list.Count == vData.BOLOs.Length) return false;
+            vData.BOLOs = list.ToArray();
             try {
-                vData.CDFVehicleData.RemoveBOLO(toRemove);
-                vData.BOLOs = vData.CDFVehicleData.GetAllBOLOs();
                 KeepVehicleInDatabase(vData);
                 Database.SaveVehicle(vData);
                 return true;
             } catch (Exception ex) {
-                Helper.Log($"TryRemoveBOLOFromVehicle failed: {ex.Message}", false, Helper.LogSeverity.Warning);
+                Helper.Log($"TryRemoveBOLOFromVehicleOrStub failed: {ex.Message}", false, Helper.LogSeverity.Warning);
                 return false;
             }
+        }
+
+        /// <summary>Remove a BOLO from a vehicle by reason. Works for in-world and stub records.</summary>
+        internal static bool TryRemoveBOLOFromVehicle(string licensePlate, string reason) {
+            return TryRemoveBOLOFromVehicleOrStub(licensePlate, reason);
         }
 
         internal static void SyncVehicleDatabaseWithCDF() {
@@ -538,7 +595,7 @@ namespace MDTPro.Data {
             }
         }
 
-        /// <summary>Push MDT vehicle data to CDF VehicleData so PR and other mods see IsStolen, Registration, Insurance.</summary>
+        /// <summary>Push MDT vehicle data to CDF VehicleData so PR and other mods see IsStolen, Registration, Insurance, and BOLOs.</summary>
         private static void SyncSingleVehicleToCDF(MDTProVehicleData databaseVehicle) {
             if (databaseVehicle?.CDFVehicleData == null) return;
             try {
@@ -557,6 +614,29 @@ namespace MDTPro.Data {
                     }
                     if (!string.IsNullOrEmpty(databaseVehicle.InsuranceExpiration) && DateTime.TryParse(databaseVehicle.InsuranceExpiration, out DateTime insExp)) {
                         try { databaseVehicle.CDFVehicleData.Insurance.ExpirationDate = insExp; } catch { }
+                    }
+                }
+                // Sync persisted BOLOs to CDF so PR and other mods see them on re-encountered vehicles
+                if (databaseVehicle.BOLOs != null && databaseVehicle.BOLOs.Length > 0) {
+                    var existingBolos = databaseVehicle.CDFVehicleData.GetAllBOLOs() ?? Array.Empty<VehicleBOLO>();
+                    foreach (var b in databaseVehicle.BOLOs) {
+                        if (b == null || !b.IsActive) continue;
+                        bool alreadyInCdf = existingBolos.Any(eb => eb != null && string.Equals(eb.Reason, b.Reason, StringComparison.OrdinalIgnoreCase));
+                        if (!alreadyInCdf) {
+                            DateTime issued, expires;
+                            string issuedBy;
+                            try {
+                                issued = (DateTime)(b.GetType().GetProperty("Issued")?.GetValue(b) ?? DateTime.UtcNow);
+                                expires = (DateTime)(b.GetType().GetProperty("Expires")?.GetValue(b) ?? DateTime.UtcNow.AddDays(7));
+                                issuedBy = (string)(b.GetType().GetProperty("IssuedBy")?.GetValue(b)) ?? "LSPD";
+                            } catch {
+                                issued = DateTime.UtcNow;
+                                expires = DateTime.UtcNow.AddDays(7);
+                                issuedBy = "LSPD";
+                            }
+                            var cdfBolo = new VehicleBOLO(b.Reason ?? "Unknown", issued, expires, issuedBy);
+                            databaseVehicle.CDFVehicleData.AddBOLO(cdfBolo);
+                        }
                     }
                 }
             } catch (Exception ex) {

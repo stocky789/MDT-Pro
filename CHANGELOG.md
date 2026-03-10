@@ -1,26 +1,13 @@
 # Changelog
 
-## [Unreleased]
+## [0.9.5.0] — 2026-03-09
 
 ### Major Features
 
 - **Quick Actions Bar** — New floating action bar (bottom-right) with one-click buttons: Panic (request panic backup), Backup (request local patrol), Clear ALPR. Requires Policing Redefined for backup actions. Toggle on/off in Config → Quick Actions Bar.
 - **Request Backup from MDT** — Request Policing Redefined backup (panic, local patrol, traffic stop, transport, tow) via `POST /post/requestBackup` with `{ "action": "panic" | "localPatrol" | "trafficStop" | "transport" | "tow" }`.
-- **Active Call enhancements** — Status badge (Pending, Accepted, En Route, Finished) and timeline (Displayed • Accepted • Finished) on the Active Call page for clearer callout flow.
-
-
-### Minor Features
-
-- **GpsHelper** — Uses GTA native `SET_NEW_WAYPOINT` for in-game waypoint (used by `setGpsWaypoint` API).
-- **BackupHelper** — Wraps Policing Redefined Backup API via reflection so the plugin loads without PR; backup actions no-op when PR is not installed.
-
-### API Verification (cross-checked)
-
-- **Policing Redefined Backup API** — Method signatures match docs: RequestPanicBackup(bool, bool), RequestBackup(EBackupUnit, EBackupResponseCode, bool×3), RequestTrafficStopBackup, RequestPoliceTransport, RequestTowServiceBackup(). EBackupUnit.LocalPatrol confirmed.
-- **GTA 5 Native** — SET_NEW_WAYPOINT (HUD, hash 0xFE4333F2) takes float x, float y. RagePluginHook Natives.SET_NEW_WAYPOINT(x, y) invoked from GameFiber.
-- **CDF** — No new CDF usage in this feature set; setGpsWaypoint uses CalloutEvents.CalloutInfo.Coords from LSPDFR callout position.
-
-## [0.9.5.0] — 2026-03-09
+- **Active Call enhancements** — Status badge (Pending, Accepted, En Route, Finished) and timeline (Displayed • Accepted • Finished) on the Active Call page. Expandable callout list: cards show name, status, address; click header to expand/collapse. Pending callouts show Accept button; Accepted show En Route button. Set GPS per callout. Accept/En Route buttons call `POST /post/calloutAction`; CalloutInterface does not expose programmatic accept/status, so use in-game interface; buttons kept for future API support.
+- **BOLO system improvements** — Create BOLO without vehicle nearby via new "Create BOLO" button on BOLO Noticeboard (plate, optional model, reason, expiry). BOLOs sync to CDF on re-encounter. Remove BOLO works for stub records. `POST /post/addBOLO` accepts optional `ModelDisplayName`.
 
 ### Minor Features
 
@@ -30,6 +17,21 @@
 - **In-game notifications** — Update checker and other in-game messages now use a police-style icon instead of the LS Customs icon.
 - **Web favicon** — MDT Pro logo now shows in the browser tab when using the MDT.
 - **OpenIV packages** — Install with MDTPro-x.x.x.oiv; uninstall with MDTPro-x.x.x-Uninstall.oiv. Both include links to LCPDFR and GitHub. The uninstaller removes the plugin and all MDTPro files. For a complete removal, manually delete the MDTPro folder from your GTA V directory after uninstalling.
+- **Backup response code selector** — Quick Actions Bar backup menu now includes Code 1, Code 2, and Code 3 options. Selected code is sent with patrol, EMS, traffic stop, and transport requests.
+- **GpsHelper** — Uses GTA native `SET_NEW_WAYPOINT` for in-game waypoint (used by `setGpsWaypoint` API).
+- **BackupHelper** — Wraps Policing Redefined Backup API via reflection so the plugin loads without PR; backup actions no-op when PR is not installed.
+
+### API Verification (cross-checked)
+
+- **Policing Redefined Backup API** — Method signatures match docs: RequestPanicBackup(bool, bool), RequestBackup(EBackupUnit, EBackupResponseCode, bool×3), RequestTrafficStopBackup, RequestPoliceTransport, RequestTowServiceBackup(). EBackupUnit.LocalPatrol confirmed.
+- **GTA 5 Native** — SET_NEW_WAYPOINT (HUD, hash 0xFE4333F2) takes float x, float y. RagePluginHook Natives.SET_NEW_WAYPOINT(x, y) invoked from GameFiber.
+- **CDF** — No new CDF usage in this feature set; setGpsWaypoint uses CalloutEvents.CalloutInfo.Coords from LSPDFR callout position.
+
+### Bug Fixes
+
+- **Fixed: ALPR vehicle color display** — In-game ALPR HUD previously showed raw RGB values (e.g. "255-0-0") instead of readable color names. Vehicle colors now display as names (e.g. "Red", "Black / White") using CalloutInterfaceAPI's color conversion.
+- **Fixed: State ID / "Ask for all docs" not populating Person Search** — Identification events (OnIdentificationGiven, OnDriverIdentificationGiven, OnOccupantIdentificationGiven) now call ResolvePedForReEncounter before AddIdentificationEvent, so foot traffic stop State ID and vehicle "ask for all documents" correctly add the ped to Person Search. Resilient identification enum mapping: unknown EGivenIdentification values fall back to "Identification" instead of skipping.
+- **Fixed: VIN Tampering license revocation** — "VIN Tampering / Altered Or Defaced VIN" now has `canRevokeLicense: true` (was false), consistent with "Possession Of Defaced VIN Plate." Convictions on this charge will now result in driver's license revocation during court sentencing.
 
 ## [0.9.3.0] — 2026-03-07
 

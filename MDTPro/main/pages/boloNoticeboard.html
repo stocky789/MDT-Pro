@@ -11,11 +11,42 @@
     <div class="boloNoticeboardHeader">
       <h1 class="boloNoticeboardTitle" data-language="title">BOLO Noticeboard</h1>
       <p class="boloNoticeboardSubtitle" data-language="subtitle">Be On the Look-Out — vehicles to watch for</p>
-      <button type="button" class="boloRefreshBtn" data-language="refresh">Refresh</button>
+      <div class="boloHeaderActions">
+        <button type="button" class="boloCreateBtn" data-language="createBOLO">Create BOLO</button>
+        <button type="button" class="boloRefreshBtn" data-language="refresh">Refresh</button>
+      </div>
     </div>
     <div class="boloListWrapper">
-      <div class="boloEmpty hidden" data-language="noBolos">No active BOLOs. Add BOLOs from Vehicle Search when a vehicle is nearby.</div>
+      <div class="boloEmpty hidden" data-language="noBolos">No active BOLOs. Add BOLOs from Vehicle Search when a vehicle is nearby, or create one above.</div>
       <div class="boloCardList"></div>
+    </div>
+    <div id="createBoloModal" class="boloModal hidden" role="dialog" aria-modal="true" aria-labelledby="createBoloModalTitle">
+      <div class="boloModalContent">
+        <h2 id="createBoloModalTitle" class="boloModalTitle" data-language="createBOLOTitle">Create BOLO</h2>
+        <p class="boloModalSubtitle" data-language="createBOLOSubtitle">Enter vehicle and BOLO details. Vehicle does not need to be nearby.</p>
+        <form id="createBoloForm" class="boloModalForm">
+          <div class="boloFormRow">
+            <label for="createBoloPlate" data-language="createBOLOPlate">License Plate *</label>
+            <input id="createBoloPlate" type="text" required placeholder="ABC 1234" maxlength="12" />
+          </div>
+          <div class="boloFormRow">
+            <label for="createBoloModel" data-language="createBOLOModel">Vehicle Model (optional)</label>
+            <input id="createBoloModel" type="text" placeholder="e.g. Sultan RS" />
+          </div>
+          <div class="boloFormRow">
+            <label for="createBoloReason" data-language="createBOLOReason">Reason *</label>
+            <input id="createBoloReason" type="text" required placeholder="e.g. Armed robbery suspect" />
+          </div>
+          <div class="boloFormRow">
+            <label for="createBoloExpires" data-language="createBOLOExpires">Expires in (days)</label>
+            <input id="createBoloExpires" type="number" min="1" max="365" value="7" />
+          </div>
+          <div class="boloModalActions">
+            <button type="button" class="boloModalCancel" data-language="cancel">Cancel</button>
+            <button type="submit" class="boloModalSubmit" data-language="createBOLOSubmit">Create BOLO</button>
+          </div>
+        </form>
+      </div>
     </div>
   </body>
   <script src="/script/root.js"></script>

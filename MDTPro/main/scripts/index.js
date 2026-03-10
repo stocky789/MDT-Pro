@@ -8,10 +8,11 @@
   const quickActionsBar = document.getElementById('quickActionsBar')
   const qabBackupMenu = document.getElementById('qabBackupMenu')
   const requestBackupAction = async (action, btnEl) => {
+    const code = parseInt(qabBackupMenu?.querySelector('.qabBackupCode.active')?.dataset?.code ?? '2', 10) || 2
     const res = await (await fetch('/post/requestBackup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action })
+      body: JSON.stringify({ action, responseCode: code })
     })).json()
     if (res?.success) topWindow.showNotification(language.quickActions?.backupSuccess || 'Backup requested.', 'checkMark')
     else topWindow.showNotification(res?.error || 'Backup request failed.', 'warning')
@@ -32,6 +33,14 @@
           qabBackupMenu.classList.remove('open')
           qabBackupMain.setAttribute('aria-expanded', 'false')
         }
+      })
+      qabBackupMenu.querySelectorAll('.qabBackupCode').forEach((codeBtn) => {
+        codeBtn.addEventListener('click', function (e) {
+          e.stopPropagation()
+          qabBackupMenu.querySelectorAll('.qabBackupCode').forEach((b) => { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false') })
+          codeBtn.classList.add('active')
+          codeBtn.setAttribute('aria-pressed', 'true')
+        })
       })
       qabBackupMenu.querySelectorAll('button[role="menuitem"]').forEach((mi) => {
         mi.addEventListener('click', async function (e) {
@@ -62,7 +71,12 @@
             if (res?.success) topWindow.showNotification(language.quickActions?.panicSuccess || 'Panic backup requested.', 'checkMark')
             else topWindow.showNotification(res?.error || 'Backup request failed.', 'warning')
           } else if (action === 'alpr') {
-            const alprRes = await fetch('/post/alprClear', { method: 'POST', body: '' })
+            const url = (typeof location !== 'undefined' && location.origin) ? `${location.origin}/post/alprClear` : '/post/alprClear'
+            const alprRes = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: '{}'
+            })
             if (alprRes.ok) topWindow.showNotification(language.quickActions?.alprCleared || 'ALPR cleared.', 'checkMark')
             else topWindow.showNotification(language.quickActions?.error || 'Action failed.', 'warning')
           }

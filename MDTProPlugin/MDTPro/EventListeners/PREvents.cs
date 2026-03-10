@@ -205,12 +205,11 @@ namespace MDTPro.EventListeners {
             }
 
             if (identificationEventTypes.ContainsKey(eventName) && args.Length >= 2 && args[0] is Ped idPed) {
-                string idType = MapIdentificationEnum(args[1]);
-                if (idType != null) {
-                    if (eventName == "OnOccupantIdentificationGiven") idType = idType + " (occupant)";
-                    DataController.AddIdentificationEvent(idPed, idType);
-                    return;
-                }
+                string idType = MapIdentificationEnum(args[1]) ?? "Identification";
+                if (eventName == "OnOccupantIdentificationGiven") idType = idType + " (occupant)";
+                DataController.ResolvePedForReEncounter(idPed);
+                DataController.AddIdentificationEvent(idPed, idType);
+                return;
             }
 
             // OnDeadPedSearched (PedDelegate): fires when PR search finds ID on a corpse. Add to ID History and capture firearms/drugs.
