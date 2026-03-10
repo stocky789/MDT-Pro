@@ -45,7 +45,7 @@
         })
       })
     }
-    // Panic, GPS, ALPR and other qabBtn (excluding backup which has its own handler)
+    // Panic, ALPR and other qabBtn (excluding backup which has its own handler)
     quickActionsBar.querySelectorAll('.qabBtn:not(.qabBackupMain)').forEach((btn) => {
       btn.addEventListener('click', async function () {
         const action = this.dataset.action
@@ -61,13 +61,6 @@
             })).json()
             if (res?.success) topWindow.showNotification(language.quickActions?.panicSuccess || 'Panic backup requested.', 'checkMark')
             else topWindow.showNotification(res?.error || 'Backup request failed.', 'warning')
-          } else if (action === 'gps') {
-            const text = await (await fetch('/post/setGpsWaypoint', {
-              method: 'POST',
-              body: ''
-            })).text()
-            if (text === 'OK') topWindow.showNotification(language.quickActions?.gpsSuccess || 'GPS set to callout.', 'checkMark')
-            else topWindow.showNotification(text || 'Could not set GPS.', 'warning')
           } else if (action === 'alpr') {
             const alprRes = await fetch('/post/alprClear', { method: 'POST', body: '' })
             if (alprRes.ok) topWindow.showNotification(language.quickActions?.alprCleared || 'ALPR cleared.', 'checkMark')

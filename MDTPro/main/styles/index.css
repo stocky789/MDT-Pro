@@ -924,7 +924,8 @@
 .quickActionsBar {
   position: fixed;
   bottom: 20px;
-  right: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 4;
   display: flex;
   flex-direction: column;
@@ -974,6 +975,11 @@
   stroke: currentColor;
 }
 
+.quickActionsBar .qabBtn svg.qabIconGroup {
+  fill: currentColor;
+  stroke: none;
+}
+
 .quickActionsBar .qabBtn.qabPanic {
   color: var(--color-error);
   border-color: var(--color-error-half);
@@ -996,6 +1002,11 @@
   margin-left: auto;
   width: 14px;
   height: 14px;
+}
+
+.quickActionsBar .qabBtn.qabBackupMain:hover .qabIconGroup,
+.quickActionsBar .qabBackupWrapper:hover .qabBtn.qabBackupMain .qabIconGroup {
+  fill: var(--color-accent);
 }
 
 .quickActionsBar .qabBackupMenu {
