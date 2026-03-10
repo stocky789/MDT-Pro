@@ -111,5 +111,8 @@ namespace MDTPro.Setup {
         public int alprHudOffsetY = 150;
         /// <summary>Scale factor for the ALPR HUD panel size (1.0 = default). Clamped 0.75–2.0 in code.</summary>
         public float alprHudScale = 1.0f;
+
+        /// <summary>Show the Quick Actions bar (backup, panic, set GPS, clear ALPR) on the desktop.</summary>
+        public bool quickActionsBarEnabled = true;
     }
 }

@@ -145,6 +145,8 @@
     <Compile Include="ALPR\ALPRController.cs" />
     <Compile Include="ALPR\ALPRHUD.cs" />
     <Compile Include="Utility\PRHelper.cs" />
+    <Compile Include="Utility\BackupHelper.cs" />
+    <Compile Include="Utility\GpsHelper.cs" />
     <Compile Include="UI\SettingsMenu.cs" />
   </ItemGroup>
   <ItemGroup>

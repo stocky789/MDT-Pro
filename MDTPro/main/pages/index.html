@@ -10,6 +10,59 @@
     <link rel="stylesheet" href="/style/index.css" />
   </head>
   <body>
+    <div class="quickActionsBar" id="quickActionsBar" aria-label="Quick actions">
+      <button type="button" class="qabBtn qabPanic" title="Panic backup" data-action="panic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/><path d="M12 16h.01"/></svg>
+        <span>Panic</span>
+      </button>
+      <div class="qabBackupWrapper" role="group" aria-label="Request backup">
+        <button type="button" class="qabBtn qabBackup qabBackupMain" title="Request backup" data-action="localPatrol" aria-haspopup="true" aria-expanded="false" aria-controls="qabBackupMenu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span>Backup</span>
+          <svg class="qabChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="qabBackupMenu" id="qabBackupMenu" role="menu" aria-hidden="true">
+          <div class="qabBackupSection" role="none">
+            <button type="button" role="menuitem" data-action="localPatrol">Local Patrol</button>
+            <button type="button" role="menuitem" data-action="statePatrol">State Patrol</button>
+            <button type="button" role="menuitem" data-action="localSwat">Local SWAT</button>
+            <button type="button" role="menuitem" data-action="nooseSwat">NOOSE SWAT</button>
+            <button type="button" role="menuitem" data-action="localK9">Local K9</button>
+            <button type="button" role="menuitem" data-action="stateK9">State K9</button>
+          </div>
+          <div class="qabBackupSection" role="none">
+            <button type="button" role="menuitem" data-action="ambulance">Ambulance</button>
+            <button type="button" role="menuitem" data-action="fire">Fire Department</button>
+            <button type="button" role="menuitem" data-action="coroner">Coroner</button>
+            <button type="button" role="menuitem" data-action="animalControl">Animal Control</button>
+          </div>
+          <div class="qabBackupSection" role="none">
+            <button type="button" role="menuitem" data-action="trafficStop">Traffic Stop</button>
+            <button type="button" role="menuitem" data-action="transport">Police Transport</button>
+            <button type="button" role="menuitem" data-action="tow">Tow Service</button>
+            <button type="button" role="menuitem" data-action="group">Group Backup</button>
+          </div>
+          <div class="qabBackupSection qabBackupPursuit" role="none">
+            <span class="qabBackupLabel">Pursuit only</span>
+            <button type="button" role="menuitem" data-action="airLocal">Air Backup (Local)</button>
+            <button type="button" role="menuitem" data-action="airNoose">Air Backup (NOOSE)</button>
+            <button type="button" role="menuitem" data-action="spikeStrips">Spike Strips</button>
+          </div>
+          <div class="qabBackupSection" role="none">
+            <button type="button" role="menuitem" data-action="felonyStop">Initiate Felony Stop</button>
+            <button type="button" role="menuitem" data-action="dismiss">Dismiss All Backup</button>
+          </div>
+        </div>
+      </div>
+      <button type="button" class="qabBtn qabGps" title="Set GPS to callout location" data-action="gps">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span>Set GPS</span>
+      </button>
+      <button type="button" class="qabBtn qabAlpr" title="Clear ALPR" data-action="alpr">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        <span>Clear ALPR</span>
+      </button>
+    </div>
     <header class="taskbar">
       <div class="taskbarBrand">
         <img src="/image/badge?v=7" alt="" class="taskbarLogo taskbarBadge" />

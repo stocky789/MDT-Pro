@@ -920,6 +920,165 @@
   }
 }
 
+/* ---------- Quick Actions Bar ---------- */
+.quickActionsBar {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-medium);
+  pointer-events: all;
+}
+
+.quickActionsBar.hidden {
+  display: none;
+}
+
+.quickActionsBar .qabBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-family);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background-color var(--transition-time-short) ease, border-color var(--transition-time-short) ease;
+}
+
+.quickActionsBar .qabBtn:hover {
+  background-color: var(--color-accent-half);
+  border-color: var(--color-accent);
+}
+
+.quickActionsBar .qabBtn:active {
+  transform: scale(0.98);
+}
+
+.quickActionsBar .qabBtn svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+}
+
+.quickActionsBar .qabBtn.qabPanic {
+  color: var(--color-error);
+  border-color: var(--color-error-half);
+}
+
+.quickActionsBar .qabBtn.qabPanic:hover {
+  background-color: var(--color-error-half);
+  border-color: var(--color-error);
+}
+
+.quickActionsBar .qabBtn.qabGps:hover {
+  color: var(--color-map);
+}
+
+.quickActionsBar .qabBackupWrapper {
+  position: relative;
+}
+
+.quickActionsBar .qabBtn.qabBackupMain .qabChevron {
+  margin-left: auto;
+  width: 14px;
+  height: 14px;
+}
+
+.quickActionsBar .qabBackupMenu {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 4px;
+  min-width: 200px;
+  max-height: 320px;
+  overflow-y: auto;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: var(--shadow-medium);
+  z-index: 10;
+}
+
+.quickActionsBar .qabBackupMenu.open {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.quickActionsBar .qabBackupSection {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.quickActionsBar .qabBackupSection:last-child {
+  border-bottom: none;
+}
+
+.quickActionsBar .qabBackupSection.qabBackupPursuit {
+  background-color: var(--color-surface-elevated);
+}
+
+.quickActionsBar .qabBackupSection .qabBackupLabel {
+  padding: 6px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.quickActionsBar .qabBackupMenu button[role="menuitem"] {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-family: var(--font-family);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition-time-short) ease;
+}
+
+.quickActionsBar .qabBackupMenu button[role="menuitem"]:hover {
+  background-color: var(--color-accent-half);
+}
+
+@media (max-width: 700px) {
+  .quickActionsBar {
+    bottom: 12px;
+    right: 12px;
+    padding: 8px 10px;
+  }
+
+  .quickActionsBar .qabBtn span {
+    display: none;
+  }
+
+  .quickActionsBar .qabBtn {
+    padding: 10px;
+    justify-content: center;
+  }
+}
+
 @media (max-width: 480px) {
   .taskbarTitle {
     display: none;
