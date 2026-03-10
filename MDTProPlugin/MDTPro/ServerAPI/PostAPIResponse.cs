@@ -10,13 +10,39 @@ using System.Text;
 namespace MDTPro.ServerAPI {
     internal class PostAPIResponse : APIResponse {
         internal PostAPIResponse(HttpListenerRequest req) : base(null) {
-            string path = req.Url.AbsolutePath.Substring("/post/".Length);
+            string rawPath = req.Url?.AbsolutePath ?? "";
+            if (!rawPath.StartsWith("/post/", StringComparison.OrdinalIgnoreCase)) return;
+            string path = rawPath.Substring("/post/".Length).Trim().TrimEnd('/');
             if (string.IsNullOrEmpty(path)) return;
 
-            if (path == "alprClear") {
-                ALPR.ALPRController.Clear();
+            if (path.Equals("alprClear", StringComparison.OrdinalIgnoreCase)) {
+                Rage.GameFiber.StartNew(() => ALPR.ALPRController.Clear());
                 buffer = Encoding.UTF8.GetBytes("OK");
                 contentType = "text/plain";
+                status = 200;
+                return;
+            }
+
+            if (path.Equals("calloutAction", StringComparison.OrdinalIgnoreCase)) {
+                string bodyCallout = Helper.GetRequestPostData(req);
+                string action = null;
+                if (!string.IsNullOrEmpty(bodyCallout)) {
+                    try {
+                        var data = Newtonsoft.Json.JsonConvert.DeserializeAnonymousType(bodyCallout, new { action = (string)null });
+                        action = data?.action?.Trim().ToLowerInvariant();
+                    } catch { }
+                }
+                if (action != "accept" && action != "enroute") {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "action must be 'accept' or 'enRoute'." }));
+                    contentType = "application/json";
+                    status = 400;
+                    return;
+                }
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new {
+                    success = false,
+                    error = "CalloutInterface and LSPDFR do not expose an API to accept callouts or set status (En Route) programmatically. Use the in-game Callout Interface to accept and respond to callouts."
+                }));
+                contentType = "application/json";
                 status = 200;
                 return;
             }
@@ -228,7 +254,7 @@ namespace MDTPro.ServerAPI {
                 contentType = "text/plain";
                 status = 200;
             } else if (path == "addBOLO") {
-                var data = JsonConvert.DeserializeAnonymousType(body, new { LicensePlate = "", Reason = "", ExpiresAt = default(DateTime), IssuedBy = "LSPD" });
+                var data = JsonConvert.DeserializeAnonymousType(body, new { LicensePlate = "", Reason = "", ExpiresAt = default(DateTime), IssuedBy = "LSPD", ModelDisplayName = (string)null });
                 if (data == null || string.IsNullOrWhiteSpace(data.LicensePlate) || string.IsNullOrWhiteSpace(data.Reason)) {
                     buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "License plate and reason are required." }));
                     contentType = "text/json";
@@ -236,12 +262,12 @@ namespace MDTPro.ServerAPI {
                     return;
                 }
                 var expires = data.ExpiresAt != default(DateTime) ? data.ExpiresAt : System.DateTime.UtcNow.AddDays(7);
-                if (DataController.TryAddBOLOToVehicle(data.LicensePlate.Trim(), data.Reason.Trim(), expires, data.IssuedBy ?? "LSPD")) {
+                if (DataController.TryAddBOLOByPlate(data.LicensePlate.Trim(), data.Reason.Trim(), expires, data.IssuedBy ?? "LSPD", data.ModelDisplayName)) {
                     buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = true }));
                     contentType = "text/json";
                     status = 200;
                 } else {
-                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "Vehicle not found or not in world. The vehicle must be nearby to add a BOLO." }));
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "Failed to add BOLO." }));
                     contentType = "text/json";
                     status = 400;
                 }

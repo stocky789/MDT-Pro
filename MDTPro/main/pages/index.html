@@ -22,6 +22,14 @@
           <svg class="qabChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         <div class="qabBackupMenu" id="qabBackupMenu" role="menu" aria-hidden="true">
+          <div class="qabBackupSection qabBackupCodeSelector" role="none">
+            <span class="qabBackupLabel">Response code</span>
+            <div class="qabBackupCodeRow" role="group" aria-label="Response code">
+              <button type="button" class="qabBackupCode" data-code="1" aria-pressed="false">Code 1</button>
+              <button type="button" class="qabBackupCode active" data-code="2" aria-pressed="true">Code 2</button>
+              <button type="button" class="qabBackupCode" data-code="3" aria-pressed="false">Code 3</button>
+            </div>
+          </div>
           <div class="qabBackupSection" role="none">
             <button type="button" role="menuitem" data-action="localPatrol">Local Patrol</button>
             <button type="button" role="menuitem" data-action="statePatrol">State Patrol</button>

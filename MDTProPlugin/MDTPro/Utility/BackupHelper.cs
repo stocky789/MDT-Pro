@@ -1,10 +1,11 @@
 // Policing Redefined Backup API integration.
-// Uses reflection so the plugin loads even when PR is not installed.
+// PR Backup API must run on the game fiber. We dispatch all calls via GameFiber.
 // API ref: https://policing-redefined.netlify.app/docs/developer-docs/pr/backup-api
 
 using Rage;
 using System;
 using System.Reflection;
+using System.Threading;
 
 namespace MDTPro.Utility {
     internal static class BackupHelper {
@@ -45,12 +46,13 @@ namespace MDTPro.Utility {
             foreach (var m in _backupApiType.GetMethods(BindingFlags.Public | BindingFlags.Static)) {
                 if (m.Name != "RequestBackup") continue;
                 var ps = m.GetParameters();
-                if (ps.Length >= 2 && ps[2].ParameterType == typeof(bool)) {
+                if (ps.Length == 5 && ps[2].ParameterType == typeof(bool)) {
                     _eBackupUnitType = ps[0].ParameterType;
                     _eBackupResponseCodeType = ps[1].ParameterType;
-                    break;
+                    return;
                 }
             }
+            Game.LogTrivial("[MDTPro] BackupHelper: Could not resolve EBackupUnit/EBackupResponseCode from RequestBackup. Enum-based backup will fail.");
         }
 
         /// <summary>Resolve enum type from PR assembly; prefers method param types, falls back to namespace search.</summary>
@@ -75,19 +77,32 @@ namespace MDTPro.Utility {
             }
         }
 
+        /// <summary>Invoke PR Backup API on game fiber (required by PR). Returns result.</summary>
+        private static bool InvokeOnGameFiber(Func<bool> action) {
+            if (!IsAvailable || action == null) return false;
+            bool result = false;
+            var done = new ManualResetEventSlim(false);
+            GameFiber.StartNew(() => {
+                try {
+                    result = action();
+                } catch (Exception ex) {
+                    Game.LogTrivial($"[MDTPro] BackupHelper: {ex.Message}");
+                } finally {
+                    done.Set();
+                }
+            });
+            return done.Wait(5000) && result;
+        }
+
         /// <summary>Request panic backup at player position. Returns true if dispatched.</summary>
         internal static bool RequestPanicBackup() {
-            if (!IsAvailable) return false;
-            try {
+            return InvokeOnGameFiber(() => {
                 var method = _backupApiType.GetMethod("RequestPanicBackup", BindingFlags.Public | BindingFlags.Static,
                     null, new[] { typeof(bool), typeof(bool) }, null);
                 if (method == null) return false;
-                var result = method.Invoke(null, new object[] { true, true });
-                return result is bool b && b;
-            } catch (Exception ex) {
-                Game.LogTrivial($"[MDTPro] BackupHelper.RequestPanicBackup: {ex.Message}");
-                return false;
-            }
+                var r = method.Invoke(null, new object[] { true, true });
+                return r is bool b && b;
+            });
         }
 
         /// <summary>Request local patrol backup at player position. Returns true if dispatched.</summary>
@@ -97,74 +112,59 @@ namespace MDTPro.Utility {
 
         /// <summary>Request traffic stop backup. Only valid during an active traffic stop. unit defaults to LocalPatrol.</summary>
         internal static bool RequestTrafficStopBackup(string unitName = "LocalPatrol", int responseCode = 2) {
-            if (!IsAvailable) return false;
-            try {
-                var unitEnum = GetPROpenType("EBackupUnit");
-                var codeEnum = GetPROpenType("EBackupResponseCode");
-                if (unitEnum == null || codeEnum == null) return false;
-                var method = _backupApiType.GetMethod("RequestTrafficStopBackup", BindingFlags.Public | BindingFlags.Static,
-                    null, new[] { unitEnum, codeEnum, typeof(bool), typeof(bool), typeof(bool) }, null);
-                if (method == null) return false;
-                var unit = Enum.Parse(unitEnum, unitName);
-                var code = Enum.ToObject(codeEnum, Math.Max(1, Math.Min(4, responseCode)));
-                var result = method.Invoke(null, new[] { unit, code, true, true, true });
-                return result is bool rb && rb;
-            } catch (Exception ex) {
-                Game.LogTrivial($"[MDTPro] BackupHelper.RequestTrafficStopBackup: {ex.Message}");
-                return false;
-            }
+            return InvokeOnGameFiber(() => RequestTrafficStopBackupInner(unitName, responseCode));
+        }
+        private static bool RequestTrafficStopBackupInner(string unitName, int responseCode) {
+            var unitEnum = GetPROpenType("EBackupUnit");
+            var codeEnum = GetPROpenType("EBackupResponseCode");
+            if (unitEnum == null || codeEnum == null) return false;
+            var method = _backupApiType.GetMethod("RequestTrafficStopBackup", BindingFlags.Public | BindingFlags.Static,
+                null, new[] { unitEnum, codeEnum, typeof(bool), typeof(bool), typeof(bool) }, null);
+            if (method == null) return false;
+            var unit = Enum.Parse(unitEnum, unitName);
+            var code = Enum.ToObject(codeEnum, Math.Max(0, Math.Min(3, responseCode - 1)));
+            var r = method.Invoke(null, new[] { unit, code, true, true, true });
+            return r is bool rb && rb;
         }
 
         /// <summary>Request police transport for nearest arrested suspect. Returns true if dispatched.</summary>
         internal static bool RequestPoliceTransport(int responseCode = 2) {
-            if (!IsAvailable) return false;
-            try {
-                var codeEnum = GetPROpenType("EBackupResponseCode");
-                if (codeEnum == null) return false;
-                var method = _backupApiType.GetMethod("RequestPoliceTransport", BindingFlags.Public | BindingFlags.Static,
-                    null, new[] { codeEnum, typeof(bool), typeof(bool), typeof(bool) }, null);
-                if (method == null) return false;
-                var code = Enum.ToObject(codeEnum, Math.Max(1, Math.Min(4, responseCode)));
-                var result = method.Invoke(null, new[] { code, true, true, true });
-                return result is bool rb && rb;
-            } catch (Exception ex) {
-                Game.LogTrivial($"[MDTPro] BackupHelper.RequestPoliceTransport: {ex.Message}");
-                return false;
-            }
+            return InvokeOnGameFiber(() => RequestPoliceTransportInner(responseCode));
+        }
+        private static bool RequestPoliceTransportInner(int responseCode) {
+            var codeEnum = GetPROpenType("EBackupResponseCode");
+            if (codeEnum == null) return false;
+            var method = _backupApiType.GetMethod("RequestPoliceTransport", BindingFlags.Public | BindingFlags.Static,
+                null, new[] { codeEnum, typeof(bool), typeof(bool), typeof(bool) }, null);
+            if (method == null) return false;
+            var code = Enum.ToObject(codeEnum, Math.Max(0, Math.Min(3, responseCode - 1)));
+            var r = method.Invoke(null, new[] { code, true, true, true });
+            return r is bool rb && rb;
         }
 
         /// <summary>Open tow service menu. Returns true if opened.</summary>
         internal static bool RequestTowServiceBackup() {
-            if (!IsAvailable) return false;
-            try {
+            return InvokeOnGameFiber(() => {
                 var method = _backupApiType.GetMethod("RequestTowServiceBackup", BindingFlags.Public | BindingFlags.Static);
-                if (method == null) return false;
-                var result = method.Invoke(null, null);
-                return result is bool b && b;
-            } catch (Exception ex) {
-                Game.LogTrivial($"[MDTPro] BackupHelper.RequestTowServiceBackup: {ex.Message}");
-                return false;
-            }
+                return method != null && method.Invoke(null, null) is bool b && b;
+            });
         }
 
-        /// <summary>Request backup at player position. unit: LocalPatrol, StatePatrol, LocalSWAT, Ambulance, etc. responseCode 1-4.</summary>
+        /// <summary>Request backup at player position. unit: LocalPatrol, StatePatrol, LocalSWAT, Ambulance, etc. responseCode 1-4 (UI); PR enum is 0-based (Code1=0, Code2=1, Code3=2, Code4=3).</summary>
         private static bool RequestBackupAtPlayer(string unitName, int responseCode = 2) {
-            if (!IsAvailable) return false;
-            try {
-                var unitEnum = GetPROpenType("EBackupUnit");
-                var codeEnum = GetPROpenType("EBackupResponseCode");
-                if (unitEnum == null || codeEnum == null) return false;
-                var method = _backupApiType.GetMethod("RequestBackup", BindingFlags.Public | BindingFlags.Static,
-                    null, new[] { unitEnum, codeEnum, typeof(bool), typeof(bool), typeof(bool) }, null);
-                if (method == null) return false;
-                var unit = Enum.Parse(unitEnum, unitName);
-                var code = Enum.ToObject(codeEnum, Math.Max(1, Math.Min(4, responseCode)));
-                var result = method.Invoke(null, new[] { unit, code, true, true, true });
-                return result is bool rb && rb;
-            } catch (Exception ex) {
-                Game.LogTrivial($"[MDTPro] BackupHelper.RequestBackupAtPlayer: {ex.Message}");
-                return false;
-            }
+            return InvokeOnGameFiber(() => RequestBackupAtPlayerInner(unitName, responseCode));
+        }
+        private static bool RequestBackupAtPlayerInner(string unitName, int responseCode) {
+            var unitEnum = GetPROpenType("EBackupUnit");
+            var codeEnum = GetPROpenType("EBackupResponseCode");
+            if (unitEnum == null || codeEnum == null) return false;
+            var method = _backupApiType.GetMethod("RequestBackup", BindingFlags.Public | BindingFlags.Static,
+                null, new[] { unitEnum, codeEnum, typeof(bool), typeof(bool), typeof(bool) }, null);
+            if (method == null) return false;
+            var unit = Enum.Parse(unitEnum, unitName);
+            var code = Enum.ToObject(codeEnum, Math.Max(0, Math.Min(3, responseCode - 1)));
+            var r = method.Invoke(null, new[] { unit, code, true, true, true });
+            return r is bool rb && rb;
         }
 
         /// <summary>Request backup at player position. unit: EBackupUnit name (LocalPatrol, StatePatrol, LocalSWAT, Ambulance, etc).</summary>
@@ -174,77 +174,53 @@ namespace MDTPro.Utility {
 
         /// <summary>Request group backup at player position. Returns true if dispatched.</summary>
         internal static bool RequestGroupBackup() {
-            if (!IsAvailable) return false;
-            try {
+            return InvokeOnGameFiber(() => {
                 var method = _backupApiType.GetMethod("RequestGroupBackup", BindingFlags.Public | BindingFlags.Static,
                     null, new[] { typeof(bool), typeof(bool), typeof(bool) }, null);
-                if (method == null) return false;
-                var result = method.Invoke(null, new object[] { true, true, true });
-                return result is bool b && b;
-            } catch (Exception ex) {
-                Game.LogTrivial($"[MDTPro] BackupHelper.RequestGroupBackup: {ex.Message}");
-                return false;
-            }
+                return method != null && method.Invoke(null, new object[] { true, true, true }) is bool b && b;
+            });
         }
 
         /// <summary>Request air backup (LocalAir or NooseAir). Only available during pursuits.</summary>
         internal static bool RequestAirBackup(string unitName = "LocalAir") {
-            if (!IsAvailable) return false;
-            try {
+            return InvokeOnGameFiber(() => {
                 var unitEnum = GetPROpenType("EBackupUnit");
                 if (unitEnum == null) return false;
                 var method = _backupApiType.GetMethod("RequestAirBackup", BindingFlags.Public | BindingFlags.Static,
                     null, new[] { unitEnum, typeof(bool), typeof(bool), typeof(bool) }, null);
-                if (method == null) return false;
-                var unit = Enum.Parse(unitEnum, unitName);
-                var result = method.Invoke(null, new[] { unit, true, true, true });
-                return result is bool b && b;
-            } catch (Exception ex) {
-                Game.LogTrivial($"[MDTPro] BackupHelper.RequestAirBackup: {ex.Message}");
-                return false;
-            }
+                return method != null && method.Invoke(null, new[] { Enum.Parse(unitEnum, unitName), true, true, true }) is bool b && b;
+            });
         }
 
         /// <summary>Request spike strips backup. Only available during pursuits.</summary>
         internal static bool RequestSpikeStripsBackup() {
-            if (!IsAvailable) return false;
-            try {
+            return InvokeOnGameFiber(() => {
                 var method = _backupApiType.GetMethod("RequestSpikeStripsBackup", BindingFlags.Public | BindingFlags.Static,
                     null, new[] { typeof(bool), typeof(bool), typeof(bool) }, null);
-                if (method == null) return false;
-                var result = method.Invoke(null, new object[] { true, true, true });
-                return result is bool b && b;
-            } catch (Exception ex) {
-                Game.LogTrivial($"[MDTPro] BackupHelper.RequestSpikeStripsBackup: {ex.Message}");
-                return false;
-            }
+                return method != null && method.Invoke(null, new object[] { true, true, true }) is bool b && b;
+            });
         }
 
         /// <summary>Initiate felony stop UI. Returns true if opened.</summary>
         internal static bool InitiateFelonyStop() {
-            if (!IsAvailable) return false;
-            try {
+            return InvokeOnGameFiber(() => {
                 var method = _backupApiType.GetMethod("InitiateFelonyStop", BindingFlags.Public | BindingFlags.Static);
-                if (method == null) return false;
-                var result = method.Invoke(null, null);
-                return result is bool b && b;
-            } catch (Exception ex) {
-                Game.LogTrivial($"[MDTPro] BackupHelper.InitiateFelonyStop: {ex.Message}");
-                return false;
-            }
+                return method != null && method.Invoke(null, null) is bool b && b;
+            });
         }
 
         /// <summary>Dismiss all active and responding backup units.</summary>
         internal static void DismissAllBackupUnits(bool force = false) {
             if (!IsAvailable) return;
-            try {
-                var method = _backupApiType.GetMethod("DismissAllBackupUnits", BindingFlags.Public | BindingFlags.Static,
-                    null, new[] { typeof(bool) }, null);
-                if (method == null) return;
-                method.Invoke(null, new object[] { force });
-            } catch (Exception ex) {
-                Game.LogTrivial($"[MDTPro] BackupHelper.DismissAllBackupUnits: {ex.Message}");
-            }
+            GameFiber.StartNew(() => {
+                try {
+                    var method = _backupApiType.GetMethod("DismissAllBackupUnits", BindingFlags.Public | BindingFlags.Static,
+                        null, new[] { typeof(bool) }, null);
+                    method?.Invoke(null, new object[] { force });
+                } catch (Exception ex) {
+                    Game.LogTrivial($"[MDTPro] BackupHelper.DismissAllBackupUnits: {ex.Message}");
+                }
+            });
         }
 
         /// <summary>Returns true if player is on an on-foot traffic stop.</summary>

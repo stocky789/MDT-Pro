@@ -286,11 +286,21 @@ namespace MDTPro.Setup {
             public string stolenBadge = "STOLEN";
             public string viewInVehicleSearch = "View in Vehicle Search";
             public string expires = "Expires";
+            public string boloCreated = "BOLO created.";
             public class Static {
                 public string title = "BOLO Noticeboard";
                 public string subtitle = "Be On the Look-Out — vehicles to watch for";
                 public string refresh = "Refresh";
-                public string noBolos = "No active BOLOs. Add BOLOs from Vehicle Search when a vehicle is nearby.";
+                public string createBOLO = "Create BOLO";
+                public string noBolos = "No active BOLOs. Add BOLOs from Vehicle Search when a vehicle is nearby, or create one above.";
+                public string createBOLOTitle = "Create BOLO";
+                public string createBOLOSubtitle = "Enter vehicle and BOLO details. Vehicle does not need to be nearby.";
+                public string createBOLOPlate = "License Plate *";
+                public string createBOLOModel = "Vehicle Model (optional)";
+                public string createBOLOReason = "Reason *";
+                public string createBOLOExpires = "Expires in (days)";
+                public string createBOLOSubmit = "Create BOLO";
+                public string cancel = "Cancel";
             }
         }
 
@@ -611,12 +621,14 @@ namespace MDTPro.Setup {
             public class Actions {
                 public string setGps = "Set GPS";
                 public string gpsSuccess = "GPS set to callout.";
+                public string accept = "Accept";
+                public string success = "Status updated.";
                 public string error = "Action failed.";
             }
 
             public class Status {
                 public string pending = "Pending";
-                public string accepted = "Accepted";
+                public string responded = "Responded";
                 public string enRoute = "En Route";
                 public string finished = "Finished";
                 public string unknown = "—";

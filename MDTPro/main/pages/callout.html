@@ -10,42 +10,13 @@
   <body>
     <div class="calloutPage">
       <div class="calloutStatusBar" id="calloutStatusBar">
-        <span class="calloutStatusBadge" id="calloutStatusBadge">—</span>
         <span class="calloutTimeline" id="calloutTimeline"></span>
       </div>
       <div class="calloutList" id="calloutList">
         <div class="calloutEmpty" id="calloutEmpty">
           <span data-language="callout.noActiveCall">No active callout</span>
         </div>
-        <div class="calloutCard hidden" id="calloutCard">
-          <ul class="calloutDetails">
-            <li class="calloutDetailRow">
-              <span class="calloutDetailLabel" data-language="address">Address</span>
-              <span class="calloutDetailValue" id="calloutAddress">—</span>
-            </li>
-            <li class="calloutDetailRow">
-              <span class="calloutDetailLabel" data-language="area">Area</span>
-              <span class="calloutDetailValue" id="calloutArea">—</span>
-            </li>
-            <li class="calloutDetailRow">
-              <span class="calloutDetailLabel" data-language="county">County</span>
-              <span class="calloutDetailValue" id="calloutCounty">—</span>
-            </li>
-            <li class="calloutDetailRow">
-              <span class="calloutDetailLabel" data-language="priority">Priority</span>
-              <span class="calloutDetailValue" id="calloutPriority">—</span>
-            </li>
-            <li class="calloutDetailRow calloutDetailFull" id="calloutMessageRow">
-              <span class="calloutDetailLabel" data-language="callout.calloutInfo.message">Message</span>
-              <span class="calloutDetailValue" id="calloutMessage">—</span>
-            </li>
-            <li class="calloutDetailRow calloutDetailFull" id="calloutAdvisoryRow">
-              <span class="calloutDetailLabel" data-language="callout.calloutInfo.advisory">Advisory</span>
-              <span class="calloutDetailValue" id="calloutAdvisory">—</span>
-            </li>
-          </ul>
-          <div class="calloutMeta" id="calloutMeta"></div>
-        </div>
+        <div class="calloutCardsContainer hidden" id="calloutCardsContainer"></div>
       </div>
     </div>
   </body>
