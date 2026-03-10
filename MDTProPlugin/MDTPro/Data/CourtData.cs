@@ -38,6 +38,7 @@ namespace MDTPro.Data {
         public bool EvidenceViolatedSupervision = false;
         public bool EvidenceResisted = false;
         public bool EvidenceHadDrugs = false;
+        public bool EvidenceUseOfForce = false;
         public int RepeatOffenderScore = 0;
         public int ConvictionChance = 0;
         public string ResolveAtUtc;
@@ -59,6 +60,8 @@ namespace MDTPro.Data {
         public string LastUpdatedUtc;
         public string OutcomeNotes;
         public string OutcomeReasoning;
+        /// <summary>Reasoning for the sentence imposed (aggravating/mitigating factors, judge remarks). Only set when Status = 1 (convicted).</summary>
+        public string SentenceReasoning;
         /// <summary>License revocations ordered by the court upon conviction (e.g. "Driver's License Revoked", "Firearms Permit Revoked (10 years)"). Based on California law.</summary>
         public List<string> LicenseRevocations = new List<string>();
         public List<Charge> Charges = new List<Charge>();

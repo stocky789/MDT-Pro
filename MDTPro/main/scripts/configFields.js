@@ -91,6 +91,7 @@ const CONFIG_SECTIONS = [
       'courtEvidenceSupervisionViolationBonus',
       'courtEvidenceResistedBonus',
       'courtEvidenceDrugsBonus',
+      'courtEvidenceUseOfForceBonus',
     ],
   },
   {
@@ -397,6 +398,10 @@ const CONFIG_FIELD_META = {
   courtEvidenceDrugsBonus: {
     label: 'Drugs found bonus',
     tooltip: 'Evidence points when drugs were found on the person.',
+  },
+  courtEvidenceUseOfForceBonus: {
+    label: 'Use of Force documented bonus',
+    tooltip: 'Evidence points when use of force was documented on the arrest report.',
   },
   courtCaseResolutionMinBase: {
     label: 'Min resolution time (minutes)',

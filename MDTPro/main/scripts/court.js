@@ -280,7 +280,7 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   evidenceBreakdown.classList.add('evidenceBreakdown')
   evidenceBreakdown.style.display = 'none'
 
-  const hasAnyRealEvidence = (courtCase.EvidenceHadWeapon ?? false) || (courtCase.EvidenceWasWanted ?? false) || (courtCase.EvidenceAssaultedPed ?? false) || (courtCase.EvidenceDamagedVehicle ?? false) || (courtCase.EvidenceResisted ?? false) || (courtCase.EvidenceHadDrugs ?? false)
+  const hasAnyRealEvidence = (courtCase.EvidenceHadWeapon ?? false) || (courtCase.EvidenceWasWanted ?? false) || (courtCase.EvidenceAssaultedPed ?? false) || (courtCase.EvidenceDamagedVehicle ?? false) || (courtCase.EvidenceResisted ?? false) || (courtCase.EvidenceHadDrugs ?? false) || (courtCase.EvidenceUseOfForce ?? false) || (courtCase.EvidenceWasDrunk ?? false) || (courtCase.EvidenceWasFleeing ?? false) || (courtCase.EvidenceViolatedSupervision ?? false) || (courtCase.EvidenceWasPatDown ?? false) || (courtCase.EvidenceIllegalWeapon ?? false)
   const noEvidenceNote = document.createElement('div')
   noEvidenceNote.classList.add('evidenceBreakdownNote')
   noEvidenceNote.innerText = hasAnyRealEvidence
@@ -324,6 +324,12 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
     { label: language.court.evidenceVehicleDamage || 'Damaged Vehicle / Property', value: courtCase.EvidenceDamagedVehicle ?? false, active: courtCase.EvidenceDamagedVehicle ?? false },
     { label: language.court.evidenceResisted || 'Resisted Arrest', value: courtCase.EvidenceResisted ?? false, active: courtCase.EvidenceResisted ?? false },
     { label: language.court.evidenceDrugs || 'Drugs Found on Person', value: courtCase.EvidenceHadDrugs ?? false, active: courtCase.EvidenceHadDrugs ?? false },
+    { label: language.court.evidenceUseOfForce || 'Use of Force Documented', value: courtCase.EvidenceUseOfForce ?? false, active: courtCase.EvidenceUseOfForce ?? false },
+    { label: language.court.evidenceDrunk || 'Intoxicated at Encounter', value: courtCase.EvidenceWasDrunk ?? false, active: courtCase.EvidenceWasDrunk ?? false },
+    { label: language.court.evidenceFleeing || 'Attempted to Flee', value: courtCase.EvidenceWasFleeing ?? false, active: courtCase.EvidenceWasFleeing ?? false },
+    { label: language.court.evidenceSupervision || 'Supervision Violation', value: courtCase.EvidenceViolatedSupervision ?? false, active: courtCase.EvidenceViolatedSupervision ?? false },
+    { label: language.court.evidencePatDown || 'Pat-Down / Search', value: courtCase.EvidenceWasPatDown ?? false, active: courtCase.EvidenceWasPatDown ?? false },
+    { label: language.court.evidenceIllegalWeapon || 'Illegal Weapon', value: courtCase.EvidenceIllegalWeapon ?? false, active: courtCase.EvidenceIllegalWeapon ?? false },
   ]
 
   for (const item of evidenceItems) {
@@ -443,16 +449,38 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   notesWrapper.appendChild(notesInput)
   inputWrapper.appendChild(notesWrapper)
 
-  const reasoningWrapper = document.createElement('div')
-  reasoningWrapper.classList.add('courtNotes')
-  reasoningWrapper.appendChild(
-    createLabel(language.court.outcomeReasoning || 'Outcome Reasoning')
-  )
-  const reasoningInput = document.createElement('textarea')
-  reasoningInput.value = courtCase.OutcomeReasoning || ''
-  reasoningInput.readOnly = true
-  reasoningWrapper.appendChild(reasoningInput)
-  if (courtCase.Status !== 0) inputWrapper.appendChild(reasoningWrapper)
+  if (courtCase.Status !== 0) {
+    const dispositionSection = document.createElement('div')
+    dispositionSection.classList.add('courtDispositionSection')
+
+    const reasoningWrapper = document.createElement('div')
+    reasoningWrapper.classList.add('courtNotes', 'courtVerdictBlock')
+    reasoningWrapper.appendChild(
+      createLabel(language.court.outcomeReasoning || 'Verdict & Outcome Reasoning')
+    )
+    const reasoningInput = document.createElement('textarea')
+    reasoningInput.value = typeof courtCase.OutcomeReasoning === 'string' ? courtCase.OutcomeReasoning : ''
+    reasoningInput.readOnly = true
+    reasoningInput.rows = 5
+    reasoningWrapper.appendChild(reasoningInput)
+    dispositionSection.appendChild(reasoningWrapper)
+
+    if (courtCase.Status === 1 && courtCase.SentenceReasoning) {
+      const sentencingWrapper = document.createElement('div')
+      sentencingWrapper.classList.add('courtNotes', 'courtSentencingBlock')
+      sentencingWrapper.appendChild(
+        createLabel(language.court.sentenceReasoning || 'Sentencing Rationale')
+      )
+      const sentencingInput = document.createElement('textarea')
+      sentencingInput.value = typeof courtCase.SentenceReasoning === 'string' ? courtCase.SentenceReasoning : ''
+      sentencingInput.readOnly = true
+      sentencingInput.rows = 4
+      sentencingWrapper.appendChild(sentencingInput)
+      dispositionSection.appendChild(sentencingWrapper)
+    }
+
+    inputWrapper.appendChild(dispositionSection)
+  }
 
   if (courtCase.Status === 1 && courtCase.LicenseRevocations && courtCase.LicenseRevocations.length > 0) {
     const revocationsWrapper = document.createElement('div')

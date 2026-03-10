@@ -142,15 +142,14 @@ async function performSearch(query) {
     )
     return
   }
-  const response = await (
-    await fetch('/data/specificVehicle', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: query,
-    })
-  ).json()
+  const res = await fetch('/data/specificVehicle', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: query,
+  })
+  const response = res.ok ? await res.json().catch(() => null) : null
 
   if (!response) {
     topWindow.showNotification(
@@ -234,20 +233,23 @@ async function performSearch(query) {
     }
   }
 
+  document
+    .querySelectorAll(
+      '.searchResponseWrapper .vehicleSearchRecordsSection, .searchResponseWrapper .vehicleSearchRecordsTitle, .searchResponseWrapper .impoundActionSection, .searchResponseWrapper .impoundReportsSection, .searchResponseWrapper .impoundReportsTitle'
+    )
+    .forEach((el) => el?.remove())
+
   // Vehicle search records (contraband from PR vehicle search)
-  const searchRecordsResponse = await (
-    await fetch('/data/vehicleSearchByPlate', {
+  let searchRecordsResponse = []
+  try {
+    const res = await fetch('/data/vehicleSearchByPlate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(response.LicensePlate ?? ''),
     })
-  ).json()
-
-  document
-    .querySelectorAll(
-      '.searchResponseWrapper .vehicleSearchRecordsSection, .searchResponseWrapper .vehicleSearchRecordsTitle'
-    )
-    .forEach((el) => el?.remove())
+    if (res.ok) searchRecordsResponse = await res.json()
+  } catch (_) {}
+  if (!Array.isArray(searchRecordsResponse)) searchRecordsResponse = []
 
   // BOLOs section (Be On the Look-Out)
   const boloPlaceholder = document.querySelector('.searchResponseWrapper .boloSectionPlaceholder')
@@ -325,6 +327,87 @@ async function performSearch(query) {
   if (boloPlaceholder) {
     boloPlaceholder.appendChild(boloSection)
   }
+
+  // Previous impound reports for this vehicle (by plate) — persisted in SQL, so re-encounters show history
+  let impoundReports = []
+  try {
+    const plate = (response.LicensePlate != null && response.LicensePlate !== '') ? response.LicensePlate : ''
+    const res = await fetch('/data/impoundReportsByPlate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(plate),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      impoundReports = Array.isArray(data) ? data : []
+    }
+  } catch (_) {
+    impoundReports = []
+  }
+  if (impoundReports.length > 0) {
+    const impoundReportsTitle = document.createElement('div')
+    impoundReportsTitle.classList.add('searchResponseSectionTitle', 'impoundReportsTitle')
+    impoundReportsTitle.innerHTML =
+      language.vehicleSearch?.static?.impoundReportsTitle || 'Impound Reports'
+    document.querySelector('.searchResponseWrapper').appendChild(impoundReportsTitle)
+
+    const impoundReportsSection = document.createElement('div')
+    impoundReportsSection.classList.add('inputWrapper', 'grid', 'impoundReportsSection')
+    document.querySelector('.searchResponseWrapper').appendChild(impoundReportsSection)
+
+    const openFn =
+      (typeof topWindow !== 'undefined' && typeof topWindow.openIdInReport === 'function')
+        ? topWindow.openIdInReport
+        : (typeof openIdInReport === 'function' ? openIdInReport : null)
+
+    for (const r of impoundReports) {
+      const row = document.createElement('div')
+      row.classList.add('clickable')
+      if (openFn) {
+        row.addEventListener('click', () => openFn(r.Id, 'impound'))
+      }
+
+      const label = document.createElement('label')
+      label.textContent = language.reports?.list?.reportType?.impound || 'Impound'
+
+      const input = document.createElement('input')
+      input.type = 'text'
+      input.disabled = true
+      const dateStr = r.TimeStamp ? new Date(r.TimeStamp).toLocaleDateString() : ''
+      const reason = r.ImpoundReason || ''
+      input.value = `${r.Id || ''}${dateStr ? ` - ${dateStr}` : ''}${reason ? ` - ${reason}` : ''}`
+
+      row.appendChild(label)
+      row.appendChild(input)
+      impoundReportsSection.appendChild(row)
+    }
+  }
+
+  const impoundSection = document.createElement('div')
+  impoundSection.classList.add('impoundActionSection', 'searchResponseSectionTitle')
+  const impoundBtn = document.createElement('button')
+  impoundBtn.type = 'button'
+  impoundBtn.classList.add('createImpoundBtn')
+  impoundBtn.textContent = language.vehicleSearch?.createImpoundReport || 'Create Impound Report'
+  impoundBtn.addEventListener('click', () => {
+    const fn = (typeof topWindow !== 'undefined' && topWindow.openReportWithPrefill) ? topWindow.openReportWithPrefill : (typeof openReportWithPrefill === 'function' ? openReportWithPrefill : null)
+    if (fn) {
+      fn('impound', {
+        source: 'vehicleSearch',
+        vehiclePlate: response.LicensePlate,
+        vehicleData: {
+          LicensePlate: response.LicensePlate,
+          ModelDisplayName: response.ModelDisplayName,
+          ModelName: response.ModelName,
+          Owner: response.Owner,
+          VehicleIdentificationNumber: response.VehicleIdentificationNumber,
+          VinStatus: response.VinStatus
+        }
+      })
+    }
+  })
+  impoundSection.appendChild(impoundBtn)
+  document.querySelector('.searchResponseWrapper').appendChild(impoundSection)
 
   if (searchRecordsResponse && searchRecordsResponse.length > 0) {
     const sectionTitle = document.createElement('div')

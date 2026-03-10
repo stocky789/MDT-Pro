@@ -140,6 +140,15 @@ namespace MDTPro.Data {
         internal static List<ArrestReport> arrestReports = new List<ArrestReport>();
         public static IReadOnlyList<ArrestReport> ArrestReports => arrestReports;
 
+        internal static List<ImpoundReport> impoundReports = new List<ImpoundReport>();
+        public static IReadOnlyList<ImpoundReport> ImpoundReports => impoundReports;
+
+        internal static List<TrafficIncidentReport> trafficIncidentReports = new List<TrafficIncidentReport>();
+        public static IReadOnlyList<TrafficIncidentReport> TrafficIncidentReports => trafficIncidentReports;
+
+        internal static List<InjuryReport> injuryReports = new List<InjuryReport>();
+        public static IReadOnlyList<InjuryReport> InjuryReports => injuryReports;
+
         internal static Location PlayerLocation = new Location();
         internal static string CurrentTime = World.TimeOfDay.ToString();
         internal static PlayerCoords PlayerCoords = new PlayerCoords();
@@ -686,6 +695,24 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>Marks a ped as deceased. Updates in-memory ped and persists to DB. Called when DTF reports death. Idempotent: skips if already marked.</summary>
+        internal static void MarkPedDeceased(string pedName, string attackerName = null, string weaponInfo = null) {
+            if (string.IsNullOrWhiteSpace(pedName)) return;
+            var existing = GetPedDataByName(pedName);
+            if (existing != null && existing.IsDeceased) return;
+            string deceasedAt = DateTime.UtcNow.ToString("o");
+            lock (_pedDbLock) {
+                MDTProPedData ped = pedDatabase.FirstOrDefault(x => x.Name != null && x.Name.Equals(pedName, StringComparison.OrdinalIgnoreCase))
+                    ?? keepInPedDatabase.FirstOrDefault(x => x.Name != null && x.Name.Equals(pedName, StringComparison.OrdinalIgnoreCase));
+                if (ped != null) {
+                    ped.IsDeceased = true;
+                    ped.DeceasedAt = deceasedAt;
+                }
+            }
+            Database.MarkPedDeceased(pedName, deceasedAt);
+            Helper.Log($"DEATH LOG: {pedName} (deceased). Attacker: {(string.IsNullOrEmpty(attackerName) ? "unknown" : attackerName)}. Weapon: {(string.IsNullOrEmpty(weaponInfo) ? "—" : weaponInfo)}", false, Helper.LogSeverity.Warning);
+        }
+
         /// <summary>Refreshes our stored ped's wanted status from CDF so PR dispatch results (warrants) show in MDT Person Search. Call when PR runs a ped through dispatch.</summary>
         internal static void RefreshPedWantedStatusFromCDF(Ped ped) {
             if (ped == null || !ped.IsValid()) return;
@@ -993,6 +1020,7 @@ namespace MDTPro.Data {
                         );
                 }
 
+                courtData.EvidenceUseOfForce = arrestReport.UseOfForce != null && !string.IsNullOrEmpty(arrestReport.UseOfForce.Type);
                 BuildCourtCaseMetadata(courtData, arrestReport.OffenderPedName, arrestReport.Location);
                 ApplyRepeatOffenderSentencing(courtData);
 
@@ -1041,6 +1069,18 @@ namespace MDTPro.Data {
                 } else {
                     incidentReports.Add(incidentReport);
                 }
+            } else if (report is ImpoundReport impoundReport) {
+                int index = impoundReports.FindIndex(x => x.Id == impoundReport.Id);
+                if (index != -1) impoundReports[index] = impoundReport;
+                else impoundReports.Add(impoundReport);
+            } else if (report is TrafficIncidentReport trafficReport) {
+                int index = trafficIncidentReports.FindIndex(x => x.Id == trafficReport.Id);
+                if (index != -1) trafficIncidentReports[index] = trafficReport;
+                else trafficIncidentReports.Add(trafficReport);
+            } else if (report is InjuryReport injuryReport) {
+                int index = injuryReports.FindIndex(x => x.Id == injuryReport.Id);
+                if (index != -1) injuryReports[index] = injuryReport;
+                else injuryReports.Add(injuryReport);
             }
             AddReportToCurrentShift(report.Id);
         }
@@ -1415,6 +1455,19 @@ namespace MDTPro.Data {
             if (hasPublicDefender.HasValue) courtCase.HasPublicDefender = hasPublicDefender.Value;
             if (outcomeNotes != null) courtCase.OutcomeNotes = outcomeNotes;
             if (outcomeReasoning != null) courtCase.OutcomeReasoning = outcomeReasoning;
+            if (status == 3) {
+                if (string.IsNullOrWhiteSpace(courtCase.OutcomeReasoning)) {
+                    string[] dismissed = new[] {
+                        "Charges were dismissed. The case did not proceed to trial.",
+                        "The charges were dismissed. The prosecution declined to proceed.",
+                        "The case was dismissed. The matter was not tried on the merits.",
+                    };
+                    courtCase.OutcomeReasoning = dismissed[Helper.GetRandomInt(0, dismissed.Length - 1)];
+                }
+                courtCase.SentenceReasoning = null;
+            } else if (status == 2) {
+                courtCase.SentenceReasoning = null;
+            }
             courtCase.LastUpdatedUtc = DateTime.UtcNow.ToString("o");
 
             if (!string.IsNullOrEmpty(courtCase.PedName)) {
@@ -2161,6 +2214,9 @@ namespace MDTPro.Data {
                         if (ctx.Resisted) { score += config.courtEvidenceResistedBonus; courtData.EvidenceResisted = true; }
                     }
                 }
+                if (courtData.EvidenceUseOfForce && config.courtEvidenceUseOfForceBonus > 0) {
+                    score += config.courtEvidenceUseOfForceBonus;
+                }
                 // Drug records come from DB (pat-down, dead body search) — always check regardless of cache
                 if (config.courtEvidenceDrugsBonus > 0) {
                     var drugs = Database.LoadDrugsByOwner(courtData.PedName, 1);
@@ -2244,21 +2300,135 @@ namespace MDTPro.Data {
                 ts >= threshold);
         }
 
+        private static int GetEvidenceBand(CourtData courtData) {
+            int score = courtData?.EvidenceScore ?? 0;
+            if (score < 35) return 0; // low
+            if (score < 60) return 1; // medium
+            return 2; // high
+        }
+
+        private static bool HasChargeKeyword(CourtData courtData, string keyword) {
+            if (courtData?.Charges == null) return false;
+            string k = keyword.ToLowerInvariant();
+            return courtData.Charges.Any(c => (c.Name ?? "").ToLowerInvariant().Contains(k));
+        }
+
+        /// <summary>Evidence tag names used to weight outcome templates. Must match the checks in CountMatchingEvidenceTags.</summary>
+        private static readonly string[] EvidenceTagNames = new[] { "Weapon", "Wanted", "PatDown", "Drunk", "Fleeing", "Assault", "VehicleDamage", "IllegalWeapon", "Supervision", "Resisted", "Drugs", "UseOfForce" };
+
+        private static int CountMatchingEvidenceTags(CourtData courtData, string[] tags) {
+            if (courtData == null || tags == null || tags.Length == 0) return 0;
+            int count = 0;
+            foreach (string tag in tags) {
+                if (tag == "Weapon" && courtData.EvidenceHadWeapon) count++;
+                else if (tag == "Wanted" && courtData.EvidenceWasWanted) count++;
+                else if (tag == "PatDown" && courtData.EvidenceWasPatDown) count++;
+                else if (tag == "Drunk" && courtData.EvidenceWasDrunk) count++;
+                else if (tag == "Fleeing" && courtData.EvidenceWasFleeing) count++;
+                else if (tag == "Assault" && courtData.EvidenceAssaultedPed) count++;
+                else if (tag == "VehicleDamage" && courtData.EvidenceDamagedVehicle) count++;
+                else if (tag == "IllegalWeapon" && courtData.EvidenceIllegalWeapon) count++;
+                else if (tag == "Supervision" && courtData.EvidenceViolatedSupervision) count++;
+                else if (tag == "Resisted" && courtData.EvidenceResisted) count++;
+                else if (tag == "Drugs" && courtData.EvidenceHadDrugs) count++;
+                else if (tag == "UseOfForce" && courtData.EvidenceUseOfForce) count++;
+            }
+            return count;
+        }
+
+        private static string SelectWeightedOutcome(CourtData courtData, (string text, string[] evidenceTags)[] pool) {
+            if (pool == null || pool.Length == 0) return "";
+            var weights = new List<int>();
+            foreach (var entry in pool) {
+                int w = 1 + (CountMatchingEvidenceTags(courtData, entry.evidenceTags) * 18);
+                weights.Add(Math.Max(1, w));
+            }
+            int total = weights.Sum();
+            if (total <= 0) return pool[0].text;
+            int r = Helper.GetRandomInt(0, Math.Max(0, total - 1));
+            for (int i = 0; i < pool.Length; i++) {
+                r -= weights[i];
+                if (r < 0) return pool[i].text;
+            }
+            return pool[pool.Length - 1].text;
+        }
+
         private static string BuildOutcomeReasoning(CourtData courtData, int convictionChance, int resolvedStatus) {
+            if (courtData == null) return "";
             var b = new StringBuilder();
             string tribunal = courtData.IsJuryTrial ? "jury" : "court";
+            int evidenceBand = GetEvidenceBand(courtData);
+            string pleaNorm = string.IsNullOrWhiteSpace(courtData.Plea) ? "Not Guilty" : courtData.Plea.Trim();
+            bool mismatchAcquittal = resolvedStatus == 2 && convictionChance >= 65;
+            bool mismatchGuilty = resolvedStatus == 1
+                && !string.Equals(pleaNorm, "Guilty", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(pleaNorm, "No Contest", StringComparison.OrdinalIgnoreCase)
+                && convictionChance <= 45 && evidenceBand == 0;
 
             if (resolvedStatus == 1) {
-                if (courtData.Plea == "Guilty") {
-                    b.Append("The defendant entered a guilty plea. The court accepted the plea and proceeded directly to sentencing.");
-                } else if (courtData.Plea == "No Contest") {
-                    b.Append("The defendant entered a no contest plea, neither admitting nor denying the charges. The court accepted the plea and returned a guilty verdict.");
-                } else if (convictionChance >= 70) {
-                    b.Append($"The {tribunal} returned a guilty verdict. The prosecution built an overwhelming case against the defendant.");
-                } else if (convictionChance >= 50) {
-                    b.Append($"After deliberation, the {tribunal} found the defendant guilty.");
+                if (string.Equals(pleaNorm, "Guilty", StringComparison.OrdinalIgnoreCase)) {
+                    string[] guiltyPlea = new[] {
+                        "The defendant entered a guilty plea. The court accepted the plea and proceeded directly to sentencing.",
+                        "The defendant pleaded guilty to all charges. Sentencing followed immediately.",
+                        "The defendant voluntarily entered a guilty plea. The court accepted the plea and proceeded to sentencing without trial.",
+                        "The defendant entered a guilty plea as part of a negotiated agreement. The court accepted the plea and proceeded to sentencing.",
+                        "Following plea negotiations, the defendant pleaded guilty. The court accepted the plea and imposed sentence.",
+                        "The defendant entered a guilty plea. In accepting the plea, the court noted the defendant's acceptance of responsibility.",
+                    };
+                    b.Append(guiltyPlea[Helper.GetRandomInt(0, guiltyPlea.Length - 1)]);
+                } else if (string.Equals(pleaNorm, "No Contest", StringComparison.OrdinalIgnoreCase)) {
+                    string[] noContestPlea = new[] {
+                        "The defendant entered a no contest plea, neither admitting nor denying the charges. The court accepted the plea and returned a guilty verdict.",
+                        "The court accepted the defendant's nolo contendere plea and entered a finding of guilty.",
+                        "The defendant entered a no contest plea. The court treated the plea as an admission for sentencing purposes and returned a guilty verdict.",
+                        "The defendant entered a no contest plea following discussions with counsel. The court accepted the plea and imposed sentence.",
+                    };
+                    b.Append(noContestPlea[Helper.GetRandomInt(0, noContestPlea.Length - 1)]);
+                } else if (mismatchGuilty) {
+                    string[] lowEvidenceGuilty = new[] {
+                        "Despite limited physical evidence, the {0} found the defendant guilty, relying heavily on witness testimony and the defendant's conduct at the scene.",
+                        "In a case that hinged on credibility, the {0} found the defendant guilty based on the weight of officer testimony and circumstantial evidence.",
+                        "The {0} returned a guilty verdict. Although the evidence was circumstantial, witness credibility and the defendant's statements supported the conviction.",
+                        "The {0} found the defendant guilty. The prosecution's case, while not overwhelming, was sufficient to establish guilt beyond a reasonable doubt.",
+                    };
+                    b.AppendFormat(lowEvidenceGuilty[Helper.GetRandomInt(0, lowEvidenceGuilty.Length - 1)], tribunal);
                 } else {
-                    b.Append($"In a closely contested case, the {tribunal} ultimately returned a guilty verdict.");
+                    var guiltyTrialPool = new (string text, string[] evidenceTags)[] {
+                        ("The {0} returned a guilty verdict. The prosecution built an overwhelming case against the defendant.", null),
+                        ("After deliberation, the {0} found the defendant guilty.", null),
+                        ("In a closely contested case, the {0} ultimately returned a guilty verdict.", null),
+                        ("The {0} found the defendant guilty. The weight of the evidence left no reasonable doubt.", null),
+                        ("The {0} returned a guilty verdict based on the strength of the testimony and physical evidence.", null),
+                        ("The {0} found the defendant guilty. Witness testimony and documentary evidence supported the charges.", null),
+                        ("The {0} returned a guilty verdict. The prosecution met its burden of proof.", null),
+                        ("After considering the evidence, the {0} found the defendant guilty on all counts.", null),
+                        ("The {0} concluded that the defendant's guilt was established beyond a reasonable doubt.", null),
+                        ("The {0} returned a guilty verdict. The defendant's own statements and the evidence presented were consistent with guilt.", null),
+                        ("The {0} found the defendant guilty. Evidence that the defendant was armed at the time of arrest strongly supported the prosecution's case.", new[] { "Weapon" }),
+                        ("The {0} returned a guilty verdict. The defendant was armed when taken into custody, a fact the {0} found significant.", new[] { "Weapon" }),
+                        ("The {0} found the defendant guilty. Possession of a weapon at the time of arrest was cited as evidence of intent and capability.", new[] { "Weapon" }),
+                        ("The {0} returned a guilty verdict. An active warrant was outstanding; the circumstances of arrest left little room for doubt.", new[] { "Wanted" }),
+                        ("The {0} found the defendant guilty. The existence of an active warrant and the manner of apprehension supported the prosecution.", new[] { "Wanted" }),
+                        ("The {0} returned a guilty verdict. The defendant's attempt to flee was cited as evidence of consciousness of guilt.", new[] { "Fleeing" }),
+                        ("The {0} found the defendant guilty. Flight from law enforcement was presented as evidence of guilt and weighed by the {0}.", new[] { "Fleeing" }),
+                        ("The {0} returned a guilty verdict. The defendant resisted arrest; that conduct was considered alongside the underlying charges.", new[] { "Resisted" }),
+                        ("The {0} found the defendant guilty. Resistance at the time of arrest was cited as supporting the prosecution's narrative.", new[] { "Resisted" }),
+                        ("The {0} returned a guilty verdict. Evidence of assault during the incident reinforced the charges.", new[] { "Assault" }),
+                        ("The {0} found the defendant guilty. The defendant's assaultive conduct was a key factor in the verdict.", new[] { "Assault" }),
+                        ("The {0} returned a guilty verdict. Visible intoxication at the time of the offence was a key factor.", new[] { "Drunk" }),
+                        ("The {0} found the defendant guilty. The defendant was visibly intoxicated when apprehended, which the {0} considered in reaching its verdict.", new[] { "Drunk" }),
+                        ("The {0} returned a guilty verdict. The defendant's violation of probation or parole conditions was taken into account.", new[] { "Supervision" }),
+                        ("The {0} found the defendant guilty. Supervision violations were presented and weighed in the {0}'s decision.", new[] { "Supervision" }),
+                        ("The {0} returned a guilty verdict. Evidence of vehicle damage was consistent with the charges and supported conviction.", new[] { "VehicleDamage" }),
+                        ("The {0} found the defendant guilty. The possession of an illegal weapon significantly strengthened the prosecution's case.", new[] { "IllegalWeapon" }),
+                        ("The {0} returned a guilty verdict. Recovery of controlled substances during arrest supported the charges.", new[] { "Drugs" }),
+                        ("The {0} found the defendant guilty. A lawful pat-down and subsequent discovery of evidence was presented at trial.", new[] { "PatDown" }),
+                        ("The {0} returned a guilty verdict. Documentation of the incident, including use of force, was found to support the prosecution.", new[] { "UseOfForce" }),
+                        ("The {0} found the defendant guilty. Multiple factors—including the defendant's conduct at arrest and the evidence gathered—supported the verdict.", new[] { "Resisted", "Weapon" }),
+                        ("The {0} returned a guilty verdict. The combination of an outstanding warrant and the defendant's conduct at arrest left no reasonable doubt.", new[] { "Wanted", "Fleeing" }),
+                    };
+                    string chosen = SelectWeightedOutcome(courtData, guiltyTrialPool);
+                    b.AppendFormat(chosen, tribunal);
                 }
                 var factors = new List<string>();
                 if (courtData.EvidenceHadWeapon) factors.Add("the defendant was armed at the time of arrest");
@@ -2268,27 +2438,141 @@ namespace MDTPro.Data {
                 if (courtData.EvidenceWasFleeing) factors.Add("the defendant attempted to flee");
                 if (courtData.EvidenceAssaultedPed) factors.Add("the defendant committed assault");
                 if (courtData.EvidenceResisted) factors.Add("the defendant resisted arrest");
+                if (courtData.EvidenceDamagedVehicle) factors.Add("the defendant caused vehicle damage");
+                if (courtData.EvidenceIllegalWeapon) factors.Add("an illegal weapon was recovered");
+                if (courtData.EvidenceHadDrugs) factors.Add("controlled substances were found");
                 if (factors.Count > 0)
                     b.Append($" Key factors: {string.Join("; ", factors)}.");
                 if (courtData.RepeatOffenderScore >= 5)
                     b.Append(" The defendant's prior criminal record weighed heavily in the verdict.");
                 if (courtData.IsJuryTrial)
                     b.Append($" The jury voted {courtData.JuryVotesForConviction}-{courtData.JuryVotesForAcquittal} in favour of conviction.");
+                if (courtData.DocketPressure > 0.6f)
+                    b.Append(" The case was heard on an expedited basis due to court docket volume.");
+                AppendChargeDomainPhrase(b, courtData, resolvedStatus);
             } else if (resolvedStatus == 2) {
-                if (convictionChance <= 35) {
-                    b.Append($"The {tribunal} found the defendant not guilty. The prosecution failed to establish guilt beyond a reasonable doubt.");
-                } else if (convictionChance <= 55) {
-                    b.Append($"The {tribunal} returned a not guilty verdict. The defence successfully raised reasonable doubt.");
+                if (mismatchAcquittal) {
+                    string[] highEvidenceAcquittal = new[] {
+                        "Despite strong prosecution evidence, the {0} returned a not guilty verdict. The defence successfully challenged key aspects of the case and raised sufficient reasonable doubt.",
+                        "In an unexpected outcome, the {0} acquitted the defendant. Procedural issues and defence challenges to the evidence ultimately prevailed.",
+                        "The {0} returned a not guilty verdict despite a robust prosecution case. The defence's challenge to witness identification and chain of custody created reasonable doubt.",
+                        "Although the prosecution presented substantial evidence, the {0} found the defendant not guilty. Credibility issues and defence arguments raised sufficient doubt.",
+                    };
+                    b.AppendFormat(highEvidenceAcquittal[Helper.GetRandomInt(0, highEvidenceAcquittal.Length - 1)], tribunal);
                 } else {
-                    b.Append($"Despite a strong prosecution case, the {tribunal} returned a not guilty verdict.");
+                var acquittalPool = new (string text, string[] evidenceTags)[] {
+                    ("The {0} found the defendant not guilty. The prosecution failed to establish guilt beyond a reasonable doubt.", null),
+                    ("The {0} returned a not guilty verdict. The defence successfully raised reasonable doubt.", null),
+                    ("Despite a strong prosecution case, the {0} returned a not guilty verdict.", null),
+                    ("The {0} acquitted the defendant. The evidence was deemed insufficient to support a conviction.", null),
+                    ("The {0} found the defendant not guilty. The prosecution's case rested largely on circumstantial evidence.", null),
+                    ("The {0} returned a not guilty verdict. Witness credibility and inconsistent testimony favoured the defence.", null),
+                    ("The {0} acquitted the defendant. The defence raised sufficient doubt as to the defendant's involvement.", null),
+                    ("The {0} found the defendant not guilty. Gaps in the chain of custody and procedural issues were cited.", null),
+                    ("The {0} returned a not guilty verdict. The evidence did not sufficiently link the defendant to the alleged conduct.", null),
+                    ("The {0} acquitted the defendant. Conflicting testimony and lack of physical evidence supported acquittal.", null),
+                    ("The {0} found the defendant not guilty. The defence presented a plausible alternative account of the facts.", null),
+                    ("The {0} returned a not guilty verdict. The prosecution could not overcome the presumption of innocence.", null),
+                    ("The {0} acquitted the defendant. Reasonable doubt remained as to intent and identification.", null),
+                    ("The {0} found the defendant not guilty. The weight of the evidence did not support conviction.", null),
+                    ("The {0} returned a not guilty verdict. The defence's challenge to the arrest and search was sustained.", null),
+                    ("The {0} acquitted the defendant. Insufficient evidence was presented to establish guilt.", null),
+                    ("The {0} found the defendant not guilty. The prosecution failed to meet its burden of proof.", null),
+                    ("The {0} returned a not guilty verdict. The defendant's account, together with the evidence, left reasonable doubt.", null),
+                };
+                string chosen = SelectWeightedOutcome(courtData, acquittalPool);
+                b.AppendFormat(chosen, tribunal);
                 }
                 if (!courtData.HasPublicDefender)
                     b.Append($" Private counsel {courtData.DefenseAttorneyName} mounted an effective defence.");
                 if (courtData.IsJuryTrial)
                     b.Append($" The jury voted {courtData.JuryVotesForAcquittal}-{courtData.JuryVotesForConviction} in favour of acquittal.");
+                if (courtData.DocketPressure > 0.6f)
+                    b.Append(" The case was resolved quickly amid a crowded court calendar.");
+                AppendChargeDomainPhrase(b, courtData, resolvedStatus);
             } else if (resolvedStatus == 3) {
-                b.Append("Charges were dismissed. The case did not proceed to trial.");
+                string[] dismissedPool = new[] {
+                    "Charges were dismissed. The case did not proceed to trial.",
+                    "The charges were dismissed. The prosecution declined to proceed.",
+                    "The case was dismissed. Insufficient evidence to proceed to trial.",
+                    "Charges were dismissed on procedural grounds. The case did not go to trial.",
+                    "The court dismissed the case. The matter was not tried on the merits.",
+                };
+                b.Append(dismissedPool[Helper.GetRandomInt(0, dismissedPool.Length - 1)]);
             }
+
+            return b.ToString().Trim();
+        }
+
+        private static void AppendChargeDomainPhrase(StringBuilder b, CourtData courtData, int resolvedStatus) {
+            if (b == null || courtData?.Charges == null || courtData.Charges.Count == 0) return;
+            var phrases = new List<string>();
+            if (HasChargeKeyword(courtData, "DUI") || HasChargeKeyword(courtData, "DWI") || HasChargeKeyword(courtData, "driving under"))
+                phrases.Add(resolvedStatus == 1 ? "The impaired driving charge was central to the case." : "The defence challenged the validity of the traffic stop and field sobriety procedures.");
+            if (HasChargeKeyword(courtData, "possession") || HasChargeKeyword(courtData, "drug") || HasChargeKeyword(courtData, "controlled"))
+                phrases.Add(resolvedStatus == 1 ? "Drug possession and related conduct were addressed in the verdict." : "Chain of custody and search legality were contested.");
+            if (HasChargeKeyword(courtData, "assault") || HasChargeKeyword(courtData, "battery") || HasChargeKeyword(courtData, "violence"))
+                phrases.Add(resolvedStatus == 1 ? "The violent nature of the offence was reflected in the outcome." : "Self-defence and intent were central to the defence.");
+            if (HasChargeKeyword(courtData, "resisting") || HasChargeKeyword(courtData, "obstruction"))
+                phrases.Add(resolvedStatus == 1 ? "The defendant's conduct toward law enforcement was considered." : "The lawfulness of the underlying detention was in dispute.");
+            if (phrases.Count > 0 && Helper.GetRandomInt(0, 2) == 0)
+                b.Append(" " + phrases[Helper.GetRandomInt(0, phrases.Count - 1)]);
+        }
+
+        private static string BuildSentenceReasoning(CourtData courtData) {
+            if (courtData == null) return "";
+            var b = new StringBuilder();
+            string judge = courtData.JudgeName ?? "the court";
+            bool hasLife = courtData.Charges?.Any(c => c.Time == null) == true;
+
+            if (courtData.RepeatOffenderScore >= 6) {
+                string[] recidivism = new[] {
+                    $"The court cited the defendant's extensive prior record and pattern of criminal conduct as significant aggravating factors.",
+                    $"{judge} noted the defendant's repeated failures to comply with prior sanctions and the need for deterrence.",
+                    "The defendant's criminal history and failure to rehabilitate weighed heavily in sentencing.",
+                };
+                b.Append(recidivism[Helper.GetRandomInt(0, recidivism.Length - 1)]);
+            } else if (courtData.RepeatOffenderScore >= 3) {
+                string[] prior = new[] {
+                    $"The defendant's prior convictions were taken into account as an aggravating factor.",
+                    $"{judge} considered the defendant's record in determining the appropriate sentence.",
+                };
+                b.Append(prior[Helper.GetRandomInt(0, prior.Length - 1)]);
+            }
+
+            if (courtData.SeverityScore >= 15 || hasLife) {
+                if (b.Length > 0) b.Append(" ");
+                string[] severity = new[] {
+                    "The seriousness of the offence warranted a substantial sentence.",
+                    "Given the nature and gravity of the charges, the court imposed a sentence at the upper end of the guideline range.",
+                    "The court found that the offences demonstrated a significant threat to public safety.",
+                };
+                b.Append(severity[Helper.GetRandomInt(0, severity.Length - 1)]);
+            }
+
+            if (courtData.IsJuryTrial && courtData.JurySize > 0) {
+                int margin = courtData.JuryVotesForConviction - courtData.JuryVotesForAcquittal;
+                if (b.Length > 0) b.Append(" ");
+                if (margin >= courtData.JurySize - 1)
+                    b.Append($"The unanimous jury verdict supported a strong sentencing response.");
+                else if (margin <= 2)
+                    b.Append($"The narrow jury verdict was noted; the court balanced the split decision in imposing sentence.");
+            }
+
+            float policy = courtData.PolicyAdjustment;
+            if (policy > 0.03f && b.Length > 0) {
+                b.Append($" {judge} imposed a sentence consistent with this district's approach to similar offences.");
+            } else if (policy < -0.02f && b.Length > 0) {
+                b.Append(" Mitigating circumstances were considered in fashioning the sentence.");
+            }
+
+            if (courtData.EvidenceAssaultedPed || courtData.EvidenceHadWeapon) {
+                if (b.Length > 0) b.Append(" ");
+                b.Append("The violent or threatening conduct at the time of the offence was cited as an aggravating factor.");
+            }
+
+            if (b.Length == 0)
+                b.Append($"{judge} considered the nature of the offence, the defendant's background, and the need for punishment and deterrence in imposing sentence.");
 
             return b.ToString().Trim();
         }
@@ -2326,9 +2610,13 @@ namespace MDTPro.Data {
         }
 
         private static void ResolveCaseAuto(CourtData courtCase) {
+            if (courtCase == null) return;
             try {
+                string plea = string.IsNullOrWhiteSpace(courtCase.Plea) ? "Not Guilty" : courtCase.Plea.Trim();
+                courtCase.Plea = plea;
+
                 int newStatus;
-                if (courtCase.Plea == "Guilty" || courtCase.Plea == "No Contest") {
+                if (string.Equals(plea, "Guilty", StringComparison.OrdinalIgnoreCase) || string.Equals(plea, "No Contest", StringComparison.OrdinalIgnoreCase)) {
                     newStatus = 1;
                 } else {
                     int roll = Helper.GetRandomInt(1, 100);
@@ -2338,10 +2626,13 @@ namespace MDTPro.Data {
                 courtCase.Status = newStatus;
                 courtCase.OutcomeReasoning = BuildOutcomeReasoning(courtCase, courtCase.ConvictionChance, newStatus);
                 if (newStatus == 1) {
+                    courtCase.SentenceReasoning = BuildSentenceReasoning(courtCase);
                     courtCase.LicenseRevocations = ComputeLicenseRevocations(courtCase);
-                    if (courtCase.LicenseRevocations.Count > 0) {
+                    if (courtCase.LicenseRevocations != null && courtCase.LicenseRevocations.Count > 0) {
                         courtCase.OutcomeReasoning += " The court further ordered: " + string.Join("; ", courtCase.LicenseRevocations) + ".";
                     }
+                } else {
+                    courtCase.SentenceReasoning = null;
                 }
                 courtCase.LastUpdatedUtc = DateTime.UtcNow.ToString("o");
 

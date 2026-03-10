@@ -177,6 +177,27 @@ namespace MDTPro.ServerAPI {
                 buffer = Encoding.UTF8.GetBytes("OK");
                 contentType = "text/plain";
                 status = 200;
+            } else if (path == "createImpoundReport") {
+                ImpoundReport report = JsonConvert.DeserializeObject<ImpoundReport>(body);
+                DataController.AddReport(report);
+                Database.SaveImpoundReport(report);
+                buffer = Encoding.UTF8.GetBytes("OK");
+                contentType = "text/plain";
+                status = 200;
+            } else if (path == "createTrafficIncidentReport") {
+                TrafficIncidentReport report = JsonConvert.DeserializeObject<TrafficIncidentReport>(body);
+                DataController.AddReport(report);
+                Database.SaveTrafficIncidentReport(report);
+                buffer = Encoding.UTF8.GetBytes("OK");
+                contentType = "text/plain";
+                status = 200;
+            } else if (path == "createInjuryReport") {
+                InjuryReport report = JsonConvert.DeserializeObject<InjuryReport>(body);
+                DataController.AddReport(report);
+                Database.SaveInjuryReport(report);
+                buffer = Encoding.UTF8.GetBytes("OK");
+                contentType = "text/plain";
+                status = 200;
             } else if (path == "updateCourtCaseStatus") {
                 var data = JsonConvert.DeserializeAnonymousType(body, new {
                     Number = "",
