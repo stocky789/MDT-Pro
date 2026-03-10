@@ -1,14 +1,35 @@
 # Changelog
 
+## [Unreleased]
+
+### Major Features
+
+- **Quick Actions Bar** — New floating action bar (bottom-right) with one-click buttons: Panic (request panic backup), Backup (request local patrol), Set GPS (set in-game waypoint to active callout), Clear ALPR. Requires Policing Redefined for backup actions. Toggle on/off in Config → Quick Actions Bar.
+- **Request Backup from MDT** — Request Policing Redefined backup (panic, local patrol, traffic stop, transport, tow) via `POST /post/requestBackup` with `{ "action": "panic" | "localPatrol" | "trafficStop" | "transport" | "tow" }`.
+- **Set GPS to Callout** — New `POST /post/setGpsWaypoint` endpoint sets the in-game map waypoint. With empty body, uses active callout coordinates. Accepts `{ "x": float, "y": float }` for custom coords.
+- **Active Call enhancements** — Status badge (Pending, Accepted, En Route, Finished) and timeline (Displayed • Accepted • Finished) on the Active Call page for clearer callout flow.
+
+### Minor Features
+
+- **GpsHelper** — Uses GTA native `SET_NEW_WAYPOINT` for in-game waypoint.
+- **BackupHelper** — Wraps Policing Redefined Backup API via reflection so the plugin loads without PR; backup actions no-op when PR is not installed.
+
+### API Verification (cross-checked)
+
+- **Policing Redefined Backup API** — Method signatures match docs: RequestPanicBackup(bool, bool), RequestBackup(EBackupUnit, EBackupResponseCode, bool×3), RequestTrafficStopBackup, RequestPoliceTransport, RequestTowServiceBackup(). EBackupUnit.LocalPatrol confirmed.
+- **GTA 5 Native** — SET_NEW_WAYPOINT (HUD, hash 0xFE4333F2) takes float x, float y. RagePluginHook Natives.SET_NEW_WAYPOINT(x, y) invoked from GameFiber.
+- **CDF** — No new CDF usage in this feature set; setGpsWaypoint uses CalloutEvents.CalloutInfo.Coords from LSPDFR callout position.
+
 ## [0.9.5.0] — 2026-03-09
 
 ### Minor Features
 
-- **Court evidence: WasFleeing** — Fleeing detection improved. `OnPedSurrendered` now marks the ped as fleeing (surrendering implies prior flight). `GET_IS_TASK_ACTIVE` fallback added for flee-related tasks (e.g. TASK_REACT_TO_PURSUIT, TASK_SMART_FLEE, TASK_VEHICLE_FLEE) so chase-then-stop scenarios are captured even when `IS_PED_FLEEING` is no longer true at arrest.
-- **Court evidence: WasDrunk** — `IS_PED_DRUNK` rarely set by the game; fallback to `TASK_MOTION_DRUNK` (task index 1160) so drunk movement/animations are detected for court evidence.
-- **ALPR range** — Scan range doubled (25 m → 50 m); read range doubled (20 m → 40 m) for better plate detection at distance.
-- **In-game notifications** — Switched from LS Customs icon to police icon (CHAR_CALL_POLICE) for update checker, web address, and other MDT Pro notifications.
-- **Web favicon** — MDT Pro logo now used as the browser tab favicon.
+- **Court evidence: WasFleeing** — Fleeing detection improved. Suspects who surrender after a chase are now correctly flagged as having fled. Chase-then-stop scenarios are captured for court even when the game no longer reports them as fleeing at arrest.
+- **Court evidence: WasDrunk** — Drunk detection improved. Suspects doing drunk movements or animations are now correctly flagged for court, even when the game's built-in drunk check doesn't trigger.
+- **ALPR range** — Scan and read range doubled for better plate detection at distance.
+- **In-game notifications** — Update checker and other in-game messages now use a police-style icon instead of the LS Customs icon.
+- **Web favicon** — MDT Pro logo now shows in the browser tab when using the MDT.
+- **OpenIV packages** — Install with MDTPro-x.x.x.oiv; uninstall with MDTPro-x.x.x-Uninstall.oiv. Both include links to LCPDFR and GitHub. The uninstaller removes the plugin and all MDTPro files. For a complete removal, manually delete the MDTPro folder from your GTA V directory after uninstalling.
 
 ## [0.9.3.0] — 2026-03-07
 

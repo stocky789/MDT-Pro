@@ -2,8 +2,51 @@ body {
   background-color: var(--color-background);
   margin: 0;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
   height: 100vh;
+}
+
+.calloutStatusBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 0 10px 8px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.calloutStatusBadge {
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.calloutStatusBadge.calloutStatus0 {
+  background-color: var(--color-warning-half);
+  color: var(--color-warning);
+}
+
+.calloutStatusBadge.calloutStatus1,
+.calloutStatusBadge.calloutStatus2 {
+  background-color: var(--color-info-half);
+  color: var(--color-info);
+}
+
+.calloutStatusBadge.calloutStatus3 {
+  background-color: var(--color-success-half);
+  color: var(--color-success);
+}
+
+.calloutTimeline {
+  font-size: 12px;
+  color: var(--color-text-primary-dimmed);
 }
 
 .inputWrapper {

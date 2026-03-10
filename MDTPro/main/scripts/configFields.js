@@ -134,6 +134,10 @@ const CONFIG_SECTIONS = [
     ],
   },
   {
+    title: 'Quick Actions Bar',
+    keys: ['quickActionsBarEnabled'],
+  },
+  {
     title: 'Updates',
     keys: [
       'checkForUpdates',
@@ -473,6 +477,10 @@ const CONFIG_FIELD_META = {
   addCalloutSuspectNamesFromMessages: {
     label: 'Add suspect names from callout messages',
     tooltip: 'When callout messages mention names (e.g. "associated with Joe Thomas"), add them as person records so they appear in Person Search. Disable if your callout pack registers suspects with CDF directly.',
+  },
+  quickActionsBarEnabled: {
+    label: 'Show Quick Actions bar',
+    tooltip: 'Show the floating Quick Actions bar (bottom-right) with one-click buttons for Panic, Backup, Set GPS to callout, and Clear ALPR. Requires Policing Redefined for backup actions.',
   },
   checkForUpdates: {
     label: 'Check for updates on load',

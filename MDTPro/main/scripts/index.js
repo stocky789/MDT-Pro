@@ -3,6 +3,84 @@
   const language = await getLanguage()
   if (config.updateDomWithLanguageOnLoad) await updateDomWithLanguage('index')
   applySettingsInfoTooltips(language)
+
+  // Quick Actions Bar visibility and handlers
+  const quickActionsBar = document.getElementById('quickActionsBar')
+  const qabBackupMenu = document.getElementById('qabBackupMenu')
+  const requestBackupAction = async (action, btnEl) => {
+    const res = await (await fetch('/post/requestBackup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action })
+    })).json()
+    if (res?.success) topWindow.showNotification(language.quickActions?.backupSuccess || 'Backup requested.', 'checkMark')
+    else topWindow.showNotification(res?.error || 'Backup request failed.', 'warning')
+    if (btnEl) btnEl.classList.remove('loading')
+  }
+  if (quickActionsBar) {
+    quickActionsBar.classList.toggle('hidden', config.quickActionsBarEnabled === false)
+    // Backup dropdown toggle
+    const qabBackupMain = quickActionsBar.querySelector('.qabBackupMain')
+    if (qabBackupMain && qabBackupMenu) {
+      qabBackupMain.addEventListener('click', function (e) {
+        e.stopPropagation()
+        const isOpen = qabBackupMenu.classList.toggle('open')
+        qabBackupMain.setAttribute('aria-expanded', String(isOpen))
+      })
+      document.addEventListener('click', function (ev) {
+        if (qabBackupMenu.classList.contains('open') && !qabBackupMain.contains(ev.target) && !qabBackupMenu.contains(ev.target)) {
+          qabBackupMenu.classList.remove('open')
+          qabBackupMain.setAttribute('aria-expanded', 'false')
+        }
+      })
+      qabBackupMenu.querySelectorAll('button[role="menuitem"]').forEach((mi) => {
+        mi.addEventListener('click', async function (e) {
+          e.stopPropagation()
+          const action = this.dataset.action
+          if (!action) return
+          qabBackupMenu.classList.remove('open')
+          qabBackupMain.setAttribute('aria-expanded', 'false')
+          qabBackupMain.classList.add('loading')
+          try { await requestBackupAction(action, qabBackupMain) } catch (e) { topWindow.showNotification(language.quickActions?.error || 'Action failed.', 'error'); qabBackupMain.classList.remove('loading') }
+        })
+      })
+    }
+    // Panic, GPS, ALPR and other qabBtn (excluding backup which has its own handler)
+    quickActionsBar.querySelectorAll('.qabBtn:not(.qabBackupMain)').forEach((btn) => {
+      btn.addEventListener('click', async function () {
+        const action = this.dataset.action
+        if (!action) return
+        if (this.classList.contains('loading')) return
+        this.classList.add('loading')
+        try {
+          if (action === 'panic') {
+            const res = await (await fetch('/post/requestBackup', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'panic' })
+            })).json()
+            if (res?.success) topWindow.showNotification(language.quickActions?.panicSuccess || 'Panic backup requested.', 'checkMark')
+            else topWindow.showNotification(res?.error || 'Backup request failed.', 'warning')
+          } else if (action === 'gps') {
+            const text = await (await fetch('/post/setGpsWaypoint', {
+              method: 'POST',
+              body: ''
+            })).text()
+            if (text === 'OK') topWindow.showNotification(language.quickActions?.gpsSuccess || 'GPS set to callout.', 'checkMark')
+            else topWindow.showNotification(text || 'Could not set GPS.', 'warning')
+          } else if (action === 'alpr') {
+            const alprRes = await fetch('/post/alprClear', { method: 'POST', body: '' })
+            if (alprRes.ok) topWindow.showNotification(language.quickActions?.alprCleared || 'ALPR cleared.', 'checkMark')
+            else topWindow.showNotification(language.quickActions?.error || 'Action failed.', 'warning')
+          }
+        } catch (e) {
+          topWindow.showNotification(language.quickActions?.error || 'Action failed.', 'error')
+        } finally {
+          this.classList.remove('loading')
+        }
+      })
+    })
+  }
   const version = await (await fetch('/version')).text()
   document.querySelector('.overlay .settings .version').innerHTML =
     `${language.index.settings.version}: ${version}`

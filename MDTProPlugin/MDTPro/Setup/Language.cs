@@ -17,6 +17,15 @@ namespace MDTPro.Setup {
         public Map map = new Map();
         public Callout callout = new Callout();
         public Alpr alpr = new Alpr();
+        public QuickActions quickActions = new QuickActions();
+
+        public class QuickActions {
+            public string panicSuccess = "Panic backup requested.";
+            public string backupSuccess = "Backup requested.";
+            public string gpsSuccess = "GPS set to callout.";
+            public string alprCleared = "ALPR cleared.";
+            public string error = "Action failed.";
+        }
 
         public class Alpr {
             public string alertTitle = "ALPR Alert";
@@ -595,6 +604,16 @@ namespace MDTPro.Setup {
             public string defaultPriority = "Code 2";
             public Static @static = new Static();
             public CalloutInfo calloutInfo = new CalloutInfo();
+            public Status status = new Status();
+
+            public class Status {
+                public string pending = "Pending";
+                public string accepted = "Accepted";
+                public string enRoute = "En Route";
+                public string finished = "Finished";
+                public string unknown = "—";
+                public string displayed = "Displayed";
+            }
 
             public class Static {
                 public string title = "Callout";

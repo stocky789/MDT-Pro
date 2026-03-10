@@ -21,6 +21,36 @@ namespace MDTPro.ServerAPI {
                 return;
             }
 
+            if (path == "setGpsWaypoint") {
+                float x = 0, y = 0;
+                bool explicitCoords = false;
+                string bodySetGps = Helper.GetRequestPostData(req);
+                if (!string.IsNullOrEmpty(bodySetGps)) {
+                    try {
+                        var data = JsonConvert.DeserializeAnonymousType(bodySetGps, new { x = 0f, y = 0f });
+                        if (data != null) { x = data.x; y = data.y; explicitCoords = true; }
+                    } catch { }
+                }
+                if (!explicitCoords && EventListeners.CalloutEvents.CalloutInfo != null) {
+                    var ci = EventListeners.CalloutEvents.CalloutInfo;
+                    if (ci.Coords != null && ci.Coords.Length >= 2) {
+                        x = ci.Coords[0];
+                        y = ci.Coords[1];
+                    }
+                }
+                if (explicitCoords || x != 0 || y != 0) {
+                    Utility.GpsHelper.SetWaypoint(x, y);
+                    buffer = Encoding.UTF8.GetBytes("OK");
+                    contentType = "text/plain";
+                    status = 200;
+                } else {
+                    buffer = Encoding.UTF8.GetBytes("No coordinates available. Accept a callout first or provide x,y in request body.");
+                    contentType = "text/plain";
+                    status = 400;
+                }
+                return;
+            }
+
             string body = Helper.GetRequestPostData(req);
             if (string.IsNullOrEmpty(body)) {
                 buffer = Encoding.UTF8.GetBytes("Bad Request - Empty Body");
@@ -212,6 +242,113 @@ namespace MDTPro.ServerAPI {
                     status = 200;
                 } else {
                     buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "Vehicle not found or not in world. The vehicle must be nearby to add a BOLO." }));
+                    contentType = "text/json";
+                    status = 400;
+                }
+            } else if (path == "requestBackup") {
+                var reqData = JsonConvert.DeserializeAnonymousType(body, new { action = (string)null, unit = (string)null, responseCode = 2 });
+                if (reqData == null || string.IsNullOrWhiteSpace(reqData.action)) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "action is required. Supported: panic, localPatrol, statePatrol, localSwat, nooseSwat, localK9, stateK9, ambulance, fire, coroner, animalControl, trafficStop, transport, tow, group, airLocal, airNoose, spikeStrips, felonyStop, dismiss" }));
+                    contentType = "text/json";
+                    status = 400;
+                    return;
+                }
+                string act = reqData.action.Trim().ToLowerInvariant();
+                int rc = reqData.responseCode >= 1 && reqData.responseCode <= 4 ? reqData.responseCode : 2;
+                bool ok = false;
+                string err = null;
+                switch (act) {
+                    case "panic":
+                        ok = Utility.BackupHelper.RequestPanicBackup();
+                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        break;
+                    case "localpatrol":
+                        ok = Utility.BackupHelper.RequestBackup("LocalPatrol", rc);
+                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        break;
+                    case "statepatrol":
+                        ok = Utility.BackupHelper.RequestBackup("StatePatrol", rc);
+                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        break;
+                    case "localswat":
+                        ok = Utility.BackupHelper.RequestBackup("LocalSWAT", rc);
+                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        break;
+                    case "nooseswat":
+                        ok = Utility.BackupHelper.RequestBackup("NooseSWAT", rc);
+                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        break;
+                    case "localk9":
+                        ok = Utility.BackupHelper.RequestBackup("LocalK9Patrol", rc);
+                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        break;
+                    case "statek9":
+                        ok = Utility.BackupHelper.RequestBackup("StateK9Patrol", rc);
+                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        break;
+                    case "ambulance":
+                        ok = Utility.BackupHelper.RequestBackup("Ambulance", rc);
+                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        break;
+                    case "fire":
+                        ok = Utility.BackupHelper.RequestBackup("FireDepartment", rc);
+                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        break;
+                    case "coroner":
+                        ok = Utility.BackupHelper.RequestBackup("Coroner", rc);
+                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        break;
+                    case "animalcontrol":
+                        ok = Utility.BackupHelper.RequestBackup("AnimalControl", rc);
+                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        break;
+                    case "trafficstop":
+                        var tsUnit = !string.IsNullOrWhiteSpace(reqData.unit) ? reqData.unit.Trim() : "LocalPatrol";
+                        ok = Utility.BackupHelper.RequestTrafficStopBackup(tsUnit, rc);
+                        err = ok ? null : "Policing Redefined not available, or not on a traffic stop.";
+                        break;
+                    case "transport":
+                        ok = Utility.BackupHelper.RequestPoliceTransport(rc);
+                        err = ok ? null : "Policing Redefined not available or transport failed.";
+                        break;
+                    case "tow":
+                        ok = Utility.BackupHelper.RequestTowServiceBackup();
+                        err = ok ? null : "Policing Redefined not available or tow menu failed.";
+                        break;
+                    case "group":
+                        ok = Utility.BackupHelper.RequestGroupBackup();
+                        err = ok ? null : "Policing Redefined not available or group backup failed.";
+                        break;
+                    case "airlocal":
+                        ok = Utility.BackupHelper.RequestAirBackup("LocalAir");
+                        err = ok ? null : "Policing Redefined not available or not in a pursuit.";
+                        break;
+                    case "airnoose":
+                        ok = Utility.BackupHelper.RequestAirBackup("NooseAir");
+                        err = ok ? null : "Policing Redefined not available or not in a pursuit.";
+                        break;
+                    case "spikestrips":
+                        ok = Utility.BackupHelper.RequestSpikeStripsBackup();
+                        err = ok ? null : "Policing Redefined not available or not in a pursuit.";
+                        break;
+                    case "felonystop":
+                        ok = Utility.BackupHelper.InitiateFelonyStop();
+                        err = ok ? null : "Policing Redefined not available or felony stop failed.";
+                        break;
+                    case "dismiss":
+                        Utility.BackupHelper.DismissAllBackupUnits(false);
+                        ok = true;
+                        break;
+                    default:
+                        err = "Unknown action. Supported: panic, localPatrol, statePatrol, localSwat, nooseSwat, localK9, stateK9, ambulance, fire, coroner, animalControl, trafficStop, transport, tow, group, airLocal, airNoose, spikeStrips, felonyStop, dismiss";
+                        break;
+                }
+                if (ok) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = true }));
+                    contentType = "text/json";
+                    status = 200;
+                } else {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = err ?? "Backup request failed." }));
                     contentType = "text/json";
                     status = 400;
                 }
