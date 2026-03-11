@@ -138,9 +138,6 @@ async function applyInjuryGameDataToSection (section, pedName, labels, gameDataN
   try {
     const res = await fetch(url)
     const data = await res.json()
-    if (typeof console !== 'undefined' && console.log) {
-      console.log('[Injury Import]', { url, ok: res.ok, status: res.status, data })
-    }
     if (!data || (data.Source === undefined && data.InjuryType == null && data.Severity == null && data.Health == null)) {
       if (noteEl) noteEl.textContent = labels.noGameData || 'No in-game data for this person. Ensure they are nearby or use DamageTrackerFramework.'
       return

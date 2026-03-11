@@ -4,9 +4,92 @@ async function getImpoundSection (data = {}, isList = false) {
   section.classList.add('section', 'impoundSection')
   if (isList) section.classList.add('searchResponseWrapper')
 
+  const labels = language.reports?.sections?.impound || {}
   const title = document.createElement('div')
   title.classList.add(isList ? 'searchResponseSectionTitle' : 'title')
-  title.innerHTML = language.reports?.sections?.impound?.title || 'Vehicle & Impound Details'
+  title.innerHTML = labels.title || 'Vehicle & Impound Details'
+  section.appendChild(title)
+
+  // Nearby vehicles row (create form only): click to prefill plate, model, owner, VIN
+  if (!isList) {
+    const nearbyRow = document.createElement('div')
+    nearbyRow.classList.add('impoundNearbyRow', 'inputWrapper')
+    const nearbyLabel = document.createElement('div')
+    nearbyLabel.classList.add('impoundNearbyLabel')
+    nearbyLabel.textContent = labels.nearbyVehiclesTitle || 'Nearby vehicles'
+    const nearbyHeader = document.createElement('div')
+    nearbyHeader.classList.add('impoundNearbyHeader')
+    const refreshBtn = document.createElement('button')
+    refreshBtn.type = 'button'
+    refreshBtn.classList.add('impoundNearbyRefresh')
+    refreshBtn.textContent = labels.refreshNearby || 'Refresh'
+    const listEl = document.createElement('div')
+    listEl.classList.add('impoundNearbyList')
+    nearbyHeader.appendChild(refreshBtn)
+    nearbyRow.appendChild(nearbyLabel)
+    nearbyRow.appendChild(nearbyHeader)
+    nearbyRow.appendChild(listEl)
+    section.appendChild(nearbyRow)
+
+    async function loadNearbyForImpound () {
+      listEl.innerHTML = ''
+      try {
+        const res = await fetch('/data/nearbyVehicles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '8'
+        })
+        const list = (res.ok ? await res.json() : null) || []
+        if (!Array.isArray(list) || list.length === 0) {
+          listEl.textContent = labels.noNearbyVehicles || 'No vehicles detected nearby.'
+          return
+        }
+        for (const vehicle of list) {
+          const btn = document.createElement('button')
+          btn.type = 'button'
+          btn.classList.add('impoundNearbyItem')
+          if (vehicle.IsStolen) btn.classList.add('stolen')
+          const model = vehicle.ModelDisplayName ? ` — ${vehicle.ModelDisplayName}` : ''
+          const dist = vehicle.Distance != null ? ` (${vehicle.Distance.toFixed(1)}m)` : ''
+          btn.textContent = `${vehicle.LicensePlate || ''}${model}${dist}`
+          btn.addEventListener('click', async function () {
+            const plate = vehicle.LicensePlate
+            if (!plate) return
+            try {
+              const vRes = await fetch('/data/specificVehicle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(plate)
+              })
+              const v = vRes.ok ? await vRes.json() : null
+              if (!v) return
+              const plateInput = section.querySelector('#impoundSectionPlateInput')
+              const modelInput = section.querySelector('#impoundSectionModelInput')
+              const ownerInput = section.querySelector('#impoundSectionOwnerInput')
+              const vinInput = section.querySelector('#impoundSectionVinInput')
+              if (plateInput) plateInput.value = v.LicensePlate || ''
+              if (modelInput) modelInput.value = v.ModelDisplayName || v.ModelName || ''
+              if (ownerInput) ownerInput.value = v.Owner || ''
+              if (vinInput) vinInput.value = v.VehicleIdentificationNumber || v.VinStatus || ''
+              if (typeof topWindow !== 'undefined' && topWindow.showNotification) {
+                topWindow.showNotification(labels.prefilledFromNearby || 'Vehicle details filled from nearby.', 'info')
+              }
+            } catch (_) {}
+          })
+          listEl.appendChild(btn)
+        }
+      } catch (_) {
+        listEl.textContent = labels.noNearbyVehicles || 'No vehicles detected nearby.'
+      }
+    }
+
+    refreshBtn.addEventListener('click', function () {
+      if (refreshBtn.classList.contains('loading')) return
+      refreshBtn.classList.add('loading')
+      loadNearbyForImpound().then(() => refreshBtn.classList.remove('loading'))
+    })
+    loadNearbyForImpound()
+  }
 
   // GTA 5 lore: two LSPD Auto Impound locations (Mission Row & Davis)
   const IMPOUND_LOTS = [
@@ -16,7 +99,6 @@ async function getImpoundSection (data = {}, isList = false) {
   // GTA 5 lore: tow companies in Los Santos (Camel Towing, Davis Towing / Davis Towing Impound)
   const TOW_COMPANIES = ['', 'Camel Towing', 'Davis Towing']
 
-  const labels = language.reports?.sections?.impound || {}
   // If creating new report and no lot set, randomize which impound lot
   const resolvedData = { ...data }
   if (!resolvedData.ImpoundLot && !isList) {

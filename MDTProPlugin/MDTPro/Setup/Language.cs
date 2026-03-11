@@ -469,6 +469,10 @@ namespace MDTPro.Setup {
 
                 public class Impound {
                     public string title = "Vehicle & Impound Details";
+                    public string nearbyVehiclesTitle = "Nearby vehicles";
+                    public string refreshNearby = "Refresh";
+                    public string noNearbyVehicles = "No vehicles detected nearby.";
+                    public string prefilledFromNearby = "Vehicle details filled from nearby.";
                     public string licensePlate = "License Plate";
                     public string model = "Model";
                     public string owner = "Owner";

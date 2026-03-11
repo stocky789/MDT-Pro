@@ -286,7 +286,7 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/json";
             } else if (path == "vehicleSearchByPlate") {
-                string plate = Helper.GetRequestBodyAsString(req);
+                string plate = Helper.GetRequestBodyAsString(req)?.Trim() ?? "";
                 var records = string.IsNullOrWhiteSpace(plate)
                     ? new System.Collections.Generic.List<VehicleSearchRecord>()
                     : Database.LoadVehicleSearchRecordsByPlate(plate);

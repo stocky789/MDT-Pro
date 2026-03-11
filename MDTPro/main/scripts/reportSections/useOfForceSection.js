@@ -8,6 +8,8 @@ async function getUseOfForceSection (data = {}, isList = false) {
   title.classList.add(isList ? 'searchResponseSectionTitle' : 'title')
   title.innerHTML = language.reports?.sections?.useOfForce?.title || 'Use of Force'
 
+  const typeRow = document.createElement('div')
+  typeRow.classList.add('useOfForceRow', 'useOfForceTypeRow')
   const typeLabel = document.createElement('label')
   typeLabel.innerHTML = language.reports?.sections?.useOfForce?.type || 'Type'
   typeLabel.htmlFor = 'useOfForceTypeSelect'
@@ -36,19 +38,26 @@ async function getUseOfForceSection (data = {}, isList = false) {
   typeOtherInput.value = data?.TypeOther || ''
   typeOtherWrapper.appendChild(typeOtherLabel)
   typeOtherWrapper.appendChild(typeOtherInput)
+  typeRow.appendChild(typeLabel)
+  typeRow.appendChild(typeSelect)
+  typeRow.appendChild(typeOtherWrapper)
 
+  const justificationRow = document.createElement('div')
+  justificationRow.classList.add('useOfForceRow', 'useOfForceJustificationRow')
   const justificationLabel = document.createElement('label')
   justificationLabel.innerHTML = language.reports?.sections?.useOfForce?.justification || 'Justification'
   justificationLabel.htmlFor = 'useOfForceJustificationInput'
   const justificationInput = document.createElement('textarea')
   justificationInput.id = 'useOfForceJustificationInput'
-  justificationInput.rows = 3
+  justificationInput.rows = 2
   justificationInput.placeholder = language.reports?.sections?.useOfForce?.justificationPlaceholder || 'Describe circumstances requiring use of force'
   justificationInput.disabled = isList
   justificationInput.value = data?.Justification || ''
+  justificationRow.appendChild(justificationLabel)
+  justificationRow.appendChild(justificationInput)
 
-  const injuryWrapper = document.createElement('div')
-  injuryWrapper.classList.add('inputWrapper', 'grid')
+  const injuryRow = document.createElement('div')
+  injuryRow.classList.add('useOfForceRow', 'useOfForceInjuryRow')
   const injurySuspectLabel = document.createElement('label')
   injurySuspectLabel.innerHTML = language.reports?.sections?.useOfForce?.injuryToSuspect || 'Injury to suspect'
   const injurySuspectCheck = document.createElement('input')
@@ -66,10 +75,11 @@ async function getUseOfForceSection (data = {}, isList = false) {
   injuryOfficerCheck.disabled = isList
   injuryOfficerCheck.checked = !!data?.InjuryToOfficer
   injuryOfficerLabel.appendChild(injuryOfficerCheck)
+  injuryRow.appendChild(injurySuspectLabel)
+  injuryRow.appendChild(injuryOfficerLabel)
 
-  injuryWrapper.appendChild(injurySuspectLabel)
-  injuryWrapper.appendChild(injuryOfficerLabel)
-
+  const witnessesRow = document.createElement('div')
+  witnessesRow.classList.add('useOfForceRow', 'useOfForceWitnessesRow')
   const witnessesLabel = document.createElement('label')
   witnessesLabel.innerHTML = language.reports?.sections?.useOfForce?.witnesses || 'Witnesses'
   witnessesLabel.htmlFor = 'useOfForceWitnessesInput'
@@ -79,6 +89,8 @@ async function getUseOfForceSection (data = {}, isList = false) {
   witnessesInput.placeholder = 'Names of witnesses (optional)'
   witnessesInput.disabled = isList
   witnessesInput.value = data?.Witnesses || ''
+  witnessesRow.appendChild(witnessesLabel)
+  witnessesRow.appendChild(witnessesInput)
 
   const toggleTypeOther = () => {
     typeOtherWrapper.style.display = typeSelect.value === 'Other' ? '' : 'none'
@@ -87,15 +99,11 @@ async function getUseOfForceSection (data = {}, isList = false) {
   toggleTypeOther()
 
   const wrapper = document.createElement('div')
-  wrapper.classList.add('inputWrapper')
-  wrapper.appendChild(typeLabel)
-  wrapper.appendChild(typeSelect)
-  wrapper.appendChild(typeOtherWrapper)
-  wrapper.appendChild(justificationLabel)
-  wrapper.appendChild(justificationInput)
-  wrapper.appendChild(injuryWrapper)
-  wrapper.appendChild(witnessesLabel)
-  wrapper.appendChild(witnessesInput)
+  wrapper.classList.add('inputWrapper', 'useOfForceFields')
+  wrapper.appendChild(typeRow)
+  wrapper.appendChild(justificationRow)
+  wrapper.appendChild(injuryRow)
+  wrapper.appendChild(witnessesRow)
   section.appendChild(title)
   section.appendChild(wrapper)
   return section
