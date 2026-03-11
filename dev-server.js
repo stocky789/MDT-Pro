@@ -479,10 +479,20 @@ const server = http.createServer((req, res) => {
     return;
   } else if (req.method === 'POST' && url === '/data/vehicleSearchByPlate') {
     readBody(req).then(body => {
-      const plate = (body || '').trim().toUpperCase();
+      let plate = (body || '').trim();
+      try {
+        const parsed = JSON.parse(body || '""');
+        if (typeof parsed === 'string') plate = parsed.trim();
+      } catch (_) {}
+      plate = plate.toUpperCase();
+      // Return vehicle search records (contraband/drugs), not the vehicle — frontend expects an array
       const vehicle = placeholderVehicles.find(v => v.LicensePlate && v.LicensePlate.toUpperCase() === plate);
-      send(res, 200, JSON.stringify(vehicle || null), 'application/json');
-    }).catch(() => send(res, 200, 'null', 'application/json'));
+      const mockRecords = vehicle ? [
+        { ItemType: 'Drug', DrugType: 'Cocaine', Description: '2g', ItemLocation: 'Glovebox' },
+        { ItemType: 'Contraband', Description: 'Stolen electronics', ItemLocation: 'Trunk' }
+      ] : [];
+      send(res, 200, JSON.stringify(mockRecords), 'application/json');
+    }).catch(() => send(res, 200, '[]', 'application/json'));
     return;
   } else if (req.method === 'POST' && url === '/data/impoundReportsByPlate') {
     readBody(req).then(() => send(res, 200, '[]', 'application/json')).catch(() => send(res, 200, '[]', 'application/json'));

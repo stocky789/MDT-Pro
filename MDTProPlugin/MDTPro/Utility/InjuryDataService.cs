@@ -104,7 +104,7 @@ namespace MDTPro.Utility {
 
         private static InjuryGameData BuildGameDataFromDamage(CachedDamageEntry e, Ped ped) {
             string injuryType = MapWeaponToInjuryType(e.WeaponType, e.WeaponGroup);
-            string severity = MapDamageToSeverity(e.Damage, e.ArmourDamage, e.BodyRegion);
+            string severity = !ped.IsAlive ? "Critical" : MapDamageToSeverity(e.Damage, e.ArmourDamage, e.BodyRegion);
             string treatment = MapSeverityToTreatment(severity, ped.IsAlive);
 
             string desc = string.Join(", ",
@@ -130,7 +130,7 @@ namespace MDTPro.Utility {
         /// <summary>Build injury data from cached damage only (ped no longer in world).</summary>
         private static InjuryGameData BuildGameDataFromDamageEntryOnly(CachedDamageEntry e) {
             string injuryType = MapWeaponToInjuryType(e.WeaponType, e.WeaponGroup);
-            string severity = MapDamageToSeverity(e.Damage, e.ArmourDamage, e.BodyRegion);
+            string severity = !e.VictimAlive ? "Critical" : MapDamageToSeverity(e.Damage, e.ArmourDamage, e.BodyRegion);
             string treatment = MapSeverityToTreatment(severity, e.VictimAlive);
             string desc = string.Join(", ",
                 new[] { injuryType, e.BodyRegion, $"{e.Damage} dmg" }.Where(s => !string.IsNullOrEmpty(s)));

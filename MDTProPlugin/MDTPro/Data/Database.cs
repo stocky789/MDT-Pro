@@ -2585,14 +2585,16 @@ namespace MDTPro.Data {
 
         internal static List<VehicleSearchRecord> LoadVehicleSearchRecordsByPlate(string licensePlate, int limit = 100) {
             if (string.IsNullOrWhiteSpace(licensePlate)) return new List<VehicleSearchRecord>();
+            string plateTrim = licensePlate.Trim();
+            if (string.IsNullOrEmpty(plateTrim)) return new List<VehicleSearchRecord>();
             lock (dbLock) {
                 if (connection == null) return new List<VehicleSearchRecord>();
                 var list = new List<VehicleSearchRecord>();
                 using (var cmd = new SQLiteCommand(@"
                     SELECT Id, LicensePlate, ItemType, DrugType, ItemLocation, Description, WeaponModelHash, WeaponModelId, Source, CapturedAt
-                    FROM vehicle_search_records WHERE LicensePlate = @plate ORDER BY CapturedAt DESC LIMIT @limit
+                    FROM vehicle_search_records WHERE LOWER(TRIM(LicensePlate)) = LOWER(@plate) ORDER BY CapturedAt DESC LIMIT @limit
                 ", connection)) {
-                    cmd.Parameters.AddWithValue("@plate", licensePlate.Trim());
+                    cmd.Parameters.AddWithValue("@plate", plateTrim);
                     cmd.Parameters.AddWithValue("@limit", limit);
                     using (var rdr = cmd.ExecuteReader()) {
                         while (rdr.Read()) {
