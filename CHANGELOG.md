@@ -1,60 +1,54 @@
 # Changelog
 
-## [Unreleased]
+All notable changes to MDT Pro are documented here.
 
-- Nothing yet.
+---
 
-## [0.9.5.0] — 2026-03-10
+## [0.9.5.0] — 2026-03-12
 
 ### Court & evidence
 
-- **Evidence from the reports you attach** — Attaching Incident, Injury, Citation, Traffic Incident, or Impound reports to an arrest (or court case) now adds to the case’s evidence. Each type contributes a different amount; you can tune these in Config → Court. Longer arrest report notes also strengthen the case.
-- **Homicide and death documentation** — For murder or manslaughter, conviction is harder when there’s no attached report that documents a death. If you attach an Injury report with severity like “Fatal” or treatment like “DOA” or “Pronounced deceased,” the case is treated as having documented death. Injury reports now include a “Fatal” severity option.
-- **Traffic Incident and Impound as evidence** — You can attach Traffic Incident and Impound reports to arrests and court cases the same way as Incident, Injury, and Citation. They count toward evidence, especially when the charges are vehicle-related (DUI, GTA, evading, hit-and-run, etc.).
-- **Clearer “Attached reports” on arrest and court** — The Attached reports section now briefly explains that only attached reports count as evidence and that you can attach Incident, Injury, Citation, Traffic Incident, or Impound by report ID.
-- **Relevant vs other evidence** — Reports that clearly match the case (e.g. incident or citation naming the defendant, or traffic/impound when the charges are vehicle-related) count for more. Other attached reports still add a smaller amount so nothing is wasted (e.g. a stolen firearm mentioned on an incident still helps a drug case a bit).
-- **Evidence seized on the arrest report** — Arrest reports now have an **Evidence seized** section with checkboxes: **Drugs found / documented** and **Firearm(s) found / documented**. Checking these feeds into court evidence even when the game or Policing Redefined didn’t log the find, so you can record what was seized.
-- **Charge types and court** — The court and evidence logic now correctly treats all charge types (felony, violent misdemeanor, vehicle-related, drug-related, firearm-related, homicide) for things like license revocations and how much weight different evidence has. Every arrest and citation charge type is covered.
+- **Evidence from attached reports** — Attach Incident, Injury, Citation, Traffic Incident, or Impound reports to an arrest or court case to add evidence. Each report type contributes to the case; amounts are tunable in Config → Court. Longer arrest notes also strengthen the case.
+- **Report relevance** — Reports that match the case (e.g. incident naming the defendant, or traffic/impound for vehicle-related charges) count for more. Other attached reports still add a smaller amount so nothing is wasted.
+- **Homicide and death documentation** — For murder or manslaughter, conviction is capped when no attached report documents a death. Attach an Injury report with severity “Fatal” or treatment “DOA” / “Pronounced deceased” so the case is treated as having documented death. Injury reports now include a “Fatal” severity option.
+- **Evidence seized** — Arrest reports have an **Evidence seized** section: check **Drugs found / documented** and **Firearm(s) found / documented** so court evidence reflects what you actually seized, even when the game or Policing Redefined didn’t log it.
+- **Charge types and license revocations** — Court logic correctly handles all charge types (felony, violent misdemeanor, vehicle-related, drug-related, firearm-related, homicide) for license revocations and evidence weight. Every arrest and citation charge is covered.
+- **Evidence captured during pursuit** — Attempted to flee, resisted arrest, vehicle damage, assault on the officer, and “had weapon” are now recorded when the suspect surrenders or is seen fleeing, not only at the moment of cuffing. This fixes cases where the suspect was no longer fleeing or armed by the time you arrested them.
+- **Resisted arrest** — Resistance is now also inferred from assault on the officer, so “Resisted Arrest” appears in court even without Policing Redefined.
+- **Arrest workflow** — New arrests start as **Pending**; save and keep attaching reports, then **Close arrest (submit for court)** to create the case. You can attach reports to the case until the hearing. Attached reports show a short summary (type, date, context) on the arrest and court pages.
+- **Court outcomes** — Verdict and sentencing text reflect all evidence (weapon, warrant, fleeing, resistance, assault, intoxication, drugs, supervision, etc.). **Sentencing Rationale** explains aggravating and mitigating factors, recidivism, and district policy. Convicted cases show a dedicated “Sentencing Rationale” section.
+- **Use of Force** — Arrest reports have a Use of Force section (type, justification, injury, witnesses). When filled in, the court case shows “Use of Force Documented” and receives the configured evidence bonus.
 
-### Major features
+### Reports
 
-- **Court evidence from reports and the arrest workflow** — Conviction evidence comes from the reports you file. New arrests start as **Pending**; you can save the arrest and keep attaching reports. When ready, **Close arrest (submit for court)** creates the court case. You can also attach reports to the case before the hearing. After the case is resolved, each charge shows Convicted, Acquitted, or Dismissed, and fines and jail time only count convicted charges. After saving an arrest, a reminder suggests attaching relevant reports.
-- **Richer court outcomes** — Verdict and sentencing text now reflect evidence (weapon, warrant, fleeing, resistance, assault, intoxication, drugs, supervision, etc.). **Sentencing Rationale** explains aggravating and mitigating factors, recidivism, jury verdict, and district policy. Unusual outcomes (e.g. guilty with little evidence) get special wording. Convicted cases show a separate “Sentencing Rationale” section on the Court page.
-- **Quick Actions Bar** — Small floating bar at the bottom-right with one-tap Panic, Backup, and Clear ALPR. Can be turned on or off in Config. Backup options need Policing Redefined.
-- **Request Backup from the MDT** — Request backup (patrol, traffic stop, transport, tow, etc.) from the MDT. Works with Policing Redefined.
-- **Active Call** — Active Call page shows each call’s status (Pending, Accepted, En Route, Finished), a short timeline, and expandable cards. You can set a GPS waypoint and use Accept / En Route when your callout system supports it.
-- **Create BOLO from the noticeboard** — Add a BOLO from the BOLO Noticeboard without needing the vehicle in front of you. Enter plate, optional model, reason, and duration. You can also remove BOLOs from the list.
-- **BOLO system and CDF** — BOLOs are plate-based. When a vehicle with a BOLO’d plate is seen or stopped, the BOLO is applied and synced to Common Data Framework so Policing Redefined and other CDF plugins see it. Vehicle Search and ALPR show BOLOs for in-world and noticeboard-only plates.
-- **Use of Force on arrest reports** — Arrest reports have a Use of Force section: type (e.g. Taser, Baton, Firearm), justification, injury yes/no, and witnesses. This is shown in court as “Use of Force Documented” and adds to evidence; the amount is configurable in Config → Court.
-- **Prefill when creating reports** — “New Injury Report” from Person Search or “Create Impound Report” from Vehicle Search opens the report with that person or vehicle already filled in.
-- **Impound Report** — New report type: plate, model, owner, VIN, reason, tow company (Camel Towing, Davis Towing), and impound lot (Mission Row or Davis). Available under Reports and from Vehicle Search via “Create Impound Report” with vehicle prefilled.
-- **Traffic Incident Report** — New report type for collisions and multi-vehicle incidents: drivers, passengers, pedestrians, vehicles (plates and models), injury details, and collision type. Available under Reports.
-- **Injury Report** — New report type: injured party, injury type, severity, treatment, and incident context. Available under Reports and from Person Search via “New Injury Report” with name prefilled. Optional import from game (DamageTrackerFramework or ped health/armor) when the injured person is nearby.
+- **Injury Report** — New report type: injured party, injury type, severity, treatment, and context. Available under Reports and from Person Search via “New Injury Report” with name prefilled. Optional import from game (DamageTrackerFramework or ped health) when the person is nearby.
+- **Traffic Incident Report** — New report type for collisions and multi-vehicle incidents: drivers, passengers, pedestrians, vehicles, injury details, and collision type. Available under Reports.
+- **Impound Report** — New report type: plate, model, owner, VIN, reason, tow company, and impound lot. Available under Reports and from Vehicle Search via “Create Impound Report” with vehicle prefilled.
+- **Prefill** — Creating an Injury report from Person Search or an Impound report from Vehicle Search opens the form with that person or vehicle already filled in. “Nearby vehicles” on the impound form now correctly fills plate and details when you select a vehicle.
 
-### Other improvements
+### BOLO & backup
 
-- **Arrest and court UI** — Arrest report shows “Attached reports (evidence for court)” with attach/detach by report ID and **Close arrest (submit for court)** when pending. Court case shows “Attached reports” and attach/detach while the case is pending. Resolved cases show per-charge outcome and total fine and jail time for convicted charges only.
-- **Court disposition** — Verdict and outcome reasoning in one section; convicted cases also show “Sentencing Rationale.” Evidence breakdown lists all evidence flags (e.g. intoxicated, fleeing, pat-down, illegal weapon).
-- **Court: Use of Force** — If the arrest report has use of force filled in, the court case shows “Use of Force Documented” in evidence and gets the configured bonus.
-- **Court: Fleeing** — Suspects who surrender after a chase are now correctly treated as having fled for court evidence.
-- **Court: Drunk** — Suspects doing drunk movements or animations are now flagged for court even when the game’s drunk check doesn’t fire.
-- **ALPR** — Scan and read range increased so plates are easier to read at distance.
-- **In-game notifications** — Update checker and other messages use a police-style icon instead of the LS Customs icon.
-- **Browser tab** — MDT Pro logo appears in the browser tab when the MDT is open.
-- **OpenIV installers** — Install with the .oiv package and uninstall with the included uninstaller. For full removal, delete the MDTPro folder from your GTA V directory after uninstalling.
-- **Backup response code** — Quick Actions backup menu lets you choose Code 1, 2, or 3 for patrol, EMS, traffic stop, and transport.
-- **BOLO noticeboard** — Only active (non-expired) BOLOs are shown.
-- **ALPR BOLO flag** — When ALPR reads a plate with an active BOLO, the hit is flagged as “BOLO” and triggers an alert.
-- **BOLO on Vehicle Search** — Plate search for a vehicle in world now shows any BOLO for that plate and syncs it to CDF.
+- **BOLO from the noticeboard** — Add or remove BOLOs from the BOLO Noticeboard without needing the vehicle in front of you (plate, optional model, reason, duration). Only active (non-expired) BOLOs are shown.
+- **BOLO and CDF** — When a vehicle with a BOLO’d plate is seen or stopped, the BOLO is synced to Common Data Framework. Vehicle Search and ALPR show BOLOs for in-world and noticeboard-only plates; ALPR flags a hit as “BOLO” and alerts.
+- **Request backup from the MDT** — Request backup (patrol, traffic stop, transport, tow, etc.) from the MDT. Works with Policing Redefined. Quick Actions bar (bottom-right) offers one-tap Panic, Backup, and Clear ALPR; backup can use Code 1, 2, or 3.
+
+### UI & workflow
+
+- **Active Call** — Active Call page shows status (Pending, Accepted, En Route, Finished), a short timeline, and expandable cards. Set a GPS waypoint and use Accept / En Route when your callout system supports it.
+- **Arrest status** — Arrest reports no longer show a separate “Open” status; use **Pending** until you close for court. You can attach and detach reports while the arrest is Pending.
+- **Court case view** — Resolved cases show per-charge outcome (Convicted, Acquitted, Dismissed) and total fine and jail time for convicted charges only. Evidence breakdown lists all flags (e.g. intoxicated, fleeing, pat-down, illegal weapon).
+- **In-game notifications** — Update checker and other messages use a police-style icon. MDT Pro logo appears in the browser tab when the MDT is open.
+- **OpenIV** — Install or uninstall with the .oiv package. For full removal, delete the MDTPro folder from your GTA V directory after uninstalling.
 
 ### Bug fixes
 
-- **Court** — Plea is now saved correctly (e.g. “Guilty” from the UI). Empty or missing plea is treated as Not Guilty. Acquitted or dismissed cases no longer show sentencing. License revocations are applied correctly. Various edge cases in outcome and sentencing text are handled without errors.
-- **ALPR vehicle color** — In-game ALPR HUD shows color names (e.g. “Red”, “Black / White”) instead of numeric values.
-- **State ID and “Ask for all docs”** — Showing a State ID on a foot stop or using “Ask for all documents” on a vehicle stop now correctly adds the person to Person Search.
-- **VIN Tampering** — Convictions for VIN tampering or defaced VIN now result in driver’s license revocation at sentencing.
-- **BOLO: noticeboard then in-world** — Creating a BOLO for a plate from the noticeboard (no car nearby), then later having a car with that plate appear in world, now correctly shows the BOLO on that vehicle and syncs to CDF.
-- **BOLO: Vehicle Search** — Searching for a plate in Vehicle Search when the vehicle was in world could miss a BOLO that existed only from the noticeboard. BOLOs are now merged and shown (and synced to CDF) correctly.
+- **Court** — Plea is saved correctly (e.g. “Guilty”). Empty or missing plea is treated as Not Guilty. Acquitted or dismissed cases no longer show sentencing. License revocations apply correctly.
+- **Impound prefill** — Clicking a nearby vehicle when creating an Impound report now correctly populates plate and vehicle fields.
+- **Arrest: attach reports after save** — You can attach and detach reports on an arrest after saving, as long as the arrest is still Pending (not yet closed for court).
+- **ALPR** — In-game ALPR HUD shows vehicle color names (e.g. “Red”, “Black / White”) instead of numeric values. Scan and read range increased for easier reading at distance.
+- **State ID and “Ask for all docs”** — Showing a State ID on a foot stop or “Ask for all documents” on a vehicle stop now correctly adds the person to Person Search.
+- **VIN and license revocations** — Convictions for VIN tampering or defaced VIN now result in driver’s license revocation at sentencing.
+- **BOLO** — Creating a BOLO from the noticeboard and later encountering that plate in world now correctly shows the BOLO on Vehicle Search and syncs to CDF. Vehicle Search no longer misses noticeboard-only BOLOs when the vehicle is in world.
 
 ## [0.9.3.0] — 2026-03-07
 
