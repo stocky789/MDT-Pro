@@ -6,6 +6,7 @@
 #   .\build.ps1 -Incremental       Faster build (no wipe, incremental)
 #   .\build.ps1 -Deploy            Build then copy to GTA V (use -GamePath if not default)
 #   .\build.ps1 -Deploy -GamePath "D:\Games\GTA V"
+#   GamePath is also used to copy DamageTrackingFramework.dll into Release (required for injury reports; or use References\DamageTrackingFramework.dll).
 #   OpenIV packages (install + uninstall) are always created in Release\
 
 param(
@@ -83,10 +84,12 @@ if (Test-Path $mdtDest) { Remove-Item $mdtDest -Recurse -Force }
 Copy-Item -Path $mdtSource -Destination $mdtDest -Recurse -Force
 Write-Host "  -> $mdtDest (web MDT)"
 
-# 5) Copy Dependencies folder into Release (mirrors Dependencies\* to Release\ so SQLite and x64\ go to the right spots)
+# 5) Copy Dependencies folder into Release (SQLite, x64\, etc.). Exclude DTF DLLs — those are handled in 5b and go to Release\plugins only.
 $releaseRoot = $release
+$depsExclude = @('DamageTrackerLib.dll', 'DamageTrackingFramework.dll')
 if (Test-Path $depsFolder) {
     Get-ChildItem -Path $depsFolder -Force | ForEach-Object {
+        if ($depsExclude -contains $_.Name) { return }
         $dest = Join-Path $releaseRoot $_.Name
         if ($_.PSIsContainer) {
             if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
@@ -100,6 +103,60 @@ if (Test-Path $depsFolder) {
 } else {
     Write-Warning "Dependencies folder not found at $depsFolder"
 }
+
+# 5b) Copy DamageTrackingFramework.dll (required for injury reports) to Release\plugins (not LSPDFR). Source: Dependencies, References, GTA, or NuGet fallback.
+$dtfDllName = 'DamageTrackingFramework.dll'
+$releasePluginsDir = Join-Path $release 'plugins'
+$dtfDest = Join-Path $releasePluginsDir $dtfDllName
+$gamePlugins = Join-Path $GamePath 'plugins\LSPDFR'
+$refsFolder = Join-Path $root 'References'
+$dtfFromDeps = Join-Path $depsFolder $dtfDllName
+$dtfFromRefs = Join-Path $refsFolder $dtfDllName
+$dtfFromGame = Join-Path $gamePlugins $dtfDllName
+$dtfFromRoot = Join-Path $GamePath $dtfDllName
+$gamePluginsTop = Join-Path $GamePath 'plugins'
+$dtfFromGamePlugins = Join-Path $gamePluginsTop $dtfDllName
+# Also check legacy name (NuGet / older builds)
+$dtfLegacyName = 'DamageTrackerLib.dll'
+$dtfFromDepsLegacy = Join-Path $depsFolder $dtfLegacyName
+$dtfFromRefsLegacy = Join-Path $refsFolder $dtfLegacyName
+$dtfFromGameLegacy = Join-Path $gamePlugins $dtfLegacyName
+$dtfFromGamePluginsLegacy = Join-Path $gamePluginsTop $dtfLegacyName
+$dtfSource = $null
+if (Test-Path $dtfFromDeps) { $dtfSource = $dtfFromDeps }
+elseif (Test-Path $dtfFromRefs) { $dtfSource = $dtfFromRefs }
+elseif (Test-Path $dtfFromGame) { $dtfSource = $dtfFromGame }
+elseif (Test-Path $dtfFromRoot) { $dtfSource = $dtfFromRoot }
+elseif (Test-Path $dtfFromGamePlugins) { $dtfSource = $dtfFromGamePlugins }
+elseif (Test-Path $dtfFromDepsLegacy) { $dtfSource = $dtfFromDepsLegacy }
+elseif (Test-Path $dtfFromRefsLegacy) { $dtfSource = $dtfFromRefsLegacy }
+elseif (Test-Path $dtfFromGameLegacy) { $dtfSource = $dtfFromGameLegacy }
+elseif (Test-Path $dtfFromGamePluginsLegacy) { $dtfSource = $dtfFromGamePluginsLegacy }
+if (-not $dtfSource) {
+    Write-Host "  DamageTrackingFramework.dll not found; trying NuGet (DamageTrackerLib)..."
+    $nugetUrl = 'https://www.nuget.org/api/v2/package/DamageTrackerLib/2.0.0'
+    $nupkgPath = Join-Path $env:TEMP "DamageTrackerLib.2.0.0.nupkg"
+    try {
+        Invoke-WebRequest -Uri $nugetUrl -OutFile $nupkgPath -UseBasicParsing
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $zip = [System.IO.Compression.ZipFile]::OpenRead($nupkgPath)
+        $dllEntry = $zip.Entries | Where-Object { $_.Name -eq $dtfLegacyName } | Select-Object -First 1
+        if (-not $dllEntry) { $dllEntry = $zip.Entries | Where-Object { $_.Name -eq $dtfDllName } | Select-Object -First 1 }
+        if (-not $dllEntry) { throw "DLL not in package" }
+        New-Item -ItemType Directory -Path $depsFolder -Force | Out-Null
+        $extractPath = Join-Path $depsFolder (Split-Path $dllEntry.FullName -Leaf)
+        [System.IO.Compression.ZipFileExtensions]::ExtractToFile($dllEntry, $extractPath, $true)
+        $zip.Dispose()
+        $dtfSource = $extractPath
+        Remove-Item $nupkgPath -Force -ErrorAction SilentlyContinue
+    } catch {
+        Write-Error "Could not get DamageTrackingFramework.dll. Put it in Dependencies\ or References\ or install DTF in GTA and use -GamePath. NuGet fallback failed: $_"
+        exit 1
+    }
+}
+New-Item -ItemType Directory -Path $releasePluginsDir -Force | Out-Null
+Copy-Item -Path $dtfSource -Destination $dtfDest -Force
+Write-Host "  -> $dtfDest (DamageTrackingFramework)"
 
 # 6) If SQLite files weren't in Dependencies, try NuGet/build output and copy to Release root and Release\x64
 $sqliteDllPaths += (Join-Path (Split-Path $dllSource) 'System.Data.SQLite.dll')
@@ -178,6 +235,13 @@ if ($Deploy) {
     $pluginsOiv = Join-Path $oivContent 'plugins\LSPDFR'
     New-Item -ItemType Directory -Path $pluginsOiv -Force | Out-Null
     Copy-Item -Path $dllDest -Destination (Join-Path $pluginsOiv 'MDTPro.dll') -Force
+    $newtonsoftDll = Join-Path $dllDestDir 'Newtonsoft.Json.dll'
+    if (Test-Path $newtonsoftDll) { Copy-Item -Path $newtonsoftDll -Destination (Join-Path $pluginsOiv 'Newtonsoft.Json.dll') -Force }
+    $pluginsOivTop = Join-Path $oivContent 'plugins'
+    if (Test-Path $dtfDest) {
+        New-Item -ItemType Directory -Path $pluginsOivTop -Force | Out-Null
+        Copy-Item -Path $dtfDest -Destination (Join-Path $pluginsOivTop $dtfDllName) -Force
+    }
     if ($sqliteDllSource) { Copy-Item -Path $sqliteDllSource -Destination (Join-Path $oivContent 'System.Data.SQLite.dll') -Force }
     if ($sqliteInteropSource) {
         $x64Oiv = Join-Path $oivContent 'x64'
@@ -195,8 +259,10 @@ if ($Deploy) {
         $mdtDeletes += "    <delete>$rel</delete>"
     }
 
+    $pluginAdds = "    <add source=`"plugins/LSPDFR/MDTPro.dll`">plugins/LSPDFR/MDTPro.dll</add>`n    <add source=`"plugins/LSPDFR/Newtonsoft.Json.dll`">plugins/LSPDFR/Newtonsoft.Json.dll</add>"
+    if (Test-Path $dtfDest) { $pluginAdds += "`n    <add source=`"plugins/DamageTrackingFramework.dll`">plugins/DamageTrackingFramework.dll</add>" }
     $contentXml = @"
-    <add source="plugins/LSPDFR/MDTPro.dll">plugins/LSPDFR/MDTPro.dll</add>
+$pluginAdds
     <add source="System.Data.SQLite.dll">System.Data.SQLite.dll</add>
     <add source="x64/SQLite.Interop.dll">x64/SQLite.Interop.dll</add>
 $($mdtAdds -join "`n")
@@ -251,7 +317,8 @@ $contentXml
     Write-Host "  -> $oivOut (OpenIV package)"
 
     # Create uninstaller OIV package (delete commands only; unique GUID)
-    # Runtime-generated files (config, data, db, reports, logs) - must delete or folder stays full
+    # ONLY remove MDT Pro files. Do NOT remove shared dependencies (SQLite, Newtonsoft.Json, DamageTrackingFramework)
+    # so other mods that use them keep working after uninstall.
     $runtimeDeletes = @(
         'MDTPro/config.json', 'MDTPro/language.json', 'MDTPro/citationOptions.json', 'MDTPro/arrestOptions.json',
         'MDTPro/MDTPro.log', 'MDTPro/ipAddresses.txt',
@@ -264,8 +331,6 @@ $contentXml
         'MDTPro/data/reports/incidentReports.json', 'MDTPro/data/reports/citationReports.json', 'MDTPro/data/reports/arrestReports.json'
     ) | ForEach-Object { "    <delete>$_</delete>" }
     $deleteXml = @"
-    <delete>System.Data.SQLite.dll</delete>
-    <delete>x64/SQLite.Interop.dll</delete>
     <delete>plugins/LSPDFR/MDTPro.dll</delete>
 $($mdtDeletes -join "`n")
 $($runtimeDeletes -join "`n")
@@ -284,7 +349,7 @@ $($runtimeDeletes -join "`n")
       <displayName>stocky789</displayName>
     </author>
     <description footerLink="https://www.lcpdfr.com/downloads/gta5mods/scripts/53627-mdtpro" footerLinkTitle="LCPDFR">
-      <![CDATA[Removes MDT Pro plugin, SQLite DLLs, and MDTPro files. For a full purge, manually delete the MDTPro folder from your GTA V root directory.]]>
+      <![CDATA[Removes only MDT Pro (plugin DLL and MDTPro folder). Leaves shared dependencies (SQLite, Newtonsoft.Json, DamageTrackingFramework) so other mods keep working. For a full purge, manually delete the MDTPro folder and any dependencies if no other mod needs them.]]>
     </description>
     <largeDescription displayName="GitHub" footerLink="https://github.com/stocky789/MDT-Pro" footerLinkTitle="GitHub">
       <![CDATA[Source code and releases: https://github.com/stocky789/MDT-Pro]]>

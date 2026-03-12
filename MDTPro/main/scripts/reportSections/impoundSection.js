@@ -63,10 +63,12 @@ async function getImpoundSection (data = {}, isList = false) {
               })
               const v = vRes.ok ? await vRes.json() : null
               if (!v) return
-              const plateInput = section.querySelector('#impoundSectionPlateInput')
-              const modelInput = section.querySelector('#impoundSectionModelInput')
-              const ownerInput = section.querySelector('#impoundSectionOwnerInput')
-              const vinInput = section.querySelector('#impoundSectionVinInput')
+              // Query from document so we always target the current create-page form (section may be stale if DOM was re-rendered)
+              const container = document.querySelector('.createPage .reportInformation')
+              const plateInput = container?.querySelector('#impoundSectionPlateInput')
+              const modelInput = container?.querySelector('#impoundSectionModelInput')
+              const ownerInput = container?.querySelector('#impoundSectionOwnerInput')
+              const vinInput = container?.querySelector('#impoundSectionVinInput')
               if (plateInput) plateInput.value = v.LicensePlate || ''
               if (modelInput) modelInput.value = v.ModelDisplayName || v.ModelName || ''
               if (ownerInput) ownerInput.value = v.Owner || ''

@@ -1,6 +1,7 @@
 async function getGeneralInformationSection(
   generalInformation,
-  isList = false
+  isList = false,
+  reportType = ''
 ) {
   const language = await getLanguage()
 
@@ -61,6 +62,7 @@ async function getGeneralInformationSection(
       statusClosed.classList.add('selected')
     })
 
+    // For arrests: only Closed, Pending, Canceled (no "Open" — Pending = can attach reports, not yet submitted to court)
     const statusOpen = document.createElement('button')
     statusOpen.innerHTML = language.reports.statusMap[1]
     statusOpen.classList.add('open')
@@ -75,6 +77,10 @@ async function getGeneralInformationSection(
         .forEach((btn) => btn.classList.remove('selected'))
       statusOpen.classList.add('selected')
     })
+    if (reportType !== 'arrest') {
+      statusInput.appendChild(statusClosed)
+      statusInput.appendChild(statusOpen)
+    }
 
     const statusCanceled = document.createElement('button')
     statusCanceled.innerHTML = language.reports.statusMap[2]
@@ -91,8 +97,28 @@ async function getGeneralInformationSection(
       statusCanceled.classList.add('selected')
     })
 
-    statusInput.appendChild(statusClosed)
-    statusInput.appendChild(statusOpen)
+    if (reportType === 'arrest') {
+      statusInput.appendChild(statusClosed)
+      // Pending = not yet closed for court; can attach reports. Hide if arrest already has a court case.
+      const statusPending = document.createElement('button')
+      statusPending.innerHTML = language.reports.statusMap[3] || 'Pending'
+      statusPending.classList.add('pending')
+      statusPending.dataset.status = 3
+      if (generalInformation.status == 3 || generalInformation.status == 1) {
+        statusPending.classList.add('selected')
+      }
+      statusPending.addEventListener('click', function () {
+        statusPending.blur()
+        statusInput
+          .querySelectorAll('button')
+          .forEach((btn) => btn.classList.remove('selected'))
+        statusPending.classList.add('selected')
+      })
+      if (generalInformation.courtCaseNumber) {
+        statusPending.style.display = 'none'
+      }
+      statusInput.appendChild(statusPending)
+    }
     statusInput.appendChild(statusCanceled)
     status.appendChild(statusInput)
   }

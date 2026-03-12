@@ -7,32 +7,54 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 
 namespace MDTPro.Setup {
     internal class SetupController {
-        internal static readonly string MDTProPath = "MDTPro";
-        internal static readonly string DataPath = $"{MDTProPath}/data";
-        internal static readonly string ReportsDataPath = $"{DataPath}/reports";
-        internal static readonly string DefaultsPath = $"{MDTProPath}/defaults";
-        internal static readonly string ConfigPath = $"{MDTProPath}/config.json";
-        internal static readonly string LanguagePath = $"{MDTProPath}/language.json";
-        internal static readonly string CitationOptionsPath = $"{MDTProPath}/citationOptions.json";
-        internal static readonly string ArrestOptionsPath = $"{MDTProPath}/arrestOptions.json";
-        internal static readonly string CitationOptionsDefaultsPath = $"{DefaultsPath}/citationOptions.json";
-        internal static readonly string ArrestOptionsDefaultsPath = $"{DefaultsPath}/arrestOptions.json";
-        internal static readonly string PedDataPath = $"{DataPath}/peds.json";
-        internal static readonly string VehicleDataPath = $"{DataPath}/vehicles.json";
-        internal static readonly string CourtDataPath = $"{DataPath}/court.json";
-        internal static readonly string ShiftHistoryDataPath = $"{DataPath}/shiftHistory.json";
-        internal static readonly string OfficerInformationDataPath = $"{DataPath}/officerInformation.json";
-        internal static readonly string LogFilePath = $"{MDTProPath}/MDTPro.log";
-        internal static readonly string ImgDefaultsDirPath = $"{MDTProPath}/imgDefaults";
-        internal static readonly string ImgDirPath = $"{MDTProPath}/img";
-        internal static readonly string IncidentReportsPath = $"{ReportsDataPath}/incidentReports.json";
-        internal static readonly string CitationReportsPath = $"{ReportsDataPath}/citationReports.json";
-        internal static readonly string ArrestReportsPath = $"{ReportsDataPath}/arrestReports.json";
-        internal static readonly string IpAddressesPath = $"{MDTProPath}/ipAddresses.txt";
-        internal static readonly string PluginsPath = $"{MDTProPath}/plugins";
+        private static string _mdtProPathRoot;
+
+        /// <summary>Resolves MDTPro folder from plugin location (GTA/plugins/LSPDFR -> GTA/MDTPro) so it works regardless of process current directory.</summary>
+        internal static string MDTProPath {
+            get {
+                if (_mdtProPathRoot != null) return _mdtProPathRoot;
+                try {
+                    string pluginDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                    if (!string.IsNullOrEmpty(pluginDir)) {
+                        string gameRoot = Path.GetFullPath(Path.Combine(pluginDir, "..", ".."));
+                        string mdt = Path.Combine(gameRoot, "MDTPro");
+                        if (Directory.Exists(mdt)) {
+                            _mdtProPathRoot = mdt;
+                            return _mdtProPathRoot;
+                        }
+                    }
+                } catch { }
+                _mdtProPathRoot = "MDTPro";
+                return _mdtProPathRoot;
+            }
+        }
+
+        internal static string DataPath => Path.Combine(MDTProPath, "data");
+        internal static string ReportsDataPath => Path.Combine(DataPath, "reports");
+        internal static string DefaultsPath => Path.Combine(MDTProPath, "defaults");
+        internal static string ConfigPath => Path.Combine(MDTProPath, "config.json");
+        internal static string LanguagePath => Path.Combine(MDTProPath, "language.json");
+        internal static string CitationOptionsPath => Path.Combine(MDTProPath, "citationOptions.json");
+        internal static string ArrestOptionsPath => Path.Combine(MDTProPath, "arrestOptions.json");
+        internal static string CitationOptionsDefaultsPath => Path.Combine(DefaultsPath, "citationOptions.json");
+        internal static string ArrestOptionsDefaultsPath => Path.Combine(DefaultsPath, "arrestOptions.json");
+        internal static string PedDataPath => Path.Combine(DataPath, "peds.json");
+        internal static string VehicleDataPath => Path.Combine(DataPath, "vehicles.json");
+        internal static string CourtDataPath => Path.Combine(DataPath, "court.json");
+        internal static string ShiftHistoryDataPath => Path.Combine(DataPath, "shiftHistory.json");
+        internal static string OfficerInformationDataPath => Path.Combine(DataPath, "officerInformation.json");
+        internal static string LogFilePath => Path.Combine(MDTProPath, "MDTPro.log");
+        internal static string ImgDefaultsDirPath => Path.Combine(MDTProPath, "imgDefaults");
+        internal static string ImgDirPath => Path.Combine(MDTProPath, "img");
+        internal static string IncidentReportsPath => Path.Combine(ReportsDataPath, "incidentReports.json");
+        internal static string CitationReportsPath => Path.Combine(ReportsDataPath, "citationReports.json");
+        internal static string ArrestReportsPath => Path.Combine(ReportsDataPath, "arrestReports.json");
+        internal static string IpAddressesPath => Path.Combine(MDTProPath, "ipAddresses.txt");
+        internal static string PluginsPath => Path.Combine(MDTProPath, "plugins");
 
         internal static void SetupDirectory() {
             if (!Directory.Exists(DataPath)) {
@@ -116,8 +138,8 @@ namespace MDTPro.Setup {
             Config config = GetConfig();
             Helper.Log($"Config:\n{JsonConvert.SerializeObject(config, Formatting.Indented)}");
 
-            string[] MDTProDirectoryFiles = Directory.GetFiles(MDTProPath).Select(item => $"[File] {item.Split('\\')[1]}").ToArray();
-            string[] MDTProDirectoryDirs = Directory.GetDirectories(MDTProPath).Select(item => $"[Directory] {item.Split('\\')[1]}").ToArray();
+            string[] MDTProDirectoryFiles = Directory.GetFiles(MDTProPath).Select(item => $"[File] {Path.GetFileName(item)}").ToArray();
+            string[] MDTProDirectoryDirs = Directory.GetDirectories(MDTProPath).Select(item => $"[Directory] {Path.GetFileName(item)}").ToArray();
             string[] MDTProDirectoryFilesAndDirs = MDTProDirectoryFiles.Concat(MDTProDirectoryDirs).ToArray();
             Helper.Log($"MDTPro Directory:\n  {string.Join("\n  ", MDTProDirectoryFilesAndDirs)}");
         }

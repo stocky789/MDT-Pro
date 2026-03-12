@@ -78,10 +78,12 @@ namespace MDTPro.ServerAPI {
                 contentType = "text/json";
                 status = 200;
             } else if (path == "specificVehicle") {
-                string body = Helper.GetRequestPostData(req);
-                string licensePlateOrVin = !string.IsNullOrEmpty(body) ? body.Trim() : "";
+                string licensePlateOrVin = Helper.GetRequestBodyAsString(req);
+                if (!string.IsNullOrEmpty(licensePlateOrVin)) licensePlateOrVin = licensePlateOrVin.Trim();
 
                 MDTProVehicleData vehicleData = DataController.GetVehicleByPlateOrVin(licensePlateOrVin);
+                if (vehicleData != null && vehicleData.CDFVehicleData != null)
+                    DataController.MergeBOLOsFromStubByPlate(vehicleData);
 
                 Database.SaveSearchHistoryEntry("vehicle", licensePlateOrVin, vehicleData?.LicensePlate);
 
@@ -321,6 +323,51 @@ namespace MDTPro.ServerAPI {
                 });
 
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(result));
+                status = 200;
+                contentType = "text/json";
+            } else if (path == "reportSummaries") {
+                string body = Helper.GetRequestPostData(req);
+                var ids = new System.Collections.Generic.List<string>();
+                if (!string.IsNullOrEmpty(body)) {
+                    try {
+                        var parsed = JsonConvert.DeserializeObject<System.Collections.Generic.List<string>>(body);
+                        if (parsed != null) ids = parsed;
+                    } catch { }
+                }
+                var summaries = new System.Collections.Generic.List<object>();
+                foreach (string id in ids) {
+                    if (string.IsNullOrWhiteSpace(id)) continue;
+                    string tid = id.Trim();
+                    var inc = DataController.IncidentReports?.FirstOrDefault(r => r.Id == tid);
+                    if (inc != null) {
+                        string sub = (inc.OffenderPedsNames != null && inc.OffenderPedsNames.Length > 0) ? string.Join(", ", inc.OffenderPedsNames) : null;
+                        summaries.Add(new { id = inc.Id, type = "incident", typeLabel = "Incident", date = inc.TimeStamp.ToString("yyyy-MM-dd"), subtitle = sub });
+                        continue;
+                    }
+                    var inj = DataController.InjuryReports?.FirstOrDefault(r => r.Id == tid);
+                    if (inj != null) {
+                        summaries.Add(new { id = inj.Id, type = "injury", typeLabel = "Injury", date = inj.TimeStamp.ToString("yyyy-MM-dd"), subtitle = inj.InjuredPartyName });
+                        continue;
+                    }
+                    var cit = DataController.CitationReports?.FirstOrDefault(r => r.Id == tid);
+                    if (cit != null) {
+                        summaries.Add(new { id = cit.Id, type = "citation", typeLabel = "Citation", date = cit.TimeStamp.ToString("yyyy-MM-dd"), subtitle = cit.OffenderPedName });
+                        continue;
+                    }
+                    var tra = DataController.TrafficIncidentReports?.FirstOrDefault(r => r.Id == tid);
+                    if (tra != null) {
+                        summaries.Add(new { id = tra.Id, type = "trafficIncident", typeLabel = "Traffic Incident", date = tra.TimeStamp.ToString("yyyy-MM-dd"), subtitle = tra.CollisionType });
+                        continue;
+                    }
+                    var imp = DataController.ImpoundReports?.FirstOrDefault(r => r.Id == tid);
+                    if (imp != null) {
+                        string sub = !string.IsNullOrEmpty(imp.LicensePlate) ? imp.LicensePlate : imp.VehicleModel;
+                        summaries.Add(new { id = imp.Id, type = "impound", typeLabel = "Impound", date = imp.TimeStamp.ToString("yyyy-MM-dd"), subtitle = sub });
+                        continue;
+                    }
+                    summaries.Add(new { id = tid, type = (string)null, typeLabel = "—", date = (string)null, subtitle = (string)null });
+                }
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(summaries));
                 status = 200;
                 contentType = "text/json";
             }

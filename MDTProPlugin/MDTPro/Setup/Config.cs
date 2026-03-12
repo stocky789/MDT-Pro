@@ -62,6 +62,24 @@ namespace MDTPro.Setup {
         public float courtEvidenceResistedBonus = 15f;
         public float courtEvidenceDrugsBonus = 12f;
         public float courtEvidenceUseOfForceBonus = 10f;
+        /// <summary>Per attached incident report (evidence for court).</summary>
+        public float courtEvidenceIncidentReportBonus = 10f;
+        /// <summary>Per attached injury report (evidence for court).</summary>
+        public float courtEvidenceInjuryReportBonus = 8f;
+        /// <summary>Per attached citation report, same ped (evidence for court).</summary>
+        public float courtEvidenceCitationReportBonus = 3f;
+        /// <summary>Per attached traffic incident report (e.g. DUI/collision cases).</summary>
+        public float courtEvidenceTrafficIncidentReportBonus = 6f;
+        /// <summary>Per attached impound report (e.g. stolen recovery, evidence).</summary>
+        public float courtEvidenceImpoundReportBonus = 5f;
+        /// <summary>Per attached report that does not meet relevance (e.g. impound on a drug case, incident that doesn't name defendant). Still counts so tangential evidence (e.g. stolen firearm in a drug case) is not ignored; just carries less weight than directly relevant reports.</summary>
+        public float courtEvidenceOtherAttachedReportBonus = 3f;
+        /// <summary>Bonus when primary arrest report Notes length exceeds courtEvidenceReportNotesMinLength.</summary>
+        public float courtEvidenceReportNotesBonus = 8f;
+        /// <summary>Minimum Notes length (chars) on arrest report to get courtEvidenceReportNotesBonus.</summary>
+        public int courtEvidenceReportNotesMinLength = 100;
+        /// <summary>Max conviction chance (%) for homicide charge when no death/fatal injury report is attached. 0 = no cap.</summary>
+        public int courtConvictionHomicideNoDeathReportCap = 25;
         public float courtCaseResolutionMinBase = 20f;
         public float courtCaseResolutionMaxMinutes = 300f;
         public float courtCaseResolutionSeverityScale = 12f;

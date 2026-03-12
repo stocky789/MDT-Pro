@@ -422,3 +422,12 @@ body {
     margin-bottom: 10px;
   }
 }
+
+/* Court case: attached reports evidence help */
+.courtAttachedReportsSection .courtAttachedReportsHelp {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-text-primary-half, #666);
+  margin: 0 0 10px 0;
+  max-width: 52em;
+}

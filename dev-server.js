@@ -522,6 +522,9 @@ const server = http.createServer((req, res) => {
       }), 'application/json');
     }).catch(() => send(res, 200, JSON.stringify({ citations: [], arrests: [], incidents: [] }), 'application/json'));
     return;
+  } else if (req.method === 'POST' && (url === '/data/reportSummaries' || url === '/data/reportSummaries/')) {
+    readBody(req).then(() => send(res, 200, '[]', 'application/json')).catch(() => send(res, 200, '[]', 'application/json'));
+    return;
   } else if (url.startsWith('/page/')) {
     const name = url.slice('/page/'.length).replace(/\.html$/, '') || 'index';
     filePath = path.join(ROOT, 'main', 'pages', name + '.html');

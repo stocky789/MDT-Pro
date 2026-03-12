@@ -111,6 +111,14 @@ namespace MDTPro.Data {
         private static readonly Dictionary<string, PedEvidenceContext> pedEvidenceCache =
             new Dictionary<string, PedEvidenceContext>(StringComparer.OrdinalIgnoreCase);
         private static readonly object pedEvidenceLock = new object();
+        /// <summary>Ped handles we've seen fleeing; looked up at arrest by handle so we don't miss due to name mismatch during chase.</summary>
+        private static readonly Dictionary<int, DateTime> fleeingPedHandles = new Dictionary<int, DateTime>();
+        /// <summary>Handles that caused vehicle damage (e.g. during pursuit); merged at arrest when we may not have had name at surrender.</summary>
+        private static readonly Dictionary<int, DateTime> damagedVehicleHandles = new Dictionary<int, DateTime>();
+        /// <summary>Handles that assaulted the player; merged at arrest in case game clears damage state.</summary>
+        private static readonly Dictionary<int, DateTime> assaultedPedHandles = new Dictionary<int, DateTime>();
+        /// <summary>Handles that were armed when we saw them (e.g. at surrender); at arrest they may be disarmed so we merge by handle.</summary>
+        private static readonly Dictionary<int, DateTime> hadWeaponHandles = new Dictionary<int, DateTime>();
 
         private static readonly HashSet<string> capturedVehicleSearchPlates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly object capturedVehicleSearchLock = new object();
@@ -210,6 +218,7 @@ namespace MDTPro.Data {
                     }
                     if (exists) continue;
                     TryApplyReEncounterVehicleProfile(mdtProVehicleData, v);
+                    MergeBOLOsFromStubByPlate(mdtProVehicleData);
                     lock (_vehicleDbLock) {
                         if (vehicleDatabase.Any(x => x.LicensePlate == mdtProVehicleData.LicensePlate)) continue;
                         vehicleDatabase.Add(mdtProVehicleData);
@@ -241,6 +250,7 @@ namespace MDTPro.Data {
                 MDTProVehicleData mdtProVehicleData = new MDTProVehicleData(vehicle);
                 if (mdtProVehicleData.LicensePlate == null) return;
                 TryApplyReEncounterVehicleProfile(mdtProVehicleData, vehicle);
+                MergeBOLOsFromStubByPlate(mdtProVehicleData);
                 lock (_vehicleDbLock) {
                     if (!vehicleDatabase.Any(x => x.LicensePlate == mdtProVehicleData.LicensePlate))
                         vehicleDatabase.Add(mdtProVehicleData);
@@ -357,33 +367,36 @@ namespace MDTPro.Data {
             }
         }
 
-        /// <summary>All vehicles that have at least one BOLO, for the BOLO noticeboard. In-world vehicles first (so CanModifyBOLOs is true when applicable); then persistent by plate, deduped.</summary>
+        /// <summary>All vehicles that have at least one active (non-expired) BOLO, for the BOLO noticeboard. In-world vehicles first (so CanModifyBOLOs is true when applicable); then persistent by plate, deduped.</summary>
         internal static System.Collections.Generic.List<object> GetActiveBOLOs() {
             var list = new System.Collections.Generic.List<object>();
             var seenPlates = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
             lock (_vehicleDbLock) {
                 foreach (var v in vehicleDatabase) {
-                    if (v?.BOLOs == null || v.BOLOs.Length == 0) continue;
-                    if (string.IsNullOrEmpty(v.LicensePlate)) continue;
-                    seenPlates.Add(v.LicensePlate);
-                    list.Add(new {
-                        v.LicensePlate,
-                        v.ModelDisplayName,
-                        v.IsStolen,
-                        BOLOs = v.BOLOs,
-                        CanModifyBOLOs = v.CanModifyBOLOs
-                    });
-                }
-                foreach (var v in keepInVehicleDatabase) {
-                    if (v?.BOLOs == null || v.BOLOs.Length == 0) continue;
-                    if (string.IsNullOrEmpty(v.LicensePlate)) continue;
+                    if (v?.BOLOs == null || v.BOLOs.Length == 0 || string.IsNullOrEmpty(v.LicensePlate)) continue;
+                    var activeBolos = v.BOLOs.Where(b => IsBOLOActive(b)).ToArray();
+                    if (activeBolos.Length == 0) continue;
                     if (seenPlates.Contains(v.LicensePlate)) continue;
                     seenPlates.Add(v.LicensePlate);
                     list.Add(new {
                         v.LicensePlate,
                         v.ModelDisplayName,
                         v.IsStolen,
-                        BOLOs = v.BOLOs,
+                        BOLOs = activeBolos,
+                        CanModifyBOLOs = v.CanModifyBOLOs
+                    });
+                }
+                foreach (var v in keepInVehicleDatabase) {
+                    if (v?.BOLOs == null || v.BOLOs.Length == 0 || string.IsNullOrEmpty(v.LicensePlate)) continue;
+                    if (seenPlates.Contains(v.LicensePlate)) continue;
+                    var activeBolos = v.BOLOs.Where(b => IsBOLOActive(b)).ToArray();
+                    if (activeBolos.Length == 0) continue;
+                    seenPlates.Add(v.LicensePlate);
+                    list.Add(new {
+                        v.LicensePlate,
+                        v.ModelDisplayName,
+                        v.IsStolen,
+                        BOLOs = activeBolos,
                         CanModifyBOLOs = false
                     });
                 }
@@ -595,6 +608,81 @@ namespace MDTPro.Data {
         /// <summary>Remove a BOLO from a vehicle by reason. Works for in-world and stub records.</summary>
         internal static bool TryRemoveBOLOFromVehicle(string licensePlate, string reason) {
             return TryRemoveBOLOFromVehicleOrStub(licensePlate, reason);
+        }
+
+        /// <summary>True if the vehicle has at least one active (non-expired) BOLO. Used by ALPR to add BOLO flag.</summary>
+        internal static bool HasActiveBOLOs(MDTProVehicleData v) {
+            if (v?.BOLOs == null || v.BOLOs.Length == 0) return false;
+            return v.BOLOs.Any(IsBOLOActive);
+        }
+
+        /// <summary>Returns true if the BOLO is still active (not expired). Uses IsActive when available, else Expires vs UtcNow.</summary>
+        private static bool IsBOLOActive(VehicleBOLO b) {
+            if (b == null) return false;
+            try {
+                var isActiveProp = b.GetType().GetProperty("IsActive");
+                if (isActiveProp != null && isActiveProp.PropertyType == typeof(bool))
+                    return (bool)isActiveProp.GetValue(b);
+            } catch { }
+            try {
+                var expiresProp = b.GetType().GetProperty("Expires");
+                if (expiresProp != null && expiresProp.GetValue(b) is DateTime expires)
+                    return expires > DateTime.UtcNow;
+            } catch { }
+            return true;
+        }
+
+        /// <summary>Merge BOLOs from a plate-matched stub (keepInVehicleDatabase) into an in-world vehicle so noticeboard BOLOs apply when the car spawns. Replaces stub with in-world record in keepInVehicleDatabase so persistence is correct.</summary>
+        internal static void MergeBOLOsFromStubByPlate(MDTProVehicleData inWorldVehicle) {
+            if (inWorldVehicle?.CDFVehicleData == null || string.IsNullOrWhiteSpace(inWorldVehicle.LicensePlate)) return;
+            string plate = inWorldVehicle.LicensePlate.Trim();
+            MDTProVehicleData stub;
+            lock (_vehicleDbLock) {
+                stub = keepInVehicleDatabase.FirstOrDefault(v => v != null && string.Equals(v.LicensePlate, plate, StringComparison.OrdinalIgnoreCase)
+                    && v != inWorldVehicle && (v.Holder == null || !v.Holder.Exists()));
+            }
+            if (stub?.BOLOs == null || stub.BOLOs.Length == 0) return;
+            var existingReasons = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (inWorldVehicle.BOLOs != null) {
+                foreach (var b in inWorldVehicle.BOLOs)
+                    if (b?.Reason != null) existingReasons.Add(b.Reason);
+            }
+            bool merged = false;
+            foreach (var b in stub.BOLOs) {
+                if (b == null || !IsBOLOActive(b) || existingReasons.Contains(b.Reason ?? "")) continue;
+                try {
+                    DateTime issued, expires;
+                    string issuedBy;
+                    try {
+                        issued = (DateTime)(b.GetType().GetProperty("Issued")?.GetValue(b) ?? DateTime.UtcNow);
+                        expires = (DateTime)(b.GetType().GetProperty("Expires")?.GetValue(b) ?? DateTime.UtcNow.AddDays(7));
+                        issuedBy = (string)(b.GetType().GetProperty("IssuedBy")?.GetValue(b)) ?? "LSPD";
+                    } catch {
+                        issued = DateTime.UtcNow;
+                        expires = DateTime.UtcNow.AddDays(7);
+                        issuedBy = "LSPD";
+                    }
+                    var cdfBolo = new VehicleBOLO(b.Reason ?? "Unknown", issued, expires, issuedBy);
+                    inWorldVehicle.CDFVehicleData.AddBOLO(cdfBolo);
+                    var list = new List<VehicleBOLO>(inWorldVehicle.BOLOs ?? Array.Empty<VehicleBOLO>());
+                    list.Add(cdfBolo);
+                    inWorldVehicle.BOLOs = list.ToArray();
+                    merged = true;
+                } catch (Exception ex) {
+                    Helper.Log($"MergeBOLOsFromStubByPlate skip BOLO: {ex.Message}", false, Helper.LogSeverity.Warning);
+                }
+            }
+            if (!merged) return;
+            lock (_vehicleDbLock) {
+                keepInVehicleDatabase.RemoveAll(v => v == stub);
+                if (!keepInVehicleDatabase.Any(x => x != null && string.Equals(x.LicensePlate, plate, StringComparison.OrdinalIgnoreCase)))
+                    keepInVehicleDatabase.Add(inWorldVehicle);
+            }
+            try {
+                Database.SaveVehicle(inWorldVehicle);
+            } catch (Exception ex) {
+                Helper.Log($"MergeBOLOsFromStubByPlate SaveVehicle: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
         }
 
         internal static void SyncVehicleDatabaseWithCDF() {
@@ -988,58 +1076,64 @@ namespace MDTPro.Data {
                     if (vehicleDataToAdd != null) KeepVehicleInDatabase(vehicleDataToAdd);
                 }
 
-                string courtCaseNumber = arrestReport.CourtCaseNumber ?? Helper.GetCourtCaseNumber();
+                // Only create/update court case when arrest is Closed. Pending = collecting evidence (attach reports).
+                if (arrestReport.Status == ReportStatus.Closed) {
+                    string courtCaseNumber = arrestReport.CourtCaseNumber ?? Helper.GetCourtCaseNumber();
+                    arrestReport.CourtCaseNumber = courtCaseNumber;
 
-                arrestReport.CourtCaseNumber = courtCaseNumber;
-
-                CourtData courtData = new CourtData(
-                    arrestReport.OffenderPedName,
-                    courtCaseNumber,
-                    arrestReport.Id,
-                    int.Parse(DateTime.Now.ToString("yy"))
+                    CourtData courtData = new CourtData(
+                        arrestReport.OffenderPedName,
+                        courtCaseNumber,
+                        arrestReport.Id,
+                        int.Parse(DateTime.Now.ToString("yy"))
                     );
 
-                foreach (ArrestReport.Charge charge in arrestReport.Charges) {
-                    int? time;
-                    if (charge.maxDays == null) {
-                        if (Helper.GetRandomInt(0, 1) == 0) {
-                            time = Helper.GetRandomInt(charge.minDays, charge.minDays * 2);
-                        } else {
-                            time = null;
-                        }
-                    } else {
-                        time = Helper.GetRandomInt(charge.minDays, (int)charge.maxDays);
+                    if (arrestReport.AttachedReportIds != null && arrestReport.AttachedReportIds.Count > 0) {
+                        courtData.AttachedReportIds.AddRange(arrestReport.AttachedReportIds);
                     }
-                    courtData.AddCharge(
-                        new CourtData.Charge(
-                            charge.name,
-                            Helper.GetRandomInt(charge.minFine, charge.maxFine),
-                            time,
-                            charge.isArrestable
+
+                    foreach (ArrestReport.Charge charge in arrestReport.Charges) {
+                        int? time;
+                        if (charge.maxDays == null) {
+                            if (Helper.GetRandomInt(0, 1) == 0) {
+                                time = Helper.GetRandomInt(charge.minDays, charge.minDays * 2);
+                            } else {
+                                time = null;
+                            }
+                        } else {
+                            time = Helper.GetRandomInt(charge.minDays, (int)charge.maxDays);
+                        }
+                        courtData.AddCharge(
+                            new CourtData.Charge(
+                                charge.name,
+                                Helper.GetRandomInt(charge.minFine, charge.maxFine),
+                                time,
+                                charge.isArrestable
                             )
                         );
-                }
-
-                courtData.EvidenceUseOfForce = arrestReport.UseOfForce != null && !string.IsNullOrEmpty(arrestReport.UseOfForce.Type);
-                BuildCourtCaseMetadata(courtData, arrestReport.OffenderPedName, arrestReport.Location);
-                ApplyRepeatOffenderSentencing(courtData);
-
-                if (!string.IsNullOrEmpty(arrestReport.OffenderPedName)) {
-                    int pedIndex = pedDatabase.FindIndex(pedData => pedData.Name?.ToLower() == arrestReport.OffenderPedName.ToLower());
-                    if (pedIndex != -1) {
-                        MDTProPedData pedDataToUpdate = pedDatabase[pedIndex];
-                        UpdatePedIncarcerationFromCourtData(pedDataToUpdate, courtData);
-                        KeepPedInDatabase(pedDataToUpdate);
-                        pedDatabase[pedIndex] = pedDataToUpdate;
                     }
-                }
 
-                if (!courtDatabase.Any(x => x.Number == courtCaseNumber)) {
-                    if (courtDatabase.Count > SetupController.GetConfig().courtDatabaseMaxEntries) {
-                        Database.DeleteCourtCase(courtDatabase[0].Number);
-                        courtDatabase.RemoveAt(0);
+                    courtData.EvidenceUseOfForce = arrestReport.UseOfForce != null && !string.IsNullOrEmpty(arrestReport.UseOfForce.Type);
+                    BuildCourtCaseMetadata(courtData, arrestReport.OffenderPedName, arrestReport.Location);
+                    ApplyRepeatOffenderSentencing(courtData);
+
+                    if (!string.IsNullOrEmpty(arrestReport.OffenderPedName)) {
+                        int pedIndex = pedDatabase.FindIndex(pedData => pedData.Name?.ToLower() == arrestReport.OffenderPedName.ToLower());
+                        if (pedIndex != -1) {
+                            MDTProPedData pedDataToUpdate = pedDatabase[pedIndex];
+                            UpdatePedIncarcerationFromCourtData(pedDataToUpdate, courtData);
+                            KeepPedInDatabase(pedDataToUpdate);
+                            pedDatabase[pedIndex] = pedDataToUpdate;
+                        }
                     }
-                    courtDatabase.Add(courtData);
+
+                    if (!courtDatabase.Any(x => x.Number == courtCaseNumber)) {
+                        if (courtDatabase.Count > SetupController.GetConfig().courtDatabaseMaxEntries) {
+                            Database.DeleteCourtCase(courtDatabase[0].Number);
+                            courtDatabase.RemoveAt(0);
+                        }
+                        courtDatabase.Add(courtData);
+                    }
                 }
 
                 int index = arrestReports.FindIndex(x => x.Id == arrestReport.Id);
@@ -1280,11 +1374,13 @@ namespace MDTPro.Data {
             bool hasLifeSentence = false;
 
             foreach (CourtData.Charge charge in courtData.Charges) {
+                if (charge.Outcome != 1) continue; // Only convicted charges (1 = Convicted)
                 if (charge.Time == null) {
                     hasLifeSentence = true;
                     continue;
                 }
-                if (charge.Time > 0) totalDays += charge.Time.Value;
+                int days = charge.SentenceDaysServed ?? charge.Time ?? 0;
+                if (days > 0) totalDays += days;
             }
 
             if (hasLifeSentence) {
@@ -1340,6 +1436,7 @@ namespace MDTPro.Data {
             bool fishingRevoked = false;
 
             foreach (CourtData.Charge charge in courtData.Charges) {
+                if (charge.Outcome != 1) continue; // Only convicted charges
                 if (string.IsNullOrEmpty(charge.Name)) continue;
                 string name = charge.Name.Trim();
 
@@ -1384,28 +1481,180 @@ namespace MDTPro.Data {
         private static bool IsFelonyChargeName(string name) {
             if (string.IsNullOrEmpty(name)) return false;
             string n = name.ToLowerInvariant();
-            // Felony categories from arrest options
+            // Felony categories: must match every felony in arrestOptions.json (Felony Traffic, Felony Firearms, Robbery/Theft, Drug felony-level, Custody, Manslaughter/Homicide, Sexual/Kidnapping, Arson, and felony-level charges in other groups)
             return n.Contains("felony ") || n.Contains("murder") || n.Contains("manslaughter") || n.Contains("rape")
                 || n.Contains("kidnapping") || n.Contains("robbery") || n.Contains("carjacking") || n.Contains("home invasion")
-                || n.Contains("first degree burglary") || n.Contains("attempted murder") || n.Contains("mayhem")
-                || n.Contains("arson") || n.Contains("explosive") || n.Contains("possession of firearm by felon")
+                || n.Contains("first degree burglary") || n.Contains("burglary") || n.Contains("attempted murder") || n.Contains("attempted robbery") || n.Contains("attempted armed")
+                || n.Contains("mayhem") || n.Contains("arson") || n.Contains("reckless burning") || n.Contains("unlawful burning") || n.Contains("explosive") || n.Contains("possession of firearm by felon") || n.Contains("possession of firearm in commission of felony")
                 || n.Contains("assault weapon") || n.Contains("machine gun") || n.Contains("short-barreled")
                 || n.Contains("discharging firearm at inhabited") || n.Contains("trafficking") || n.Contains("manufacturing meth")
-                || n.Contains("for sale") || n.Contains("transport of meth") || n.Contains("aggravated kidnapping")
-                || n.Contains("dui causing") || n.Contains("hit and run causing") || n.Contains("street racing causing")
-                || n.Contains("felony reckless evading") || n.Contains("grand theft auto") || n.Contains("possession of stolen vehicle")
-                || n.Contains("assault with deadly weapon (firearm)") || n.Contains("altering or removing firearm serial");
+                || n.Contains("for sale") || n.Contains("transport of meth") || n.Contains("transport or sale of meth") || n.Contains("sale or transport of cannabis")
+                || n.Contains("aggravated kidnapping") || n.Contains("dui causing") || n.Contains("hit and run causing") || n.Contains("street racing causing")
+                || n.Contains("felony reckless evading") || n.Contains("reckless evading peace officer") || n.Contains("grand theft auto") || n.Contains("possession of stolen vehicle")
+                || n.Contains("assault with deadly weapon") || n.Contains("assault with deadly weapon (firearm)") || n.Contains("altering or removing firearm serial")
+                || n.Contains("escape from custody") || n.Contains("escape from jail") || n.Contains("aid in escape")
+                || n.Contains("accessory after the fact") || n.Contains("accessory before the fact")
+                || n.Contains("failure to register as sex offender")
+                || n.Contains("battery causing serious bodily injury") || n.Contains("malicious wounding")
+                || (n.Contains("vandalism") && n.Contains("or more") && !n.Contains("under $400"));
         }
 
         private static bool IsViolentMisdemeanorChargeName(string name) {
             if (string.IsNullOrEmpty(name)) return false;
             string n = name.ToLowerInvariant();
             return n.Contains("brandishing") || n.Contains("simple assault") || n.Contains("aggravated assault")
-                || n.Contains("assault with deadly weapon") || n.Contains("simple battery") || n.Contains("battery on")
-                || n.Contains("battery causing") || n.Contains("battery with deadly") || n.Contains("malicious wounding")
-                || n.Contains("sexual battery") || n.Contains("assault on peace officer") || n.Contains("assault on firefighter")
+                || n.Contains("simple battery") || n.Contains("battery on") || n.Contains("battery with deadly")
+                || n.Contains("sexual battery") || n.Contains("malicious wounding")
+                || n.Contains("assault on peace officer") || n.Contains("assault on firefighter")
                 || n.Contains("criminal threats") || n.Contains("negligent discharge") || n.Contains("shooting from vehicle")
-                || n.Contains("domestic violence") || n.Contains("corporal injury") || n.Contains("violation of protective order");
+                || n.Contains("domestic violence") || n.Contains("corporal injury") || n.Contains("violation of protective order")
+                || n.Contains("reckless endangerment") || n.Contains("wanton endangerment") || n.Contains("mutual combat") || n.Contains("battery (mutual")
+                || n.Contains("sexual assault") || n.Contains("vehicular assault");
+        }
+
+        private static bool IsHomicideChargeName(string name) {
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.ToLowerInvariant();
+            return n.Contains("murder") || n.Contains("manslaughter");
+        }
+
+        // Charge classification is name-based only: citation and arrest options (citationOptions.json, arrestOptions.json) define charges by name; only the charge name is persisted on reports/court, not the group. So we match substrings of charge.Name against the names in those files.
+
+        /// <summary>True if the charge is vehicle-related (GTA, stolen vehicle, DUI, vehicular, evading, VIN, impound, etc.). Matches arrest/citation charge names from arrestOptions.json and citationOptions.json.</summary>
+        private static bool IsVehicleRelatedChargeName(string name) {
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.ToLowerInvariant();
+            return n.Contains("grand theft auto") || n.Contains("stolen vehicle") || n.Contains("possession of stolen vehicle")
+                || n.Contains("dui") || n.Contains("dwi") || n.Contains("driving under the influence") || n.Contains("under the influence")
+                || n.Contains("chemical test") || n.Contains("field sobriety") || n.Contains("refusal to submit")
+                || n.Contains("vehicular") || n.Contains("evading") || n.Contains("vin ") || n.Contains("vin tampering") || n.Contains("defaced vin")
+                || n.Contains("hit and run") || n.Contains("hit-and-run") || n.Contains("reckless driving") || n.Contains("street racing")
+                || n.Contains("carjacking") || n.Contains("driving on suspended") || n.Contains("driving without license") || n.Contains("driving without valid license") || n.Contains("driving with license expired")
+                || n.Contains("refusal to sign traffic") || n.Contains("wrong side of road") || n.Contains("driving on wrong side")
+                || (n.Contains("vehicle") && (n.Contains("theft") || n.Contains("stolen") || n.Contains("evidence")));
+        }
+
+        /// <summary>True if the charge is firearm/weapon-related. Matches arrest charge names from arrestOptions.json (Misdemeanor/Felony Firearms / Weapons groups). Used so the system can treat firearm charges consistently (e.g. evidence relevance, future use).</summary>
+        private static bool IsFirearmChargeName(string name) {
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.ToLowerInvariant();
+            return n.Contains("firearm") || n.Contains("deadly weapon") || n.Contains("assault weapon") || n.Contains("machine gun")
+                || n.Contains("short-barreled") || n.Contains("short barreled") || n.Contains("brandishing")
+                || n.Contains("negligent discharge") || n.Contains("concealed") && n.Contains("permit")
+                || n.Contains("possession of ammunition") || n.Contains("altered") && (n.Contains("serial") || n.Contains("serial number"))
+                || n.Contains("removing firearm serial") || n.Contains("discharging firearm") || n.Contains("shooting from vehicle")
+                || n.Contains("stolen firearm") || n.Contains("explosive device") || n.Contains("detonate explosive");
+        }
+
+        /// <summary>True if the case has at least one vehicle-related charge. Impound reports only count as evidence for such cases.</summary>
+        private static bool IsCaseVehicleRelated(CourtData courtData) {
+            if (courtData?.Charges == null) return false;
+            return courtData.Charges.Any(c => c != null && IsVehicleRelatedChargeName(c.Name ?? ""));
+        }
+
+        /// <summary>True if the case has at least one firearm/weapon-related charge. Available for evidence relevance or UI (e.g. when to treat DocumentedFirearms as directly relevant).</summary>
+        private static bool IsCaseFirearmRelated(CourtData courtData) {
+            if (courtData?.Charges == null) return false;
+            return courtData.Charges.Any(c => c != null && IsFirearmChargeName(c.Name ?? ""));
+        }
+
+        /// <summary>True if the charge is drug/narcotics-related (possession, sale, trafficking, paraphernalia, etc.). Matches arrest/citation charge names. Used for evidence relevance and consistency (e.g. when drug evidence is directly relevant).</summary>
+        private static bool IsDrugRelatedChargeName(string name) {
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.ToLowerInvariant();
+            return n.Contains("controlled substance") || n.Contains("drug paraphernalia") || n.Contains("under influence of controlled")
+                || n.Contains("trafficking") || n.Contains("for sale") || n.Contains("sale or transport") || n.Contains("transport or sale") || n.Contains("transport of meth")
+                || n.Contains("manufacturing meth") || n.Contains("possession of cannabis") || n.Contains("possession of cocaine")
+                || n.Contains("possession of methamphetamine") || n.Contains("possession of heroin") || n.Contains("possession of pcp")
+                || n.Contains("possession of lsd") || n.Contains("hallucinogen") || n.Contains("possession of ecstasy") || n.Contains("mdma")
+                || n.Contains("possession of fentanyl") || n.Contains("prescription") && n.Contains("narcotic");
+        }
+
+        /// <summary>True if the case has at least one drug-related charge. Used for evidence relevance (e.g. DocumentedDrugs / drug records directly relevant).</summary>
+        private static bool IsCaseDrugRelated(CourtData courtData) {
+            if (courtData?.Charges == null) return false;
+            return courtData.Charges.Any(c => c != null && IsDrugRelatedChargeName(c.Name ?? ""));
+        }
+
+        /// <summary>True if this attached report is relevant to the case (same defendant, or report type matches charge type). Only relevant reports get evidence bonus.</summary>
+        private static bool IsAttachedReportRelevantToCase(CourtData courtData, string reportId, string reportType) {
+            if (courtData == null || string.IsNullOrWhiteSpace(reportId) || string.IsNullOrWhiteSpace(reportType)) return false;
+            string defendant = (courtData.PedName ?? "").Trim();
+            if (reportType == "incident") {
+                IncidentReport r = IncidentReports?.FirstOrDefault(x => x.Id == reportId);
+                if (r?.OffenderPedsNames == null || r.OffenderPedsNames.Length == 0) return false;
+                return r.OffenderPedsNames.Any(n => string.Equals(n?.Trim(), defendant, StringComparison.OrdinalIgnoreCase));
+            }
+            if (reportType == "citation") {
+                CitationReport r = CitationReports?.FirstOrDefault(x => x.Id == reportId);
+                if (r == null) return false;
+                return string.Equals((r.OffenderPedName ?? "").Trim(), defendant, StringComparison.OrdinalIgnoreCase);
+            }
+            if (reportType == "injury") {
+                // Injury reports document harm/death; always relevant when attached (e.g. victim death for homicide, assault injuries).
+                return true;
+            }
+            if (reportType == "trafficIncident") {
+                TrafficIncidentReport r = TrafficIncidentReports?.FirstOrDefault(x => x.Id == reportId);
+                if (r == null) return false;
+                bool defendantIsDriver = r.DriverNames != null && r.DriverNames.Any(n => string.Equals(n?.Trim(), defendant, StringComparison.OrdinalIgnoreCase));
+                if (defendantIsDriver) return true;
+                // If case is vehicle-related (DUI, GTA, etc.) the traffic report might still document the scene even if defendant not listed as driver yet.
+                return IsCaseVehicleRelated(courtData);
+            }
+            if (reportType == "impound") {
+                // Impound only relevant for vehicle-related charges (GTA, stolen recovery, evidence, etc.).
+                return IsCaseVehicleRelated(courtData);
+            }
+            return false;
+        }
+
+        /// <summary>True if any attached injury report indicates death/fatal outcome (Severity or Treatment). Used for homicide conviction cap.</summary>
+        private static bool HasQualifyingDeathOrFatalInjuryReport(CourtData courtCase) {
+            if (courtCase?.AttachedReportIds == null || courtCase.AttachedReportIds.Count == 0 || InjuryReports == null) return false;
+            foreach (string reportId in courtCase.AttachedReportIds) {
+                InjuryReport ir = InjuryReports.FirstOrDefault(r => r.Id == reportId);
+                if (ir == null) continue;
+                string severity = (ir.Severity ?? "").Trim().ToLowerInvariant();
+                string treatment = (ir.Treatment ?? "").Trim().ToLowerInvariant();
+                if (severity.Contains("fatal") || severity.Contains("death") || severity.Contains("critical") || severity.Contains("deceased"))
+                    return true;
+                if (treatment.Contains("deceased") || treatment.Contains("doa") || treatment.Contains("pronounced dead") || treatment.Contains("pronounced deceased"))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>Per-charge conviction chance (0-100). Case chance + tier modifier + variance, then skewed so higher values are rarer. Roll is always 1-100; convicted if roll &lt;= chance.</summary>
+        private static int GetPerChargeConvictionChance(CourtData courtCase, CourtData.Charge charge) {
+            Config config = SetupController.GetConfig();
+            int baseChance = courtCase.ConvictionChance;
+            int variance = Helper.GetRandomInt(-4, 4);
+            int tierMod = 0;
+            string name = charge?.Name ?? "";
+            bool isHomicide = IsHomicideChargeName(name);
+            bool hasDeathReport = HasQualifyingDeathOrFatalInjuryReport(courtCase);
+
+            if (isHomicide) {
+                if (hasDeathReport) tierMod -= 10;  // Homicide with documented death report: still harder but not as much
+                else tierMod -= 25;                 // Homicide without death/fatal injury report: much harder
+            } else if (IsFelonyChargeName(name)) tierMod -= 10;
+            else if (IsViolentMisdemeanorChargeName(name)) tierMod = 0;
+            else tierMod = 5;
+            int chance = Math.Max(15, Math.Min(85, baseChance + variance + tierMod));
+
+            // Homicide without death report: cap conviction chance so documentation matters
+            if (isHomicide && !hasDeathReport && config.courtConvictionHomicideNoDeathReportCap > 0)
+                chance = Math.Min(chance, config.courtConvictionHomicideNoDeathReportCap);
+
+            // Skew so higher conviction chances are rarer: more often reduce, rarely boost
+            int skewRoll = Helper.GetRandomInt(1, 100);
+            if (skewRoll <= 50) chance -= Helper.GetRandomInt(8, 22);      // 50%: substantial drop
+            else if (skewRoll <= 80) chance -= Helper.GetRandomInt(0, 10); // 30%: small drop
+            else if (skewRoll <= 95) { /* 15%: no change */ }
+            else chance += Helper.GetRandomInt(0, 12);                     // 5%: rare boost
+
+            return Math.Max(15, Math.Min(85, chance));
         }
 
         /// <summary>Applies court-ordered license revocations to ped data. Sets LicenseStatus, WeaponPermitStatus, FishingPermitStatus when applicable. Uses CDF/PR enums: DriversLicenseState (ELicenseState), WeaponPermit/FishingPermit.Status (EDocumentStatus) per https://policing-redefined.netlify.app/docs/developer-docs/cdf/peds/permits</summary>
@@ -1536,10 +1785,8 @@ namespace MDTPro.Data {
                         NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(victim, ped, false));
                 }
 
-                Vehicle[] nearbyVehicles = ped.GetNearbyVehicles(20);
-                bool damagedVehicle = nearbyVehicles != null && nearbyVehicles.Any(v =>
-                    v.IsValid() &&
-                    NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(v, ped, false));
+                // Vehicle damage: any vehicle damaged by suspect counts (body damage, not just totalled). (1) Vehicles within 50m (chase wreckage spread out). (2) Suspect's current vehicle if they're still in it. Capture at arrest is best-effort; pursuit damage is also logged when they surrender (MarkPedFleeing).
+                bool damagedVehicle = CheckVehicleDamageByPed(ped);
 
                 // Illegal weapon carry: armed but weapon permit status is not valid (uses CDF WeaponPermit when available)
                 // Also check probation/parole violation. Use Holder fallback for re-encounters.
@@ -1560,22 +1807,43 @@ namespace MDTPro.Data {
                     } catch { }
                 }
 
-                bool resisted = GetPedResistanceFromPR(ped);
+                bool resisted = GetPedResistanceFromPR(ped) || assaultedPed;
 
                 string cacheKey = dbPed?.Name ?? persona.FullName;
                 lock (pedEvidenceLock) {
                     PruneStaleEvidenceEntries();
+                    bool wasFleeingByHandle = false;
+                    bool damagedVehicleByHandle = false;
+                    bool assaultedByHandle = false;
+                    bool hadWeaponByHandle = false;
+                    try {
+                        wasFleeingByHandle = fleeingPedHandles.Remove(ped.Handle);
+                        damagedVehicleByHandle = damagedVehicleHandles.Remove(ped.Handle);
+                        assaultedByHandle = assaultedPedHandles.Remove(ped.Handle);
+                        hadWeaponByHandle = hadWeaponHandles.Remove(ped.Handle);
+                    } catch { }
                     if (!pedEvidenceCache.TryGetValue(cacheKey, out PedEvidenceContext ctx)) {
                         ctx = new PedEvidenceContext();
                         pedEvidenceCache[cacheKey] = ctx;
                     }
-                    ctx.HadWeapon = hadWeapon;
+                    ctx.HadWeapon = hadWeapon || hadWeaponByHandle;
                     ctx.WasWanted = wasWanted;
                     ctx.WasDrunk = wasDrunk;
-                    ctx.WasFleeing = ctx.WasFleeing || wasFleeing;
-                    ctx.AssaultedPed = assaultedPed;
-                    ctx.DamagedVehicle = damagedVehicle;
+                    ctx.WasFleeing = ctx.WasFleeing || wasFleeing || wasFleeingByHandle;
+                    ctx.AssaultedPed = assaultedPed || assaultedByHandle;
+                    ctx.DamagedVehicle = ctx.DamagedVehicle || damagedVehicle || damagedVehicleByHandle;
                     ctx.HadIllegalWeapon = hadIllegalWeapon;
+                    if (hadWeaponByHandle && !ctx.HadIllegalWeapon) {
+                        if (dbPed != null && !string.IsNullOrEmpty(dbPed.WeaponPermitStatus) && !dbPed.WeaponPermitStatus.Equals("Valid", StringComparison.OrdinalIgnoreCase))
+                            ctx.HadIllegalWeapon = true;
+                        if (!ctx.HadIllegalWeapon) {
+                            try {
+                                var cdfPed = ped.GetPedData();
+                                if (cdfPed?.WeaponPermit != null && cdfPed.WeaponPermit.Status != EDocumentStatus.Valid)
+                                    ctx.HadIllegalWeapon = true;
+                            } catch { }
+                        }
+                    }
                     ctx.ViolatedSupervision = violatedSupervision;
                     ctx.Resisted = resisted;
                     ctx.CapturedAt = DateTime.UtcNow;
@@ -1604,19 +1872,51 @@ namespace MDTPro.Data {
             return false;
         }
 
+        /// <summary>True if any vehicle has been damaged by this ped (any damage counts, not just totalled). Checks vehicles within 50m and the ped's current vehicle if in one.</summary>
+        private static bool CheckVehicleDamageByPed(Ped ped) {
+            if (ped == null || !ped.IsValid()) return false;
+            try {
+                Vehicle[] nearbyVehicles = ped.GetNearbyVehicles(50);
+                bool any = nearbyVehicles != null && nearbyVehicles.Any(v =>
+                    v != null && v.IsValid() &&
+                    NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(v, ped, false));
+                if (!any && ped.IsInAnyVehicle(false)) {
+                    Vehicle suspectVehicle = ped.CurrentVehicle;
+                    if (suspectVehicle != null && suspectVehicle.IsValid() &&
+                        NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(suspectVehicle, ped, false))
+                        any = true;
+                }
+                return any;
+            } catch { return false; }
+        }
+
         internal static void MarkPedFleeing(Ped ped) {
             if (ped == null || !ped.IsValid()) return;
             try {
-                Persona persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped);
-                if (persona == null || string.IsNullOrEmpty(persona.FullName)) return;
-                string cacheKey = GetPedDataForPed(ped)?.Name ?? persona.FullName;
+                bool damagedVehicle = CheckVehicleDamageByPed(ped);
+                Ped playerPed = Main.Player;
+                bool assaultedPlayer = playerPed != null && playerPed.IsValid() && playerPed != ped &&
+                    NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(playerPed, ped, false);
+                bool hadWeapon = NativeFunction.Natives.GET_BEST_PED_WEAPON<uint>(ped, false) != 0xA2719263u; // WEAPON_UNARMED
+                DateTime now = DateTime.UtcNow;
                 lock (pedEvidenceLock) {
-                    if (!pedEvidenceCache.TryGetValue(cacheKey, out PedEvidenceContext ctx)) {
-                        ctx = new PedEvidenceContext();
-                        pedEvidenceCache[cacheKey] = ctx;
+                    fleeingPedHandles[ped.Handle] = now;
+                    if (damagedVehicle) damagedVehicleHandles[ped.Handle] = now;
+                    if (assaultedPlayer) assaultedPedHandles[ped.Handle] = now;
+                    if (hadWeapon) hadWeaponHandles[ped.Handle] = now;
+                    Persona persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped);
+                    if (persona != null && !string.IsNullOrEmpty(persona.FullName)) {
+                        string cacheKey = GetPedDataForPed(ped)?.Name ?? persona.FullName;
+                        if (!pedEvidenceCache.TryGetValue(cacheKey, out PedEvidenceContext ctx)) {
+                            ctx = new PedEvidenceContext();
+                            pedEvidenceCache[cacheKey] = ctx;
+                        }
+                        ctx.WasFleeing = true;
+                        if (damagedVehicle) ctx.DamagedVehicle = true;
+                        if (assaultedPlayer) ctx.AssaultedPed = true;
+                        if (hadWeapon) ctx.HadWeapon = true;
+                        ctx.CapturedAt = now;
                     }
-                    ctx.WasFleeing = true;
-                    ctx.CapturedAt = DateTime.UtcNow;
                 }
             } catch (Exception e) {
                 Helper.Log($"Fleeing capture failed: {e.Message}", false, Helper.LogSeverity.Warning);
@@ -2052,6 +2352,14 @@ namespace MDTPro.Data {
                 .Select(kvp => kvp.Key)
                 .ToList();
             foreach (string key in stale) pedEvidenceCache.Remove(key);
+            List<int> staleHandles = fleeingPedHandles.Where(kvp => kvp.Value < threshold).Select(kvp => kvp.Key).ToList();
+            foreach (int h in staleHandles) fleeingPedHandles.Remove(h);
+            staleHandles = damagedVehicleHandles.Where(kvp => kvp.Value < threshold).Select(kvp => kvp.Key).ToList();
+            foreach (int h in staleHandles) damagedVehicleHandles.Remove(h);
+            staleHandles = assaultedPedHandles.Where(kvp => kvp.Value < threshold).Select(kvp => kvp.Key).ToList();
+            foreach (int h in staleHandles) assaultedPedHandles.Remove(h);
+            staleHandles = hadWeaponHandles.Where(kvp => kvp.Value < threshold).Select(kvp => kvp.Key).ToList();
+            foreach (int h in staleHandles) hadWeaponHandles.Remove(h);
         }
 
         private static void BuildCourtCaseMetadata(CourtData courtData, string offenderPedName, Location reportLocation) {
@@ -2188,6 +2496,17 @@ namespace MDTPro.Data {
             return Math.Max(0, (int)Math.Round(score));
         }
 
+        /// <summary>Returns the report type for an attached report ID, or null if not found. Used for per-type evidence bonuses.</summary>
+        private static string ResolveAttachedReportType(string reportId) {
+            if (string.IsNullOrWhiteSpace(reportId)) return null;
+            if (IncidentReports?.Any(r => r.Id == reportId) == true) return "incident";
+            if (InjuryReports?.Any(r => r.Id == reportId) == true) return "injury";
+            if (CitationReports?.Any(r => r.Id == reportId) == true) return "citation";
+            if (TrafficIncidentReports?.Any(r => r.Id == reportId) == true) return "trafficIncident";
+            if (ImpoundReports?.Any(r => r.Id == reportId) == true) return "impound";
+            return null;
+        }
+
         private static int GetEvidenceScore(CourtData courtData, Config config) {
             if (courtData?.Charges == null || courtData.Charges.Count == 0) return 0;
 
@@ -2199,7 +2518,39 @@ namespace MDTPro.Data {
                 if (charge.Time == null) score += config.courtEvidenceLifeSentenceBonus;
             }
 
+            // Report-based evidence: relevant reports get full weight; other attached reports get a smaller bonus so tangential evidence (e.g. stolen firearm in a drug case) still counts but carries less weight
+            if (courtData.AttachedReportIds != null && courtData.AttachedReportIds.Count > 0) {
+                foreach (string reportId in courtData.AttachedReportIds) {
+                    if (string.IsNullOrWhiteSpace(reportId)) continue;
+                    string reportType = ResolveAttachedReportType(reportId);
+                    if (string.IsNullOrEmpty(reportType)) continue;
+                    bool relevant = IsAttachedReportRelevantToCase(courtData, reportId, reportType);
+                    if (relevant) {
+                        if (reportType == "incident" && config.courtEvidenceIncidentReportBonus > 0)
+                            score += config.courtEvidenceIncidentReportBonus;
+                        else if (reportType == "injury" && config.courtEvidenceInjuryReportBonus > 0)
+                            score += config.courtEvidenceInjuryReportBonus;
+                        else if (reportType == "citation" && config.courtEvidenceCitationReportBonus > 0)
+                            score += config.courtEvidenceCitationReportBonus;
+                        else if (reportType == "trafficIncident" && config.courtEvidenceTrafficIncidentReportBonus > 0)
+                            score += config.courtEvidenceTrafficIncidentReportBonus;
+                        else if (reportType == "impound" && config.courtEvidenceImpoundReportBonus > 0)
+                            score += config.courtEvidenceImpoundReportBonus;
+                    } else if (config.courtEvidenceOtherAttachedReportBonus > 0) {
+                        score += config.courtEvidenceOtherAttachedReportBonus;
+                    }
+                }
+            }
+
+            // Arrest report notes length bonus (primary report only)
+            if (config.courtEvidenceReportNotesBonus > 0 && config.courtEvidenceReportNotesMinLength > 0 && !string.IsNullOrEmpty(courtData.ReportId)) {
+                ArrestReport primaryArrest = arrestReports?.FirstOrDefault(r => r.Id == courtData.ReportId);
+                if (primaryArrest != null && primaryArrest.Notes != null && primaryArrest.Notes.Length >= config.courtEvidenceReportNotesMinLength)
+                    score += config.courtEvidenceReportNotesBonus;
+            }
+
             if (!string.IsNullOrEmpty(courtData.PedName)) {
+                ArrestReport primaryArrest = !string.IsNullOrEmpty(courtData.ReportId) ? arrestReports?.FirstOrDefault(r => r.Id == courtData.ReportId) : null;
                 lock (pedEvidenceLock) {
                     if (pedEvidenceCache.TryGetValue(courtData.PedName, out PedEvidenceContext ctx)) {
                         if (ctx.HadWeapon) { score += config.courtEvidenceWeaponBonus; courtData.EvidenceHadWeapon = true; }
@@ -2217,13 +2568,25 @@ namespace MDTPro.Data {
                 if (courtData.EvidenceUseOfForce && config.courtEvidenceUseOfForceBonus > 0) {
                     score += config.courtEvidenceUseOfForceBonus;
                 }
-                // Drug records come from DB (pat-down, dead body search) — always check regardless of cache
+                // Drug records: from DB (pat-down, dead body search) or from arrest report "Evidence seized" when officer documented it
                 if (config.courtEvidenceDrugsBonus > 0) {
                     var drugs = Database.LoadDrugsByOwner(courtData.PedName, 1);
                     if (drugs != null && drugs.Count > 0) {
                         score += config.courtEvidenceDrugsBonus;
                         courtData.EvidenceHadDrugs = true;
+                    } else if (primaryArrest != null && primaryArrest.DocumentedDrugs) {
+                        score += config.courtEvidenceDrugsBonus;
+                        courtData.EvidenceHadDrugs = true;
                     }
+                }
+                // Firearms: from cache (at arrest) or from arrest report "Evidence seized" when officer documented it
+                if (primaryArrest != null && primaryArrest.DocumentedFirearms) {
+                    bool hadWeaponAlready = courtData.EvidenceHadWeapon;
+                    bool hadIllegalAlready = courtData.EvidenceIllegalWeapon;
+                    courtData.EvidenceHadWeapon = true;
+                    courtData.EvidenceIllegalWeapon = true;
+                    if (!hadWeaponAlready && config.courtEvidenceWeaponBonus > 0) score += config.courtEvidenceWeaponBonus;
+                    if (!hadIllegalAlready && config.courtEvidenceIllegalWeaponBonus > 0) score += config.courtEvidenceIllegalWeaponBonus;
                 }
                 // Fallback: MDT is authoritative for warrants; if cache didn't set EvidenceWasWanted, set from ped record (both pedDatabase and keepInPedDatabase)
                 if (!courtData.EvidenceWasWanted) {
@@ -2615,14 +2978,25 @@ namespace MDTPro.Data {
                 string plea = string.IsNullOrWhiteSpace(courtCase.Plea) ? "Not Guilty" : courtCase.Plea.Trim();
                 courtCase.Plea = plea;
 
-                int newStatus;
-                if (string.Equals(plea, "Guilty", StringComparison.OrdinalIgnoreCase) || string.Equals(plea, "No Contest", StringComparison.OrdinalIgnoreCase)) {
-                    newStatus = 1;
-                } else {
-                    int roll = Helper.GetRandomInt(1, 100);
-                    newStatus = roll <= courtCase.ConvictionChance ? 1 : 2;
+                bool pleaGuiltyOrNoContest = string.Equals(plea, "Guilty", StringComparison.OrdinalIgnoreCase) || string.Equals(plea, "No Contest", StringComparison.OrdinalIgnoreCase);
+
+                if (courtCase.Charges != null) {
+                    foreach (CourtData.Charge charge in courtCase.Charges) {
+                        if (pleaGuiltyOrNoContest) {
+                            charge.Outcome = 1; // Convicted
+                            charge.ConvictionChance = null;
+                            charge.SentenceDaysServed = charge.Time;
+                        } else {
+                            int chance = GetPerChargeConvictionChance(courtCase, charge);
+                            charge.ConvictionChance = chance;
+                            int roll = Helper.GetRandomInt(1, 100);
+                            charge.Outcome = roll <= chance ? 1 : 2; // 1 Convicted, 2 Acquitted
+                            if (charge.Outcome == 1) charge.SentenceDaysServed = charge.Time;
+                        }
+                    }
                 }
 
+                int newStatus = (courtCase.Charges != null && courtCase.Charges.Any(c => c.Outcome == 1)) ? 1 : 2;
                 courtCase.Status = newStatus;
                 courtCase.OutcomeReasoning = BuildOutcomeReasoning(courtCase, courtCase.ConvictionChance, newStatus);
                 if (newStatus == 1) {
@@ -2663,7 +3037,8 @@ namespace MDTPro.Data {
                 }
 
                 Database.SaveCourtCase(courtCase);
-                Helper.Log($"Court case {courtCase.Number} auto-resolved: {(newStatus == 1 ? "Convicted" : "Acquitted")} (plea: {courtCase.Plea}, chance: {courtCase.ConvictionChance}%)", false, Helper.LogSeverity.Info);
+                int convictedCount = courtCase.Charges?.Count(c => c.Outcome == 1) ?? 0;
+                Helper.Log($"Court case {courtCase.Number} auto-resolved: {(newStatus == 1 ? "Convicted" : "Acquitted")} ({convictedCount}/{courtCase.Charges?.Count ?? 0} charges) (plea: {courtCase.Plea})", false, Helper.LogSeverity.Info);
             } catch (Exception e) {
                 Helper.Log($"Auto-resolution failed for case {courtCase?.Number}: {e.Message}", false, Helper.LogSeverity.Warning);
             }

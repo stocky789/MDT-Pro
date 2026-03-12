@@ -267,11 +267,14 @@ namespace MDTPro.Utility {
             } catch { /* ignore */ }
         }
 
+        private static readonly string[] DtfAssemblyNames = { "DamageTrackingFramework", "DamageTrackerLib" };
+
         private static Type FindDamageTrackerServiceType() {
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies()) {
                 try {
-                    if (asm.GetName().Name?.Equals("DamageTrackerLib", StringComparison.OrdinalIgnoreCase) != true) continue;
-                    Type t = asm.GetType("DamageTrackerLib.DamageTrackerService");
+                    string name = asm.GetName().Name;
+                    if (name == null || !DtfAssemblyNames.Any(n => name.Equals(n, StringComparison.OrdinalIgnoreCase))) continue;
+                    Type t = asm.GetType("DamageTrackerLib.DamageTrackerService") ?? asm.GetType("DamageTrackingFramework.DamageTrackerService");
                     if (t != null) return t;
                 } catch { }
             }
@@ -281,8 +284,9 @@ namespace MDTPro.Utility {
         private static Type FindPedDamageInfoType() {
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies()) {
                 try {
-                    if (asm.GetName().Name?.Equals("DamageTrackerLib", StringComparison.OrdinalIgnoreCase) != true) continue;
-                    Type t = asm.GetType("DamageTrackerLib.DamageInfo.PedDamageInfo");
+                    string name = asm.GetName().Name;
+                    if (name == null || !DtfAssemblyNames.Any(n => name.Equals(n, StringComparison.OrdinalIgnoreCase))) continue;
+                    Type t = asm.GetType("DamageTrackerLib.DamageInfo.PedDamageInfo") ?? asm.GetType("DamageTrackingFramework.DamageInfo.PedDamageInfo");
                     if (t != null) return t;
                 } catch { }
             }

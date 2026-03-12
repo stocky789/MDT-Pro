@@ -729,3 +729,72 @@ body {
 .injurySection .injuryGameDataNote:not(:empty) {
   margin-left: 0;
 }
+
+/* Arrest: attached reports evidence help – so it’s clear only attached reports count */
+.arrestAttachedReportsSection {
+  margin-top: 20px;
+}
+
+.arrestAttachedReportsSection .sectionTitle {
+  margin-bottom: 8px;
+}
+
+.arrestAttachedReportsSection .arrestAttachedReportsHelp {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-text-primary-half, #666);
+  margin: 0 0 16px 0;
+  max-width: 52em;
+}
+
+.arrestAttachedReportsSection .attachedReportIdsList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.arrestAttachedReportsSection .attachedReportIdRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--color-bg-secondary, rgba(0, 0, 0, 0.08));
+  border-radius: 6px;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+}
+
+.arrestAttachedReportsSection .attachedReportIdRowInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.arrestAttachedReportsSection .attachedReportIdRowId {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.arrestAttachedReportsSection .attachedReportIdRowMeta {
+  font-size: 12px;
+  color: var(--color-text-primary-half, #888);
+}
+
+.arrestAttachedReportsSection .attachReportWrap {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.arrestAttachedReportsSection .attachReportWrap input.attachReportIdInput {
+  flex: 1;
+  min-width: 0;
+}
+
+.arrestAttachedReportsSection .closeArrestButton {
+  margin-top: 8px;
+}
