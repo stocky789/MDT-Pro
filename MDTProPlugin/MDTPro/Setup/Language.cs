@@ -337,7 +337,8 @@ namespace MDTPro.Setup {
             public string[] statusMap = {
                 "Closed",
                 "Open",
-                "Canceled"
+                "Canceled",
+                "Pending"
             };
             public Static @static = new Static();
             public Notifications notifications = new Notifications();
@@ -388,12 +389,18 @@ namespace MDTPro.Setup {
                 public string saveSuccess = "Report saved.";
                 public string saveError = "Failed to save report.";
                 public string invalidTimeStamp = "Invalid date or time.";
+                /// <summary>Title for the caution dialog shown after saving an arrest report.</summary>
+                public string arrestSaveCautionTitle = "Reminder";
+                /// <summary>Caution text reminding the player to attach relevant reports to the arrest for court evidence.</summary>
+                public string arrestSaveCautionMessage = "Remember to attach relevant reports (e.g. incident, injury) to this arrest report. The arrest report alone may not be enough evidence to secure a conviction in court—this depends on the case.";
                 public string invalidTime = "Invalid time.";
                 public string invalidDate = "Invalid date.";
                 public string noCharges = "Add at least one charge.";
                 public string noOffender = "Offender name required.";
                 public string prefilledFromPersonSearch = "Prefilled from Person Search";
                 public string prefilledFromVehicleSearch = "Prefilled from Vehicle Search";
+                public string closeArrestSuccess = "Arrest closed and submitted for court.";
+                public string closeArrestError = "Failed to close arrest.";
             }
 
             public class Sections {
@@ -459,6 +466,16 @@ namespace MDTPro.Setup {
                 public class Arrest {
                     public string title = "Arrest Charges";
                     public string searchChargesPlaceholder = "Search charges";
+                    public string evidenceSeized = "Evidence seized";
+                    public string documentedDrugs = "Drugs found / documented";
+                    public string documentedFirearms = "Firearm(s) found / documented";
+                    public string attachedReports = "Attached reports (evidence for court)";
+                    /// <summary>Explains that attached reports count as evidence; relevant ones carry full weight, others still count but less.</summary>
+                    public string attachedReportsHelp = "Reports you attach here are used as evidence when this arrest goes to court. Reports that directly support the case (Incident/Citation naming this defendant, Injury documenting harm, Traffic Incident with defendant as driver or vehicle-related charges, Impound for vehicle-related charges) carry full weight. Other attached reports (e.g. impound on a drug case, incident that doesn't name the defendant) still count but carry less weight—so tangential evidence like a stolen firearm in a drug case is not ignored.";
+                    public string attachReport = "Attach report";
+                    public string attachReportIdPlaceholder = "Report ID (e.g. INC-25-0001, INJ-25-0001)";
+                    public string detach = "Detach";
+                    public string closeArrestSubmit = "Close arrest (submit for court)";
                 }
 
                 public UseOfForce useOfForce = new UseOfForce();
@@ -664,6 +681,17 @@ namespace MDTPro.Setup {
             public string outcomeReasoning = "Verdict & Outcome Reasoning";
             public string sentenceReasoning = "Sentencing Rationale";
             public string licenseRevocations = "License Revocations Ordered";
+            public string attachedReports = "Attached reports (evidence)";
+            /// <summary>Explains that relevant reports carry full weight, others still count but less.</summary>
+            public string attachedReportsHelp = "Attached reports count as evidence. Those that directly support the case (defendant named, or report type matches charges) carry full weight; other attached reports still count but carry less weight, so tangential evidence is not ignored.";
+            public string attachReportToCase = "Attach report to case";
+            public string attachReportIdPlaceholder = "Report ID";
+            public string detach = "Detach";
+            public string chargeOutcomeConvicted = "Convicted";
+            public string chargeOutcomeAcquitted = "Acquitted";
+            public string chargeOutcomePending = "Pending";
+            public string chargeOutcomeDismissed = "Dismissed";
+            public string chargeOutcome = "Outcome";
             public Static @static = new Static();
 
             public class Static {

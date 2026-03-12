@@ -64,6 +64,8 @@ namespace MDTPro.Data {
         public string SentenceReasoning;
         /// <summary>License revocations ordered by the court upon conviction (e.g. "Driver's License Revoked", "Firearms Permit Revoked (10 years)"). Based on California law.</summary>
         public List<string> LicenseRevocations = new List<string>();
+        /// <summary>Report IDs attached to this case (evidence). Editable until court date; then frozen.</summary>
+        public List<string> AttachedReportIds = new List<string>();
         public List<Charge> Charges = new List<Charge>();
 
         public class Charge {
@@ -86,6 +88,12 @@ namespace MDTPro.Data {
             public int Fine;
             public int? Time;
             public bool? IsArrestable;
+            /// <summary>0 Pending, 1 Convicted, 2 Acquitted, 3 Dismissed. Set at resolution.</summary>
+            public int Outcome;
+            /// <summary>Per-charge conviction chance at resolution (for display/log).</summary>
+            public int? ConvictionChance;
+            /// <summary>Actual sentence days applied (after range roll and multiplier) when convicted.</summary>
+            public int? SentenceDaysServed;
         }
 
         public void AddCharge(Charge charge) {

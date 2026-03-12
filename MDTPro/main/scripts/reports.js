@@ -241,9 +241,14 @@ async function onListPageTypeSelectorButtonClick(type) {
   canceledButton.innerHTML = language.reports.statusMap[2]
   canceledButton.dataset.status = 2
 
+  const pendingButton = document.createElement('button')
+  pendingButton.innerHTML = language.reports.statusMap[3] || 'Pending'
+  pendingButton.dataset.status = 3
+
   statusButtonWrapper.appendChild(closedButton)
   statusButtonWrapper.appendChild(openButton)
   statusButtonWrapper.appendChild(canceledButton)
+  statusButtonWrapper.appendChild(pendingButton)
 
   for (const button of statusButtonWrapper.querySelectorAll('button')) {
     button.addEventListener('click', async function () {
@@ -647,6 +652,7 @@ async function renderReportInformation(report, type, isList) {
     reportId: report.Id,
     status: report.Status,
     timeStamp: timeStamp,
+    ...(type === 'arrest' && report.CourtCaseNumber ? { courtCaseNumber: report.CourtCaseNumber } : {})
   }
 
   const officerInformation = report.OfficerInformation
@@ -654,7 +660,7 @@ async function renderReportInformation(report, type, isList) {
   const location = report.Location
 
   reportInformationEl.appendChild(
-    await getGeneralInformationSection(generalInformation, isList)
+    await getGeneralInformationSection(generalInformation, isList, type)
   )
   reportInformationEl.appendChild(
     await getOfficerInformationSection(officerInformation, isList)
@@ -708,9 +714,21 @@ async function renderReportInformation(report, type, isList) {
       }
       if (type === 'arrest' && report.CourtCaseNumber)
         reportInformationEl.dataset.courtCaseNumber = report.CourtCaseNumber
+      if (type === 'arrest')
+        reportInformationEl.dataset.attachedReportIds = JSON.stringify(report.AttachedReportIds || [])
       if (type === 'arrest' && (!isList || (report.UseOfForce && report.UseOfForce.Type))) {
         reportInformationEl.appendChild(
           await getUseOfForceSection(report.UseOfForce || {}, isList)
+        )
+      }
+      if (type === 'arrest') {
+        reportInformationEl.appendChild(
+          await getEvidenceSeizedSection(report, isList)
+        )
+      }
+      if (type === 'arrest' && !isList) {
+        reportInformationEl.appendChild(
+          await getArrestAttachedReportsSection(report)
         )
       }
       break
@@ -765,6 +783,213 @@ async function renderReportInformation(report, type, isList) {
   }
 
   reportInformationEl.appendChild(await getNotesSection(report.Notes, isList))
+}
+
+/**
+ * Arrest report: Evidence seized (drugs / firearms documented). Used for court evidence when in-game/PR did not capture.
+ * @param {object} report - Arrest report with DocumentedDrugs, DocumentedFirearms
+ * @param {boolean} isList - If true, show read-only
+ * @returns {Promise<HTMLElement>}
+ */
+async function getEvidenceSeizedSection(report, isList) {
+  const language = await getLanguage()
+  const labels = language.reports?.sections?.arrest || {}
+  const section = document.createElement('div')
+  section.className = 'section evidenceSeizedSection'
+  section.dataset.title = labels.evidenceSeized || 'Evidence seized'
+  const title = document.createElement('div')
+  title.className = 'sectionTitle'
+  title.textContent = section.dataset.title
+  section.appendChild(title)
+  const wrapper = document.createElement('div')
+  wrapper.className = 'inputWrapper grid'
+  const drugsLabel = document.createElement('label')
+  drugsLabel.htmlFor = 'evidenceSeizedDrugs'
+  drugsLabel.textContent = labels.documentedDrugs || 'Drugs found / documented'
+  const drugsCheck = document.createElement('input')
+  drugsCheck.type = 'checkbox'
+  drugsCheck.id = 'evidenceSeizedDrugs'
+  drugsCheck.checked = !!report.DocumentedDrugs
+  drugsCheck.disabled = isList
+  drugsLabel.appendChild(drugsCheck)
+  wrapper.appendChild(drugsLabel)
+  const firearmsLabel = document.createElement('label')
+  firearmsLabel.htmlFor = 'evidenceSeizedFirearms'
+  firearmsLabel.textContent = labels.documentedFirearms || 'Firearm(s) found / documented'
+  const firearmsCheck = document.createElement('input')
+  firearmsCheck.type = 'checkbox'
+  firearmsCheck.id = 'evidenceSeizedFirearms'
+  firearmsCheck.checked = !!report.DocumentedFirearms
+  firearmsCheck.disabled = isList
+  firearmsLabel.appendChild(firearmsCheck)
+  wrapper.appendChild(firearmsLabel)
+  section.appendChild(wrapper)
+  return section
+}
+
+/**
+ * Section shown when editing an arrest report with Status Pending: attached report IDs,
+ * attach/detach controls, and "Close arrest (submit for court)" button.
+ * @param {object} report - Arrest report with Id, Status, AttachedReportIds
+ * @returns {Promise<HTMLElement>}
+ */
+async function getArrestAttachedReportsSection(report) {
+  const language = await getLanguage()
+  const section = document.createElement('div')
+  section.className = 'arrestAttachedReportsSection'
+  section.dataset.title = language.reports?.sections?.arrest?.attachedReports ?? 'Attached reports (evidence for court)'
+
+  const status = parseInt(report.Status, 10)
+  // Open (1) and Pending (3) both mean "not yet closed for court" — allow attaching reports for either
+  const canAttach = status === 1 || status === 3
+  const hasId = report.Id != null && report.Id !== ''
+
+  if (!hasId || !canAttach) {
+    section.classList.add('hidden')
+    return section
+  }
+
+  const title = document.createElement('div')
+  title.className = 'sectionTitle'
+  title.textContent = section.dataset.title
+  section.appendChild(title)
+
+  const help = document.createElement('p')
+  help.className = 'arrestAttachedReportsHelp'
+  help.textContent = language.reports?.sections?.arrest?.attachedReportsHelp ?? 'Reports you attach are used as evidence. Those that directly support the case carry full weight; other attached reports still count but carry less weight (e.g. impound on a drug case, or a stolen firearm report—not ignored, just weighted less).'
+  section.appendChild(help)
+
+  const listWrap = document.createElement('div')
+  listWrap.className = 'attachedReportIdsList'
+  const attachedIds = report.AttachedReportIds || []
+
+  // Fetch brief info for each attached report so we can show type, date, subtitle
+  let summaries = []
+  if (attachedIds.length > 0) {
+    try {
+      const res = await fetch('/data/reportSummaries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(attachedIds)
+      })
+      if (res.ok) summaries = await res.json()
+    } catch (_) {}
+  }
+
+  attachedIds.forEach((reportId) => {
+    const sum = summaries.find((s) => s.id === reportId)
+    const typeLabel = sum?.typeLabel ?? '—'
+    const date = sum?.date ? new Date(sum.date + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : ''
+    const subtitle = sum?.subtitle ? String(sum.subtitle).trim() : ''
+
+    const row = document.createElement('div')
+    row.className = 'attachedReportIdRow'
+    const info = document.createElement('div')
+    info.className = 'attachedReportIdRowInfo'
+    const idBlock = document.createElement('span')
+    idBlock.className = 'attachedReportIdRowId'
+    idBlock.textContent = reportId
+    info.appendChild(idBlock)
+    const meta = document.createElement('span')
+    meta.className = 'attachedReportIdRowMeta'
+    meta.textContent = [typeLabel, date, subtitle].filter(Boolean).join(' · ')
+    info.appendChild(meta)
+    row.appendChild(info)
+    const detachBtn = document.createElement('button')
+    detachBtn.type = 'button'
+    detachBtn.className = 'detachReportButton'
+    detachBtn.textContent = language.reports?.sections?.arrest?.detach ?? 'Detach'
+    detachBtn.addEventListener('click', async function () {
+      if (detachBtn.classList.contains('loading')) return
+      detachBtn.classList.add('loading')
+      const res = await (
+        await fetch('/post/detachReportFromArrest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ arrestReportId: report.Id, reportId })
+        })
+      ).text()
+      detachBtn.classList.remove('loading')
+      if (res === 'OK') {
+        const list = await (await fetch('/data/arrestReports')).json()
+        const updated = list.find((r) => r.Id === report.Id)
+        if (updated) await renderReportInformation(updated, 'arrest', false)
+      } else {
+        let msg = language.reports?.notifications?.saveError ?? 'Error'
+        try {
+          const err = JSON.parse(res)
+          if (err && err.error) msg = err.error
+        } catch (_) {}
+        topWindow.showNotification(msg, 'error')
+      }
+    })
+    row.appendChild(detachBtn)
+    listWrap.appendChild(row)
+  })
+  section.appendChild(listWrap)
+
+  const attachWrap = document.createElement('div')
+  attachWrap.className = 'attachReportWrap'
+  const attachInput = document.createElement('input')
+  attachInput.type = 'text'
+  attachInput.placeholder = language.reports?.sections?.arrest?.attachReportIdPlaceholder ?? 'Report ID (e.g. INC-25-0001)'
+  attachInput.className = 'attachReportIdInput'
+  const attachBtn = document.createElement('button')
+  attachBtn.type = 'button'
+  attachBtn.className = 'attachReportButton'
+  attachBtn.textContent = language.reports?.sections?.arrest?.attachReport ?? 'Attach report'
+  attachBtn.addEventListener('click', async function () {
+    const reportId = (attachInput.value || '').trim()
+    if (!reportId) return
+    if (attachBtn.classList.contains('loading')) return
+    attachBtn.classList.add('loading')
+    const res = await (
+      await fetch('/post/attachReportToArrest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ arrestReportId: report.Id, reportId })
+      })
+    ).text()
+    attachBtn.classList.remove('loading')
+    if (res === 'OK') {
+      attachInput.value = ''
+      const list = await (await fetch('/data/arrestReports')).json()
+      const updated = list.find((r) => r.Id === report.Id)
+      if (updated) await renderReportInformation(updated, 'arrest', false)
+    } else {
+      let msg = language.reports?.notifications?.saveError ?? 'Error'
+      try {
+        const err = JSON.parse(res)
+        if (err && err.error) msg = err.error
+      } catch (_) {}
+      topWindow.showNotification(msg, 'error')
+    }
+  })
+  attachWrap.appendChild(attachInput)
+  attachWrap.appendChild(attachBtn)
+  section.appendChild(attachWrap)
+
+  const closeArrestBtn = document.createElement('button')
+  closeArrestBtn.type = 'button'
+  closeArrestBtn.className = 'closeArrestButton'
+  closeArrestBtn.textContent = language.reports?.sections?.arrest?.closeArrestSubmit ?? 'Close arrest (submit for court)'
+  closeArrestBtn.addEventListener('click', async function () {
+    if (closeArrestBtn.classList.contains('loading')) return
+    const statusBtn = document.querySelector('.createPage .statusInput button[data-status="0"]')
+    if (!statusBtn) return
+    document.querySelectorAll('.createPage .statusInput button').forEach((b) => b.classList.remove('selected'))
+    statusBtn.classList.add('selected')
+    closeArrestBtn.classList.add('loading')
+    await saveReport('arrest', { skipArrestCaution: true })
+    closeArrestBtn.classList.remove('loading')
+    topWindow.showNotification(
+      language.reports?.notifications?.closeArrestSuccess ?? 'Arrest closed and submitted for court.',
+      'success'
+    )
+  })
+  section.appendChild(closeArrestBtn)
+
+  return section
 }
 
 document
@@ -829,7 +1054,7 @@ async function onCreatePageTypeSelectorButtonClick(type) {
 
   const fakeReport = {
     Id: reportId,
-    Status: type == 'citation' || type == 'arrest' ? 0 : 1,
+    Status: type === 'arrest' ? 3 : (type === 'citation' ? 0 : 1),
     TimeStamp: config.useInGameTime ? inGameDate : new Date(),
     OfficerInformation: officerInformation,
     Location: location,
@@ -932,7 +1157,7 @@ async function generateReportId(type) {
   return id
 }
 
-async function saveReport(type) {
+async function saveReport(type, options = {}) {
   const language = await getLanguage()
 
   const el = document.querySelector('.createPage .reportInformation')
@@ -1096,6 +1321,11 @@ async function saveReport(type) {
       }
 
       report.CourtCaseNumber = el.dataset.courtCaseNumber ?? null
+      try {
+        report.AttachedReportIds = JSON.parse(el.dataset.attachedReportIds || '[]')
+      } catch {
+        report.AttachedReportIds = []
+      }
 
       const uofType = el.querySelector('#useOfForceTypeSelect')?.value?.trim()
       if (uofType) {
@@ -1108,6 +1338,8 @@ async function saveReport(type) {
           Witnesses: el.querySelector('#useOfForceWitnessesInput')?.value?.trim() || null
         }
       }
+      report.DocumentedDrugs = el.querySelector('#evidenceSeizedDrugs')?.checked === true
+      report.DocumentedFirearms = el.querySelector('#evidenceSeizedFirearms')?.checked === true
 
       response = await (
         await fetch('/post/createArrestReport', {
@@ -1183,16 +1415,23 @@ async function saveReport(type) {
   }
 
   if (response != 'OK') {
-    topWindow.showNotification(
-      language.reports.notifications.saveError,
-      'error'
-    )
+    let msg = language.reports.notifications.saveError
+    try {
+      const err = JSON.parse(response)
+      if (err && err.error) msg = err.error
+    } catch (_) {}
+    topWindow.showNotification(msg, 'error')
     return
   }
   topWindow.showNotification(
     language.reports.notifications.saveSuccess,
     'success'
   )
+
+  if (type === 'arrest' && !options.skipArrestCaution) {
+    await showArrestSaveCautionDialog(language)
+  }
+
   clearDraft()
 
   document.querySelector('.createPage').classList.add('hidden')
@@ -1201,6 +1440,55 @@ async function saveReport(type) {
   reportIsOnCreatePageBool = false
 
   await onListPageTypeSelectorButtonClick(type)
+}
+
+/**
+ * Shows a caution/warning dialog after saving an arrest report, reminding the player
+ * to attach relevant reports for court evidence. Returns a Promise that resolves when the user dismisses the dialog.
+ */
+function showArrestSaveCautionDialog(language) {
+  return new Promise((resolve) => {
+    const doc = document
+    const overlay = doc.createElement('div')
+    overlay.className = 'arrestCautionOverlay'
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;'
+
+    const box = doc.createElement('div')
+    box.className = 'arrestCautionBox'
+    box.style.cssText = 'background:var(--color-background, #1a1a2e);border:2px solid var(--color-warning, #e6a800);border-radius:8px;padding:1.25rem;max-width:360px;box-shadow:0 4px 20px rgba(0,0,0,0.4);'
+
+    const title = doc.createElement('div')
+    title.className = 'arrestCautionTitle'
+    title.style.cssText = 'font-weight:bold;color:var(--color-warning, #e6a800);margin-bottom:0.75rem;font-size:1.1rem;'
+    title.textContent = language.reports?.notifications?.arrestSaveCautionTitle || 'Reminder'
+
+    const message = doc.createElement('div')
+    message.className = 'arrestCautionMessage'
+    message.style.cssText = 'color:var(--color-text, #e0e0e0);line-height:1.45;margin-bottom:1rem;'
+    message.textContent = language.reports?.notifications?.arrestSaveCautionMessage ||
+      'Remember to attach relevant reports (e.g. incident, injury) to this arrest report. The arrest report alone may not be enough evidence to secure a conviction in court—this depends on the case.'
+
+    const okBtn = doc.createElement('button')
+    okBtn.className = 'arrestCautionOk'
+    okBtn.textContent = 'OK'
+    okBtn.style.cssText = 'background:var(--color-warning, #e6a800);color:#1a1a2e;border:none;padding:0.5rem 1.25rem;border-radius:4px;cursor:pointer;font-weight:bold;'
+    okBtn.addEventListener('click', () => {
+      overlay.remove()
+      resolve()
+    })
+
+    box.appendChild(title)
+    box.appendChild(message)
+    box.appendChild(okBtn)
+    overlay.appendChild(box)
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.remove()
+        resolve()
+      }
+    })
+    doc.body.appendChild(overlay)
+  })
 }
 
 function isValidDate(date) {

@@ -16,7 +16,7 @@ namespace MDTPro.Data {
         private static SQLiteConnection connection;
         private static readonly object dbLock = new object();
 
-        private const int CurrentSchemaVersion = 23;
+        private const int CurrentSchemaVersion = 25;
 
         internal static void Initialize() {
             lock (dbLock) {
@@ -463,6 +463,16 @@ namespace MDTPro.Data {
             }
         }
 
+        private static List<string> ParseAttachedReportIds(string json) {
+            if (string.IsNullOrWhiteSpace(json)) return new List<string>();
+            try {
+                var list = Newtonsoft.Json.JsonConvert.DeserializeObject<List<string>>(json);
+                return list ?? new List<string>();
+            } catch {
+                return new List<string>();
+            }
+        }
+
         private static int GetSchemaVersion() {
             using (var cmd = new SQLiteCommand("SELECT version FROM schema_version LIMIT 1", connection)) {
                 object result = cmd.ExecuteScalar();
@@ -832,6 +842,23 @@ namespace MDTPro.Data {
                     Helper.Log("Database migrated to schema version 23 (peds IsDeceased/DeceasedAt, damage_cache)");
                 } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true || ex.Message?.Contains("already exists") == true) { }
             }
+            if (fromVersion < 24) {
+                try {
+                    using (var cmd = new SQLiteCommand("ALTER TABLE court_charges ADD COLUMN Outcome INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); }
+                    using (var cmd = new SQLiteCommand("ALTER TABLE court_charges ADD COLUMN ConvictionChance INTEGER", connection)) { cmd.ExecuteNonQuery(); }
+                    using (var cmd = new SQLiteCommand("ALTER TABLE court_charges ADD COLUMN SentenceDaysServed INTEGER", connection)) { cmd.ExecuteNonQuery(); }
+                    using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN AttachedReportIds TEXT", connection)) { cmd.ExecuteNonQuery(); }
+                    using (var cmd = new SQLiteCommand("ALTER TABLE arrest_reports ADD COLUMN AttachedReportIds TEXT", connection)) { cmd.ExecuteNonQuery(); }
+                    Helper.Log("Database migrated to schema version 24 (per-charge Outcome, court/arrest AttachedReportIds)");
+                } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            }
+            if (fromVersion < 25) {
+                try {
+                    using (var cmd = new SQLiteCommand("ALTER TABLE arrest_reports ADD COLUMN DocumentedDrugs INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); }
+                    using (var cmd = new SQLiteCommand("ALTER TABLE arrest_reports ADD COLUMN DocumentedFirearms INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); }
+                    Helper.Log("Database migrated to schema version 25 (arrest Evidence seized: DocumentedDrugs, DocumentedFirearms)");
+                } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            }
 
             SetSchemaVersion(CurrentSchemaVersion);
         }
@@ -1050,7 +1077,8 @@ namespace MDTPro.Data {
                                 OutcomeNotes = reader["OutcomeNotes"] as string,
                                 OutcomeReasoning = reader["OutcomeReasoning"] as string,
                                 SentenceReasoning = ReaderOptionalString(reader, "SentenceReasoning"),
-                                LicenseRevocations = ParseLicenseRevocations(reader["LicenseRevocations"] as string)
+                                LicenseRevocations = ParseLicenseRevocations(reader["LicenseRevocations"] as string),
+                                AttachedReportIds = ParseAttachedReportIds(ReaderOptionalString(reader, "AttachedReportIds"))
                             };
 
                             courtCase.Charges = LoadCourtCharges(courtCase.Number);
@@ -1075,13 +1103,30 @@ namespace MDTPro.Data {
                             Name = reader["Name"] as string,
                             Fine = Convert.ToInt32(reader["Fine"]),
                             Time = reader["Time"] is DBNull ? (int?)null : Convert.ToInt32(reader["Time"]),
-                            IsArrestable = reader["IsArrestable"] is DBNull ? (bool?)null : Convert.ToBoolean(reader["IsArrestable"])
+                            IsArrestable = reader["IsArrestable"] is DBNull ? (bool?)null : Convert.ToBoolean(reader["IsArrestable"]),
+                            Outcome = ReaderOptionalInt(reader, "Outcome", 0),
+                            ConvictionChance = ReaderOptionalIntNull(reader, "ConvictionChance"),
+                            SentenceDaysServed = ReaderOptionalIntNull(reader, "SentenceDaysServed")
                         });
                     }
                 }
             }
 
             return charges;
+        }
+
+        private static int ReaderOptionalInt(SQLiteDataReader reader, string columnName, int defaultValue) {
+            try {
+                int ordinal = reader.GetOrdinal(columnName);
+                return reader.IsDBNull(ordinal) ? defaultValue : Convert.ToInt32(reader[ordinal]);
+            } catch { return defaultValue; }
+        }
+
+        private static int? ReaderOptionalIntNull(SQLiteDataReader reader, string columnName) {
+            try {
+                int ordinal = reader.GetOrdinal(columnName);
+                return reader.IsDBNull(ordinal) ? (int?)null : Convert.ToInt32(reader[ordinal]);
+            } catch { return null; }
         }
 
         internal static OfficerInformationData LoadOfficerInformation() {
@@ -1270,7 +1315,8 @@ namespace MDTPro.Data {
                                 Notes = reader["Notes"] as string,
                                 OffenderPedName = reader["OffenderPedName"] as string,
                                 OffenderVehicleLicensePlate = reader["OffenderVehicleLicensePlate"] as string,
-                                CourtCaseNumber = reader["CourtCaseNumber"] as string
+                                CourtCaseNumber = reader["CourtCaseNumber"] as string,
+                                AttachedReportIds = ParseAttachedReportIds(ReaderOptionalString(reader, "AttachedReportIds"))
                             };
                             try {
                                 string uofType = reader["UseOfForceType"] as string;
@@ -1285,6 +1331,10 @@ namespace MDTPro.Data {
                                     };
                                 }
                             } catch { /* columns may not exist on older schema */ }
+                            try {
+                                report.DocumentedDrugs = GetBooleanFromReader(reader, "DocumentedDrugs");
+                                report.DocumentedFirearms = GetBooleanFromReader(reader, "DocumentedFirearms");
+                            } catch { /* schema < 25 */ }
 
                             report.Charges = LoadArrestReportCharges(report.Id);
                             reports.Add(report);
@@ -1757,7 +1807,7 @@ namespace MDTPro.Data {
                     SentenceMultiplier, ProsecutionStrength, DefenseStrength, DocketPressure, PolicyAdjustment,
                     CourtDistrict, CourtName, CourtType, HasPublicDefender, Plea,
                     JudgeName, ProsecutorName, DefenseAttorneyName,
-                    HearingDateUtc, CreatedAtUtc, LastUpdatedUtc, OutcomeNotes, OutcomeReasoning, SentenceReasoning, LicenseRevocations
+                    HearingDateUtc, CreatedAtUtc, LastUpdatedUtc, OutcomeNotes, OutcomeReasoning, SentenceReasoning, LicenseRevocations, AttachedReportIds
                 ) VALUES (
                     @Number, @PedName, @ReportId, @ShortYear, @Status,
                     @IsJuryTrial, @JurySize, @JuryVotesForConviction, @JuryVotesForAcquittal,
@@ -1769,7 +1819,7 @@ namespace MDTPro.Data {
                     @SentenceMultiplier, @ProsecutionStrength, @DefenseStrength, @DocketPressure, @PolicyAdjustment,
                     @CourtDistrict, @CourtName, @CourtType, @HasPublicDefender, @Plea,
                     @JudgeName, @ProsecutorName, @DefenseAttorneyName,
-                    @HearingDateUtc, @CreatedAtUtc, @LastUpdatedUtc, @OutcomeNotes, @OutcomeReasoning, @SentenceReasoning, @LicenseRevocations
+                    @HearingDateUtc, @CreatedAtUtc, @LastUpdatedUtc, @OutcomeNotes, @OutcomeReasoning, @SentenceReasoning, @LicenseRevocations, @AttachedReportIds
                 )",
                 connection, transaction)) {
                 cmd.Parameters.AddWithValue("@Number", (object)courtCase.Number ?? DBNull.Value);
@@ -1823,6 +1873,9 @@ namespace MDTPro.Data {
                 string revocationsJson = courtCase.LicenseRevocations != null && courtCase.LicenseRevocations.Count > 0
                     ? Newtonsoft.Json.JsonConvert.SerializeObject(courtCase.LicenseRevocations) : null;
                 cmd.Parameters.AddWithValue("@LicenseRevocations", (object)revocationsJson ?? DBNull.Value);
+                string attachedJson = courtCase.AttachedReportIds != null && courtCase.AttachedReportIds.Count > 0
+                    ? Newtonsoft.Json.JsonConvert.SerializeObject(courtCase.AttachedReportIds) : null;
+                cmd.Parameters.AddWithValue("@AttachedReportIds", (object)attachedJson ?? DBNull.Value);
                 cmd.ExecuteNonQuery();
             }
 
@@ -1834,14 +1887,17 @@ namespace MDTPro.Data {
             if (courtCase.Charges != null) {
                 foreach (var charge in courtCase.Charges) {
                     using (var cmd = new SQLiteCommand(@"
-                        INSERT INTO court_charges (CaseNumber, Name, Fine, Time, IsArrestable)
-                        VALUES (@CaseNumber, @Name, @Fine, @Time, @IsArrestable)",
+                        INSERT INTO court_charges (CaseNumber, Name, Fine, Time, IsArrestable, Outcome, ConvictionChance, SentenceDaysServed)
+                        VALUES (@CaseNumber, @Name, @Fine, @Time, @IsArrestable, @Outcome, @ConvictionChance, @SentenceDaysServed)",
                         connection, transaction)) {
                         cmd.Parameters.AddWithValue("@CaseNumber", courtCase.Number);
                         cmd.Parameters.AddWithValue("@Name", (object)charge.Name ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@Fine", charge.Fine);
                         cmd.Parameters.AddWithValue("@Time", charge.Time.HasValue ? (object)charge.Time.Value : DBNull.Value);
                         cmd.Parameters.AddWithValue("@IsArrestable", charge.IsArrestable.HasValue ? (object)(charge.IsArrestable.Value ? 1 : 0) : DBNull.Value);
+                        cmd.Parameters.AddWithValue("@Outcome", charge.Outcome);
+                        cmd.Parameters.AddWithValue("@ConvictionChance", charge.ConvictionChance.HasValue ? (object)charge.ConvictionChance.Value : DBNull.Value);
+                        cmd.Parameters.AddWithValue("@SentenceDaysServed", charge.SentenceDaysServed.HasValue ? (object)charge.SentenceDaysServed.Value : DBNull.Value);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -2057,7 +2113,8 @@ namespace MDTPro.Data {
                             TimeStamp, Status, Notes, OffenderPedName,
                             OffenderVehicleLicensePlate, CourtCaseNumber,
                             UseOfForceType, UseOfForceTypeOther, UseOfForceJustification,
-                            UseOfForceInjurySuspect, UseOfForceInjuryOfficer, UseOfForceWitnesses
+                            UseOfForceInjurySuspect, UseOfForceInjuryOfficer, UseOfForceWitnesses,
+                            DocumentedDrugs, DocumentedFirearms, AttachedReportIds
                         ) VALUES (
                             @Id, @ShortYear, @OfficerFirstName, @OfficerLastName, @OfficerRank,
                             @OfficerCallSign, @OfficerAgency, @OfficerBadgeNumber,
@@ -2065,12 +2122,16 @@ namespace MDTPro.Data {
                             @TimeStamp, @Status, @Notes, @OffenderPedName,
                             @OffenderVehicleLicensePlate, @CourtCaseNumber,
                             @UseOfForceType, @UseOfForceTypeOther, @UseOfForceJustification,
-                            @UseOfForceInjurySuspect, @UseOfForceInjuryOfficer, @UseOfForceWitnesses
+                            @UseOfForceInjurySuspect, @UseOfForceInjuryOfficer, @UseOfForceWitnesses,
+                            @DocumentedDrugs, @DocumentedFirearms, @AttachedReportIds
                         )", connection, transaction)) {
                         AddReportBaseParams(cmd, report);
                         cmd.Parameters.AddWithValue("@OffenderPedName", (object)report.OffenderPedName ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@OffenderVehicleLicensePlate", (object)report.OffenderVehicleLicensePlate ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@CourtCaseNumber", (object)report.CourtCaseNumber ?? DBNull.Value);
+                        string arrestAttachedJson = report.AttachedReportIds != null && report.AttachedReportIds.Count > 0
+                            ? Newtonsoft.Json.JsonConvert.SerializeObject(report.AttachedReportIds) : null;
+                        cmd.Parameters.AddWithValue("@AttachedReportIds", (object)arrestAttachedJson ?? DBNull.Value);
                         var uof = report.UseOfForce;
                         cmd.Parameters.AddWithValue("@UseOfForceType", (object)uof?.Type ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@UseOfForceTypeOther", (object)uof?.TypeOther ?? DBNull.Value);
@@ -2078,6 +2139,8 @@ namespace MDTPro.Data {
                         cmd.Parameters.AddWithValue("@UseOfForceInjurySuspect", uof?.InjuryToSuspect == true ? 1 : 0);
                         cmd.Parameters.AddWithValue("@UseOfForceInjuryOfficer", uof?.InjuryToOfficer == true ? 1 : 0);
                         cmd.Parameters.AddWithValue("@UseOfForceWitnesses", (object)uof?.Witnesses ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@DocumentedDrugs", report.DocumentedDrugs ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@DocumentedFirearms", report.DocumentedFirearms ? 1 : 0);
                         cmd.ExecuteNonQuery();
                     }
 

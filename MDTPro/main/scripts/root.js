@@ -405,6 +405,7 @@ const statusColorMap = {
   0: 'success',
   1: 'info',
   2: 'error',
+  3: 'warning', // Pending (arrest)
 }
 
 function getActivePlugins() {

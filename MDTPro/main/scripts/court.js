@@ -155,20 +155,37 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   const chargesInputWrapper = document.createElement('div')
   chargesInputWrapper.classList.add('inputWrapper', 'grid')
 
+  const isResolved = courtCase.Status !== 0
   let totalFine = 0
   let totalTime = 0
   let lifeSentences = 0
   for (const charge of courtCase.Charges || []) {
-    totalFine += charge.Fine || 0
-    totalTime += charge.Time || 0
-    if (charge.Time === null) lifeSentences++
+    // Outcome 1 = Convicted; legacy data (Outcome 0) on resolved cases: treat as convicted when case Status === 1
+    const convicted = isResolved && (charge.Outcome === 1 || (charge.Outcome === 0 && courtCase.Status === 1))
+    if (!isResolved || convicted) {
+      totalFine += charge.Fine || 0
+      totalTime += charge.Time || 0
+      if (charge.Time === null) lifeSentences++
+    }
 
     const chargeWrapper = document.createElement('div')
     const chargeLabel = document.createElement('label')
     chargeLabel.innerHTML = charge.Name
     chargeWrapper.appendChild(chargeLabel)
+    let detailValue = await getChargeDetailsString(charge.Fine || 0, charge.Time)
+    if (isResolved) {
+      const outcomeMap = {
+        1: language.court.chargeOutcomeConvicted || 'Convicted',
+        2: language.court.chargeOutcomeAcquitted || 'Acquitted',
+        3: language.court.chargeOutcomeDismissed || 'Dismissed'
+      }
+      // Legacy charges have Outcome 0; use case Status (1=Convicted, 2=Acquitted, 3=Dismissed) for display
+      const displayOutcome = (charge.Outcome === 0 || charge.Outcome === undefined) ? courtCase.Status : charge.Outcome
+      const outcomeLabel = outcomeMap[displayOutcome] || (language.court.chargeOutcomePending || 'Pending')
+      detailValue = `${detailValue} · ${outcomeLabel}`
+    }
     const chargeInput = document.createElement('input')
-    chargeInput.value = await getChargeDetailsString(charge.Fine || 0, charge.Time)
+    chargeInput.value = detailValue
     chargeInput.type = 'text'
     chargeInput.disabled = true
     chargeWrapper.appendChild(chargeInput)
@@ -207,6 +224,93 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   reportWrapper.appendChild(createLabel(language.court.report))
   reportWrapper.appendChild(createReadOnlyInput(courtCase.ReportId || ''))
   inputWrapper.appendChild(reportWrapper)
+
+  if (courtCase.Status === 0) {
+    const attachedSection = document.createElement('div')
+    attachedSection.classList.add('courtAttachedReportsSection')
+    attachedSection.appendChild(
+      createSectionHeader(language.court.attachedReports || 'Attached reports (evidence)')
+    )
+    const attachedHelp = document.createElement('p')
+    attachedHelp.className = 'courtAttachedReportsHelp'
+    attachedHelp.textContent = language.court.attachedReportsHelp || 'Attached reports count as evidence. Relevant ones (defendant named, or report type matches charges) carry full weight; others still count but carry less weight.'
+    attachedSection.appendChild(attachedHelp)
+    const attachedIds = courtCase.AttachedReportIds || []
+    const listWrap = document.createElement('div')
+    listWrap.classList.add('courtAttachedReportIdsList')
+    attachedIds.forEach((reportId) => {
+      const row = document.createElement('div')
+      row.classList.add('courtAttachedReportIdRow')
+      const span = document.createElement('span')
+      span.textContent = reportId
+      const detachBtn = document.createElement('button')
+      detachBtn.type = 'button'
+      detachBtn.className = 'detachCourtReportButton'
+      detachBtn.textContent = language.court.detach || 'Detach'
+      detachBtn.addEventListener('click', async function () {
+        if (detachBtn.classList.contains('loading')) return
+        detachBtn.classList.add('loading')
+        const res = await (
+          await fetch('/post/detachReportFromCourtCase', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ courtCaseNumber: courtCase.Number, reportId })
+          })
+        ).text()
+        detachBtn.classList.remove('loading')
+        if (res === 'OK') await refreshCourtList()
+        else topWindow.showNotification(language.court.saveCaseError || 'Error', 'error')
+      })
+      row.appendChild(span)
+      row.appendChild(detachBtn)
+      listWrap.appendChild(row)
+    })
+    attachedSection.appendChild(listWrap)
+    const now = new Date()
+    const resolveAt = courtCase.ResolveAtUtc ? new Date(courtCase.ResolveAtUtc) : null
+    const canAttach = !resolveAt || now < resolveAt
+    if (canAttach) {
+      const attachWrap = document.createElement('div')
+      attachWrap.classList.add('courtAttachReportWrap')
+      const attachInput = document.createElement('input')
+      attachInput.type = 'text'
+      attachInput.placeholder = language.court.attachReportIdPlaceholder || 'Report ID'
+      attachInput.className = 'courtAttachReportIdInput'
+      const attachBtn = document.createElement('button')
+      attachBtn.type = 'button'
+      attachBtn.className = 'courtAttachReportButton'
+      attachBtn.textContent = language.court.attachReportToCase || 'Attach report to case'
+      attachBtn.addEventListener('click', async function () {
+        const reportId = (attachInput.value || '').trim()
+        if (!reportId) return
+        if (attachBtn.classList.contains('loading')) return
+        attachBtn.classList.add('loading')
+        const res = await (
+          await fetch('/post/attachReportToCourtCase', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ courtCaseNumber: courtCase.Number, reportId })
+          })
+        ).text()
+        attachBtn.classList.remove('loading')
+        if (res === 'OK') {
+          attachInput.value = ''
+          await refreshCourtList()
+        } else {
+          let msg = language.court.saveCaseError || 'Error'
+          try {
+            const err = JSON.parse(res)
+            if (err && err.error) msg = err.error
+          } catch (_) {}
+          topWindow.showNotification(msg, 'error')
+        }
+      })
+      attachWrap.appendChild(attachInput)
+      attachWrap.appendChild(attachBtn)
+      attachedSection.appendChild(attachWrap)
+    }
+    inputWrapper.appendChild(attachedSection)
+  }
 
   const totalFineWrapper = document.createElement('div')
   totalFineWrapper.appendChild(createLabel(language.court.totalFine))

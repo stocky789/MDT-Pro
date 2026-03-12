@@ -8,6 +8,12 @@ namespace MDTPro.Data.Reports {
         public string OffenderVehicleLicensePlate;
         public string CourtCaseNumber;
         public UseOfForceData UseOfForce;
+        /// <summary>Officer documented that drugs were found during this arrest. Used for court evidence when in-game/PR capture did not fire.</summary>
+        public bool DocumentedDrugs;
+        /// <summary>Officer documented that firearm(s) were found during this arrest. Used for court evidence when in-game/PR capture did not fire.</summary>
+        public bool DocumentedFirearms;
+        /// <summary>Report IDs attached as evidence (incident, injury, citation). Editable only while Status == Pending.</summary>
+        public List<string> AttachedReportIds = new List<string>();
 
         public class Charge : ArrestGroup.Charge {
             public bool addedByReportInEdit = false;

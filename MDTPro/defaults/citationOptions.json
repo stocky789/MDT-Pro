@@ -486,13 +486,6 @@
         "isArrestable": true
       },
       {
-        "name": "Possession Of Defaced VIN Plate",
-        "minFine": 500,
-        "maxFine": 1000,
-        "canRevokeLicense": true,
-        "isArrestable": true
-      },
-      {
         "name": "Possession Of Stolen Property",
         "minFine": 250,
         "maxFine": 1000,

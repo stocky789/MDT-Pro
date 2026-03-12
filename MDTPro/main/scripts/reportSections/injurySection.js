@@ -58,7 +58,7 @@ async function getInjurySection (data = {}, isList = false) {
   }
 
   const injuryTypeSuggestions = ['Gunshot', 'Fall', 'Stab wound', 'Blunt trauma', 'Assault (unarmed)', 'Burns', 'Vehicle impact', 'Explosion', 'Less lethal', 'Drowning', 'Animal attack']
-  const severitySuggestions = ['Minor', 'Moderate', 'Serious', 'Critical']
+  const severitySuggestions = ['Minor', 'Moderate', 'Serious', 'Critical', 'Fatal']
   const treatmentSuggestions = ['First aid on scene', 'EMS on scene', 'Transported to hospital', 'Pronounced deceased on scene', 'DOA', 'Refused treatment']
 
   const fields = [

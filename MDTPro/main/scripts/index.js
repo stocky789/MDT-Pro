@@ -380,12 +380,14 @@ async function openWindow(name, pluginId = null) {
   ]
 
   const existingWindows = document.querySelectorAll('.overlay .windows .window')
-
+  // Stagger offset so multiple windows don't fully overlap (avoids clicks hitting wrong window)
+  const staggerPx = 36
+  const staggerIndex = Math.min(existingWindows.length, 12)
   const windowElement = document.createElement('div')
   windowElement.style.width = `${size[0]}px`
   windowElement.style.height = `${size[1]}px`
-  windowElement.style.left = `${offset[0] + existingWindows.length * 25}px`
-  windowElement.style.top = `${offset[1] + existingWindows.length * 25}px`
+  windowElement.style.left = `${offset[0] + staggerIndex * staggerPx}px`
+  windowElement.style.top = `${offset[1] + staggerIndex * staggerPx}px`
   windowElement.style.scale = '0'
   windowElement.classList.add('window')
 

@@ -36,6 +36,8 @@ namespace MDTPro.Data.Reports {
     public enum ReportStatus {
         Closed,
         Open,
-        Canceled
+        Canceled,
+        /// <summary>Arrest only: filed but not closed for court; user can attach reports.</summary>
+        Pending
     }
 }

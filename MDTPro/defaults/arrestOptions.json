@@ -993,16 +993,6 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Possession Of Defaced VIN Plate",
-        "minFine": 500,
-        "maxFine": 1000,
-        "minDays": 0,
-        "maxDays": 365,
-        "probation": 0.4,
-        "canBeWarrant": true,
-        "canRevokeLicense": true
-      },
-      {
         "name": "Possession Of Stolen Property",
         "minFine": 250,
         "maxFine": 1000,
