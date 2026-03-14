@@ -265,10 +265,10 @@ async function performSearch(query) {
   boloTitle.innerHTML = language.vehicleSearch?.static?.bolosTitle || 'BOLOs (Be On the Look-Out)'
   boloSection.appendChild(boloTitle)
 
-  if (!canModifyBOLOs) {
+  if (!canModifyBOLOs && bolos.length > 0) {
     const hint = document.createElement('div')
     hint.classList.add('boloHint')
-    hint.textContent = language.vehicleSearch?.static?.boloVehicleRequired || 'Vehicle must be nearby to add or remove BOLOs.'
+    hint.textContent = language.vehicleSearch?.static?.boloRemoveVehicleRequired || 'Vehicle must be nearby to remove BOLOs.'
     boloSection.appendChild(hint)
   }
 
@@ -317,12 +317,7 @@ async function performSearch(query) {
   addBtn.type = 'button'
   addBtn.classList.add('boloAddBtn')
   addBtn.textContent = language.vehicleSearch?.static?.addBOLO || 'Add BOLO'
-  addBtn.disabled = !canModifyBOLOs
-  if (canModifyBOLOs) {
-    addBtn.addEventListener('click', () => showAddBOLOModal(response, language, performSearch))
-  } else {
-    addBtn.title = language.vehicleSearch?.static?.boloVehicleRequired || 'Vehicle must be nearby to add or remove BOLOs.'
-  }
+  addBtn.addEventListener('click', () => showAddBOLOModal(response, language, performSearch))
   boloSection.appendChild(addBtn)
   if (boloPlaceholder) {
     boloPlaceholder.appendChild(boloSection)
@@ -438,32 +433,71 @@ async function performSearch(query) {
   await loadSearchHistory()
 }
 
-async function showAddBOLOModal(vehicleResponse, language, onSuccess) {
-  const reason = prompt(language.vehicleSearch?.static?.boloReasonPrompt || 'Enter BOLO reason:')
-  if (reason == null || !reason.trim()) return
-  const expiresDays = prompt(language.vehicleSearch?.static?.boloExpiresPrompt || 'Expires in how many days? (default 7):', '7')
-  let days = 7
-  if (expiresDays != null && expiresDays.trim()) {
-    const n = parseInt(expiresDays, 10)
-    if (!isNaN(n) && n > 0) days = n
+function showAddBOLOModal(vehicleResponse, language, onSuccess) {
+  const modal = document.getElementById('addBoloModal')
+  const form = document.getElementById('addBoloForm')
+  const plateInput = document.getElementById('addBoloPlate')
+  const reasonInput = document.getElementById('addBoloReason')
+  const expiresInput = document.getElementById('addBoloExpires')
+  const cancelBtn = document.querySelector('.addBoloModalCancel')
+  if (!modal || !form) return
+  plateInput.value = vehicleResponse?.LicensePlate || ''
+  reasonInput.value = ''
+  expiresInput.value = '7'
+  modal.classList.remove('hidden')
+  reasonInput.focus()
+  function closeModal() {
+    modal.classList.add('hidden')
   }
-  const expires = new Date()
-  expires.setDate(expires.getDate() + days)
-  const res = await (await fetch('/post/addBOLO', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      LicensePlate: vehicleResponse.LicensePlate,
-      Reason: reason.trim(),
-      ExpiresAt: expires.toISOString(),
-      IssuedBy: 'LSPD'
-    })
-  })).json()
-  if (res && res.success) {
-    topWindow.showNotification(language.vehicleSearch?.notifications?.boloAdded || 'BOLO added.', 'checkMark')
-    if (typeof onSuccess === 'function') await onSuccess(vehicleResponse.LicensePlate)
-  } else {
-    topWindow.showNotification(res?.error || 'Failed to add BOLO.', 'warning')
+  const cancelHandler = () => {
+    cancelBtn.removeEventListener('click', cancelHandler)
+    form.onsubmit = null
+    modal.onclick = null
+    closeModal()
+  }
+  form.onsubmit = async (e) => {
+    e.preventDefault()
+    const reason = reasonInput?.value?.trim()
+    if (!reason) return
+    const expiresDays = parseInt(expiresInput?.value || '7', 10)
+    const days = isNaN(expiresDays) || expiresDays < 1 ? 7 : Math.min(365, Math.max(1, expiresDays))
+    const expires = new Date()
+    expires.setDate(expires.getDate() + days)
+    const submitBtn = form.querySelector('.addBoloModalSubmit')
+    if (submitBtn) submitBtn.disabled = true
+    try {
+      const res = await (await fetch('/post/addBOLO', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          LicensePlate: vehicleResponse.LicensePlate,
+          Reason: reason,
+          ExpiresAt: expires.toISOString(),
+          IssuedBy: 'LSPD',
+          ModelDisplayName: vehicleResponse?.ModelDisplayName || undefined
+        })
+      })).json()
+      if (res && res.success) {
+        if (typeof topWindow !== 'undefined' && typeof topWindow.showNotification === 'function') {
+          topWindow.showNotification(language.vehicleSearch?.notifications?.boloAdded || 'BOLO added.', 'checkMark')
+        }
+        cancelHandler()
+        if (typeof onSuccess === 'function') await onSuccess(vehicleResponse.LicensePlate)
+      } else {
+        if (typeof topWindow !== 'undefined' && typeof topWindow.showNotification === 'function') {
+          topWindow.showNotification(res?.error || 'Failed to add BOLO.', 'warning')
+        }
+      }
+    } catch (_) {
+      if (typeof topWindow !== 'undefined' && typeof topWindow.showNotification === 'function') {
+        topWindow.showNotification('Failed to add BOLO.', 'warning')
+      }
+    }
+    if (submitBtn) submitBtn.disabled = false
+  }
+  cancelBtn.addEventListener('click', cancelHandler)
+  modal.onclick = (e) => {
+    if (e.target === modal) cancelHandler()
   }
 }
 

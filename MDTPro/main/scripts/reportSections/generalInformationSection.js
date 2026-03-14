@@ -37,7 +37,8 @@ async function getGeneralInformationSection(
   if (isList) {
     const statusInput = document.createElement('input')
     statusInput.type = 'text'
-    statusInput.value = language.reports.statusMap[generalInformation.status]
+    const defaultStatusLabels = ['Closed', 'Open', 'Canceled', 'Pending']
+    statusInput.value = (language.reports?.statusMap?.[generalInformation.status] ?? defaultStatusLabels[generalInformation.status]) || 'Unknown'
     statusInput.id = 'generalInformationSectionStatusInput'
     statusInput.disabled = true
     statusInput.style.color = `var(--color-${
@@ -45,10 +46,12 @@ async function getGeneralInformationSection(
     })`
     status.appendChild(statusInput)
   } else {
+    const defaultStatusLabels = ['Closed', 'Open', 'Canceled', 'Pending']
+    const statusLabel = (i) => (language.reports?.statusMap?.[i] ?? defaultStatusLabels[i]) || defaultStatusLabels[i]
     const statusInput = document.createElement('div')
     statusInput.classList.add('statusInput')
     const statusClosed = document.createElement('button')
-    statusClosed.innerHTML = language.reports.statusMap[0]
+    statusClosed.innerHTML = statusLabel(0)
     statusClosed.classList.add('closed')
     statusClosed.dataset.status = 0
     if (generalInformation.status == 0) {
@@ -64,7 +67,7 @@ async function getGeneralInformationSection(
 
     // For arrests: only Closed, Pending, Canceled (no "Open" — Pending = can attach reports, not yet submitted to court)
     const statusOpen = document.createElement('button')
-    statusOpen.innerHTML = language.reports.statusMap[1]
+    statusOpen.innerHTML = statusLabel(1)
     statusOpen.classList.add('open')
     statusOpen.dataset.status = 1
     if (generalInformation.status == 1) {
@@ -83,7 +86,7 @@ async function getGeneralInformationSection(
     }
 
     const statusCanceled = document.createElement('button')
-    statusCanceled.innerHTML = language.reports.statusMap[2]
+    statusCanceled.innerHTML = statusLabel(2)
     statusCanceled.classList.add('canceled')
     statusCanceled.dataset.status = 2
     if (generalInformation.status == 2) {
@@ -101,7 +104,7 @@ async function getGeneralInformationSection(
       statusInput.appendChild(statusClosed)
       // Pending = not yet closed for court; can attach reports. Hide if arrest already has a court case.
       const statusPending = document.createElement('button')
-      statusPending.innerHTML = language.reports.statusMap[3] || 'Pending'
+      statusPending.innerHTML = statusLabel(3)
       statusPending.classList.add('pending')
       statusPending.dataset.status = 3
       if (generalInformation.status == 3 || generalInformation.status == 1) {

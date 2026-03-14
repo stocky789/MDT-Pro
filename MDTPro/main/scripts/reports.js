@@ -227,23 +227,27 @@ async function onListPageTypeSelectorButtonClick(type) {
   const statusButtonWrapper = document.createElement('div')
   statusButtonWrapper.classList.add('buttonWrapper')
 
+  const defaultStatusLabels = ['Closed', 'Open', 'Canceled', 'Pending']
+  const statusLabel = (i) => (language.reports?.statusMap?.[i] ?? defaultStatusLabels[i]) || defaultStatusLabels[i]
+
   const closedButton = document.createElement('button')
-  closedButton.innerHTML = language.reports.statusMap[0]
+  closedButton.innerHTML = statusLabel(0)
   closedButton.dataset.status = 0
   closedButton.classList.add('selected')
 
   const openButton = document.createElement('button')
-  openButton.innerHTML = language.reports.statusMap[1]
+  openButton.innerHTML = statusLabel(1)
   openButton.dataset.status = 1
   openButton.classList.add('selected')
 
   const canceledButton = document.createElement('button')
-  canceledButton.innerHTML = language.reports.statusMap[2]
+  canceledButton.innerHTML = statusLabel(2)
   canceledButton.dataset.status = 2
 
   const pendingButton = document.createElement('button')
-  pendingButton.innerHTML = language.reports.statusMap[3] || 'Pending'
+  pendingButton.innerHTML = statusLabel(3)
   pendingButton.dataset.status = 3
+  pendingButton.classList.add('selected')
 
   statusButtonWrapper.appendChild(closedButton)
   statusButtonWrapper.appendChild(openButton)
@@ -547,13 +551,11 @@ async function renderReports(reports, type) {
     const statusElement = document.createElement('div')
     statusElement.classList.add('status')
     statusElement.dataset.status = report.Status
-    statusElement.style.backgroundColor = `var(--color-${
-      statusColorMap[report.Status]
-    }-half)`
-    statusElement.style.borderColor = `var(--color-${
-      statusColorMap[report.Status]
-    })`
-    statusElement.innerHTML = language.reports.statusMap[report.Status]
+    const statusColor = statusColorMap[report.Status] ?? statusColorMap[3] ?? 'warning'
+    statusElement.style.backgroundColor = `var(--color-${statusColor}-half)`
+    statusElement.style.borderColor = `var(--color-${statusColor})`
+    const defaultStatusLabels = { 0: 'Closed', 1: 'Open', 2: 'Canceled', 3: 'Pending' }
+    statusElement.innerHTML = (language.reports?.statusMap?.[report.Status] ?? defaultStatusLabels[report.Status]) || 'Unknown'
 
     infoWrapper.appendChild(textWrapper)
     infoWrapper.appendChild(statusElement)

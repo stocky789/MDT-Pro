@@ -312,17 +312,20 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
     inputWrapper.appendChild(attachedSection)
   }
 
-  const totalFineWrapper = document.createElement('div')
-  totalFineWrapper.appendChild(createLabel(language.court.totalFine))
-  totalFineWrapper.appendChild(createReadOnlyInput(await getCurrencyString(totalFine)))
-  inputWrapper.appendChild(totalFineWrapper)
+  const isCaseConcluded = courtCase.Status === 1 || courtCase.Status === 2
+  if (isCaseConcluded) {
+    const totalFineWrapper = document.createElement('div')
+    totalFineWrapper.appendChild(createLabel(language.court.totalFine))
+    totalFineWrapper.appendChild(createReadOnlyInput(await getCurrencyString(totalFine)))
+    inputWrapper.appendChild(totalFineWrapper)
 
-  const totalTimeWrapper = document.createElement('div')
-  totalTimeWrapper.appendChild(createLabel(language.court.totalIncarceration))
-  totalTimeWrapper.appendChild(
-    createReadOnlyInput(await getTotalTimeString(totalTime, lifeSentences))
-  )
-  if (totalTime > 0 || lifeSentences > 0) inputWrapper.appendChild(totalTimeWrapper)
+    const totalTimeWrapper = document.createElement('div')
+    totalTimeWrapper.appendChild(createLabel(language.court.totalIncarceration))
+    totalTimeWrapper.appendChild(
+      createReadOnlyInput(await getTotalTimeString(totalTime, lifeSentences))
+    )
+    if (totalTime > 0 || lifeSentences > 0) inputWrapper.appendChild(totalTimeWrapper)
+  }
 
   const riskWrapper = document.createElement('div')
   inputWrapper.appendChild(
@@ -521,13 +524,15 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   )
   inputWrapper.appendChild(policyWrapper)
 
-  const juryWrapper = document.createElement('div')
-  juryWrapper.appendChild(createLabel(language.court.jury || 'Jury'))
-  const juryText = courtCase.IsJuryTrial
-    ? `${courtCase.JuryVotesForConviction || 0}-${courtCase.JuryVotesForAcquittal || 0} / ${courtCase.JurySize || 0}`
-    : language.court.benchTrial || 'Bench Trial'
-  juryWrapper.appendChild(createReadOnlyInput(juryText))
-  inputWrapper.appendChild(juryWrapper)
+  if (isCaseConcluded) {
+    const juryWrapper = document.createElement('div')
+    juryWrapper.appendChild(createLabel(language.court.jury || 'Jury'))
+    const juryText = courtCase.IsJuryTrial
+      ? `${courtCase.JuryVotesForConviction || 0}-${courtCase.JuryVotesForAcquittal || 0} / ${courtCase.JurySize || 0}`
+      : language.court.benchTrial || 'Bench Trial'
+    juryWrapper.appendChild(createReadOnlyInput(juryText))
+    inputWrapper.appendChild(juryWrapper)
+  }
 
   const pleaWrapper = document.createElement('div')
   pleaWrapper.appendChild(createLabel(language.court.plea || 'Plea'))
