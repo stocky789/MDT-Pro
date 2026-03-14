@@ -112,13 +112,13 @@ namespace MDTPro.Data {
             new Dictionary<string, PedEvidenceContext>(StringComparer.OrdinalIgnoreCase);
         private static readonly object pedEvidenceLock = new object();
         /// <summary>Ped handles we've seen fleeing; looked up at arrest by handle so we don't miss due to name mismatch during chase.</summary>
-        private static readonly Dictionary<int, DateTime> fleeingPedHandles = new Dictionary<int, DateTime>();
+        private static readonly Dictionary<Rage.PoolHandle, DateTime> fleeingPedHandles = new Dictionary<Rage.PoolHandle, DateTime>();
         /// <summary>Handles that caused vehicle damage (e.g. during pursuit); merged at arrest when we may not have had name at surrender.</summary>
-        private static readonly Dictionary<int, DateTime> damagedVehicleHandles = new Dictionary<int, DateTime>();
+        private static readonly Dictionary<Rage.PoolHandle, DateTime> damagedVehicleHandles = new Dictionary<Rage.PoolHandle, DateTime>();
         /// <summary>Handles that assaulted the player; merged at arrest in case game clears damage state.</summary>
-        private static readonly Dictionary<int, DateTime> assaultedPedHandles = new Dictionary<int, DateTime>();
+        private static readonly Dictionary<Rage.PoolHandle, DateTime> assaultedPedHandles = new Dictionary<Rage.PoolHandle, DateTime>();
         /// <summary>Handles that were armed when we saw them (e.g. at surrender); at arrest they may be disarmed so we merge by handle.</summary>
-        private static readonly Dictionary<int, DateTime> hadWeaponHandles = new Dictionary<int, DateTime>();
+        private static readonly Dictionary<Rage.PoolHandle, DateTime> hadWeaponHandles = new Dictionary<Rage.PoolHandle, DateTime>();
 
         private static readonly HashSet<string> capturedVehicleSearchPlates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly object capturedVehicleSearchLock = new object();
@@ -2352,14 +2352,14 @@ namespace MDTPro.Data {
                 .Select(kvp => kvp.Key)
                 .ToList();
             foreach (string key in stale) pedEvidenceCache.Remove(key);
-            List<int> staleHandles = fleeingPedHandles.Where(kvp => kvp.Value < threshold).Select(kvp => kvp.Key).ToList();
-            foreach (int h in staleHandles) fleeingPedHandles.Remove(h);
+            List<Rage.PoolHandle> staleHandles = fleeingPedHandles.Where(kvp => kvp.Value < threshold).Select(kvp => kvp.Key).ToList();
+            foreach (Rage.PoolHandle h in staleHandles) fleeingPedHandles.Remove(h);
             staleHandles = damagedVehicleHandles.Where(kvp => kvp.Value < threshold).Select(kvp => kvp.Key).ToList();
-            foreach (int h in staleHandles) damagedVehicleHandles.Remove(h);
+            foreach (Rage.PoolHandle h in staleHandles) damagedVehicleHandles.Remove(h);
             staleHandles = assaultedPedHandles.Where(kvp => kvp.Value < threshold).Select(kvp => kvp.Key).ToList();
-            foreach (int h in staleHandles) assaultedPedHandles.Remove(h);
+            foreach (Rage.PoolHandle h in staleHandles) assaultedPedHandles.Remove(h);
             staleHandles = hadWeaponHandles.Where(kvp => kvp.Value < threshold).Select(kvp => kvp.Key).ToList();
-            foreach (int h in staleHandles) hadWeaponHandles.Remove(h);
+            foreach (Rage.PoolHandle h in staleHandles) hadWeaponHandles.Remove(h);
         }
 
         private static void BuildCourtCaseMetadata(CourtData courtData, string offenderPedName, Location reportLocation) {
