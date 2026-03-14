@@ -181,9 +181,12 @@ Plugin Name
     │       script 1.js
     │       script 2.js
     │
-    └───styles
-            style 1.css
-            style 2.css
+    ├───styles
+    │       style 1.css
+    │       style 2.css
+    │
+    └───images (optional)
+            badge.png
 ```
 
 Multiple pages, scripts, and styles are supported per plugin.
@@ -191,6 +194,7 @@ Multiple pages, scripts, and styles are supported per plugin.
 - HTML in `pages` is served at `/plugin/<pluginId>/page/<fileName>`
 - JS in `scripts` is served at `/plugin/<pluginId>/script/<fileName>`
 - CSS in `styles` is served at `/plugin/<pluginId>/style/<fileName>`
+- Images in `images` (optional) at `/plugin/<pluginId>/image/<fileName>` (png, jpg, svg)
 - In JavaScript, get the plugin ID with: `const pluginId = document.currentScript.dataset.pluginId`
 - Scripts and styles are loaded on the main index page when the plugin is enabled on the Customization page.
 
