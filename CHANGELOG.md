@@ -49,6 +49,7 @@ All notable changes to MDT Pro are documented here.
 - **State ID and “Ask for all docs”** — Showing a State ID on a foot stop or “Ask for all documents” on a vehicle stop now correctly adds the person to Person Search.
 - **VIN and license revocations** — Convictions for VIN tampering or defaced VIN now result in driver’s license revocation at sentencing.
 - **BOLO** — Creating a BOLO from the noticeboard and later encountering that plate in world now correctly shows the BOLO on Vehicle Search and syncs to CDF. Vehicle Search no longer misses noticeboard-only BOLOs when the vehicle is in world.
+- **Recent IDs** — Patting down a suspect now adds the person to Recent IDs in Person Search. Previously only asking for a driver's license (or other ID-given events) triggered this.
 
 ## [0.9.3.0] — 2026-03-07
 
