@@ -633,6 +633,26 @@ async function openWindow(name, pluginId = null) {
   })
 }
 
+/**
+ * Bring a specific window to front (for use when reusing e.g. Reports window).
+ * Called from root.js so that "Open report from ped/vehicle" always raises the Reports window.
+ */
+function focusWindowByElement(windowEl) {
+  if (!windowEl || !windowEl.classList?.contains('window')) return
+  document.querySelectorAll('.overlay .windows .window').forEach((win) => {
+    win.style.zIndex = ''
+  })
+  windowEl.style.zIndex = '3'
+  windowEl.classList.remove('minimized')
+  const windows = document.querySelectorAll('.overlay .windows .window')
+  const taskbarWindows = document.querySelectorAll('.taskbar .icons button.taskbarWindow')
+  const index = Array.from(windows).indexOf(windowEl)
+  if (index >= 0 && taskbarWindows[index]) {
+    taskbarWindows.forEach((btn) => btn.classList.remove('focused'))
+    taskbarWindows[index].classList.add('focused')
+  }
+}
+
 document.addEventListener('mousedown', function (e) {
   const officerProfileBtn = document.querySelector('.taskbar .icons .officerProfile')
   const settingsBtn = document.querySelector('.taskbar .icons .settings')

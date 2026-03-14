@@ -246,19 +246,50 @@ async function openFirearmsSearch(serialOrOwner) {
 }
 
 async function checkForReportOnCreatePage() {
-  for (const iframe of topDoc.querySelectorAll('.overlay .window iframe')) {
-    if (iframe.contentWindow.reportIsOnCreatePage()) {
-      const language = await getLanguage()
-      topWindow.showNotification(
-        language.reports.notifications.createPageAlreadyOpen
-      )
-      return true
+  for (const iframe of topDoc.querySelectorAll('.overlay .windows .window iframe')) {
+    try {
+      if (typeof iframe.contentWindow?.reportIsOnCreatePage === 'function' && iframe.contentWindow.reportIsOnCreatePage()) {
+        const language = await getLanguage()
+        topWindow.showNotification(
+          language.reports.notifications.createPageAlreadyOpen
+        )
+        return true
+      }
+    } catch (_) {}
+  }
+  return false
+}
+
+/** Find an existing Reports window element (so we can reuse it and bring to front). */
+function findExistingReportsWindow() {
+  const windows = topDoc.querySelectorAll('.overlay .windows .window')
+  for (const win of windows) {
+    const iframe = win.querySelector('iframe')
+    if (iframe?.src && (iframe.src.includes('/page/reports.html') || iframe.src.includes('reports.html'))) {
+      return { windowEl: win, iframe }
     }
   }
+  return null
 }
 
 async function openPedAsOffenderInReport(type, pedName = '') {
   if (await checkForReportOnCreatePage()) return
+
+  const existing = findExistingReportsWindow()
+  if (existing) {
+    const { windowEl, iframe } = existing
+    if (typeof topWindow.focusWindowByElement === 'function') {
+      topWindow.focusWindowByElement(windowEl)
+    }
+    const win = iframe.contentWindow
+    if (win && typeof win.onCreateButtonClick === 'function') {
+      await win.onCreateButtonClick()
+      await win.onCreatePageTypeSelectorButtonClick(type)
+      const pedInput = win.document.querySelector('.createPage #offenderSectionPedNameInput')
+      if (pedInput) pedInput.value = pedName || ''
+    }
+    return
+  }
 
   await topWindow.openWindow('reports')
   const iframe = topDoc
@@ -293,16 +324,15 @@ async function openReportWithPrefill(reportType, prefillData) {
       data: prefillData
     }))
   } catch (_) {}
+  const existing = findExistingReportsWindow()
+  if (existing && typeof topWindow.focusWindowByElement === 'function') {
+    topWindow.focusWindowByElement(existing.windowEl)
+  }
   await topWindow.openWindow('reports')
 }
 
 async function openIdInReport(id, type = null) {
   if (!id) return
-  await topWindow.openWindow('reports')
-  const iframe = topDoc
-    .querySelector('.overlay .windows')
-    .lastChild?.querySelector('iframe')
-  if (!iframe) return
 
   async function performSearch(win, reportType) {
     if (typeof win.onListPageTypeSelectorButtonClick !== 'function') return false
@@ -318,8 +348,7 @@ async function openIdInReport(id, type = null) {
     return false
   }
 
-  async function runOpenReportLogic() {
-    const win = iframe.contentWindow
+  async function runOpenReportLogic(win) {
     if (!win) return
     let found = false
     if (type) {
@@ -336,10 +365,28 @@ async function openIdInReport(id, type = null) {
     }
   }
 
-  iframe.onload = runOpenReportLogic
+  const existing = findExistingReportsWindow()
+  if (existing) {
+    const { windowEl, iframe } = existing
+    if (typeof topWindow.focusWindowByElement === 'function') {
+      topWindow.focusWindowByElement(windowEl)
+    }
+    const win = iframe.contentWindow
+    if (win) {
+      await runOpenReportLogic(win)
+    }
+    return
+  }
 
+  await topWindow.openWindow('reports')
+  const iframe = topDoc
+    .querySelector('.overlay .windows')
+    .lastChild?.querySelector('iframe')
+  if (!iframe) return
+
+  iframe.onload = () => runOpenReportLogic(iframe.contentWindow)
   if (iframe.contentDocument?.readyState === 'complete') {
-    runOpenReportLogic()
+    runOpenReportLogic(iframe.contentWindow)
   }
 }
 
