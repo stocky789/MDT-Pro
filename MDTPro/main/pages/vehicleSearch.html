@@ -151,6 +151,30 @@
       </div>
       <div class="boloSectionPlaceholder"></div>
     </div>
+    <div id="addBoloModal" class="addBoloModal hidden" role="dialog" aria-modal="true" aria-labelledby="addBoloModalTitle">
+      <div class="addBoloModalContent">
+        <h2 id="addBoloModalTitle" class="addBoloModalTitle" data-language="addBOLOTitle">Add BOLO</h2>
+        <p class="addBoloModalSubtitle" data-language="addBOLOSubtitle">Enter BOLO details for this vehicle.</p>
+        <form id="addBoloForm" class="addBoloModalForm">
+          <div class="addBoloFormRow">
+            <label for="addBoloPlate" data-language="labels.licensePlate">License Plate</label>
+            <input id="addBoloPlate" type="text" readonly disabled />
+          </div>
+          <div class="addBoloFormRow">
+            <label for="addBoloReason" data-language="boloReason">Reason *</label>
+            <input id="addBoloReason" type="text" required placeholder="e.g. Armed robbery suspect" />
+          </div>
+          <div class="addBoloFormRow">
+            <label for="addBoloExpires" data-language="boloExpires">Expires in (days)</label>
+            <input id="addBoloExpires" type="number" min="1" max="365" value="7" />
+          </div>
+          <div class="addBoloModalActions">
+            <button type="button" class="addBoloModalCancel" data-language="cancel">Cancel</button>
+            <button type="submit" class="addBoloModalSubmit" data-language="addBOLOSubmit">Add BOLO</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </body>
   <script src="/script/root.js"></script>
   <script src="/script/vehicleSearch.js"></script>

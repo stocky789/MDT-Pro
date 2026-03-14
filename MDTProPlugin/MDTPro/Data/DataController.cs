@@ -840,6 +840,7 @@ namespace MDTPro.Data {
                     ?? pedDatabase.FirstOrDefault(x => x.Holder != null && x.Holder.IsValid() && x.Holder.Handle == ped.Handle);
                 if (pedData == null) {
                     pedData = new MDTProPedData { Name = pedName };
+                    pedData.TryParseNameIntoFirstLast();
                     pedData.IdentificationHistory = new List<MDTProPedData.IdentificationEntry>();
                     if (!pedDatabase.Any(x => x.Name == pedName)) pedDatabase.Add(pedData);
                 } else {
@@ -954,6 +955,7 @@ namespace MDTPro.Data {
                 if (pedDatabase.Any(x => x.Name != null && x.Name.Equals(fullName, StringComparison.OrdinalIgnoreCase))) return;
                 if (keepInPedDatabase.Any(x => x.Name != null && x.Name.Equals(fullName, StringComparison.OrdinalIgnoreCase))) return;
                 stub = new MDTProPedData { Name = fullName };
+                stub.TryParseNameIntoFirstLast();
                 stub.Citations = new List<CitationGroup.Charge>();
                 stub.Arrests = new List<ArrestGroup.Charge>();
                 stub.IdentificationHistory = new List<MDTProPedData.IdentificationEntry>();
@@ -1215,6 +1217,8 @@ namespace MDTPro.Data {
 
             StoreIdentifiedPedHandle(mdtProPedData.Name, ped.Handle);
 
+            mdtProPedData.TryParseNameIntoFirstLast();
+
             MDTProPedData existingPed;
             lock (_pedDbLock) {
                 existingPed = pedDatabase.FirstOrDefault(x => x.Name == mdtProPedData.Name);
@@ -1232,6 +1236,15 @@ namespace MDTPro.Data {
                         existingPed.FishingPermitExpiration = mdtProPedData.FishingPermitExpiration;
                         existingPed.HuntingPermitStatus = mdtProPedData.HuntingPermitStatus;
                         existingPed.HuntingPermitExpiration = mdtProPedData.HuntingPermitExpiration;
+                        // Fill identity when stub/callout record has no CDF data (e.g. callout suspects)
+                        if (!string.IsNullOrEmpty(mdtProPedData.FirstName)) existingPed.FirstName = existingPed.FirstName ?? mdtProPedData.FirstName;
+                        if (!string.IsNullOrEmpty(mdtProPedData.LastName)) existingPed.LastName = existingPed.LastName ?? mdtProPedData.LastName;
+                        if (!string.IsNullOrEmpty(mdtProPedData.Birthday)) existingPed.Birthday = existingPed.Birthday ?? mdtProPedData.Birthday;
+                        if (!string.IsNullOrEmpty(mdtProPedData.Gender)) existingPed.Gender = existingPed.Gender ?? mdtProPedData.Gender;
+                        if (!string.IsNullOrEmpty(mdtProPedData.Address)) existingPed.Address = existingPed.Address ?? mdtProPedData.Address;
+                        if (mdtProPedData.ModelHash != 0) existingPed.ModelHash = existingPed.ModelHash != 0 ? existingPed.ModelHash : mdtProPedData.ModelHash;
+                        if (!string.IsNullOrEmpty(mdtProPedData.ModelName)) existingPed.ModelName = existingPed.ModelName ?? mdtProPedData.ModelName;
+                        existingPed.TryParseNameIntoFirstLast();
                     }
                 }
             }
@@ -1576,6 +1589,21 @@ namespace MDTPro.Data {
             return courtData.Charges.Any(c => c != null && IsDrugRelatedChargeName(c.Name ?? ""));
         }
 
+        /// <summary>True if the charge indicates evading, fleeing, or pursuit. Used to infer EvidenceWasFleeing when in-game capture misses (chase-then-stop clears fleeing state).</summary>
+        private static bool IsEvadingOrFleeingChargeName(string name) {
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.ToLowerInvariant();
+            return n.Contains("evading") || n.Contains("evad ") || n.Contains("pursuit") || n.Contains("flee");
+        }
+
+        /// <summary>True if the charge typically involves vehicle damage (evading, reckless evading, hit and run). Used to infer EvidenceDamagedVehicle when game natives miss.</summary>
+        private static bool IsVehicleDamageLikelyChargeName(string name) {
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.ToLowerInvariant();
+            return n.Contains("evading") || n.Contains("reckless evading") || n.Contains("hit and run")
+                || n.Contains("hit-and-run") || (n.Contains("reckless") && n.Contains("evad"));
+        }
+
         /// <summary>True if this attached report is relevant to the case (same defendant, or report type matches charge type). Only relevant reports get evidence bonus.</summary>
         private static bool IsAttachedReportRelevantToCase(CourtData courtData, string reportId, string reportType) {
             if (courtData == null || string.IsNullOrWhiteSpace(reportId) || string.IsNullOrWhiteSpace(reportType)) return false;
@@ -1872,19 +1900,30 @@ namespace MDTPro.Data {
             return false;
         }
 
-        /// <summary>True if any vehicle has been damaged by this ped (any damage counts, not just totalled). Checks vehicles within 50m and the ped's current vehicle if in one.</summary>
+        /// <summary>True if any vehicle has been damaged by this ped or their vehicle. During pursuits, GTA attributes collision damage to the suspect's vehicle, not the ped, so we check both.</summary>
         private static bool CheckVehicleDamageByPed(Ped ped) {
             if (ped == null || !ped.IsValid()) return false;
             try {
                 Vehicle[] nearbyVehicles = ped.GetNearbyVehicles(50);
+                // (1) Direct: vehicle damaged by ped entity (rare; usually applies to on-foot damage)
                 bool any = nearbyVehicles != null && nearbyVehicles.Any(v =>
                     v != null && v.IsValid() &&
                     NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(v, ped, false));
+                // (2) Suspect's current vehicle damaged by ped (e.g. they were driving, crashed)
                 if (!any && ped.IsInAnyVehicle(false)) {
                     Vehicle suspectVehicle = ped.CurrentVehicle;
                     if (suspectVehicle != null && suspectVehicle.IsValid() &&
                         NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(suspectVehicle, ped, false))
                         any = true;
+                }
+                // (3) Key fix: during pursuit, collision damage is attributed to the suspect's VEHICLE, not the ped
+                if (!any && ped.IsInAnyVehicle(false)) {
+                    Vehicle suspectVehicle = ped.CurrentVehicle;
+                    if (suspectVehicle != null && suspectVehicle.IsValid() && nearbyVehicles != null) {
+                        any = nearbyVehicles.Any(v =>
+                            v != null && v.IsValid() && v != suspectVehicle &&
+                            NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(v, suspectVehicle, false));
+                    }
                 }
                 return any;
             } catch { return false; }
@@ -2567,6 +2606,21 @@ namespace MDTPro.Data {
                 }
                 if (courtData.EvidenceUseOfForce && config.courtEvidenceUseOfForceBonus > 0) {
                     score += config.courtEvidenceUseOfForceBonus;
+                }
+                // Infer Resisted from UseOfForce: tazer/baton/etc implies resistance when officer documented it
+                if (courtData.EvidenceUseOfForce && !courtData.EvidenceResisted && config.courtEvidenceResistedBonus > 0) {
+                    courtData.EvidenceResisted = true;
+                    score += config.courtEvidenceResistedBonus;
+                }
+                // Infer Attempted to Flee from evading/pursuit charges when in-game capture missed (chase-then-stop clears fleeing state)
+                if (!courtData.EvidenceWasFleeing && courtData.Charges != null && courtData.Charges.Any(c => c != null && IsEvadingOrFleeingChargeName(c.Name ?? ""))) {
+                    courtData.EvidenceWasFleeing = true;
+                    if (config.courtEvidenceFleeingBonus > 0) score += config.courtEvidenceFleeingBonus;
+                }
+                // Infer Damaged Vehicle from evading/reckless/hit-and-run charges when game natives missed (collision damage attributed to vehicle, not ped)
+                if (!courtData.EvidenceDamagedVehicle && courtData.Charges != null && courtData.Charges.Any(c => c != null && IsVehicleDamageLikelyChargeName(c.Name ?? ""))) {
+                    courtData.EvidenceDamagedVehicle = true;
+                    if (config.courtEvidenceVehicleDamageBonus > 0) score += config.courtEvidenceVehicleDamageBonus;
                 }
                 // Drug records: from DB (pat-down, dead body search) or from arrest report "Evidence seized" when officer documented it
                 if (config.courtEvidenceDrugsBonus > 0) {
