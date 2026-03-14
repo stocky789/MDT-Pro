@@ -581,7 +581,7 @@ async function renderReports(reports, type) {
       showLoadingOnButton(editButton)
 
       const language = await getLanguage()
-      for (const iframe of topDoc.querySelectorAll('.overlay .window iframe')) {
+      for (const iframe of topDoc.querySelectorAll('.overlay .windows .window iframe')) {
         if (iframe.contentWindow.reportIsOnCreatePage()) {
           topWindow.showNotification(
             language.reports.notifications.createPageAlreadyOpen
