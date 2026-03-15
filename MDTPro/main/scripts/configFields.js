@@ -152,11 +152,11 @@ const PRESET_CUSTOM = { label: 'Custom...', value: '__custom__' }
 const CONFIG_FIELD_META = {
   port: {
     label: 'HTTP port',
-    tooltip: 'The port the MDT web interface runs on (e.g. 8080). You may need to allow this port in your firewall.',
+    tooltip: 'The port the MDT web interface runs on (e.g. 9000). You may need to allow this port in your firewall.',
     presets: [
-      { label: '8080 (default)', value: 8080 },
+      { label: '9000 (default)', value: 9000 },
+      { label: '8080', value: 8080 },
       { label: '3010', value: 3010 },
-      { label: '9000', value: 9000 },
       PRESET_CUSTOM,
     ],
   },

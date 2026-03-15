@@ -14,8 +14,12 @@ INSTALL
 
 USE
   1. Start GTA V and go on duty with LSPDFR.
-  2. MDT Pro will show on-screen addresses (e.g. http://127.0.0.1:8080).
+  2. MDT Pro will show on-screen addresses (e.g. http://127.0.0.1:9000).
   3. Open that address in any browser (Chrome/Brave recommended).
+
+  If you can't connect from another device (phone, tablet, etc.): this is usually a Windows
+  Firewall issue (on your game PC, not your router). Add an inbound rule for port 9000
+  (or your chosen port in config) in Windows Firewall.
 
 UPDATING
   Overwrite the existing plugin files and the MDTPro folder. Your MDTPro/data/ and config.json are kept.
