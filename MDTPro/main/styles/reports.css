@@ -126,6 +126,23 @@ body {
   display: none;
 }
 
+/* Report ID row: input + Copy button */
+.reportId .reportIdRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.reportId .reportIdRow input {
+  flex: 1;
+  min-width: 0;
+}
+.reportId .copyReportIdBtn {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
 .inputWrapper .status .statusInput:has(button) {
   margin-top: 2px;
   display: flex;

@@ -19,13 +19,36 @@ async function getGeneralInformationSection(
   reportIdLabel.innerHTML =
     language.reports.sections.generalInformation.reportId
   reportIdLabel.htmlFor = 'generalInformationSectionReportIdInput'
+  const reportIdRow = document.createElement('div')
+  reportIdRow.classList.add('reportIdRow')
   const reportIdInput = document.createElement('input')
   reportIdInput.type = 'text'
   reportIdInput.value = generalInformation.reportId
   reportIdInput.id = 'generalInformationSectionReportIdInput'
   reportIdInput.disabled = true
+  const copyBtn = document.createElement('button')
+  copyBtn.type = 'button'
+  copyBtn.classList.add('copyReportIdBtn')
+  copyBtn.textContent = language.reports?.sections?.generalInformation?.copyReportId || 'Copy'
+  copyBtn.title = language.reports?.sections?.generalInformation?.copyReportId || 'Copy report ID to clipboard'
+  copyBtn.addEventListener('click', async () => {
+    const id = generalInformation.reportId || ''
+    if (!id) return
+    try {
+      await navigator.clipboard.writeText(id)
+      if (typeof topWindow !== 'undefined' && typeof topWindow.showNotification === 'function') {
+        topWindow.showNotification(language.reports?.sections?.generalInformation?.copiedToClipboard || 'Report ID copied to clipboard.', 'checkMark')
+      }
+    } catch (_) {
+      if (typeof topWindow !== 'undefined' && typeof topWindow.showNotification === 'function') {
+        topWindow.showNotification(language.reports?.sections?.generalInformation?.copyFailed || 'Could not copy.', 'warning')
+      }
+    }
+  })
+  reportIdRow.appendChild(reportIdInput)
+  reportIdRow.appendChild(copyBtn)
   reportId.appendChild(reportIdLabel)
-  reportId.appendChild(reportIdInput)
+  reportId.appendChild(reportIdRow)
 
   const status = document.createElement('div')
   status.classList.add('status')

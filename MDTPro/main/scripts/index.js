@@ -108,8 +108,13 @@
               headers: { 'Content-Type': 'application/json' },
               body: '{}'
             })
-            if (alprRes.ok) topWindow.showNotification(language.quickActions?.alprCleared || 'ALPR cleared.', 'checkMark')
-            else topWindow.showNotification(language.quickActions?.error || 'Action failed.', 'warning')
+            if (alprRes.ok) {
+              const notificationsEl = topDoc.querySelector('.overlay .notifications')
+              if (notificationsEl) {
+                notificationsEl.querySelectorAll('.alpr-popup').forEach((el) => el.remove())
+              }
+              topWindow.showNotification(language.quickActions?.alprCleared || 'ALPR cleared.', 'checkMark')
+            } else topWindow.showNotification(language.quickActions?.error || 'Action failed.', 'warning')
           }
         } catch (e) {
           topWindow.showNotification(language.quickActions?.error || 'Action failed.', 'error')

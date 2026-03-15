@@ -1260,8 +1260,49 @@ namespace MDTPro.Data {
                 if (pedDatabase.Any(x => x.Name == mdtProPedData.Name)) return;
                 pedDatabase.Add(mdtProPedData);
             }
-            Database.SavePed(mdtProPedData);
+            if (!MDTProPedData.IsMinimalIdentity(mdtProPedData))
+                Database.SavePed(mdtProPedData);
             SetContextPed(mdtProPedData);
+
+            // Delayed CDF retry: if CDF was null or minimal, PR may populate shortly; re-read after 2s and merge identity
+            if (mdtProPedData.CDFPedData == null || MDTProPedData.IsMinimalIdentity(mdtProPedData)) {
+                uint pedHandle = ped.Handle;
+                string pedName = mdtProPedData.Name;
+                GameFiber.StartNew(() => {
+                    GameFiber.Wait(2000);
+                    try {
+                        Ped p = World.GetEntityByHandle<Ped>(pedHandle);
+                        if (p == null || !p.IsValid()) return;
+                        MDTProPedData updated = new MDTProPedData(p);
+                        if (updated.CDFPedData == null || MDTProPedData.IsMinimalIdentity(updated)) return;
+                        MDTProPedData existing = null;
+                        lock (_pedDbLock) {
+                            existing = pedDatabase.FirstOrDefault(x => x != null && string.Equals(x.Name, pedName, StringComparison.OrdinalIgnoreCase));
+                            if (existing == null) return;
+                            if (!string.IsNullOrEmpty(updated.Birthday)) existing.Birthday = existing.Birthday ?? updated.Birthday;
+                            if (!string.IsNullOrEmpty(updated.Gender)) existing.Gender = existing.Gender ?? updated.Gender;
+                            if (!string.IsNullOrEmpty(updated.Address)) existing.Address = existing.Address ?? updated.Address;
+                            if (!string.IsNullOrEmpty(updated.LicenseStatus)) existing.LicenseStatus = existing.LicenseStatus ?? updated.LicenseStatus;
+                            if (!string.IsNullOrEmpty(updated.LicenseExpiration)) existing.LicenseExpiration = existing.LicenseExpiration ?? updated.LicenseExpiration;
+                            if (!string.IsNullOrEmpty(updated.WeaponPermitStatus)) existing.WeaponPermitStatus = existing.WeaponPermitStatus ?? updated.WeaponPermitStatus;
+                            if (!string.IsNullOrEmpty(updated.WeaponPermitExpiration)) existing.WeaponPermitExpiration = existing.WeaponPermitExpiration ?? updated.WeaponPermitExpiration;
+                            if (!string.IsNullOrEmpty(updated.WeaponPermitType)) existing.WeaponPermitType = existing.WeaponPermitType ?? updated.WeaponPermitType;
+                            if (!string.IsNullOrEmpty(updated.FishingPermitStatus)) existing.FishingPermitStatus = existing.FishingPermitStatus ?? updated.FishingPermitStatus;
+                            if (!string.IsNullOrEmpty(updated.FishingPermitExpiration)) existing.FishingPermitExpiration = existing.FishingPermitExpiration ?? updated.FishingPermitExpiration;
+                            if (!string.IsNullOrEmpty(updated.HuntingPermitStatus)) existing.HuntingPermitStatus = existing.HuntingPermitStatus ?? updated.HuntingPermitStatus;
+                            if (!string.IsNullOrEmpty(updated.HuntingPermitExpiration)) existing.HuntingPermitExpiration = existing.HuntingPermitExpiration ?? updated.HuntingPermitExpiration;
+                            if (updated.ModelHash != 0 && existing.ModelHash == 0) existing.ModelHash = updated.ModelHash;
+                            if (!string.IsNullOrEmpty(updated.ModelName)) existing.ModelName = existing.ModelName ?? updated.ModelName;
+                            existing.TryParseNameIntoFirstLast();
+                        }
+                        KeepPedInDatabase(existing);
+                        Database.SavePed(existing);
+                        Helper.Log($"[MDTPro] Delayed CDF retry filled identity for: {pedName}", false, Helper.LogSeverity.Info);
+                    } catch (Exception ex) {
+                        Helper.Log($"[MDTPro] Delayed CDF retry failed: {ex.Message}", false, Helper.LogSeverity.Warning);
+                    }
+                }, "MDTPro-CDF-retry");
+            }
         }
 
         /// <summary>Caller must hold _resolvedPedHandlesLock.</summary>
@@ -3093,6 +3134,10 @@ namespace MDTPro.Data {
                 Database.SaveCourtCase(courtCase);
                 int convictedCount = courtCase.Charges?.Count(c => c.Outcome == 1) ?? 0;
                 Helper.Log($"Court case {courtCase.Number} auto-resolved: {(newStatus == 1 ? "Convicted" : "Acquitted")} ({convictedCount}/{courtCase.Charges?.Count ?? 0} charges) (plea: {courtCase.Plea})", false, Helper.LogSeverity.Info);
+
+                string defendantName = !string.IsNullOrWhiteSpace(courtCase.PedName) ? courtCase.PedName.Trim() : "Unknown";
+                string msg = string.Format(Setup.SetupController.GetLanguage().court.trialHeardNotification, courtCase.Number ?? "?", defendantName);
+                Utility.RageNotification.Show(msg, Utility.RageNotification.NotificationType.Info);
             } catch (Exception e) {
                 Helper.Log($"Auto-resolution failed for case {courtCase?.Number}: {e.Message}", false, Helper.LogSeverity.Warning);
             }

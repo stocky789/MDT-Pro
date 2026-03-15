@@ -1,5 +1,6 @@
 using CommonDataFramework.Modules.PedDatabase;
 using MDTPro.Setup;
+using MDTPro.Utility;
 using System.Reflection;
 using Rage;
 using System;
@@ -56,8 +57,19 @@ namespace MDTPro.Data {
         }
         public MDTProPedData() { }
 
+        /// <summary>True when ped has name but no meaningful identity (DOB, license, address, gender). Used to avoid persisting or to trigger delayed CDF retry.</summary>
+        public static bool IsMinimalIdentity(MDTProPedData p) {
+            if (p == null) return true;
+            bool hasName = !string.IsNullOrWhiteSpace(p.Name) || !string.IsNullOrWhiteSpace(p.FirstName) || !string.IsNullOrWhiteSpace(p.LastName);
+            if (!hasName) return true;
+            bool hasIdentity = !string.IsNullOrWhiteSpace(p.Birthday) || !string.IsNullOrWhiteSpace(p.LicenseStatus)
+                || !string.IsNullOrWhiteSpace(p.Address) || !string.IsNullOrWhiteSpace(p.Gender);
+            return !hasIdentity;
+        }
+
         private void PopulateParameters() {
             if (CDFPedData == null) {
+                Helper.Log($"[MDTPro] Ped built with CDF null, using LSPDFR fallback: {(Name ?? "(no name)")}", false, Helper.LogSeverity.Info);
                 PopulateFromLSPDFRPersonaFallback();
                 return;
             }
@@ -89,7 +101,7 @@ namespace MDTPro.Data {
                 HuntingPermitStatus = CDFPedData.HuntingPermit.Status.ToString();
                 HuntingPermitExpiration = CDFPedData.HuntingPermit.ExpirationDate?.ToString("s");
             } catch (Exception e) {
-                Game.LogTrivial($"[MDTPro] Warning: Could not read CDF permit/license data for {Name}: {e.Message}");
+                Helper.Log($"[MDTPro] CDF permit/license read failed for {Name}: {e.Message}", false, Helper.LogSeverity.Warning);
             }
             if (CDFPedData.HasRealPed && Holder != null && Holder.IsValid()) {
                 try {

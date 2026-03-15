@@ -67,6 +67,9 @@ namespace MDTPro.ServerAPI {
                 Database.SaveSearchHistoryEntry("ped", name, pedData?.Name);
                 if (pedData != null) {
                     DataController.KeepPedInDatabase(pedData);
+                    if (MDTProPedData.IsMinimalIdentity(pedData)) {
+                        Utility.Helper.Log($"[MDTPro] Person Search returning minimal-identity ped (will show N/A): {pedData.Name}", false, Utility.Helper.LogSeverity.Info);
+                    }
                 }
 
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(pedData));

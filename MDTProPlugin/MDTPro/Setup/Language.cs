@@ -421,6 +421,9 @@ namespace MDTPro.Setup {
                     public string time = "Time";
                     public string reportId = "Report ID";
                     public string status = "Status";
+                    public string copyReportId = "Copy";
+                    public string copiedToClipboard = "Report ID copied to clipboard.";
+                    public string copyFailed = "Could not copy.";
                 }
 
                 public class Location {
@@ -611,6 +614,8 @@ namespace MDTPro.Setup {
         }
 
         public class Court {
+            /// <summary>Shown as in-game notification when a trial is auto-resolved. {0} = case number, {1} = defendant name.</summary>
+            public string trialHeardNotification = "Trial {0} for {1} has been heard - to see the outcome check the MDT.";
             public string empty = "No court cases.";
             public string charges = "Charges";
             public string number = "Case Number";

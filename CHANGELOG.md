@@ -37,7 +37,9 @@ All notable changes to MDT Pro are documented here.
 - **Active Call** — Active Call page shows status (Pending, Accepted, En Route, Finished), a short timeline, and expandable cards. Set a GPS waypoint and use Accept / En Route when your callout system supports it.
 - **Arrest status** — Arrest reports no longer show a separate “Open” status; use **Pending** until you close for court. You can attach and detach reports while the arrest is Pending.
 - **Court case view** — Resolved cases show per-charge outcome (Convicted, Acquitted, Dismissed) and total fine and jail time for convicted charges only. Evidence breakdown lists all flags (e.g. intoxicated, fleeing, pat-down, illegal weapon).
-- **In-game notifications** — Update checker and other messages use a police-style icon. MDT Pro logo appears in the browser tab when the MDT is open.
+- **In-game notifications** — Update checker and other messages use a police-style icon. MDT Pro logo appears in the browser tab when the MDT is open. Court trial heard: when a trial is resolved, an in-game notification appears ("Trial X for Firstname Lastname has been heard - to see the outcome check the MDT").
+- **Person Search & Vehicle Search auto-refresh** — Recent IDs, Nearby Vehicles, and Recent Searches refresh every 1 second while the window is open. Freshly gathered IDs and vehicles appear without closing and reopening.
+- **Copy Report ID** — A Copy button next to the Report ID in the General Information section copies the report ID to the clipboard for easy pasting elsewhere.
 - **OpenIV** — Install or uninstall with the .oiv package. For full removal, delete the MDTPro folder from your GTA V directory after uninstalling.
 
 ### Bug fixes
