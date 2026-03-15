@@ -65,14 +65,18 @@ Your GTA V folder should have:
 - Go on duty with LSPDFR. MDT Pro will start its web server and show in-game notifications with the addresses to open the MDT.
 - If you miss the notifications, addresses are also written to `MDTPro/ipAddresses.txt`.
 - Open the MDT in any browser. Chromium-based browsers (e.g. Chrome, Brave) work best. Use one of the shown addresses—if one fails (e.g. firewall), try another.
-- The default port is **8080**. You can change it (and other options) on the **Customization** page (see [Customization](#customization)).
+- The default port is **9000**. You can change it (and other options) on the **Customization** page (see [Customization](#customization)).
+
+### Connecting from another device
+
+If you can't reach the MDT from another device (phone, tablet, another PC on your network), it may be a **Windows Firewall** issue—this is the firewall on your game PC, not your router. Add an inbound rule in Windows Firewall to allow the port MDT Pro uses (9000 by default, or whatever you set in Customization). Without this rule, Windows may block incoming connections from other devices on your network.
 
 ### Setup using Steam overlay
 
 - In Steam: **Steam → Settings → In-Game**.
 - Enable *Enable the Steam Overlay while in-game*.
 - Set *Overlay shortcut key(s)* to the key you want for opening the overlay (and thus the MDT).
-- Set *Web browser home page* to `http://127.0.0.1:8080` (or the address and port shown by MDT Pro).
+- Set *Web browser home page* to `http://127.0.0.1:9000` (or the address and port shown by MDT Pro).
 
 ## UI Usage
 

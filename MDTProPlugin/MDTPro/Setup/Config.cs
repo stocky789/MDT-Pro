@@ -2,7 +2,7 @@
 
 namespace MDTPro.Setup {
     internal class Config {
-        public int port = 8080;
+        public int port = 9000;
         public int maxNumberOfNearbyPedsOrVehicles = 15;
         public int databaseLimitMultiplier = 10;
         /// <summary>Milliseconds between WebSocket pushes for time, location, and map coords. Higher = less CPU; 1000 is smooth for taskbar/map.</summary>
