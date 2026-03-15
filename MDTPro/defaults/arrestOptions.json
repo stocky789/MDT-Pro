@@ -970,7 +970,7 @@
         "maxDays": 365,
         "probation": 0.4,
         "canBeWarrant": true,
-        "canRevokeLicense": false
+        "canRevokeLicense": true
       },
       {
         "name": "Possession Of Stolen Debit / Credit Card",
@@ -980,6 +980,16 @@
         "maxDays": 365,
         "probation": 0.4,
         "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession Of Credit Card Scanning Device",
+        "minFine": 500,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {

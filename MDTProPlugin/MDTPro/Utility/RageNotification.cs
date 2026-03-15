@@ -8,9 +8,8 @@ namespace MDTPro.Utility {
     /// Thread-safe: can be called from any thread; ensures display runs on the game fiber.
     /// </summary>
     internal static class RageNotification {
-        private const string TexturePolice = "CHAR_CALL_POLICE";
+        private const string TextureDefault = "CHAR_CALL911";
         private const string TextureError = "CHAR_BLOCKED";
-        private const string TextureComputer = "CHAR_LS_CUSTOMS";
         private const string TitlePrefix = "MDT Pro";
 
         /// <summary>
@@ -69,9 +68,7 @@ namespace MDTPro.Utility {
         private static (string dict, string name) GetTextureForType(NotificationType type) {
             return type switch {
                 NotificationType.Error => (TextureError, TextureError),
-                NotificationType.Success => (TexturePolice, TexturePolice),
-                NotificationType.Info => (TextureComputer, TextureComputer),
-                _ => (TextureComputer, TextureComputer),
+                _ => (TextureDefault, TextureDefault),
             };
         }
 

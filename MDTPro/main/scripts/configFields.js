@@ -91,6 +91,7 @@ const CONFIG_SECTIONS = [
       'courtEvidenceSupervisionViolationBonus',
       'courtEvidenceResistedBonus',
       'courtEvidenceDrugsBonus',
+      'courtEvidenceUseOfForceBonus',
     ],
   },
   {
@@ -134,6 +135,10 @@ const CONFIG_SECTIONS = [
     ],
   },
   {
+    title: 'Quick Actions Bar',
+    keys: ['quickActionsBarEnabled'],
+  },
+  {
     title: 'Updates',
     keys: [
       'checkForUpdates',
@@ -147,11 +152,11 @@ const PRESET_CUSTOM = { label: 'Custom...', value: '__custom__' }
 const CONFIG_FIELD_META = {
   port: {
     label: 'HTTP port',
-    tooltip: 'The port the MDT web interface runs on (e.g. 8080). You may need to allow this port in your firewall.',
+    tooltip: 'The port the MDT web interface runs on (e.g. 9000). You may need to allow this port in your firewall.',
     presets: [
-      { label: '8080 (default)', value: 8080 },
+      { label: '9000 (default)', value: 9000 },
+      { label: '8080', value: 8080 },
       { label: '3010', value: 3010 },
-      { label: '9000', value: 9000 },
       PRESET_CUSTOM,
     ],
   },
@@ -394,6 +399,10 @@ const CONFIG_FIELD_META = {
     label: 'Drugs found bonus',
     tooltip: 'Evidence points when drugs were found on the person.',
   },
+  courtEvidenceUseOfForceBonus: {
+    label: 'Use of Force documented bonus',
+    tooltip: 'Evidence points when use of force was documented on the arrest report.',
+  },
   courtCaseResolutionMinBase: {
     label: 'Min resolution time (minutes)',
     tooltip: 'Minimum base minutes until a court case is resolved.',
@@ -473,6 +482,10 @@ const CONFIG_FIELD_META = {
   addCalloutSuspectNamesFromMessages: {
     label: 'Add suspect names from callout messages',
     tooltip: 'When callout messages mention names (e.g. "associated with Joe Thomas"), add them as person records so they appear in Person Search. Disable if your callout pack registers suspects with CDF directly.',
+  },
+  quickActionsBarEnabled: {
+    label: 'Show Quick Actions bar',
+    tooltip: 'Show the floating Quick Actions bar (bottom-center) with one-click buttons for Panic, Backup, and Clear ALPR. Requires Policing Redefined for backup actions.',
   },
   checkForUpdates: {
     label: 'Check for updates on load',

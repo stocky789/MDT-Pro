@@ -920,6 +920,346 @@
   }
 }
 
+/* ---------- Quick Actions Bar ---------- */
+.quickActionsBar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-medium);
+  pointer-events: all;
+}
+
+.quickActionsBar.hidden {
+  display: none;
+}
+
+.quickActionsBar .qabBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-family);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background-color var(--transition-time-short) ease, border-color var(--transition-time-short) ease;
+}
+
+.quickActionsBar .qabBtn:hover {
+  background-color: var(--color-accent-half);
+  border-color: var(--color-accent);
+}
+
+.quickActionsBar .qabBtn:active {
+  transform: scale(0.98);
+}
+
+.quickActionsBar .qabBtn svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+}
+
+.quickActionsBar .qabBtn svg.qabIconGroup {
+  fill: currentColor;
+  stroke: none;
+}
+
+.quickActionsBar .qabBtn.qabNotepad svg {
+  fill: currentColor;
+  stroke: none;
+}
+
+.quickActionsBar .qabBtn.qabPanic {
+  color: var(--color-error);
+  border-color: var(--color-error-half);
+}
+
+.quickActionsBar .qabBtn.qabPanic:hover {
+  background-color: var(--color-error-half);
+  border-color: var(--color-error);
+}
+
+.quickActionsBar .qabBtn.qabGps:hover {
+  color: var(--color-map);
+}
+
+.quickActionsBar .qabBackupWrapper {
+  position: relative;
+}
+
+.quickActionsBar .qabBtn.qabBackupMain .qabChevron {
+  margin-left: auto;
+  width: 14px;
+  height: 14px;
+}
+
+.quickActionsBar .qabBtn.qabBackupMain:hover .qabIconGroup,
+.quickActionsBar .qabBackupWrapper:hover .qabBtn.qabBackupMain .qabIconGroup {
+  fill: var(--color-accent);
+}
+
+.quickActionsBar .qabBackupMenu {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 4px;
+  min-width: 200px;
+  max-height: 320px;
+  overflow-y: auto;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: var(--shadow-medium);
+  z-index: 10;
+}
+
+.quickActionsBar .qabBackupMenu.open {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.quickActionsBar .qabBackupSection {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.quickActionsBar .qabBackupSection:last-child {
+  border-bottom: none;
+}
+
+.quickActionsBar .qabBackupSection.qabBackupPursuit {
+  background-color: var(--color-surface-elevated);
+}
+
+.quickActionsBar .qabBackupSection .qabBackupLabel {
+  padding: 6px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.quickActionsBar .qabBackupCodeSelector .qabBackupCodeRow {
+  display: flex;
+  gap: 4px;
+  padding: 4px 12px 8px;
+}
+
+.quickActionsBar .qabBackupCode {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition-time-short) ease, border-color var(--transition-time-short) ease;
+}
+
+.quickActionsBar .qabBackupCode:hover {
+  background-color: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+}
+
+.quickActionsBar .qabBackupCode.active {
+  background-color: var(--color-accent-half);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.quickActionsBar .qabBackupMenu button[role="menuitem"] {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-family: var(--font-family);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition-time-short) ease;
+}
+
+.quickActionsBar .qabBackupMenu button[role="menuitem"]:hover {
+  background-color: var(--color-accent-half);
+}
+
+/* ---------- Notepad popup ---------- */
+.notepadPopup {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition-time-short) ease, visibility var(--transition-time-short) ease;
+}
+
+.notepadPopup.open {
+  pointer-events: all;
+  opacity: 1;
+  visibility: visible;
+}
+
+.notepadPopupBackdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.notepadPopupPanel {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-medium);
+}
+
+.notepadPopupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.notepadPopupTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.notepadPopupClose {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color var(--transition-time-short) ease, background-color var(--transition-time-short) ease;
+}
+
+.notepadPopupClose:hover {
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-elevated);
+}
+
+.notepadPopupText {
+  flex: 1;
+  min-height: 200px;
+  margin: 0;
+  padding: 12px 16px;
+  border: none;
+  resize: vertical;
+  font-family: var(--font-family);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-elevated);
+}
+
+.notepadPopupText:focus {
+  outline: none;
+}
+
+.notepadPopupText::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.notepadPopupActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.notepadPopupActions button {
+  padding: 8px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background-color: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: background-color var(--transition-time-short) ease, border-color var(--transition-time-short) ease;
+}
+
+.notepadPopupActions button:hover {
+  background-color: var(--color-accent-half);
+  border-color: var(--color-accent);
+}
+
+.notepadPopupSave {
+  background-color: var(--color-accent-half) !important;
+  border-color: var(--color-accent) !important;
+  color: var(--color-accent) !important;
+}
+
+.notepadPopupSave:hover {
+  background-color: var(--color-accent) !important;
+  color: var(--color-surface) !important;
+}
+
+@media (max-width: 700px) {
+  .quickActionsBar {
+    bottom: 12px;
+    right: 12px;
+    padding: 8px 10px;
+  }
+
+  .quickActionsBar .qabBtn span {
+    display: none;
+  }
+
+  .quickActionsBar .qabBtn {
+    padding: 10px;
+    justify-content: center;
+  }
+}
+
 @media (max-width: 480px) {
   .taskbarTitle {
     display: none;

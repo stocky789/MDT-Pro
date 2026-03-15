@@ -12,6 +12,10 @@
   const dayDetailTitle = document.querySelector('.dayDetailTitle')
   const dayDetailContent = document.querySelector('.dayDetailContent')
 
+  if (!monthTitle || !prevBtn || !nextBtn || !weekdayHeaders || !daysEl || !dayDetailTitle || !dayDetailContent) {
+    return
+  }
+
   async function loadReports() {
     const [citations, arrests, incidents, shiftHistory, currentShift] = await Promise.all([
       fetch('/data/citationReports').then((r) => r.json()).catch(() => []),
@@ -191,8 +195,8 @@
     renderMonth()
   }
 
-  prevBtn.addEventListener('click', goPrevMonth)
-  nextBtn.addEventListener('click', goNextMonth)
+  if (prevBtn) prevBtn.addEventListener('click', goPrevMonth)
+  if (nextBtn) nextBtn.addEventListener('click', goNextMonth)
 
   await loadReports()
   renderMonth()

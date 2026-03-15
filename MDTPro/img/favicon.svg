@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- Shield outline - no fill behind it, transparent -->
-  <path fill="#c9a227" d="M16 2L28 9v9L16 30 4 18V9L16 2z"/>
-  <!-- Star -->
-  <path fill="#c9a227" d="M16 9l1.8 3.6 4 .6-2.9 2.8.7 4L16 17.5l-3.6 1.9.7-4-2.9-2.8 4-.6L16 9z"/>
-</svg>

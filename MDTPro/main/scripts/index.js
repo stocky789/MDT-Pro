@@ -3,6 +3,127 @@
   const language = await getLanguage()
   if (config.updateDomWithLanguageOnLoad) await updateDomWithLanguage('index')
   applySettingsInfoTooltips(language)
+
+  // Quick Actions Bar visibility and handlers
+  const quickActionsBar = document.getElementById('quickActionsBar')
+  const qabBackupMenu = document.getElementById('qabBackupMenu')
+  const requestBackupAction = async (action, btnEl) => {
+    const code = parseInt(qabBackupMenu?.querySelector('.qabBackupCode.active')?.dataset?.code ?? '2', 10) || 2
+    const res = await (await fetch('/post/requestBackup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, responseCode: code })
+    })).json()
+    if (res?.success) topWindow.showNotification(language.quickActions?.backupSuccess || 'Backup requested.', 'checkMark')
+    else topWindow.showNotification(res?.error || 'Backup request failed.', 'warning')
+    if (btnEl) btnEl.classList.remove('loading')
+  }
+  if (quickActionsBar) {
+    quickActionsBar.classList.toggle('hidden', config.quickActionsBarEnabled === false)
+    // Backup dropdown toggle
+    const qabBackupMain = quickActionsBar.querySelector('.qabBackupMain')
+    if (qabBackupMain && qabBackupMenu) {
+      qabBackupMain.addEventListener('click', function (e) {
+        e.stopPropagation()
+        const isOpen = qabBackupMenu.classList.toggle('open')
+        qabBackupMain.setAttribute('aria-expanded', String(isOpen))
+      })
+      document.addEventListener('click', function (ev) {
+        if (qabBackupMenu.classList.contains('open') && !qabBackupMain.contains(ev.target) && !qabBackupMenu.contains(ev.target)) {
+          qabBackupMenu.classList.remove('open')
+          qabBackupMain.setAttribute('aria-expanded', 'false')
+        }
+      })
+      qabBackupMenu.querySelectorAll('.qabBackupCode').forEach((codeBtn) => {
+        codeBtn.addEventListener('click', function (e) {
+          e.stopPropagation()
+          qabBackupMenu.querySelectorAll('.qabBackupCode').forEach((b) => { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false') })
+          codeBtn.classList.add('active')
+          codeBtn.setAttribute('aria-pressed', 'true')
+        })
+      })
+      qabBackupMenu.querySelectorAll('button[role="menuitem"]').forEach((mi) => {
+        mi.addEventListener('click', async function (e) {
+          e.stopPropagation()
+          const action = this.dataset.action
+          if (!action) return
+          qabBackupMenu.classList.remove('open')
+          qabBackupMain.setAttribute('aria-expanded', 'false')
+          qabBackupMain.classList.add('loading')
+          try { await requestBackupAction(action, qabBackupMain) } catch (e) { topWindow.showNotification(language.quickActions?.error || 'Action failed.', 'error'); qabBackupMain.classList.remove('loading') }
+        })
+      })
+    }
+    // Notepad: open popup (excluded from loading/API flow below)
+    const notepadBtn = quickActionsBar.querySelector('.qabBtn[data-action="notepad"]')
+    const notepadPopup = document.getElementById('notepadPopup')
+    const notepadText = document.getElementById('notepadText')
+    const NOTEPAD_STORAGE_KEY = 'mdt-notepad'
+    if (notepadBtn && notepadPopup && notepadText) {
+      const openNotepad = () => {
+        notepadText.value = localStorage.getItem(NOTEPAD_STORAGE_KEY) || ''
+        notepadPopup.classList.add('open')
+        notepadPopup.setAttribute('aria-hidden', 'false')
+        notepadText.focus()
+      }
+      const closeNotepad = () => {
+        notepadPopup.classList.remove('open')
+        notepadPopup.setAttribute('aria-hidden', 'true')
+      }
+      notepadBtn.addEventListener('click', function () {
+        openNotepad()
+      })
+      notepadPopup.querySelectorAll('[data-notepad-close]').forEach((el) => {
+        el.addEventListener('click', closeNotepad)
+      })
+      notepadPopup.querySelector('.notepadPopupSave')?.addEventListener('click', function () {
+        localStorage.setItem(NOTEPAD_STORAGE_KEY, notepadText.value)
+        topWindow.showNotification(language.quickActions?.notepadSaved || 'Notepad saved.', 'checkMark')
+      })
+      notepadPopup.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeNotepad()
+      })
+    }
+
+    // Panic, ALPR and other qabBtn (excluding backup and notepad which have their own handlers)
+    quickActionsBar.querySelectorAll('.qabBtn:not(.qabBackupMain):not([data-action="notepad"])').forEach((btn) => {
+      btn.addEventListener('click', async function () {
+        const action = this.dataset.action
+        if (!action) return
+        if (this.classList.contains('loading')) return
+        this.classList.add('loading')
+        try {
+          if (action === 'panic') {
+            const res = await (await fetch('/post/requestBackup', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'panic' })
+            })).json()
+            if (res?.success) topWindow.showNotification(language.quickActions?.panicSuccess || 'Panic backup requested.', 'checkMark')
+            else topWindow.showNotification(res?.error || 'Backup request failed.', 'warning')
+          } else if (action === 'alpr') {
+            const url = (typeof location !== 'undefined' && location.origin) ? `${location.origin}/post/alprClear` : '/post/alprClear'
+            const alprRes = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: '{}'
+            })
+            if (alprRes.ok) {
+              const notificationsEl = topDoc.querySelector('.overlay .notifications')
+              if (notificationsEl) {
+                notificationsEl.querySelectorAll('.alpr-popup').forEach((el) => el.remove())
+              }
+              topWindow.showNotification(language.quickActions?.alprCleared || 'ALPR cleared.', 'checkMark')
+            } else topWindow.showNotification(language.quickActions?.error || 'Action failed.', 'warning')
+          }
+        } catch (e) {
+          topWindow.showNotification(language.quickActions?.error || 'Action failed.', 'error')
+        } finally {
+          this.classList.remove('loading')
+        }
+      })
+    })
+  }
   const version = await (await fetch('/version')).text()
   document.querySelector('.overlay .settings .version').innerHTML =
     `${language.index.settings.version}: ${version}`
@@ -230,8 +351,21 @@ locationWS.onclose = async () => {
 const desktopItems = document.querySelectorAll('.desktop .desktopItem')
 
 for (const desktopItem of desktopItems) {
-  desktopItem.addEventListener('click', function () {
-    openWindow(this.dataset.name)
+  desktopItem.addEventListener('click', async function () {
+    const name = this.dataset.name
+    if (!name) return
+    try {
+      await openWindow(name)
+    } catch (e) {
+      const msg = e?.message || String(e)
+      console.error('openWindow failed:', name, e)
+      if (typeof topWindow.showNotification === 'function') {
+        topWindow.showNotification(
+          (await getLanguage()).index?.notifications?.errorLoadingPage || 'Failed to open: ' + name + (msg ? ' — ' + msg : ''),
+          'error'
+        )
+      }
+    }
   })
 }
 
@@ -251,12 +385,14 @@ async function openWindow(name, pluginId = null) {
   ]
 
   const existingWindows = document.querySelectorAll('.overlay .windows .window')
-
+  // Stagger offset so multiple windows don't fully overlap (avoids clicks hitting wrong window)
+  const staggerPx = 36
+  const staggerIndex = Math.min(existingWindows.length, 12)
   const windowElement = document.createElement('div')
   windowElement.style.width = `${size[0]}px`
   windowElement.style.height = `${size[1]}px`
-  windowElement.style.left = `${offset[0] + existingWindows.length * 25}px`
-  windowElement.style.top = `${offset[1] + existingWindows.length * 25}px`
+  windowElement.style.left = `${offset[0] + staggerIndex * staggerPx}px`
+  windowElement.style.top = `${offset[1] + staggerIndex * staggerPx}px`
   windowElement.style.scale = '0'
   windowElement.classList.add('window')
 
@@ -500,6 +636,26 @@ async function openWindow(name, pluginId = null) {
   requestAnimationFrame(() => {
     taskbarIcon.style.opacity = '1'
   })
+}
+
+/**
+ * Bring a specific window to front (for use when reusing e.g. Reports window).
+ * Called from root.js so that "Open report from ped/vehicle" always raises the Reports window.
+ */
+function focusWindowByElement(windowEl) {
+  if (!windowEl || !windowEl.classList?.contains('window')) return
+  document.querySelectorAll('.overlay .windows .window').forEach((win) => {
+    win.style.zIndex = ''
+  })
+  windowEl.style.zIndex = '3'
+  windowEl.classList.remove('minimized')
+  const windows = document.querySelectorAll('.overlay .windows .window')
+  const taskbarWindows = document.querySelectorAll('.taskbar .icons button.taskbarWindow')
+  const index = Array.from(windows).indexOf(windowEl)
+  if (index >= 0 && taskbarWindows[index]) {
+    taskbarWindows.forEach((btn) => btn.classList.remove('focused'))
+    taskbarWindows[index].classList.add('focused')
+  }
 }
 
 document.addEventListener('mousedown', function (e) {

@@ -2,18 +2,20 @@ body {
   background-color: var(--color-background);
   margin: 0;
   overflow: hidden;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .listPage,
 .createPage {
-  padding: 12px;
+  padding: 16px 20px;
   background-color: var(--color-background);
 }
 
 .listWrapper {
   display: grid;
-  grid-template-columns: minmax(140px, 1fr) 3fr;
-  gap: 12px;
+  grid-template-columns: minmax(160px, 1fr) 3fr;
+  gap: 20px;
   min-height: 0;
 }
 
@@ -25,31 +27,36 @@ body {
 
 .buttonWrapper:has(.createButton),
 .buttonWrapper:has(.saveButton) {
-  margin-bottom: 12px;
-  padding-bottom: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
   border-bottom: 1px solid var(--color-border);
   display: flex;
-  gap: 8px;
+  gap: 10px;
+}
+
+.buttonWrapper:has(.cancelButton),
+.buttonWrapper:has(.saveButton) button {
+  min-width: 100px;
+  padding: 10px 16px;
+  font-size: 14px;
 }
 
 .typeSelector {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 8px 0;
+  gap: 4px;
+  padding: 10px 12px;
   border-right: 1px solid var(--color-border);
-  max-height: calc(100vh - 100px);
+  max-height: calc(100vh - 120px);
   overflow: auto;
   background-color: var(--color-surface);
-  padding-left: 8px;
-  padding-right: 8px;
 }
 
 .typeSelector button {
   width: 100%;
   text-align: left;
-  padding: 10px 12px;
-  border-radius: var(--radius-small);
+  padding: 10px 14px;
+  border-radius: 4px;
   font-size: 13px;
   font-weight: 500;
   transition: background-color var(--transition-time-short) ease;
@@ -59,20 +66,51 @@ body {
   background-color: var(--color-surface-elevated);
 }
 
+.createPage .reportInformation {
+  padding-right: 8px;
+}
+
 .createPage .reportInformation .section .title {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   border-bottom: 1px solid var(--color-border);
-  color: var(--color-text-primary-dimmed);
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  letter-spacing: 0.04em;
+  color: var(--color-text-primary);
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .createPage .reportInformation .section:not(:first-child) .title {
-  margin-top: 16px;
-  padding-top: 16px;
+  margin-top: 20px;
+  padding-top: 20px;
   border-top: 1px solid var(--color-border);
+}
+
+.createPage .reportInformation .section .inputWrapper {
+  --gap: 14px;
+}
+
+.createPage .reportInformation .section .inputWrapper > div label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary-dimmed);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.createPage .reportInformation .section .inputWrapper > div input,
+.createPage .reportInformation .section .inputWrapper > div select,
+.createPage .reportInformation .section .inputWrapper > div textarea {
+  font-size: 14px;
+  padding: 8px 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.createPage .reportInformation .section .inputWrapper > div textarea {
+  min-height: 80px;
+  resize: vertical;
 }
 
 .createPage
@@ -86,6 +124,23 @@ body {
   .time
   input::-webkit-calendar-picker-indicator {
   display: none;
+}
+
+/* Report ID row: input + Copy button */
+.reportId .reportIdRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.reportId .reportIdRow input {
+  flex: 1;
+  min-width: 0;
+}
+.reportId .copyReportIdBtn {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .inputWrapper .status .statusInput:has(button) {
@@ -364,6 +419,18 @@ body {
   color: var(--color-text-primary-half);
 }
 
+.listPage .reportsList .listElement .infoWrapper .textWrapper .idRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.listPage .reportsList .listElement .infoWrapper .textWrapper .idRow .listCopyBtn {
+  padding: 2px 8px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
 .listPage .reportsList .listElement .infoWrapper .status {
   padding: 4px 10px;
   border-radius: var(--radius-small);
@@ -481,4 +548,255 @@ body {
   .listPage .reportsList .listElement .infoWrapper .status {
     margin-left: auto;
   }
+}
+
+/* Injury report: Recent IDs list (same as Person Search – select identified peds) */
+.injurySection .injuryRecentIdsRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.injurySection .injuryRecentIdsRow label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary-dimmed);
+}
+
+.injurySection .injuryRecentIdsList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.injurySection .injuryRecentIdsList .injuryRecentIdItem {
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.injurySection .injuryRecentIdsList .injuryRecentIdItem:hover {
+  background: var(--color-surface);
+  border-color: var(--color-accent);
+}
+
+.injurySection .injuryRecentIdType {
+  color: var(--color-text-primary-half);
+  font-size: 12px;
+}
+
+/* Injury: grid field that should span full width (e.g. textarea) */
+.injurySection .inputWrapper.grid .fullWidth {
+  grid-column: 1 / -1;
+}
+
+/* Impound: full-width field (Impound Lot) for long address text */
+.impoundSection .inputWrapper.grid .fullWidth {
+  grid-column: 1 / -1;
+}
+
+/* Impound: nearby vehicles row – click to prefill form */
+.impoundSection .impoundNearbyRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.impoundSection .impoundNearbyLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary-dimmed);
+}
+
+.impoundSection .impoundNearbyHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.impoundSection .impoundNearbyRefresh {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.impoundSection .impoundNearbyList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.impoundSection .impoundNearbyList .impoundNearbyItem {
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.impoundSection .impoundNearbyList .impoundNearbyItem.stolen {
+  color: var(--color-error);
+}
+
+.injurySection .inputWrapper.grid .fullWidth textarea {
+  width: 100%;
+  min-height: 88px;
+}
+
+/* Use of Force: compact grid layout */
+.useOfForceSection .useOfForceFields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.useOfForceSection .useOfForceRow label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary-dimmed);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.useOfForceSection .useOfForceTypeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: flex-end;
+}
+
+.useOfForceSection .useOfForceTypeRow > label {
+  flex: 0 0 auto;
+}
+
+.useOfForceSection .useOfForceTypeRow > select {
+  flex: 0 0 auto;
+  min-width: 120px;
+  font-size: 14px;
+  padding: 6px 10px;
+}
+
+.useOfForceSection .useOfForceTypeRow .useOfForceTypeOtherWrapper {
+  flex: 1 1 180px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.useOfForceSection .useOfForceJustificationRow textarea {
+  width: 100%;
+  min-height: 56px;
+  resize: vertical;
+  font-size: 14px;
+  padding: 8px 10px;
+  box-sizing: border-box;
+}
+
+.useOfForceSection .useOfForceInjuryRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px 24px;
+  align-items: center;
+}
+
+.useOfForceSection .useOfForceInjuryRow label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0;
+  cursor: pointer;
+  font-weight: 400;
+}
+
+.useOfForceSection .useOfForceInjuryRow input[type="checkbox"] {
+  margin: 0;
+}
+
+.useOfForceSection .useOfForceWitnessesRow input {
+  font-size: 14px;
+  padding: 6px 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+
+/* Arrest: attached reports evidence help – so it’s clear only attached reports count */
+.arrestAttachedReportsSection {
+  margin-top: 20px;
+}
+
+.arrestAttachedReportsSection .sectionTitle {
+  margin-bottom: 8px;
+}
+
+.arrestAttachedReportsSection .arrestAttachedReportsHelp {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-text-primary-half, #666);
+  margin: 0 0 16px 0;
+  max-width: 52em;
+}
+
+.arrestAttachedReportsSection .attachedReportIdsList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.arrestAttachedReportsSection .attachedReportIdRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--color-bg-secondary, rgba(0, 0, 0, 0.08));
+  border-radius: 6px;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+}
+
+.arrestAttachedReportsSection .attachedReportIdRowInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.arrestAttachedReportsSection .attachedReportIdRowId {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.arrestAttachedReportsSection .attachedReportIdRowMeta {
+  font-size: 12px;
+  color: var(--color-text-primary-half, #888);
+}
+
+.arrestAttachedReportsSection .attachReportWrap {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.arrestAttachedReportsSection .attachReportWrap input.attachReportIdInput {
+  flex: 1;
+  min-width: 0;
+}
+
+.arrestAttachedReportsSection .closeArrestButton {
+  margin-top: 8px;
 }

@@ -79,9 +79,7 @@ namespace MDTPro.ServerAPI {
                                 }
                                 break;
                             case "calloutEvent":
-                                if (CalloutEvents.CalloutInfo != null) {
-                                    SendData(webSocket, JsonConvert.SerializeObject(CalloutEvents.CalloutInfo), clientMsg).Wait();
-                                }
+                                SendData(webSocket, JsonConvert.SerializeObject(new { callouts = CalloutEvents.CalloutList }), clientMsg).Wait();
 
                                 CalloutEvents.OnCalloutEvent += OnCalloutEvent;
 
@@ -90,7 +88,7 @@ namespace MDTPro.ServerAPI {
                                         CalloutEvents.OnCalloutEvent -= OnCalloutEvent;
                                         return;
                                     }
-                                    SendData(webSocket, JsonConvert.SerializeObject(calloutInfo), clientMsg).Wait();
+                                    SendData(webSocket, JsonConvert.SerializeObject(new { callouts = CalloutEvents.CalloutList }), clientMsg).Wait();
                                 }
                                 break;
                             default:

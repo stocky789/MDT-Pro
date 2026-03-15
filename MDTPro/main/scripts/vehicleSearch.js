@@ -22,6 +22,29 @@
 
   await loadNearbyVehicles()
   await loadSearchHistory()
+
+  // Auto-refresh nearby vehicles and search history every 1 second for real-time updates
+  const REFRESH_INTERVAL_MS = 1000
+  let refreshTimer = null
+  function startRefreshTimer() {
+    if (refreshTimer) return
+    refreshTimer = setInterval(async () => {
+      if (document.hidden) return
+      await loadNearbyVehicles()
+      await loadSearchHistory()
+    }, REFRESH_INTERVAL_MS)
+  }
+  function stopRefreshTimer() {
+    if (refreshTimer) {
+      clearInterval(refreshTimer)
+      refreshTimer = null
+    }
+  }
+  document.addEventListener('visibilitychange', () => {
+    document.hidden ? stopRefreshTimer() : startRefreshTimer()
+  })
+  if (!document.hidden) startRefreshTimer()
+  window.addEventListener('pagehide', stopRefreshTimer)
 })()
 
 document
@@ -142,15 +165,14 @@ async function performSearch(query) {
     )
     return
   }
-  const response = await (
-    await fetch('/data/specificVehicle', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: query,
-    })
-  ).json()
+  const res = await fetch('/data/specificVehicle', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: query,
+  })
+  const response = res.ok ? await res.json().catch(() => null) : null
 
   if (!response) {
     topWindow.showNotification(
@@ -234,20 +256,23 @@ async function performSearch(query) {
     }
   }
 
+  document
+    .querySelectorAll(
+      '.searchResponseWrapper .vehicleSearchRecordsSection, .searchResponseWrapper .vehicleSearchRecordsTitle, .searchResponseWrapper .impoundActionSection, .searchResponseWrapper .impoundReportsSection, .searchResponseWrapper .impoundReportsTitle'
+    )
+    .forEach((el) => el?.remove())
+
   // Vehicle search records (contraband from PR vehicle search)
-  const searchRecordsResponse = await (
-    await fetch('/data/vehicleSearchByPlate', {
+  let searchRecordsResponse = []
+  try {
+    const res = await fetch('/data/vehicleSearchByPlate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(response.LicensePlate ?? ''),
     })
-  ).json()
-
-  document
-    .querySelectorAll(
-      '.searchResponseWrapper .vehicleSearchRecordsSection, .searchResponseWrapper .vehicleSearchRecordsTitle'
-    )
-    .forEach((el) => el?.remove())
+    if (res.ok) searchRecordsResponse = await res.json()
+  } catch (_) {}
+  if (!Array.isArray(searchRecordsResponse)) searchRecordsResponse = []
 
   // BOLOs section (Be On the Look-Out)
   const boloPlaceholder = document.querySelector('.searchResponseWrapper .boloSectionPlaceholder')
@@ -263,10 +288,10 @@ async function performSearch(query) {
   boloTitle.innerHTML = language.vehicleSearch?.static?.bolosTitle || 'BOLOs (Be On the Look-Out)'
   boloSection.appendChild(boloTitle)
 
-  if (!canModifyBOLOs) {
+  if (!canModifyBOLOs && bolos.length > 0) {
     const hint = document.createElement('div')
     hint.classList.add('boloHint')
-    hint.textContent = language.vehicleSearch?.static?.boloVehicleRequired || 'Vehicle must be nearby to add or remove BOLOs.'
+    hint.textContent = language.vehicleSearch?.static?.boloRemoveVehicleRequired || 'Vehicle must be nearby to remove BOLOs.'
     boloSection.appendChild(hint)
   }
 
@@ -315,16 +340,92 @@ async function performSearch(query) {
   addBtn.type = 'button'
   addBtn.classList.add('boloAddBtn')
   addBtn.textContent = language.vehicleSearch?.static?.addBOLO || 'Add BOLO'
-  addBtn.disabled = !canModifyBOLOs
-  if (canModifyBOLOs) {
-    addBtn.addEventListener('click', () => showAddBOLOModal(response, language, performSearch))
-  } else {
-    addBtn.title = language.vehicleSearch?.static?.boloVehicleRequired || 'Vehicle must be nearby to add or remove BOLOs.'
-  }
+  addBtn.addEventListener('click', () => showAddBOLOModal(response, language, performSearch))
   boloSection.appendChild(addBtn)
   if (boloPlaceholder) {
     boloPlaceholder.appendChild(boloSection)
   }
+
+  // Previous impound reports for this vehicle (by plate) — persisted in SQL, so re-encounters show history
+  let impoundReports = []
+  try {
+    const plate = (response.LicensePlate != null && response.LicensePlate !== '') ? response.LicensePlate : ''
+    const res = await fetch('/data/impoundReportsByPlate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(plate),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      impoundReports = Array.isArray(data) ? data : []
+    }
+  } catch (_) {
+    impoundReports = []
+  }
+  if (impoundReports.length > 0) {
+    const impoundReportsTitle = document.createElement('div')
+    impoundReportsTitle.classList.add('searchResponseSectionTitle', 'impoundReportsTitle')
+    impoundReportsTitle.innerHTML =
+      language.vehicleSearch?.static?.impoundReportsTitle || 'Impound Reports'
+    document.querySelector('.searchResponseWrapper').appendChild(impoundReportsTitle)
+
+    const impoundReportsSection = document.createElement('div')
+    impoundReportsSection.classList.add('inputWrapper', 'grid', 'impoundReportsSection')
+    document.querySelector('.searchResponseWrapper').appendChild(impoundReportsSection)
+
+    const openFn =
+      (typeof topWindow !== 'undefined' && typeof topWindow.openIdInReport === 'function')
+        ? topWindow.openIdInReport
+        : (typeof openIdInReport === 'function' ? openIdInReport : null)
+
+    for (const r of impoundReports) {
+      const row = document.createElement('div')
+      row.classList.add('clickable')
+      if (openFn) {
+        row.addEventListener('click', () => openFn(r.Id, 'impound'))
+      }
+
+      const label = document.createElement('label')
+      label.textContent = language.reports?.list?.reportType?.impound || 'Impound'
+
+      const input = document.createElement('input')
+      input.type = 'text'
+      input.disabled = true
+      const dateStr = r.TimeStamp ? new Date(r.TimeStamp).toLocaleDateString() : ''
+      const reason = r.ImpoundReason || ''
+      input.value = `${r.Id || ''}${dateStr ? ` - ${dateStr}` : ''}${reason ? ` - ${reason}` : ''}`
+
+      row.appendChild(label)
+      row.appendChild(input)
+      impoundReportsSection.appendChild(row)
+    }
+  }
+
+  const impoundSection = document.createElement('div')
+  impoundSection.classList.add('impoundActionSection', 'searchResponseSectionTitle')
+  const impoundBtn = document.createElement('button')
+  impoundBtn.type = 'button'
+  impoundBtn.classList.add('createImpoundBtn')
+  impoundBtn.textContent = language.vehicleSearch?.createImpoundReport || 'Create Impound Report'
+  impoundBtn.addEventListener('click', () => {
+    const fn = (typeof topWindow !== 'undefined' && topWindow.openReportWithPrefill) ? topWindow.openReportWithPrefill : (typeof openReportWithPrefill === 'function' ? openReportWithPrefill : null)
+    if (fn) {
+      fn('impound', {
+        source: 'vehicleSearch',
+        vehiclePlate: response.LicensePlate,
+        vehicleData: {
+          LicensePlate: response.LicensePlate,
+          ModelDisplayName: response.ModelDisplayName,
+          ModelName: response.ModelName,
+          Owner: response.Owner,
+          VehicleIdentificationNumber: response.VehicleIdentificationNumber,
+          VinStatus: response.VinStatus
+        }
+      })
+    }
+  })
+  impoundSection.appendChild(impoundBtn)
+  document.querySelector('.searchResponseWrapper').appendChild(impoundSection)
 
   if (searchRecordsResponse && searchRecordsResponse.length > 0) {
     const sectionTitle = document.createElement('div')
@@ -355,32 +456,71 @@ async function performSearch(query) {
   await loadSearchHistory()
 }
 
-async function showAddBOLOModal(vehicleResponse, language, onSuccess) {
-  const reason = prompt(language.vehicleSearch?.static?.boloReasonPrompt || 'Enter BOLO reason:')
-  if (reason == null || !reason.trim()) return
-  const expiresDays = prompt(language.vehicleSearch?.static?.boloExpiresPrompt || 'Expires in how many days? (default 7):', '7')
-  let days = 7
-  if (expiresDays != null && expiresDays.trim()) {
-    const n = parseInt(expiresDays, 10)
-    if (!isNaN(n) && n > 0) days = n
+function showAddBOLOModal(vehicleResponse, language, onSuccess) {
+  const modal = document.getElementById('addBoloModal')
+  const form = document.getElementById('addBoloForm')
+  const plateInput = document.getElementById('addBoloPlate')
+  const reasonInput = document.getElementById('addBoloReason')
+  const expiresInput = document.getElementById('addBoloExpires')
+  const cancelBtn = document.querySelector('.addBoloModalCancel')
+  if (!modal || !form) return
+  plateInput.value = vehicleResponse?.LicensePlate || ''
+  reasonInput.value = ''
+  expiresInput.value = '7'
+  modal.classList.remove('hidden')
+  reasonInput.focus()
+  function closeModal() {
+    modal.classList.add('hidden')
   }
-  const expires = new Date()
-  expires.setDate(expires.getDate() + days)
-  const res = await (await fetch('/post/addBOLO', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      LicensePlate: vehicleResponse.LicensePlate,
-      Reason: reason.trim(),
-      ExpiresAt: expires.toISOString(),
-      IssuedBy: 'LSPD'
-    })
-  })).json()
-  if (res && res.success) {
-    topWindow.showNotification(language.vehicleSearch?.notifications?.boloAdded || 'BOLO added.', 'checkMark')
-    if (typeof onSuccess === 'function') await onSuccess(vehicleResponse.LicensePlate)
-  } else {
-    topWindow.showNotification(res?.error || 'Failed to add BOLO.', 'warning')
+  const cancelHandler = () => {
+    cancelBtn.removeEventListener('click', cancelHandler)
+    form.onsubmit = null
+    modal.onclick = null
+    closeModal()
+  }
+  form.onsubmit = async (e) => {
+    e.preventDefault()
+    const reason = reasonInput?.value?.trim()
+    if (!reason) return
+    const expiresDays = parseInt(expiresInput?.value || '7', 10)
+    const days = isNaN(expiresDays) || expiresDays < 1 ? 7 : Math.min(365, Math.max(1, expiresDays))
+    const expires = new Date()
+    expires.setDate(expires.getDate() + days)
+    const submitBtn = form.querySelector('.addBoloModalSubmit')
+    if (submitBtn) submitBtn.disabled = true
+    try {
+      const res = await (await fetch('/post/addBOLO', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          LicensePlate: vehicleResponse.LicensePlate,
+          Reason: reason,
+          ExpiresAt: expires.toISOString(),
+          IssuedBy: 'LSPD',
+          ModelDisplayName: vehicleResponse?.ModelDisplayName || undefined
+        })
+      })).json()
+      if (res && res.success) {
+        if (typeof topWindow !== 'undefined' && typeof topWindow.showNotification === 'function') {
+          topWindow.showNotification(language.vehicleSearch?.notifications?.boloAdded || 'BOLO added.', 'checkMark')
+        }
+        cancelHandler()
+        if (typeof onSuccess === 'function') await onSuccess(vehicleResponse.LicensePlate)
+      } else {
+        if (typeof topWindow !== 'undefined' && typeof topWindow.showNotification === 'function') {
+          topWindow.showNotification(res?.error || 'Failed to add BOLO.', 'warning')
+        }
+      }
+    } catch (_) {
+      if (typeof topWindow !== 'undefined' && typeof topWindow.showNotification === 'function') {
+        topWindow.showNotification('Failed to add BOLO.', 'warning')
+      }
+    }
+    if (submitBtn) submitBtn.disabled = false
+  }
+  cancelBtn.addEventListener('click', cancelHandler)
+  modal.onclick = (e) => {
+    if (e.target === modal) cancelHandler()
   }
 }
 

@@ -2,7 +2,7 @@
 
 namespace MDTPro.Setup {
     internal class Config {
-        public int port = 8080;
+        public int port = 9000;
         public int maxNumberOfNearbyPedsOrVehicles = 15;
         public int databaseLimitMultiplier = 10;
         /// <summary>Milliseconds between WebSocket pushes for time, location, and map coords. Higher = less CPU; 1000 is smooth for taskbar/map.</summary>
@@ -61,6 +61,25 @@ namespace MDTPro.Setup {
         public float courtEvidenceSupervisionViolationBonus = 22f;
         public float courtEvidenceResistedBonus = 15f;
         public float courtEvidenceDrugsBonus = 12f;
+        public float courtEvidenceUseOfForceBonus = 10f;
+        /// <summary>Per attached incident report (evidence for court).</summary>
+        public float courtEvidenceIncidentReportBonus = 10f;
+        /// <summary>Per attached injury report (evidence for court).</summary>
+        public float courtEvidenceInjuryReportBonus = 8f;
+        /// <summary>Per attached citation report, same ped (evidence for court).</summary>
+        public float courtEvidenceCitationReportBonus = 3f;
+        /// <summary>Per attached traffic incident report (e.g. DUI/collision cases).</summary>
+        public float courtEvidenceTrafficIncidentReportBonus = 6f;
+        /// <summary>Per attached impound report (e.g. stolen recovery, evidence).</summary>
+        public float courtEvidenceImpoundReportBonus = 5f;
+        /// <summary>Per attached report that does not meet relevance (e.g. impound on a drug case, incident that doesn't name defendant). Still counts so tangential evidence (e.g. stolen firearm in a drug case) is not ignored; just carries less weight than directly relevant reports.</summary>
+        public float courtEvidenceOtherAttachedReportBonus = 3f;
+        /// <summary>Bonus when primary arrest report Notes length exceeds courtEvidenceReportNotesMinLength.</summary>
+        public float courtEvidenceReportNotesBonus = 8f;
+        /// <summary>Minimum Notes length (chars) on arrest report to get courtEvidenceReportNotesBonus.</summary>
+        public int courtEvidenceReportNotesMinLength = 100;
+        /// <summary>Max conviction chance (%) for homicide charge when no death/fatal injury report is attached. 0 = no cap.</summary>
+        public int courtConvictionHomicideNoDeathReportCap = 25;
         public float courtCaseResolutionMinBase = 20f;
         public float courtCaseResolutionMaxMinutes = 300f;
         public float courtCaseResolutionSeverityScale = 12f;
@@ -111,5 +130,8 @@ namespace MDTPro.Setup {
         public int alprHudOffsetY = 150;
         /// <summary>Scale factor for the ALPR HUD panel size (1.0 = default). Clamped 0.75–2.0 in code.</summary>
         public float alprHudScale = 1.0f;
+
+        /// <summary>Show the Quick Actions bar (backup, panic, set GPS, clear ALPR) on the desktop.</summary>
+        public bool quickActionsBarEnabled = true;
     }
 }
