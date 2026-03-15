@@ -4,7 +4,7 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
-## [0.9.5.0] — 2026-03-12
+## [0.9.5.0] — 2026-03-15
 
 ### Court & evidence
 
