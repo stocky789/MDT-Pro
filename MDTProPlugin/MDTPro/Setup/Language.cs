@@ -537,11 +537,6 @@ namespace MDTPro.Setup {
                     public string treatment = "Treatment";
                     public string incidentContext = "Incident context";
                     public string linkedReportId = "Linked report ID";
-                    public string importFromGame = "Import from game";
-                    public string basedOnDamageTracker = "Based on in-game damage (DamageTrackerFramework).";
-                    public string basedOnHealth = "Based on current health/armor.";
-                    public string noGameData = "No in-game data for this person. Ensure they are nearby or use DamageTrackerFramework.";
-                    public string importError = "Could not load game data.";
                     public string selectFromRecentIds = "Select injured party (Recent IDs)";
                     public string noRecentIds = "No recent IDs. Collect an ID from a ped (e.g. traffic stop) to show them here.";
                     public string recentIdsError = "Could not load Recent IDs.";

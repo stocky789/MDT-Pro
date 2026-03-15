@@ -783,7 +783,7 @@ namespace MDTPro.Data {
             }
         }
 
-        /// <summary>Marks a ped as deceased. Updates in-memory ped and persists to DB. Called when DTF reports death. Idempotent: skips if already marked.</summary>
+        /// <summary>Marks a ped as deceased. Updates in-memory ped and persists to DB. Idempotent: skips if already marked.</summary>
         internal static void MarkPedDeceased(string pedName, string attackerName = null, string weaponInfo = null) {
             if (string.IsNullOrWhiteSpace(pedName)) return;
             var existing = GetPedDataByName(pedName);

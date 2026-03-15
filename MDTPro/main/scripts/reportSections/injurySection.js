@@ -39,12 +39,11 @@ async function getInjurySection (data = {}, isList = false) {
               span.textContent = ` (${entry.Type})`
               btn.appendChild(span)
             }
-            btn.addEventListener('click', async function () {
+            btn.addEventListener('click', function () {
               const name = (btn.dataset.pedName || '').trim()
               if (!name) return
               const pedNameInput = section.querySelector('#injurySectionInjuredPartyInput')
               if (pedNameInput) pedNameInput.value = name
-              await applyInjuryGameDataToSection(section, name, labels)
             })
             recentIdsList.appendChild(btn)
           }
@@ -116,61 +115,5 @@ async function getInjurySection (data = {}, isList = false) {
 
   section.appendChild(wrapper)
 
-  if (!isList) {
-    const gameDataRow = document.createElement('div')
-    gameDataRow.classList.add('inputWrapper', 'injuryGameDataRow')
-    const importBtn = document.createElement('button')
-    importBtn.type = 'button'
-    importBtn.className = 'button importInjuryFromGameBtn'
-    importBtn.textContent = labels.importFromGame || 'Import from game'
-    const gameDataNote = document.createElement('div')
-    gameDataNote.className = 'injuryGameDataNote'
-    gameDataNote.setAttribute('aria-live', 'polite')
-    gameDataRow.appendChild(importBtn)
-    gameDataRow.appendChild(gameDataNote)
-    section.appendChild(gameDataRow)
-
-    importBtn.addEventListener('click', async function () {
-      const pedNameInput = section.querySelector('#injurySectionInjuredPartyInput')
-      const pedName = (pedNameInput?.value || '').trim()
-      await applyInjuryGameDataToSection(section, pedName || null, labels, gameDataNote)
-    })
-  }
-
   return section
-}
-
-async function applyInjuryGameDataToSection (section, pedName, labels, gameDataNoteEl) {
-  const noteEl = gameDataNoteEl || section.querySelector('.injuryGameDataNote')
-  const url = pedName
-    ? `/data/injuryGameData?pedName=${encodeURIComponent(pedName)}`
-    : '/data/injuryGameData'
-  try {
-    const res = await fetch(url)
-    const data = await res.json()
-    if (!data || (data.Source === undefined && data.InjuryType == null && data.Severity == null && data.Health == null)) {
-      if (noteEl) noteEl.textContent = labels.noGameData || 'No in-game data for this person. Ensure they are nearby or use DamageTrackerFramework.'
-      return
-    }
-    if (data.InjuryType) {
-      const typeInput = section.querySelector('#injurySectionInjuryTypeInput')
-      if (typeInput) typeInput.value = data.InjuryType
-    }
-    if (data.Severity) {
-      const severitySelect = section.querySelector('#injurySectionSeverityInput')
-      if (severitySelect) severitySelect.value = data.Severity
-    }
-    if (data.Treatment) {
-      const treatmentInput = section.querySelector('#injurySectionTreatmentInput')
-      if (treatmentInput) treatmentInput.value = data.Treatment
-    }
-    section.dataset.gameInjurySnapshot = JSON.stringify(data)
-    if (noteEl) {
-      noteEl.textContent = data.Source === 'DamageTracker'
-        ? (labels.basedOnDamageTracker || 'Based on in-game damage (DamageTrackerFramework).')
-        : (labels.basedOnHealth || 'Based on current health/armor.')
-    }
-  } catch (e) {
-    if (noteEl) noteEl.textContent = labels.importError || 'Could not load game data.'
-  }
 }

@@ -84,7 +84,7 @@ if (Test-Path $mdtDest) { Remove-Item $mdtDest -Recurse -Force }
 Copy-Item -Path $mdtSource -Destination $mdtDest -Recurse -Force
 Write-Host "  -> $mdtDest (web MDT)"
 
-# 5) Copy Dependencies folder into Release (SQLite, x64\, etc.). Exclude DTF DLLs — those are handled in 5b and go to Release\plugins only.
+# 5) Copy Dependencies folder into Release (SQLite, x64\, etc.). Exclude optional/unused DLLs if present.
 $releaseRoot = $release
 $depsExclude = @('DamageTrackerLib.dll', 'DamageTrackingFramework.dll')
 if (Test-Path $depsFolder) {
@@ -103,60 +103,6 @@ if (Test-Path $depsFolder) {
 } else {
     Write-Warning "Dependencies folder not found at $depsFolder"
 }
-
-# 5b) Copy DamageTrackingFramework.dll (required for injury reports) to Release\plugins (not LSPDFR). Source: Dependencies, References, GTA, or NuGet fallback.
-$dtfDllName = 'DamageTrackingFramework.dll'
-$releasePluginsDir = Join-Path $release 'plugins'
-$dtfDest = Join-Path $releasePluginsDir $dtfDllName
-$gamePlugins = Join-Path $GamePath 'plugins\LSPDFR'
-$refsFolder = Join-Path $root 'References'
-$dtfFromDeps = Join-Path $depsFolder $dtfDllName
-$dtfFromRefs = Join-Path $refsFolder $dtfDllName
-$dtfFromGame = Join-Path $gamePlugins $dtfDllName
-$dtfFromRoot = Join-Path $GamePath $dtfDllName
-$gamePluginsTop = Join-Path $GamePath 'plugins'
-$dtfFromGamePlugins = Join-Path $gamePluginsTop $dtfDllName
-# Also check legacy name (NuGet / older builds)
-$dtfLegacyName = 'DamageTrackerLib.dll'
-$dtfFromDepsLegacy = Join-Path $depsFolder $dtfLegacyName
-$dtfFromRefsLegacy = Join-Path $refsFolder $dtfLegacyName
-$dtfFromGameLegacy = Join-Path $gamePlugins $dtfLegacyName
-$dtfFromGamePluginsLegacy = Join-Path $gamePluginsTop $dtfLegacyName
-$dtfSource = $null
-if (Test-Path $dtfFromDeps) { $dtfSource = $dtfFromDeps }
-elseif (Test-Path $dtfFromRefs) { $dtfSource = $dtfFromRefs }
-elseif (Test-Path $dtfFromGame) { $dtfSource = $dtfFromGame }
-elseif (Test-Path $dtfFromRoot) { $dtfSource = $dtfFromRoot }
-elseif (Test-Path $dtfFromGamePlugins) { $dtfSource = $dtfFromGamePlugins }
-elseif (Test-Path $dtfFromDepsLegacy) { $dtfSource = $dtfFromDepsLegacy }
-elseif (Test-Path $dtfFromRefsLegacy) { $dtfSource = $dtfFromRefsLegacy }
-elseif (Test-Path $dtfFromGameLegacy) { $dtfSource = $dtfFromGameLegacy }
-elseif (Test-Path $dtfFromGamePluginsLegacy) { $dtfSource = $dtfFromGamePluginsLegacy }
-if (-not $dtfSource) {
-    Write-Host "  DamageTrackingFramework.dll not found; trying NuGet (DamageTrackerLib)..."
-    $nugetUrl = 'https://www.nuget.org/api/v2/package/DamageTrackerLib/2.0.0'
-    $nupkgPath = Join-Path $env:TEMP "DamageTrackerLib.2.0.0.nupkg"
-    try {
-        Invoke-WebRequest -Uri $nugetUrl -OutFile $nupkgPath -UseBasicParsing
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-        $zip = [System.IO.Compression.ZipFile]::OpenRead($nupkgPath)
-        $dllEntry = $zip.Entries | Where-Object { $_.Name -eq $dtfLegacyName } | Select-Object -First 1
-        if (-not $dllEntry) { $dllEntry = $zip.Entries | Where-Object { $_.Name -eq $dtfDllName } | Select-Object -First 1 }
-        if (-not $dllEntry) { throw "DLL not in package" }
-        New-Item -ItemType Directory -Path $depsFolder -Force | Out-Null
-        $extractPath = Join-Path $depsFolder (Split-Path $dllEntry.FullName -Leaf)
-        [System.IO.Compression.ZipFileExtensions]::ExtractToFile($dllEntry, $extractPath, $true)
-        $zip.Dispose()
-        $dtfSource = $extractPath
-        Remove-Item $nupkgPath -Force -ErrorAction SilentlyContinue
-    } catch {
-        Write-Error "Could not get DamageTrackingFramework.dll. Put it in Dependencies\ or References\ or install DTF in GTA and use -GamePath. NuGet fallback failed: $_"
-        exit 1
-    }
-}
-New-Item -ItemType Directory -Path $releasePluginsDir -Force | Out-Null
-Copy-Item -Path $dtfSource -Destination $dtfDest -Force
-Write-Host "  -> $dtfDest (DamageTrackingFramework)"
 
 # 6) If SQLite files weren't in Dependencies, try NuGet/build output and copy to Release root and Release\x64
 $sqliteDllPaths += (Join-Path (Split-Path $dllSource) 'System.Data.SQLite.dll')
@@ -237,11 +183,6 @@ if ($Deploy) {
     Copy-Item -Path $dllDest -Destination (Join-Path $pluginsOiv 'MDTPro.dll') -Force
     $newtonsoftDll = Join-Path $dllDestDir 'Newtonsoft.Json.dll'
     if (Test-Path $newtonsoftDll) { Copy-Item -Path $newtonsoftDll -Destination (Join-Path $pluginsOiv 'Newtonsoft.Json.dll') -Force }
-    $pluginsOivTop = Join-Path $oivContent 'plugins'
-    if (Test-Path $dtfDest) {
-        New-Item -ItemType Directory -Path $pluginsOivTop -Force | Out-Null
-        Copy-Item -Path $dtfDest -Destination (Join-Path $pluginsOivTop $dtfDllName) -Force
-    }
     if ($sqliteDllSource) { Copy-Item -Path $sqliteDllSource -Destination (Join-Path $oivContent 'System.Data.SQLite.dll') -Force }
     if ($sqliteInteropSource) {
         $x64Oiv = Join-Path $oivContent 'x64'
@@ -260,7 +201,6 @@ if ($Deploy) {
     }
 
     $pluginAdds = "    <add source=`"plugins/LSPDFR/MDTPro.dll`">plugins/LSPDFR/MDTPro.dll</add>`n    <add source=`"plugins/LSPDFR/Newtonsoft.Json.dll`">plugins/LSPDFR/Newtonsoft.Json.dll</add>"
-    if (Test-Path $dtfDest) { $pluginAdds += "`n    <add source=`"plugins/DamageTrackingFramework.dll`">plugins/DamageTrackingFramework.dll</add>" }
     $contentXml = @"
 $pluginAdds
     <add source="System.Data.SQLite.dll">System.Data.SQLite.dll</add>

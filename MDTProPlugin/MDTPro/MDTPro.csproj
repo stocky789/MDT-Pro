@@ -102,7 +102,6 @@
     <Compile Include="Data\Database.cs" />
     <Compile Include="Data\SearchHistoryEntry.cs" />
     <Compile Include="Data\DataController.cs" />
-    <Compile Include="Data\InjuryGameData.cs" />
     <Compile Include="Data\ALPRHit.cs" />
     <Compile Include="Data\DrugRecord.cs" />
     <Compile Include="Data\FirearmRecord.cs" />
@@ -151,7 +150,6 @@
     <Compile Include="Utility\PRHelper.cs" />
     <Compile Include="Utility\BackupHelper.cs" />
     <Compile Include="Utility\GpsHelper.cs" />
-    <Compile Include="Utility\InjuryDataService.cs" />
     <Compile Include="UI\SettingsMenu.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -40,25 +40,6 @@ function getRecentIds() {
     .map(p => ({ Name: p.Name, Type: p.IdentificationHistory[0].Type, Timestamp: p.IdentificationHistory[0].Timestamp }));
 }
 
-function getMockInjuryGameData(pedName) {
-  const name = (pedName || '').trim();
-  if (!name) return {};
-  return {
-    Source: 'Health',
-    InjuryType: 'Blunt trauma',
-    Severity: 'Moderate',
-    Treatment: 'First aid on scene',
-    BodyRegion: 'Torso',
-    WeaponGroup: 'Melee',
-    DamageAmount: 25,
-    Health: 150,
-    MaxHealth: 200,
-    Armor: 0,
-    VictimAlive: true,
-    Description: 'Health 150/200, Armor 0 (inferred severity: Moderate)',
-  };
-}
-
 function readBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -428,12 +409,6 @@ const server = http.createServer((req, res) => {
     return;
   } else if (url === '/data/currentTime') {
     send(res, 200, new Date().toTimeString().slice(0, 8), 'text/plain');
-    return;
-  } else if (url.startsWith('/data/injuryGameData')) {
-    const q = req.url.includes('?') ? req.url.split('?')[1] : '';
-    const params = new URLSearchParams(q);
-    const pedName = params.get('pedName') || '';
-    send(res, 200, JSON.stringify(getMockInjuryGameData(pedName)), 'application/json');
     return;
   } else if (req.method === 'POST' && (url === '/data/specificPed' || url === '/data/specificPed/')) {
     readBody(req).then(body => {

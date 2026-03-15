@@ -731,33 +731,6 @@ body {
   box-sizing: border-box;
 }
 
-/* Injury: Import from game row – button and message on one line when space allows */
-.injurySection .injuryGameDataRow {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--color-border);
-}
-
-.injurySection .importInjuryFromGameBtn {
-  flex-shrink: 0;
-  padding: 8px 14px;
-  font-size: 13px;
-}
-
-.injurySection .injuryGameDataNote {
-  font-size: 13px;
-  color: var(--color-text-primary-half);
-  line-height: 1.4;
-  min-height: 1.4em;
-}
-
-.injurySection .injuryGameDataNote:not(:empty) {
-  margin-left: 0;
-}
 
 /* Arrest: attached reports evidence help – so it’s clear only attached reports count */
 .arrestAttachedReportsSection {
