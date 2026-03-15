@@ -419,6 +419,18 @@ body {
   color: var(--color-text-primary-half);
 }
 
+.listPage .reportsList .listElement .infoWrapper .textWrapper .idRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.listPage .reportsList .listElement .infoWrapper .textWrapper .idRow .listCopyBtn {
+  padding: 2px 8px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
 .listPage .reportsList .listElement .infoWrapper .status {
   padding: 4px 10px;
   border-radius: var(--radius-small);

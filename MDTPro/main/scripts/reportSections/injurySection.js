@@ -57,15 +57,15 @@ async function getInjurySection (data = {}, isList = false) {
     })()
   }
 
-  const injuryTypeSuggestions = ['Gunshot', 'Fall', 'Stab wound', 'Blunt trauma', 'Assault (unarmed)', 'Burns', 'Vehicle impact', 'Explosion', 'Less lethal', 'Drowning', 'Animal attack']
-  const severitySuggestions = ['Minor', 'Moderate', 'Serious', 'Critical', 'Fatal']
-  const treatmentSuggestions = ['First aid on scene', 'EMS on scene', 'Transported to hospital', 'Pronounced deceased on scene', 'DOA', 'Refused treatment']
+  const injuryTypeOptions = ['', 'Gunshot', 'Fall', 'Stab wound', 'Blunt trauma', 'Assault (unarmed)', 'Burns', 'Vehicle impact', 'Explosion', 'Less lethal', 'Drowning', 'Animal attack']
+  const severityOptions = ['', 'Minor', 'Moderate', 'Serious', 'Critical', 'Fatal']
+  const treatmentOptions = ['', 'First aid on scene', 'EMS on scene', 'Transported to hospital', 'Pronounced deceased on scene', 'DOA', 'Refused treatment']
 
   const fields = [
     { id: 'injurySectionInjuredPartyInput', key: 'InjuredPartyName', label: labels.injuredParty || 'Injured party' },
-    { id: 'injurySectionInjuryTypeInput', key: 'InjuryType', label: labels.injuryType || 'Injury type', datalist: injuryTypeSuggestions },
-    { id: 'injurySectionSeverityInput', key: 'Severity', label: labels.severity || 'Severity', datalist: severitySuggestions },
-    { id: 'injurySectionTreatmentInput', key: 'Treatment', label: labels.treatment || 'Treatment', datalist: treatmentSuggestions },
+    { id: 'injurySectionInjuryTypeInput', key: 'InjuryType', label: labels.injuryType || 'Injury type', options: injuryTypeOptions },
+    { id: 'injurySectionSeverityInput', key: 'Severity', label: labels.severity || 'Severity', options: severityOptions },
+    { id: 'injurySectionTreatmentInput', key: 'Treatment', label: labels.treatment || 'Treatment', options: treatmentOptions },
     { id: 'injurySectionContextInput', key: 'IncidentContext', label: labels.incidentContext || 'Incident context', tag: 'textarea' },
     { id: 'injurySectionLinkedReportInput', key: 'LinkedReportId', label: labels.linkedReportId || 'Linked report ID' }
   ]
@@ -78,26 +78,36 @@ async function getInjurySection (data = {}, isList = false) {
     const lbl = document.createElement('label')
     lbl.htmlFor = f.id
     lbl.innerHTML = f.label
-    const input = f.tag === 'textarea'
-      ? document.createElement('textarea')
-      : document.createElement('input')
-    input.id = f.id
-    if (input.tagName === 'INPUT') input.type = 'text'
-    input.disabled = isList
-    if (input.tagName === 'INPUT') input.autocomplete = 'off'
-    if (f.datalist && f.datalist.length > 0 && input.tagName === 'INPUT') {
-      const listId = f.id + '-list'
-      const datalist = document.createElement('datalist')
-      datalist.id = listId
-      f.datalist.forEach((opt) => {
+    let input
+    if (f.options && f.options.length > 0) {
+      input = document.createElement('select')
+      input.id = f.id
+      input.disabled = isList
+      input.autocomplete = 'off'
+      const currentVal = data?.[f.key] || ''
+      f.options.forEach((opt) => {
         const o = document.createElement('option')
         o.value = opt
-        datalist.appendChild(o)
+        o.textContent = opt || '—'
+        input.appendChild(o)
       })
-      cell.appendChild(datalist)
-      input.setAttribute('list', listId)
+      if (currentVal && !f.options.includes(currentVal)) {
+        const o = document.createElement('option')
+        o.value = currentVal
+        o.textContent = currentVal
+        input.appendChild(o)
+      }
+      input.value = currentVal
+    } else {
+      input = f.tag === 'textarea'
+        ? document.createElement('textarea')
+        : document.createElement('input')
+      input.id = f.id
+      if (input.tagName === 'INPUT') input.type = 'text'
+      input.disabled = isList
+      if (input.tagName === 'INPUT') input.autocomplete = 'off'
+      input.value = data?.[f.key] || ''
     }
-    input.value = data?.[f.key] || ''
     if (f.tag === 'textarea') cell.classList.add('fullWidth')
     cell.appendChild(lbl)
     cell.appendChild(input)

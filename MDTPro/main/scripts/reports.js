@@ -460,8 +460,29 @@ async function renderReports(reports, type) {
     infoWrapper.classList.add('infoWrapper')
 
     const iDElement = document.createElement('div')
-    iDElement.classList.add('id')
+    iDElement.classList.add('id', 'idRow')
     iDElement.innerHTML = `${language.reports.list.reportId}: <span>${report.Id}</span>`
+    const copyBtn = document.createElement('button')
+    copyBtn.type = 'button'
+    copyBtn.classList.add('copyReportIdBtn', 'listCopyBtn')
+    copyBtn.textContent = language.reports?.sections?.generalInformation?.copyReportId || 'Copy'
+    copyBtn.title = language.reports?.sections?.generalInformation?.copyReportId || 'Copy report ID to clipboard'
+    copyBtn.addEventListener('click', async (e) => {
+      e.stopPropagation()
+      const id = report.Id || ''
+      if (!id) return
+      try {
+        await navigator.clipboard.writeText(id)
+        if (typeof topWindow !== 'undefined' && typeof topWindow.showNotification === 'function') {
+          topWindow.showNotification(language.reports?.sections?.generalInformation?.copiedToClipboard || 'Report ID copied to clipboard.', 'checkMark')
+        }
+      } catch (_) {
+        if (typeof topWindow !== 'undefined' && typeof topWindow.showNotification === 'function') {
+          topWindow.showNotification(language.reports?.sections?.generalInformation?.copyFailed || 'Could not copy.', 'warning')
+        }
+      }
+    })
+    iDElement.appendChild(copyBtn)
 
     const dateElement = document.createElement('div')
     dateElement.innerHTML = `${language.reports.list.date}: <span>${new Date(
