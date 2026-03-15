@@ -142,21 +142,6 @@ namespace MDTPro.ServerAPI {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.injuryReports));
                 status = 200;
                 contentType = "text/json";
-            } else if (path == "injuryGameData") {
-                string pedName = null;
-                if (!string.IsNullOrEmpty(req.Url.Query)) {
-                    NameValueCollection q = HttpUtility.ParseQueryString(req.Url.Query);
-                    pedName = q["pedName"]?.Trim();
-                }
-                if (string.IsNullOrEmpty(pedName)) {
-                    var contextData = InjuryDataService.GetInjuryGameDataForContext();
-                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(contextData ?? (object)new { }));
-                } else {
-                    var gameData = InjuryDataService.GetInjuryGameDataForPed(pedName);
-                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(gameData ?? (object)new { }));
-                }
-                status = 200;
-                contentType = "text/json";
             } else if (path == "playerLocation") {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.PlayerLocation));
                 status = 200;

@@ -21,7 +21,7 @@ All notable changes to MDT Pro are documented here.
 
 ### Reports
 
-- **Injury Report** — New report type: injured party, injury type, severity, treatment, and context. Available under Reports and from Person Search via “New Injury Report” with name prefilled. Optional import from game (DamageTrackerFramework or ped health) when the person is nearby.
+- **Injury Report** — New report type: injured party, injury type, severity, treatment, and context. Available under Reports and from Person Search via “New Injury Report” with name prefilled.
 - **Traffic Incident Report** — New report type for collisions and multi-vehicle incidents: drivers, passengers, pedestrians, vehicles, injury details, and collision type. Available under Reports.
 - **Impound Report** — New report type: plate, model, owner, VIN, reason, tow company, and impound lot. Available under Reports and from Vehicle Search via “Create Impound Report” with vehicle prefilled.
 - **Prefill** — Creating an Injury report from Person Search or an Impound report from Vehicle Search opens the form with that person or vehicle already filled in. “Nearby vehicles” on the impound form now correctly fills plate and details when you select a vehicle.

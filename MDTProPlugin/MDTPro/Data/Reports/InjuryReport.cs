@@ -6,7 +6,7 @@ namespace MDTPro.Data.Reports {
         public string Treatment;
         public string IncidentContext;
         public string LinkedReportId;
-        /// <summary>Optional JSON snapshot of in-game injury data when report was created from game data (DamageTracker or health).</summary>
+        /// <summary>Optional JSON snapshot of in-game injury data when report was created from game data (legacy).</summary>
         public string GameInjurySnapshot;
     }
 }
