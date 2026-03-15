@@ -186,6 +186,34 @@ function showNotification(message, icon = 'info', duration = 4000) {
   }
 }
 
+/**
+ * Copy text to clipboard. Tries Clipboard API first; falls back to execCommand for
+ * non-secure contexts (e.g. Steam overlay, HTTP). Returns true if copy succeeded.
+ */
+function copyToClipboard(text) {
+  if (text === undefined || text === null) text = ''
+  const str = String(text)
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    return navigator.clipboard.writeText(str).then(() => true).catch(() => false)
+  }
+  try {
+    const el = document.createElement('textarea')
+    el.value = str
+    el.style.position = 'fixed'
+    el.style.left = '-9999px'
+    el.style.top = '0'
+    el.setAttribute('readonly', '')
+    document.body.appendChild(el)
+    el.select()
+    el.setSelectionRange(0, str.length)
+    const ok = document.execCommand('copy')
+    document.body.removeChild(el)
+    return Promise.resolve(ok)
+  } catch (e) {
+    return Promise.resolve(false)
+  }
+}
+
 async function getLanguageValue(value) {
   const language = await getLanguage()
   if (value === '' || value === null || value === undefined)

@@ -471,13 +471,11 @@ async function renderReports(reports, type) {
       e.stopPropagation()
       const id = report.Id || ''
       if (!id) return
-      try {
-        await navigator.clipboard.writeText(id)
-        if (typeof topWindow !== 'undefined' && typeof topWindow.showNotification === 'function') {
+      const ok = await copyToClipboard(id)
+      if (typeof topWindow !== 'undefined' && typeof topWindow.showNotification === 'function') {
+        if (ok) {
           topWindow.showNotification(language.reports?.sections?.generalInformation?.copiedToClipboard || 'Report ID copied to clipboard.', 'checkMark')
-        }
-      } catch (_) {
-        if (typeof topWindow !== 'undefined' && typeof topWindow.showNotification === 'function') {
+        } else {
           topWindow.showNotification(language.reports?.sections?.generalInformation?.copyFailed || 'Could not copy.', 'warning')
         }
       }
