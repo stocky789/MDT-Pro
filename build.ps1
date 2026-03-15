@@ -325,6 +325,34 @@ $deleteXml
     Remove-Item -Path $oivDir -Recurse -Force
     Write-Host "  -> $oivUninstallOut (OpenIV uninstaller)"
 
+# README with install instructions (always)
+$readmePath = Join-Path $release 'README.txt'
+@"
+MDT Pro - Install instructions
+===============================
+
+OPENIV INSTALL (recommended)
+----------------------------
+- MDTPro-*.oiv = Install package. In OpenIV: Edit mode -> drag the .oiv onto OpenIV, or Tools -> Package Installer, then install.
+- MDTPro-*-Uninstall.oiv = Uninstall package. Use this to remove the mod via OpenIV.
+
+
+MANUAL INSTALL (no OpenIV)
+-------------------------
+Copy everything from this folder into your GTA V folder (the folder containing GTA5.exe), EXCEPT the .oiv files.
+
+Copy:
+  - plugins\   (into GTA V\plugins\)
+  - MDTPro\    (into GTA V\MDTPro\)
+  - x64\       (into GTA V\x64\)
+  - System.Data.SQLite.dll  (into GTA V root)
+
+Do NOT copy the .oiv files into your game folder; they are only for OpenIV.
+
+Requirements: LSPDFR, RagePluginHook, Common Data Framework. See the mod page for full requirements.
+"@ | Out-File -FilePath $readmePath -Encoding UTF8
+Write-Host "  -> $readmePath (install instructions)"
+
 Write-Host "Done. Full mod release: $release"
 Write-Host "  Release\plugins\lspdfr\MDTPro.dll"
 Write-Host "  Release\System.Data.SQLite.dll (GTA V root)"
