@@ -1510,6 +1510,10 @@ namespace MDTPro.Data {
 
         internal static void SavePed(MDTProPedData ped) {
             if (ped?.Name == null) return;
+            if (MDTProPedData.IsMinimalIdentity(ped)) {
+                Utility.Helper.Log($"[MDTPro] Skipping save of minimal-identity ped (would show N/A in Person Search): {ped.Name}", false, Utility.Helper.LogSeverity.Info);
+                return;
+            }
 
             lock (dbLock) {
                 if (connection == null) return;

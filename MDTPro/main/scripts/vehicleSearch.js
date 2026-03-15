@@ -22,6 +22,29 @@
 
   await loadNearbyVehicles()
   await loadSearchHistory()
+
+  // Auto-refresh nearby vehicles and search history every 1 second for real-time updates
+  const REFRESH_INTERVAL_MS = 1000
+  let refreshTimer = null
+  function startRefreshTimer() {
+    if (refreshTimer) return
+    refreshTimer = setInterval(async () => {
+      if (document.hidden) return
+      await loadNearbyVehicles()
+      await loadSearchHistory()
+    }, REFRESH_INTERVAL_MS)
+  }
+  function stopRefreshTimer() {
+    if (refreshTimer) {
+      clearInterval(refreshTimer)
+      refreshTimer = null
+    }
+  }
+  document.addEventListener('visibilitychange', () => {
+    document.hidden ? stopRefreshTimer() : startRefreshTimer()
+  })
+  if (!document.hidden) startRefreshTimer()
+  window.addEventListener('pagehide', stopRefreshTimer)
 })()
 
 document
