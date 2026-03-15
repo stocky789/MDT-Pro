@@ -103,5 +103,78 @@
     refreshBtn.disabled = false
   })
 
+  // Create BOLO modal
+  const createBtn = document.querySelector('.boloCreateBtn')
+  const modal = document.getElementById('createBoloModal')
+  const form = document.getElementById('createBoloForm')
+  const plateInput = document.getElementById('createBoloPlate')
+  const cancelBtn = document.querySelector('.boloModalCancel')
+
+  function openCreateBoloModal () {
+    if (modal) modal.classList.remove('hidden')
+    if (plateInput) plateInput.focus()
+    if (form) form.reset()
+    if (document.getElementById('createBoloExpires')) {
+      document.getElementById('createBoloExpires').value = '7'
+    }
+  }
+
+  function closeCreateBoloModal () {
+    if (modal) modal.classList.add('hidden')
+  }
+
+  if (createBtn) createBtn.addEventListener('click', openCreateBoloModal)
+  if (cancelBtn) cancelBtn.addEventListener('click', closeCreateBoloModal)
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeCreateBoloModal()
+    })
+  }
+
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const plate = plateInput?.value?.trim()
+      const model = document.getElementById('createBoloModel')?.value?.trim()
+      const reason = document.getElementById('createBoloReason')?.value?.trim()
+      const expiresDays = parseInt(document.getElementById('createBoloExpires')?.value || '7', 10)
+      if (!plate || !reason) return
+      const expires = new Date()
+      expires.setDate(expires.getDate() + (isNaN(expiresDays) || expiresDays < 1 ? 7 : expiresDays))
+      const submitBtn = form.querySelector('.boloModalSubmit')
+      const topWindow = window.opener || (window.parent !== window ? window.parent : null)
+      if (submitBtn) submitBtn.disabled = true
+      try {
+        const res = await (await fetch('/post/addBOLO', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            LicensePlate: plate,
+            Reason: reason,
+            ExpiresAt: expires.toISOString(),
+            IssuedBy: 'LSPD',
+            ModelDisplayName: model || undefined
+          })
+        })).json()
+        if (res && res.success) {
+          if (topWindow && typeof topWindow.showNotification === 'function') {
+            topWindow.showNotification(lang.boloCreated || 'BOLO created.', 'checkMark')
+          }
+          closeCreateBoloModal()
+          await loadBolos()
+        } else {
+          if (topWindow && typeof topWindow.showNotification === 'function') {
+            topWindow.showNotification(res?.error || 'Failed to create BOLO.', 'warning')
+          }
+        }
+      } catch (_) {
+        if (topWindow && typeof topWindow.showNotification === 'function') {
+          topWindow.showNotification('Failed to create BOLO.', 'warning')
+        }
+      }
+      if (submitBtn) submitBtn.disabled = false
+    })
+  }
+
   await loadBolos()
 })()

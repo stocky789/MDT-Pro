@@ -17,6 +17,15 @@ namespace MDTPro.Setup {
         public Map map = new Map();
         public Callout callout = new Callout();
         public Alpr alpr = new Alpr();
+        public QuickActions quickActions = new QuickActions();
+
+        public class QuickActions {
+            public string panicSuccess = "Panic backup requested.";
+            public string backupSuccess = "Backup requested.";
+            public string gpsSuccess = "GPS set to callout.";
+            public string alprCleared = "ALPR cleared.";
+            public string error = "Action failed.";
+        }
 
         public class Alpr {
             public string alertTitle = "ALPR Alert";
@@ -161,6 +170,7 @@ namespace MDTPro.Setup {
         public class PedSearch {
             public Static @static = new Static();
             public Notifications notifications = new Notifications();
+            public string createInjuryReport = "New Injury Report";
 
             public class Static {
                 public string title = "Person Search";
@@ -245,6 +255,8 @@ namespace MDTPro.Setup {
                 public string boloReasonPrompt = "Enter BOLO reason:";
                 public string boloExpiresPrompt = "Expires in how many days? (default 7):";
                 public string searchResultsTitle = "Search Results (Contraband)";
+                public string impoundReportsTitle = "Impound Reports";
+                public string createImpoundReport = "Create Impound Report";
                 public Labels labels = new Labels();
 
                 public class Labels {
@@ -277,11 +289,21 @@ namespace MDTPro.Setup {
             public string stolenBadge = "STOLEN";
             public string viewInVehicleSearch = "View in Vehicle Search";
             public string expires = "Expires";
+            public string boloCreated = "BOLO created.";
             public class Static {
                 public string title = "BOLO Noticeboard";
                 public string subtitle = "Be On the Look-Out — vehicles to watch for";
                 public string refresh = "Refresh";
-                public string noBolos = "No active BOLOs. Add BOLOs from Vehicle Search when a vehicle is nearby.";
+                public string createBOLO = "Create BOLO";
+                public string noBolos = "No active BOLOs. Add BOLOs from Vehicle Search when a vehicle is nearby, or create one above.";
+                public string createBOLOTitle = "Create BOLO";
+                public string createBOLOSubtitle = "Enter vehicle and BOLO details. Vehicle does not need to be nearby.";
+                public string createBOLOPlate = "License Plate *";
+                public string createBOLOModel = "Vehicle Model (optional)";
+                public string createBOLOReason = "Reason *";
+                public string createBOLOExpires = "Expires in (days)";
+                public string createBOLOSubmit = "Create BOLO";
+                public string cancel = "Cancel";
             }
         }
 
@@ -315,7 +337,8 @@ namespace MDTPro.Setup {
             public string[] statusMap = {
                 "Closed",
                 "Open",
-                "Canceled"
+                "Canceled",
+                "Pending"
             };
             public Static @static = new Static();
             public Notifications notifications = new Notifications();
@@ -336,6 +359,9 @@ namespace MDTPro.Setup {
                         public string incident = "Incident Reports";
                         public string citation = "Citation Reports";
                         public string arrest = "Arrest Reports";
+                        public string impound = "Impound Reports";
+                        public string trafficIncident = "Traffic Incident Reports";
+                        public string injury = "Injury Reports";
                     }
                 }
 
@@ -349,6 +375,9 @@ namespace MDTPro.Setup {
                         public string incident = "Incident Report";
                         public string citation = "Citation Report";
                         public string arrest = "Arrest Report";
+                        public string impound = "Impound Report";
+                        public string trafficIncident = "Traffic Incident Report";
+                        public string injury = "Injury Report";
                     }
                 }
             }
@@ -360,10 +389,18 @@ namespace MDTPro.Setup {
                 public string saveSuccess = "Report saved.";
                 public string saveError = "Failed to save report.";
                 public string invalidTimeStamp = "Invalid date or time.";
+                /// <summary>Title for the caution dialog shown after saving an arrest report.</summary>
+                public string arrestSaveCautionTitle = "Reminder";
+                /// <summary>Caution text reminding the player to attach relevant reports to the arrest for court evidence.</summary>
+                public string arrestSaveCautionMessage = "Remember to attach relevant reports (e.g. incident, injury) to this arrest report. The arrest report alone may not be enough evidence to secure a conviction in court—this depends on the case.";
                 public string invalidTime = "Invalid time.";
                 public string invalidDate = "Invalid date.";
                 public string noCharges = "Add at least one charge.";
                 public string noOffender = "Offender name required.";
+                public string prefilledFromPersonSearch = "Prefilled from Person Search";
+                public string prefilledFromVehicleSearch = "Prefilled from Vehicle Search";
+                public string closeArrestSuccess = "Arrest closed and submitted for court.";
+                public string closeArrestError = "Failed to close arrest.";
             }
 
             public class Sections {
@@ -384,6 +421,9 @@ namespace MDTPro.Setup {
                     public string time = "Time";
                     public string reportId = "Report ID";
                     public string status = "Status";
+                    public string copyReportId = "Copy";
+                    public string copiedToClipboard = "Report ID copied to clipboard.";
+                    public string copyFailed = "Could not copy.";
                 }
 
                 public class Location {
@@ -429,6 +469,88 @@ namespace MDTPro.Setup {
                 public class Arrest {
                     public string title = "Arrest Charges";
                     public string searchChargesPlaceholder = "Search charges";
+                    public string evidenceSeized = "Evidence seized";
+                    public string documentedDrugs = "Drugs found / documented";
+                    public string documentedFirearms = "Firearm(s) found / documented";
+                    public string attachedReports = "Attached reports (evidence for court)";
+                    /// <summary>Explains that attached reports count as evidence; relevant ones carry full weight, others still count but less.</summary>
+                    public string attachedReportsHelp = "Reports you attach here are used as evidence when this arrest goes to court. Reports that directly support the case (Incident/Citation naming this defendant, Injury documenting harm, Traffic Incident with defendant as driver or vehicle-related charges, Impound for vehicle-related charges) carry full weight. Other attached reports (e.g. impound on a drug case, incident that doesn't name the defendant) still count but carry less weight—so tangential evidence like a stolen firearm in a drug case is not ignored.";
+                    public string attachReport = "Attach report";
+                    public string attachReportIdPlaceholder = "Report ID (e.g. INC-25-0001, INJ-25-0001)";
+                    public string detach = "Detach";
+                    public string closeArrestSubmit = "Close arrest (submit for court)";
+                }
+
+                public UseOfForce useOfForce = new UseOfForce();
+
+                public Impound impound = new Impound();
+                public TrafficIncident trafficIncident = new TrafficIncident();
+                public Injury injury = new Injury();
+
+                public class Impound {
+                    public string title = "Vehicle & Impound Details";
+                    public string nearbyVehiclesTitle = "Nearby vehicles";
+                    public string refreshNearby = "Refresh";
+                    public string noNearbyVehicles = "No vehicles detected nearby.";
+                    public string prefilledFromNearby = "Vehicle details filled from nearby.";
+                    public string licensePlate = "License Plate";
+                    public string model = "Model";
+                    public string owner = "Owner";
+                    public string vin = "VIN";
+                    public string impoundReason = "Impound Reason";
+                    public string towCompany = "Tow Company";
+                    public string impoundLot = "Impound Lot";
+                }
+
+                public class TrafficIncident {
+                    public string title = "Traffic Incident Details";
+                    public string drivers = "Drivers";
+                    public string driver = "Driver";
+                    public string addDriver = "Add driver";
+                    public string removeDriver = "Remove";
+                    public string passengers = "Passengers";
+                    public string passenger = "Passenger";
+                    public string addPassenger = "Add passenger";
+                    public string removePassenger = "Remove";
+                    public string pedestrians = "Pedestrians";
+                    public string pedestrian = "Pedestrian";
+                    public string addPedestrian = "Add pedestrian";
+                    public string removePedestrian = "Remove";
+                    public string vehicles = "Vehicles";
+                    public string vehiclePlate = "Plate";
+                    public string addVehicle = "Add vehicle";
+                    public string removeVehicle = "Remove";
+                    public string vehicleModels = "Vehicle Models";
+                    public string model = "Model";
+                    public string addModel = "Add model";
+                    public string removeModel = "Remove";
+                    public string injuryReported = "Injury reported";
+                    public string injuryDetails = "Injury details";
+                    public string collisionType = "Collision type";
+                }
+
+                public class Injury {
+                    public string title = "Injury Details";
+                    public string injuredParty = "Injured party";
+                    public string injuryType = "Injury type";
+                    public string severity = "Severity";
+                    public string treatment = "Treatment";
+                    public string incidentContext = "Incident context";
+                    public string linkedReportId = "Linked report ID";
+                    public string selectFromRecentIds = "Select injured party (Recent IDs)";
+                    public string noRecentIds = "No recent IDs. Collect an ID from a ped (e.g. traffic stop) to show them here.";
+                    public string recentIdsError = "Could not load Recent IDs.";
+                }
+
+                public class UseOfForce {
+                    public string title = "Use of Force";
+                    public string type = "Type";
+                    public string typeOther = "Type (if Other)";
+                    public string justification = "Justification";
+                    public string justificationPlaceholder = "Describe circumstances requiring use of force";
+                    public string injuryToSuspect = "Injury to suspect";
+                    public string injuryToOfficer = "Injury to officer";
+                    public string witnesses = "Witnesses";
                 }
             }
 
@@ -436,6 +558,9 @@ namespace MDTPro.Setup {
                 public string incident = "I";
                 public string citation = "C";
                 public string arrest = "A";
+                public string impound = "IMP";
+                public string trafficIncident = "TIR";
+                public string injury = "INJ";
             }
 
             public class List {
@@ -484,6 +609,8 @@ namespace MDTPro.Setup {
         }
 
         public class Court {
+            /// <summary>Shown as in-game notification when a trial is auto-resolved. {0} = case number, {1} = defendant name.</summary>
+            public string trialHeardNotification = "Trial {0} for {1} has been heard - to see the outcome check the MDT.";
             public string empty = "No court cases.";
             public string charges = "Charges";
             public string number = "Case Number";
@@ -525,7 +652,18 @@ namespace MDTPro.Setup {
             public string judge = "Judge";
             public string severityScore = "Severity Score";
             public string evidenceScore = "Evidence Score";
+            public string evidenceWeapon = "Armed at Arrest";
+            public string evidenceWanted = "Active Warrant at Encounter";
+            public string evidenceAssault = "Assaulted Another Person";
+            public string evidenceVehicleDamage = "Damaged Vehicle / Property";
             public string evidenceResisted = "Resisted Arrest";
+            public string evidenceDrugs = "Drugs Found on Person";
+            public string evidenceUseOfForce = "Use of Force Documented";
+            public string evidenceDrunk = "Intoxicated at Encounter";
+            public string evidenceFleeing = "Attempted to Flee";
+            public string evidenceSupervision = "Supervision Violation";
+            public string evidencePatDown = "Pat-Down / Search";
+            public string evidenceIllegalWeapon = "Illegal Weapon";
             public string prosecutionStrength = "Prosecution Strength";
             public string defenseStrength = "Defense Strength";
             public string docketPressure = "Docket Pressure";
@@ -540,8 +678,20 @@ namespace MDTPro.Setup {
                 "No Contest"
             };
             public string outcomeNotes = "Outcome Notes";
-            public string outcomeReasoning = "Outcome Reasoning";
+            public string outcomeReasoning = "Verdict & Outcome Reasoning";
+            public string sentenceReasoning = "Sentencing Rationale";
             public string licenseRevocations = "License Revocations Ordered";
+            public string attachedReports = "Attached reports (evidence)";
+            /// <summary>Explains that relevant reports carry full weight, others still count but less.</summary>
+            public string attachedReportsHelp = "Attached reports count as evidence. Those that directly support the case (defendant named, or report type matches charges) carry full weight; other attached reports still count but carry less weight, so tangential evidence is not ignored.";
+            public string attachReportToCase = "Attach report to case";
+            public string attachReportIdPlaceholder = "Report ID";
+            public string detach = "Detach";
+            public string chargeOutcomeConvicted = "Convicted";
+            public string chargeOutcomeAcquitted = "Acquitted";
+            public string chargeOutcomePending = "Pending";
+            public string chargeOutcomeDismissed = "Dismissed";
+            public string chargeOutcome = "Outcome";
             public Static @static = new Static();
 
             public class Static {
@@ -593,8 +743,28 @@ namespace MDTPro.Setup {
 
         public class Callout {
             public string defaultPriority = "Code 2";
+            public string noActiveCall = "No active callout";
             public Static @static = new Static();
             public CalloutInfo calloutInfo = new CalloutInfo();
+            public Actions actions = new Actions();
+            public Status status = new Status();
+
+            public class Actions {
+                public string setGps = "Set GPS";
+                public string gpsSuccess = "GPS set to callout.";
+                public string accept = "Accept";
+                public string success = "Status updated.";
+                public string error = "Action failed.";
+            }
+
+            public class Status {
+                public string pending = "Pending";
+                public string responded = "Responded";
+                public string enRoute = "En Route";
+                public string finished = "Finished";
+                public string unknown = "—";
+                public string displayed = "Displayed";
+            }
 
             public class Static {
                 public string title = "Callout";
@@ -609,6 +779,8 @@ namespace MDTPro.Setup {
                 public string unit = "Unit ";
                 public string acceptedTime = " — Assigned ";
                 public string finishedTime = "Cleared ";
+                public string message = "Message";
+                public string advisory = "Advisory";
             }
         }
     }

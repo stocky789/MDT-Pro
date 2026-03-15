@@ -186,6 +186,34 @@ function showNotification(message, icon = 'info', duration = 4000) {
   }
 }
 
+/**
+ * Copy text to clipboard. Tries Clipboard API first; falls back to execCommand for
+ * non-secure contexts (e.g. Steam overlay, HTTP). Returns true if copy succeeded.
+ */
+function copyToClipboard(text) {
+  if (text === undefined || text === null) text = ''
+  const str = String(text)
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    return navigator.clipboard.writeText(str).then(() => true).catch(() => false)
+  }
+  try {
+    const el = document.createElement('textarea')
+    el.value = str
+    el.style.position = 'fixed'
+    el.style.left = '-9999px'
+    el.style.top = '0'
+    el.setAttribute('readonly', '')
+    document.body.appendChild(el)
+    el.select()
+    el.setSelectionRange(0, str.length)
+    const ok = document.execCommand('copy')
+    document.body.removeChild(el)
+    return Promise.resolve(ok)
+  } catch (e) {
+    return Promise.resolve(false)
+  }
+}
+
 async function getLanguageValue(value) {
   const language = await getLanguage()
   if (value === '' || value === null || value === undefined)
@@ -246,19 +274,50 @@ async function openFirearmsSearch(serialOrOwner) {
 }
 
 async function checkForReportOnCreatePage() {
-  for (const iframe of topDoc.querySelectorAll('.overlay .window iframe')) {
-    if (iframe.contentWindow.reportIsOnCreatePage()) {
-      const language = await getLanguage()
-      topWindow.showNotification(
-        language.reports.notifications.createPageAlreadyOpen
-      )
-      return true
+  for (const iframe of topDoc.querySelectorAll('.overlay .windows .window iframe')) {
+    try {
+      if (typeof iframe.contentWindow?.reportIsOnCreatePage === 'function' && iframe.contentWindow.reportIsOnCreatePage()) {
+        const language = await getLanguage()
+        topWindow.showNotification(
+          language.reports.notifications.createPageAlreadyOpen
+        )
+        return true
+      }
+    } catch (_) {}
+  }
+  return false
+}
+
+/** Find an existing Reports window element (so we can reuse it and bring to front). */
+function findExistingReportsWindow() {
+  const windows = topDoc.querySelectorAll('.overlay .windows .window')
+  for (const win of windows) {
+    const iframe = win.querySelector('iframe')
+    if (iframe?.src && (iframe.src.includes('/page/reports.html') || iframe.src.includes('reports.html'))) {
+      return { windowEl: win, iframe }
     }
   }
+  return null
 }
 
 async function openPedAsOffenderInReport(type, pedName = '') {
   if (await checkForReportOnCreatePage()) return
+
+  const existing = findExistingReportsWindow()
+  if (existing) {
+    const { windowEl, iframe } = existing
+    if (typeof topWindow.focusWindowByElement === 'function') {
+      topWindow.focusWindowByElement(windowEl)
+    }
+    const win = iframe.contentWindow
+    if (win && typeof win.onCreateButtonClick === 'function') {
+      await win.onCreateButtonClick()
+      await win.onCreatePageTypeSelectorButtonClick(type)
+      const pedInput = win.document.querySelector('.createPage #offenderSectionPedNameInput')
+      if (pedInput) pedInput.value = pedName || ''
+    }
+    return
+  }
 
   await topWindow.openWindow('reports')
   const iframe = topDoc
@@ -270,48 +329,92 @@ async function openPedAsOffenderInReport(type, pedName = '') {
 
     await iframe.contentWindow.onCreatePageTypeSelectorButtonClick(type)
 
-    iframe.contentWindow.document.querySelector(
+    const pedInput = iframe.contentWindow.document.querySelector(
       '.createPage #offenderSectionPedNameInput'
-    ).value = pedName
+    )
+    if (pedInput) pedInput.value = pedName || ''
   }
 }
 
+/**
+ * Open Reports window with prefill data from sessionStorage.
+ * Used by Vehicle Search (impound), Person Search (injury), etc.
+ * @param {string} reportType - 'impound' | 'injury' | 'trafficIncident' | 'citation' | 'arrest' | 'incident'
+ * @param {object} prefillData - { source, pedName?, vehiclePlate?, vehicleData?, pedData? }
+ */
+async function openReportWithPrefill(reportType, prefillData) {
+  if (await checkForReportOnCreatePage()) return
+  try {
+    sessionStorage.setItem('mdtproReportPrefill', JSON.stringify({
+      source: prefillData.source || 'unknown',
+      reportType,
+      expires: Date.now() + 60000,
+      data: prefillData
+    }))
+  } catch (_) {}
+  const existing = findExistingReportsWindow()
+  if (existing && typeof topWindow.focusWindowByElement === 'function') {
+    topWindow.focusWindowByElement(existing.windowEl)
+  }
+  await topWindow.openWindow('reports')
+}
+
 async function openIdInReport(id, type = null) {
+  if (!id) return
+
+  async function performSearch(win, reportType) {
+    if (typeof win.onListPageTypeSelectorButtonClick !== 'function') return false
+    await win.onListPageTypeSelectorButtonClick(reportType)
+    const list = win.document.querySelectorAll('.listPage .reportsList .listElement')
+    for (const listElement of list) {
+      if ((listElement.dataset.id || '') === String(id)) {
+        const viewBtn = listElement.querySelector('.viewButton')
+        if (viewBtn) viewBtn.click()
+        return true
+      }
+    }
+    return false
+  }
+
+  async function runOpenReportLogic(win) {
+    if (!win) return
+    let found = false
+    if (type) {
+      found = await performSearch(win, type)
+    } else {
+      const reportTypes = ['citation', 'arrest', 'incident', 'impound', 'trafficIncident', 'injury']
+      for (const reportType of reportTypes) {
+        found = await performSearch(win, reportType)
+        if (found) break
+      }
+    }
+    if (!found && typeof win.showNotification === 'function') {
+      win.showNotification('Report not found.', 'warning')
+    }
+  }
+
+  const existing = findExistingReportsWindow()
+  if (existing) {
+    const { windowEl, iframe } = existing
+    if (typeof topWindow.focusWindowByElement === 'function') {
+      topWindow.focusWindowByElement(windowEl)
+    }
+    const win = iframe.contentWindow
+    if (win) {
+      await runOpenReportLogic(win)
+    }
+    return
+  }
+
   await topWindow.openWindow('reports')
   const iframe = topDoc
     .querySelector('.overlay .windows')
-    .lastChild.querySelector('iframe')
+    .lastChild?.querySelector('iframe')
+  if (!iframe) return
 
-  let found = false
-
-  iframe.onload = async () => {
-    iframe.contentWindow.document.addEventListener(
-      'pageLoaded',
-      async function () {
-        if (type) {
-          await performSearch(type)
-          return
-        }
-        const reportTypes = ['citation', 'arrest', 'incident']
-        for (const reportType of reportTypes) {
-          if (!found) await performSearch(reportType)
-        }
-      }
-    )
-  }
-
-  async function performSearch(reportType) {
-    await iframe.contentWindow.onListPageTypeSelectorButtonClick(reportType)
-
-    for (const listElement of iframe.contentWindow.document.querySelectorAll(
-      '.listPage .reportsList .listElement'
-    )) {
-      if (listElement.dataset.id == id) {
-        listElement.querySelector('.viewButton').click()
-        found = true
-        return
-      }
-    }
+  iframe.onload = () => runOpenReportLogic(iframe.contentWindow)
+  if (iframe.contentDocument?.readyState === 'complete') {
+    runOpenReportLogic(iframe.contentWindow)
   }
 }
 
@@ -377,6 +480,7 @@ const statusColorMap = {
   0: 'success',
   1: 'info',
   2: 'error',
+  3: 'warning', // Pending (arrest)
 }
 
 function getActivePlugins() {

@@ -16,6 +16,30 @@
       })
       await loadSearchHistory()
     })
+
+  // Auto-refresh Recent IDs and search history every 1 second for real-time updates
+  const REFRESH_INTERVAL_MS = 1000
+  let refreshTimer = null
+  function startRefreshTimer() {
+    if (refreshTimer) return
+    refreshTimer = setInterval(async () => {
+      if (document.hidden) return
+      await loadRecentIds()
+      await loadSearchHistory()
+      filterPersonLists(document.querySelector('.searchInputWrapper #pedSearchInput')?.value?.trim?.())
+    }, REFRESH_INTERVAL_MS)
+  }
+  function stopRefreshTimer() {
+    if (refreshTimer) {
+      clearInterval(refreshTimer)
+      refreshTimer = null
+    }
+  }
+  document.addEventListener('visibilitychange', () => {
+    document.hidden ? stopRefreshTimer() : startRefreshTimer()
+  })
+  if (!document.hidden) startRefreshTimer()
+  window.addEventListener('pagehide', stopRefreshTimer)
 })()
 
 const searchInput = document.querySelector('.searchInputWrapper #pedSearchInput')
@@ -70,7 +94,27 @@ document
   })
 
 async function loadRecentIds() {
-  const recentIds = await (await fetch('/data/recentIds')).json()
+  let recentIds = []
+  try {
+    const res = await fetch('/data/recentIds')
+    recentIds = res.ok ? await res.json() : []
+  } catch (e) {
+    recentIds = []
+  }
+
+  // Dev server fallback: when on localhost:3010 (dev server) and no data, show placeholder names so you don't have to remember them
+  const isDevServer = (typeof window !== 'undefined' && window.location && (window.location.port === '3010') && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+  if (isDevServer && (!recentIds || recentIds.length === 0)) {
+    recentIds = [
+      { Name: 'John Doe', Type: 'State ID' },
+      { Name: 'Jane Smith', Type: 'State ID' },
+      { Name: 'Mike Johnson', Type: 'State ID' },
+      { Name: 'Sarah Davis', Type: 'State ID' },
+      { Name: 'Tom Miller', Type: 'State ID' },
+      { Name: 'Alice Brown', Type: 'State ID' },
+      { Name: 'Bob Wilson', Type: 'State ID' },
+    ]
+  }
 
   const wrapper = document.querySelector('.recentIdsWrapper')
   const list = document.querySelector('.recentIdsList')
@@ -96,13 +140,12 @@ async function loadRecentIds() {
 }
 
 async function loadSearchHistory() {
-  const history = await (
-    await fetch('/data/searchHistory', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: 'ped',
-    })
-  ).json()
+  const res = await fetch('/data/searchHistory', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: 'ped',
+  })
+  const history = res.ok ? await res.json().catch(() => []) : []
 
   const wrapper = document.querySelector('.searchHistoryWrapper')
   const list = document.querySelector('.searchHistoryList')
@@ -130,26 +173,26 @@ async function loadSearchHistory() {
 
 async function performSearch(query) {
   const language = await getLanguage()
+  const notifs = language?.pedSearch?.notifications || {}
   if (!query) {
     topWindow.showNotification(
-      language.pedSearch.notifications.emptySearchInput,
+      notifs.emptySearchInput || 'Enter a name to search.',
       'warning'
     )
     return
   }
-  const response = await (
-    await fetch('/data/specificPed', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: query,
-    })
-  ).json()
+  const res = await fetch('/data/specificPed', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: query,
+  })
+  const response = res.ok ? await res.json().catch(() => null) : null
 
   if (!response) {
     topWindow.showNotification(
-      language.pedSearch.notifications.pedNotFound,
+      notifs.pedNotFound || 'Person not found.',
       'warning'
     )
     return
@@ -158,34 +201,34 @@ async function performSearch(query) {
   // Alert notifications for wanted/probation/parole/advisory
   if (response.IsWanted) {
     topWindow.showNotification(
-      `${language.pedSearch.notifications?.wanted || 'WANTED'}: ${response.Name} \u2014 ${response.WarrantText}`,
+      `${notifs.wanted || 'WANTED'}: ${response.Name} \u2014 ${response.WarrantText}`,
       'warning',
       -1
     )
   }
   if (response.IsOnProbation) {
     topWindow.showNotification(
-      `${language.pedSearch.notifications?.advisory || 'ADVISORY'}: ${response.Name} ${language.pedSearch.notifications?.isOnProbation || 'is on probation'}`,
+      `${notifs.advisory || 'ADVISORY'}: ${response.Name} ${notifs.isOnProbation || 'is on probation'}`,
       'warning',
       8000
     )
   }
   if (response.IsOnParole) {
     topWindow.showNotification(
-      `${language.pedSearch.notifications?.advisory || 'ADVISORY'}: ${response.Name} ${language.pedSearch.notifications?.isOnParole || 'is on parole'}`,
+      `${notifs.advisory || 'ADVISORY'}: ${response.Name} ${notifs.isOnParole || 'is on parole'}`,
       'warning',
       8000
     )
   }
   if (response.AdvisoryText) {
     topWindow.showNotification(
-      `${language.pedSearch.notifications?.advisory || 'ADVISORY'}: ${response.AdvisoryText}`,
+      `${notifs.advisory || 'ADVISORY'}: ${response.AdvisoryText}`,
       'info',
       8000
     )
   }
 
-  document.title = `${language.pedSearch.static.title}: ${response.Name}`
+  document.title = `${(language?.pedSearch?.static?.title) || 'Person Search'}: ${response.Name}`
 
   document.querySelector('.searchResponseWrapper').classList.remove('hidden')
 
@@ -288,6 +331,11 @@ async function performSearch(query) {
     openPedAsOffenderInReport('citation', response.Name)
   document.querySelector('.searchResponseWrapper .createArrestBtn').onclick = () =>
     openPedAsOffenderInReport('arrest', response.Name)
+  const createInjuryBtn = document.querySelector('.searchResponseWrapper .createInjuryReportBtn')
+  if (createInjuryBtn) {
+    createInjuryBtn.onclick = () =>
+      openReportWithPrefill('injury', { pedName: response.Name, source: 'pedSearch' })
+  }
 
   // Drug records for this ped
   const drugsResponse = await (
@@ -308,7 +356,7 @@ async function performSearch(query) {
     const sectionTitle = document.createElement('div')
     sectionTitle.classList.add('searchResponseSectionTitle', 'drugRecordsTitle')
     sectionTitle.innerHTML =
-      language.pedSearch.static?.drugRecordsTitle || 'Substance History'
+      language?.pedSearch?.static?.drugRecordsTitle || 'Substance History'
     document.querySelector('.searchResponseWrapper').appendChild(sectionTitle)
 
     const drugsSection = document.createElement('div')
@@ -347,7 +395,7 @@ async function performSearch(query) {
     const sectionTitle = document.createElement('div')
     sectionTitle.classList.add('searchResponseSectionTitle', 'vehiclesOwnedTitle')
     sectionTitle.innerHTML =
-      language.pedSearch.static?.vehiclesOwnedTitle || 'Vehicles Owned'
+      language?.pedSearch?.static?.vehiclesOwnedTitle || 'Vehicles Owned'
     document.querySelector('.searchResponseWrapper').appendChild(sectionTitle)
 
     const vehiclesSection = document.createElement('div')
@@ -392,7 +440,7 @@ async function performSearch(query) {
     const sectionTitle = document.createElement('div')
     sectionTitle.classList.add('searchResponseSectionTitle', 'registeredFirearmsTitle')
     sectionTitle.innerHTML =
-      language.pedSearch?.static?.registeredFirearmsTitle || 'Registered Firearms'
+      language?.pedSearch?.static?.registeredFirearmsTitle || 'Registered Firearms'
     document.querySelector('.searchResponseWrapper').appendChild(sectionTitle)
 
     const firearmsSection = document.createElement('div')
@@ -444,7 +492,7 @@ async function performSearch(query) {
     const sectionTitle = document.createElement('div')
     sectionTitle.classList.add('searchResponseSectionTitle', 'pedReportsTitle')
     sectionTitle.innerHTML =
-      language.pedSearch.static?.reportsTitle || 'Associated Reports'
+      language?.pedSearch?.static?.reportsTitle || 'Associated Reports'
     document.querySelector('.searchResponseWrapper').appendChild(sectionTitle)
 
     const reportsSection = document.createElement('div')

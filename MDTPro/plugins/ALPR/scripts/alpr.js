@@ -61,6 +61,8 @@
     }
 
     const container = document.querySelector('.overlay .notifications') || document.body
+    const createdAt = Date.now()
+    wrapper.dataset.alprCreated = String(createdAt)
     container.appendChild(wrapper)
 
     // Keep only the most recent 8 ALPR popups; older ones are removed by the 2-minute auto-dismiss
@@ -115,6 +117,24 @@
     if (typeof getConfig !== 'function') return
 
     checkInGameAlprStatus()
+
+    // Interval-based cleanup: remove ALPR popups older than 2 minutes.
+    // Per-popup setTimeout can be throttled when the tab is in the background, so this ensures cleanup runs when the timer fires (even if delayed).
+    const autoDismissMs = 2 * 60 * 1000
+    const fadeOutMs = 1500
+    setInterval(function () {
+      const popups = document.querySelectorAll('.alpr-popup:not(.alpr-popup--fade-out)')
+      const now = Date.now()
+      popups.forEach(function (popup) {
+        const created = parseInt(popup.dataset.alprCreated, 10)
+        if (!isNaN(created) && now - created >= autoDismissMs) {
+          popup.classList.add('alpr-popup--fade-out')
+          setTimeout(function () {
+            if (popup.parentNode) popup.remove()
+          }, fadeOutMs)
+        }
+      })
+    }, 15000)
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
     const ws = new WebSocket(`${protocol}//${location.host}/ws`)

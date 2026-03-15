@@ -41,7 +41,8 @@ To build the plugin from source:
 
 ## Installation
 
-1. Extract all files and folders from the ZIP into the GTA V main directory (the folder containing `GTA5.exe`).
+- **OpenIV:** Install or uninstall with the `.oiv` package. For full removal, delete the `MDTPro` folder after uninstalling.
+- **Manual:** Extract all files and folders from the ZIP into the GTA V main directory (the folder containing `GTA5.exe`).
 
 Your GTA V folder should have:
 - `plugins/LSPDFR/MDTPro.dll`
@@ -64,14 +65,18 @@ Your GTA V folder should have:
 - Go on duty with LSPDFR. MDT Pro will start its web server and show in-game notifications with the addresses to open the MDT.
 - If you miss the notifications, addresses are also written to `MDTPro/ipAddresses.txt`.
 - Open the MDT in any browser. Chromium-based browsers (e.g. Chrome, Brave) work best. Use one of the shown addresses—if one fails (e.g. firewall), try another.
-- The default port is **8080**. You can change it (and other options) on the **Customization** page (see [Customization](#customization)).
+- The default port is **9000**. You can change it (and other options) on the **Customization** page (see [Customization](#customization)).
+
+### Connecting from another device
+
+If you can't reach the MDT from another device (phone, tablet, another PC on your network), it may be a **Windows Firewall** issue—this is the firewall on your game PC, not your router. Add an inbound rule in Windows Firewall to allow the port MDT Pro uses (9000 by default, or whatever you set in Customization). Without this rule, Windows may block incoming connections from other devices on your network.
 
 ### Setup using Steam overlay
 
 - In Steam: **Steam → Settings → In-Game**.
 - Enable *Enable the Steam Overlay while in-game*.
 - Set *Overlay shortcut key(s)* to the key you want for opening the overlay (and thus the MDT).
-- Set *Web browser home page* to `http://127.0.0.1:8080` (or the address and port shown by MDT Pro).
+- Set *Web browser home page* to `http://127.0.0.1:9000` (or the address and port shown by MDT Pro).
 
 ## UI Usage
 
@@ -93,10 +98,12 @@ Your GTA V folder should have:
 - A **notes** section is available for incident description or extra details.
 - Report drafts are auto-saved in the browser; if you leave and return to the create page within 24 hours, you may be prompted to restore the draft.
 
-#### Incident reports
+#### Report types
 
-- Use for any reporting that does not fit citations or arrests.
-- Offender, witness, and victim names are optional.
+- **Incident** — General reporting; offender, witness, and victim names optional.
+- **Injury** — Injured party, severity, treatment. Create from Reports or Person Search (name prefilled).
+- **Traffic Incident** — Collisions and multi-vehicle incidents. Available under Reports.
+- **Impound** — Plate, owner, reason, tow company. Create from Reports or Vehicle Search (vehicle prefilled).
 
 #### Citation and arrest reports
 
@@ -105,14 +112,19 @@ Your GTA V folder should have:
 
 ### Person Lookup (Ped Search)
 
-- Search by name to see information about that person (from MDT Pro and, when available, CDF).
+- Search by name to see information about that person (from MDT Pro and, when available, CDF). Create an Injury Report with name prefilled via "New Injury Report".
 - The **history** section lists citations and arrests. Click a citation or arrest entry to **create a new report** for that ped (pre-filled where applicable).
 - **Callout suspects:** Person records normally come from CDF (e.g. peds you stop, vehicle owners). Some callout packs generate a suspect name from evidence (e.g. “mobile phone associated with Joe Thomas”) but do *not* register that person with CDF, so they would not appear in Person Search. MDT Pro tries to add name-only “stub” records when it sees phrases like “associated with …”, “sightings of …”, etc. in the **Active Call** message or additional messages. You can turn this off in config with `addCalloutSuspectNamesFromMessages: false`. For full integration, callout authors can register suspects with CDF so they appear across all CDF-using plugins.
 
 ### Vehicle Lookup
 
-- Search by **license plate** or **VIN** to see vehicle and related information.
+- Search by **license plate** or **VIN** to see vehicle and related information. Create an Impound Report with vehicle prefilled via "Create Impound Report".
 - Click the **owner** in the basic information area to open Person Lookup for the vehicle’s registered owner.
+
+### BOLO & Backup
+
+- **BOLO Noticeboard** — Add or remove BOLOs (plate, reason, duration) without the vehicle in front of you. BOLOs sync to CDF and ALPR.
+- **Quick Actions** — Panic, Backup (patrol, traffic stop, transport, tow, etc.), and Clear ALPR from the bottom-right bar. Works with Policing Redefined.
 
 ### Shift History
 
@@ -120,7 +132,7 @@ Your GTA V folder should have:
 
 ### Court
 
-- View and manage **court cases** derived from citation and arrest reports.
+- View and manage **court cases** derived from arrest reports. Arrests start as Pending; attach reports (Incident, Injury, Citation, Traffic Incident, Impound) as evidence, then Close arrest to create the case.
 - Filter and sort by status, case number, ped name, or report ID.
 - Cases can be updated (e.g. status, resolution); the system supports docket management, sentencing, and related options configurable in `config.json`.
 
@@ -131,7 +143,7 @@ Your GTA V folder should have:
 
 ### Active Call
 
-- Shows details of the **current callout** when **CalloutInterface** is installed: location (postal, street, area, county), priority, message, advisory, unit/callsign, and timestamps (displayed, accepted, finished).
+- Shows details of the **current callout** when **CalloutInterface** is installed: status (Pending, Accepted, En Route, Finished), location (postal, street, area, county), priority, message, timeline, and expandable cards. Set a GPS waypoint and use Accept/En Route when your callout system supports it.
 - Without CalloutInterface, the page opens but does not receive callout data.
 - When callout messages mention a suspect by name (e.g. “associated with Joe Thomas”), MDT Pro can add that name to Person Search so you can look them up; see [Person Lookup](#person-lookup-ped-search).
 
@@ -173,9 +185,12 @@ Plugin Name
     │       script 1.js
     │       script 2.js
     │
-    └───styles
-            style 1.css
-            style 2.css
+    ├───styles
+    │       style 1.css
+    │       style 2.css
+    │
+    └───images (optional)
+            badge.png
 ```
 
 Multiple pages, scripts, and styles are supported per plugin.
@@ -183,6 +198,7 @@ Multiple pages, scripts, and styles are supported per plugin.
 - HTML in `pages` is served at `/plugin/<pluginId>/page/<fileName>`
 - JS in `scripts` is served at `/plugin/<pluginId>/script/<fileName>`
 - CSS in `styles` is served at `/plugin/<pluginId>/style/<fileName>`
+- Images in `images` (optional) at `/plugin/<pluginId>/image/<fileName>` (png, jpg, svg)
 - In JavaScript, get the plugin ID with: `const pluginId = document.currentScript.dataset.pluginId`
 - Scripts and styles are loaded on the main index page when the plugin is enabled on the Customization page.
 
@@ -213,10 +229,6 @@ function initTestPage(contentWindow) {
   contentWindow.document.body.innerHTML = 'Test page loaded'
 }
 ```
-
-## Resetting data (optional)
-
-The **ClearMDTProData** utility (in the repo, in the `ClearMDTProData` folder) can reset the SQLite database, legacy shift/court/peds JSON, etc. Build it first (e.g. open `ClearMDTProData/ClearMDTProData.sln` and build, or run `dotnet run` from the `ClearMDTProData` folder). Then run the executable from the directory that contains the `MDTPro` folder (e.g. GTA V main directory after install, or repo root when using the repo’s `MDTPro`). Use when you want a clean slate without deleting the whole `MDTPro` folder.
 
 ## License
 

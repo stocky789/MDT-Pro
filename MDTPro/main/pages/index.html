@@ -10,6 +10,81 @@
     <link rel="stylesheet" href="/style/index.css" />
   </head>
   <body>
+    <div class="quickActionsBar" id="quickActionsBar" aria-label="Quick actions">
+      <button type="button" class="qabBtn qabPanic" title="Panic backup" data-action="panic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/><path d="M12 16h.01"/></svg>
+        <span>Panic</span>
+      </button>
+      <div class="qabBackupWrapper" role="group" aria-label="Request backup">
+        <button type="button" class="qabBtn qabBackup qabBackupMain" title="Request backup" data-action="localPatrol" aria-haspopup="true" aria-expanded="false" aria-controls="qabBackupMenu">
+          <svg class="qabIconGroup" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M-21,2a2,2,0,0,0-2-2,2,2,0,0,0-2,2,2,2,0,0,0,2,2A2,2,0,0,0-21,2Zm-2,1a1,1,0,0,1-1-1,1,1,0,0,1,1-1,1,1,0,0,1,1,1A1,1,0,0,1-23,3Zm10-1a2,2,0,0,0-2-2,2,2,0,0,0-2,2,2,2,0,0,0,2,2A2,2,0,0,0-13,2Zm-2,1a1,1,0,0,1-1-1,1,1,0,0,1,1-1,1,1,0,0,1,1,1A1,1,0,0,1-15,3Zm1.5,1h-3a2.493,2.493,0,0,0-2.027,1.048A2.95,2.95,0,0,0-19,5a2.95,2.95,0,0,0-.473.048A2.493,2.493,0,0,0-21.5,4h-3A2.5,2.5,0,0,0-27,6.5,1.5,1.5,0,0,0-25.5,8H-22a3,3,0,0,0,3,3,3,3,0,0,0,3-3h3.5A1.5,1.5,0,0,0-11,6.5,2.5,2.5,0,0,0-13.5,4ZM-17,8a2,2,0,0,1-2,2,2,2,0,0,1-2-2,2,2,0,0,1,2-2A2,2,0,0,1-17,8Zm-8.5-1a.5.5,0,0,1-.5-.5A1.5,1.5,0,0,1-24.5,5h3a1.491,1.491,0,0,1,1.02.406A3,3,0,0,0-21.816,7Zm13,0h-3.684A3,3,0,0,0-17.52,5.406,1.491,1.491,0,0,1-16.5,5h3A1.5,1.5,0,0,1-12,6.5.5.5,0,0,1-12.5,7ZM-25,14.5A1.5,1.5,0,0,0-23.5,16h9A1.5,1.5,0,0,0-13,14.5,3.5,3.5,0,0,0-16.5,11h-5A3.5,3.5,0,0,0-25,14.5Zm8.5-2.5A2.5,2.5,0,0,1-14,14.5a.5.5,0,0,1-.5.5h-9a.5.5,0,0,1-.5-.5A2.5,2.5,0,0,1-21.5,12Z" transform="translate(27)"/></svg>
+          <span>Backup</span>
+          <svg class="qabChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="qabBackupMenu" id="qabBackupMenu" role="menu" aria-hidden="true">
+          <div class="qabBackupSection qabBackupCodeSelector" role="none">
+            <span class="qabBackupLabel">Response code</span>
+            <div class="qabBackupCodeRow" role="group" aria-label="Response code">
+              <button type="button" class="qabBackupCode" data-code="1" aria-pressed="false">Code 1</button>
+              <button type="button" class="qabBackupCode active" data-code="2" aria-pressed="true">Code 2</button>
+              <button type="button" class="qabBackupCode" data-code="3" aria-pressed="false">Code 3</button>
+            </div>
+          </div>
+          <div class="qabBackupSection" role="none">
+            <button type="button" role="menuitem" data-action="localPatrol">Local Patrol</button>
+            <button type="button" role="menuitem" data-action="statePatrol">State Patrol</button>
+            <button type="button" role="menuitem" data-action="localSwat">Local SWAT</button>
+            <button type="button" role="menuitem" data-action="nooseSwat">NOOSE SWAT</button>
+            <button type="button" role="menuitem" data-action="localK9">Local K9</button>
+            <button type="button" role="menuitem" data-action="stateK9">State K9</button>
+          </div>
+          <div class="qabBackupSection" role="none">
+            <button type="button" role="menuitem" data-action="ambulance">Ambulance</button>
+            <button type="button" role="menuitem" data-action="fire">Fire Department</button>
+            <button type="button" role="menuitem" data-action="coroner">Coroner</button>
+            <button type="button" role="menuitem" data-action="animalControl">Animal Control</button>
+          </div>
+          <div class="qabBackupSection" role="none">
+            <button type="button" role="menuitem" data-action="trafficStop">Traffic Stop</button>
+            <button type="button" role="menuitem" data-action="transport">Police Transport</button>
+            <button type="button" role="menuitem" data-action="tow">Tow Service</button>
+            <button type="button" role="menuitem" data-action="group">Group Backup</button>
+          </div>
+          <div class="qabBackupSection qabBackupPursuit" role="none">
+            <span class="qabBackupLabel">Pursuit only</span>
+            <button type="button" role="menuitem" data-action="airLocal">Air Backup (Local)</button>
+            <button type="button" role="menuitem" data-action="airNoose">Air Backup (NOOSE)</button>
+            <button type="button" role="menuitem" data-action="spikeStrips">Spike Strips</button>
+          </div>
+          <div class="qabBackupSection" role="none">
+            <button type="button" role="menuitem" data-action="felonyStop">Initiate Felony Stop</button>
+            <button type="button" role="menuitem" data-action="dismiss">Dismiss All Backup</button>
+          </div>
+        </div>
+      </div>
+      <button type="button" class="qabBtn qabAlpr" title="Clear ALPR" data-action="alpr">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        <span>Clear ALPR</span>
+      </button>
+      <button type="button" class="qabBtn qabNotepad" title="Notepad" data-action="notepad" aria-controls="notepadPopup">
+        <svg viewBox="0 0 256 256" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M208,48.00586v152a23.99994,23.99994,0,0,1-24,24H72a23.99994,23.99994,0,0,1-24-24v-152a7.99993,7.99993,0,0,1,8-8H200A7.99993,7.99993,0,0,1,208,48.00586Z" opacity="0.2"/><path d="M168,128.00586a8.00008,8.00008,0,0,1-8,8H96a8,8,0,1,1,0-16h64A8.00008,8.00008,0,0,1,168,128.00586Zm-8,24H96a8,8,0,1,0,0,16h64a8,8,0,0,0,0-16Zm56-104v152a32.03667,32.03667,0,0,1-32,32H72a32.03667,32.03667,0,0,1-32-32v-152a16.01833,16.01833,0,0,1,16-16H72v-8a8,8,0,0,1,16,0v8h32v-8a8,8,0,1,1,16,0v8h32v-8a8,8,0,1,1,16,0v8h16A16.01833,16.01833,0,0,1,216,48.00586Zm-16,0H184v8a8,8,0,0,1-16,0v-8H136v8a8,8,0,0,1-16,0v-8H88v8a8,8,0,0,1-16,0v-8H56v152a16.01833,16.01833,0,0,0,16,16H184a16.01833,16.01833,0,0,0,16-16Z"/></svg>
+        <span>Notepad</span>
+      </button>
+    </div>
+    <div class="notepadPopup" id="notepadPopup" role="dialog" aria-label="Notepad" aria-hidden="true">
+      <div class="notepadPopupBackdrop" data-notepad-close></div>
+      <div class="notepadPopupPanel">
+        <div class="notepadPopupHeader">
+          <h2 class="notepadPopupTitle" data-language="quickActions.notepad">Notepad</h2>
+          <button type="button" class="notepadPopupClose" title="Close" data-notepad-close aria-label="Close">&times;</button>
+        </div>
+        <textarea class="notepadPopupText" id="notepadText" placeholder="Type your notes here…" rows="12"></textarea>
+        <div class="notepadPopupActions">
+          <button type="button" class="notepadPopupSave" data-language="quickActions.notepadSave">Save</button>
+          <button type="button" class="notepadPopupCloseBtn" data-notepad-close data-language="quickActions.notepadClose">Close</button>
+        </div>
+      </div>
+    </div>
     <header class="taskbar">
       <div class="taskbarBrand">
         <img src="/image/badge?v=7" alt="" class="taskbarLogo taskbarBadge" />

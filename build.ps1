@@ -6,6 +6,8 @@
 #   .\build.ps1 -Incremental       Faster build (no wipe, incremental)
 #   .\build.ps1 -Deploy            Build then copy to GTA V (use -GamePath if not default)
 #   .\build.ps1 -Deploy -GamePath "D:\Games\GTA V"
+#   GamePath is also used to copy DamageTrackingFramework.dll into Release (required for injury reports; or use References\DamageTrackingFramework.dll).
+#   OpenIV packages (install + uninstall) are always created in Release\
 
 param(
     [switch]$Incremental,
@@ -82,10 +84,12 @@ if (Test-Path $mdtDest) { Remove-Item $mdtDest -Recurse -Force }
 Copy-Item -Path $mdtSource -Destination $mdtDest -Recurse -Force
 Write-Host "  -> $mdtDest (web MDT)"
 
-# 5) Copy Dependencies folder into Release (mirrors Dependencies\* to Release\ so SQLite and x64\ go to the right spots)
+# 5) Copy Dependencies folder into Release (SQLite, x64\, etc.). Exclude optional/unused DLLs if present.
 $releaseRoot = $release
+$depsExclude = @('DamageTrackerLib.dll', 'DamageTrackingFramework.dll')
 if (Test-Path $depsFolder) {
     Get-ChildItem -Path $depsFolder -Force | ForEach-Object {
+        if ($depsExclude -contains $_.Name) { return }
         $dest = Join-Path $releaseRoot $_.Name
         if ($_.PSIsContainer) {
             if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
@@ -155,6 +159,199 @@ if ($Deploy) {
     if (Test-Path $dataBackup) { Copy-Item $dataBackup (Join-Path $mdtProDest 'data') -Recurse -Force; Remove-Item $dataBackup -Recurse -Force }
     Write-Host "Deployed to $GamePath"
 }
+
+# 8) Create OpenIV package (always)
+    Write-Host "Creating OpenIV package..."
+    $asmInfo = Join-Path $root 'MDTProPlugin\MDTPro\Properties\AssemblyInfo.cs'
+    $versionMatch = Select-String -Path $asmInfo -Pattern '^\s*\[assembly:\s*AssemblyVersion\("([^"]+)"\)' | Select-Object -First 1
+    $versionStr = if ($versionMatch) { $versionMatch.Matches.Groups[1].Value } else { '0.9.0.0' }
+    $versionStr = $versionStr -replace '\*', '0'  # sanitize for file paths
+    # OIV uses major.minor (tag) - use full version as tag so OpenIV shows "0.0 (0.9.5.0)" i.e. readable 0.9.5.0
+    $versionParts = $versionStr.Split('.')
+    $major = if ($versionParts.Length -gt 0) { [int]$versionParts[0] } else { 0 }
+    $minor = if ($versionParts.Length -gt 1) { [int]$versionParts[1] } else { 9 }
+    $tag = $versionStr  # full version in tag e.g. "0.9.5.0"
+
+    $oivDir = Join-Path $release 'oivBuild'
+    $oivContent = Join-Path $oivDir 'content'
+    if (Test-Path $oivDir) { Remove-Item $oivDir -Recurse -Force }
+    New-Item -ItemType Directory -Path $oivContent -Force | Out-Null
+
+    # Content structure for OIV (paths relative to GTA V root)
+    $pluginsOiv = Join-Path $oivContent 'plugins\LSPDFR'
+    New-Item -ItemType Directory -Path $pluginsOiv -Force | Out-Null
+    Copy-Item -Path $dllDest -Destination (Join-Path $pluginsOiv 'MDTPro.dll') -Force
+    $newtonsoftDll = Join-Path $dllDestDir 'Newtonsoft.Json.dll'
+    if (Test-Path $newtonsoftDll) { Copy-Item -Path $newtonsoftDll -Destination (Join-Path $pluginsOiv 'Newtonsoft.Json.dll') -Force }
+    if ($sqliteDllSource) { Copy-Item -Path $sqliteDllSource -Destination (Join-Path $oivContent 'System.Data.SQLite.dll') -Force }
+    if ($sqliteInteropSource) {
+        $x64Oiv = Join-Path $oivContent 'x64'
+        New-Item -ItemType Directory -Path $x64Oiv -Force | Out-Null
+        Copy-Item -Path $sqliteInteropSource -Destination (Join-Path $x64Oiv 'SQLite.Interop.dll') -Force
+    }
+    Copy-Item -Path $mdtDest -Destination (Join-Path $oivContent 'MDTPro') -Recurse -Force
+
+    # Generate assembly.xml add and delete commands for MDTPro folder (OIV uses forward slashes)
+    $mdtAdds = @()
+    $mdtDeletes = @()
+    Get-ChildItem -Path (Join-Path $oivContent 'MDTPro') -Recurse -File | ForEach-Object {
+        $rel = $_.FullName.Substring($oivContent.Length + 1).Replace('\', '/')
+        $mdtAdds += "    <add source=`"$rel`">$rel</add>"
+        $mdtDeletes += "    <delete>$rel</delete>"
+    }
+
+    $pluginAdds = "    <add source=`"plugins/LSPDFR/MDTPro.dll`">plugins/LSPDFR/MDTPro.dll</add>`n    <add source=`"plugins/LSPDFR/Newtonsoft.Json.dll`">plugins/LSPDFR/Newtonsoft.Json.dll</add>"
+    $contentXml = @"
+$pluginAdds
+    <add source="System.Data.SQLite.dll">System.Data.SQLite.dll</add>
+    <add source="x64/SQLite.Interop.dll">x64/SQLite.Interop.dll</add>
+$($mdtAdds -join "`n")
+"@
+
+    $assemblyXml = @"
+<?xml version="1.0" encoding="UTF-8"?>
+<package version="2.2" id="{E8A7C4B2-9D1F-4E6A-8B3C-2F5A1D9E7B4C}" target="Five">
+  <metadata>
+    <name>MDT Pro</name>
+    <version>
+      <major>$major</major>
+      <minor>$minor</minor>
+      <tag>$tag</tag>
+    </version>
+    <author>
+      <displayName>stocky789</displayName>
+    </author>
+    <description footerLink="https://www.lcpdfr.com/downloads/gta5mods/scripts/53627-mdtpro" footerLinkTitle="LCPDFR">
+      <![CDATA[Police MDT (Mobile Data Terminal) plugin for LSPDFR. Runs a local web server when you go on duty. Requires LSPDFR, CommonDataFramework, CalloutInterfaceAPI, and Policing Redefined. Install with OpenIV Package Installer.]]>
+    </description>
+    <largeDescription displayName="GitHub" footerLink="https://github.com/stocky789/MDT-Pro" footerLinkTitle="GitHub">
+      <![CDATA[Source code and releases: https://github.com/stocky789/MDT-Pro]]>
+    </largeDescription>
+  </metadata>
+  <colors>
+    <headerBackground useBlackTextColor="False">`$FF1a365d</headerBackground>
+    <iconBackground>`$FF2c5282</iconBackground>
+  </colors>
+  <content>
+$contentXml
+  </content>
+</package>
+"@
+    $assemblyXml | Out-File -FilePath (Join-Path $oivDir 'assembly.xml') -Encoding UTF8
+
+    # Optional: copy 128x128 icon if available
+    $iconSrc = Join-Path $root 'favicon\MDT Pro.png'
+    if (Test-Path $iconSrc) {
+        Copy-Item -Path $iconSrc -Destination (Join-Path $oivDir 'icon.png') -Force
+    }
+
+    # Create .oiv (ZIP) - OIV is a ZIP archive; create as .zip then rename to .oiv
+    $oivZip = Join-Path $release "MDTPro-$versionStr.zip"
+    $oivOut = Join-Path $release "MDTPro-$versionStr.oiv"
+    if (Test-Path $oivZip) { Remove-Item $oivZip -Force }
+    if (Test-Path $oivOut) { Remove-Item $oivOut -Force }
+    $oivItems = @( (Join-Path $oivDir 'assembly.xml'), (Join-Path $oivDir 'content') )
+    if (Test-Path (Join-Path $oivDir 'icon.png')) { $oivItems += Join-Path $oivDir 'icon.png' }
+    Compress-Archive -Path $oivItems -DestinationPath $oivZip -CompressionLevel Optimal -Force
+    Rename-Item -Path $oivZip -NewName (Split-Path $oivOut -Leaf) -Force
+    Write-Host "  -> $oivOut (OpenIV package)"
+
+    # Create uninstaller OIV package (delete commands only; unique GUID)
+    # ONLY remove MDT Pro files. Do NOT remove shared dependencies (SQLite, Newtonsoft.Json, DamageTrackingFramework)
+    # so other mods that use them keep working after uninstall.
+    $runtimeDeletes = @(
+        'MDTPro/config.json', 'MDTPro/language.json', 'MDTPro/citationOptions.json', 'MDTPro/arrestOptions.json',
+        'MDTPro/MDTPro.log', 'MDTPro/ipAddresses.txt',
+        'MDTPro/data/mdtpro.db', 'MDTPro/data/mdtpro.db-wal', 'MDTPro/data/mdtpro.db-shm',
+        'MDTPro/data/peds.json', 'MDTPro/data/peds.json.bak',
+        'MDTPro/data/vehicles.json', 'MDTPro/data/vehicles.json.bak',
+        'MDTPro/data/court.json', 'MDTPro/data/court.json.bak',
+        'MDTPro/data/shiftHistory.json', 'MDTPro/data/shiftHistory.json.bak',
+        'MDTPro/data/officerInformation.json', 'MDTPro/data/officerInformation.json.bak',
+        'MDTPro/data/reports/incidentReports.json', 'MDTPro/data/reports/citationReports.json', 'MDTPro/data/reports/arrestReports.json'
+    ) | ForEach-Object { "    <delete>$_</delete>" }
+    $deleteXml = @"
+    <delete>plugins/LSPDFR/MDTPro.dll</delete>
+$($mdtDeletes -join "`n")
+$($runtimeDeletes -join "`n")
+"@
+    $uninstallAssembly = @"
+<?xml version="1.0" encoding="UTF-8"?>
+<package version="2.2" id="{A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D}" target="Five">
+  <metadata>
+    <name>MDT Pro - Uninstall</name>
+    <version>
+      <major>$major</major>
+      <minor>$minor</minor>
+      <tag>$tag</tag>
+    </version>
+    <author>
+      <displayName>stocky789</displayName>
+    </author>
+    <description footerLink="https://www.lcpdfr.com/downloads/gta5mods/scripts/53627-mdtpro" footerLinkTitle="LCPDFR">
+      <![CDATA[Removes only MDT Pro (plugin DLL and MDTPro folder). Leaves shared dependencies (SQLite, Newtonsoft.Json, DamageTrackingFramework) so other mods keep working. For a full purge, manually delete the MDTPro folder and any dependencies if no other mod needs them.]]>
+    </description>
+    <largeDescription displayName="GitHub" footerLink="https://github.com/stocky789/MDT-Pro" footerLinkTitle="GitHub">
+      <![CDATA[Source code and releases: https://github.com/stocky789/MDT-Pro]]>
+    </largeDescription>
+  </metadata>
+  <colors>
+    <headerBackground useBlackTextColor="False">`$FF4a1515</headerBackground>
+    <iconBackground>`$FF6b2121</iconBackground>
+  </colors>
+  <content>
+$deleteXml
+  </content>
+</package>
+"@
+    $oivUninstallDir = Join-Path $release 'oivUninstall'
+    if (Test-Path $oivUninstallDir) { Remove-Item $oivUninstallDir -Recurse -Force }
+    New-Item -ItemType Directory -Path $oivUninstallDir -Force | Out-Null
+    $uninstallAssembly | Out-File -FilePath (Join-Path $oivUninstallDir 'assembly.xml') -Encoding UTF8
+    if (Test-Path $iconSrc) { Copy-Item -Path $iconSrc -Destination (Join-Path $oivUninstallDir 'icon.png') -Force }
+    # OpenIV requires a content folder; Compress-Archive skips empty dirs, so add placeholder
+    $uninstallContentDir = Join-Path $oivUninstallDir 'content'
+    New-Item -ItemType Directory -Path $uninstallContentDir -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $uninstallContentDir '.gitkeep'), '')
+    $oivUninstallZip = Join-Path $release "MDTPro-$versionStr-Uninstall.zip"
+    $oivUninstallOut = Join-Path $release "MDTPro-$versionStr-Uninstall.oiv"
+    if (Test-Path $oivUninstallZip) { Remove-Item $oivUninstallZip -Force }
+    if (Test-Path $oivUninstallOut) { Remove-Item $oivUninstallOut -Force }
+    $uninstallOivItems = @( (Join-Path $oivUninstallDir 'assembly.xml'), (Join-Path $oivUninstallDir 'content') )
+    if (Test-Path (Join-Path $oivUninstallDir 'icon.png')) { $uninstallOivItems += Join-Path $oivUninstallDir 'icon.png' }
+    Compress-Archive -Path $uninstallOivItems -DestinationPath $oivUninstallZip -CompressionLevel Optimal -Force
+    Rename-Item -Path $oivUninstallZip -NewName (Split-Path $oivUninstallOut -Leaf) -Force
+    Remove-Item -Path $oivUninstallDir -Recurse -Force
+    Remove-Item -Path $oivDir -Recurse -Force
+    Write-Host "  -> $oivUninstallOut (OpenIV uninstaller)"
+
+# README with install instructions (always)
+$readmePath = Join-Path $release 'README.txt'
+@"
+MDT Pro - Install instructions
+===============================
+
+OPENIV INSTALL (recommended)
+----------------------------
+- MDTPro-*.oiv = Install package. In OpenIV: Edit mode -> drag the .oiv onto OpenIV, or Tools -> Package Installer, then install.
+- MDTPro-*-Uninstall.oiv = Uninstall package. Use this to remove the mod via OpenIV.
+
+
+MANUAL INSTALL (no OpenIV)
+-------------------------
+Copy everything from this folder into your GTA V folder (the folder containing GTA5.exe), EXCEPT the .oiv files.
+
+Copy:
+  - plugins\   (into GTA V\plugins\)
+  - MDTPro\    (into GTA V\MDTPro\)
+  - x64\       (into GTA V\x64\)
+  - System.Data.SQLite.dll  (into GTA V root)
+
+Do NOT copy the .oiv files into your game folder; they are only for OpenIV.
+
+Requirements: LSPDFR, RagePluginHook, Common Data Framework. See the mod page for full requirements.
+"@ | Out-File -FilePath $readmePath -Encoding UTF8
+Write-Host "  -> $readmePath (install instructions)"
 
 Write-Host "Done. Full mod release: $release"
 Write-Host "  Release\plugins\lspdfr\MDTPro.dll"

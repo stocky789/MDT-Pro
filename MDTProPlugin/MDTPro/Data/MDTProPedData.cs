@@ -1,5 +1,6 @@
 using CommonDataFramework.Modules.PedDatabase;
 using MDTPro.Setup;
+using MDTPro.Utility;
 using System.Reflection;
 using Rage;
 using System;
@@ -38,6 +39,8 @@ namespace MDTPro.Data {
         public string HuntingPermitStatus;
         public string HuntingPermitExpiration;
         public string IncarceratedUntil;
+        public bool IsDeceased;
+        public string DeceasedAt;
         public List<CitationGroup.Charge> Citations;
         public List<ArrestGroup.Charge> Arrests;
         public List<IdentificationEntry> IdentificationHistory;
@@ -54,8 +57,19 @@ namespace MDTPro.Data {
         }
         public MDTProPedData() { }
 
+        /// <summary>True when ped has name but no meaningful identity (DOB, license, address, gender). Used to avoid persisting or to trigger delayed CDF retry.</summary>
+        public static bool IsMinimalIdentity(MDTProPedData p) {
+            if (p == null) return true;
+            bool hasName = !string.IsNullOrWhiteSpace(p.Name) || !string.IsNullOrWhiteSpace(p.FirstName) || !string.IsNullOrWhiteSpace(p.LastName);
+            if (!hasName) return true;
+            bool hasIdentity = !string.IsNullOrWhiteSpace(p.Birthday) || !string.IsNullOrWhiteSpace(p.LicenseStatus)
+                || !string.IsNullOrWhiteSpace(p.Address) || !string.IsNullOrWhiteSpace(p.Gender);
+            return !hasIdentity;
+        }
+
         private void PopulateParameters() {
             if (CDFPedData == null) {
+                Helper.Log($"[MDTPro] Ped built with CDF null, using LSPDFR fallback: {(Name ?? "(no name)")}", false, Helper.LogSeverity.Info);
                 PopulateFromLSPDFRPersonaFallback();
                 return;
             }
@@ -87,7 +101,7 @@ namespace MDTPro.Data {
                 HuntingPermitStatus = CDFPedData.HuntingPermit.Status.ToString();
                 HuntingPermitExpiration = CDFPedData.HuntingPermit.ExpirationDate?.ToString("s");
             } catch (Exception e) {
-                Game.LogTrivial($"[MDTPro] Warning: Could not read CDF permit/license data for {Name}: {e.Message}");
+                Helper.Log($"[MDTPro] CDF permit/license read failed for {Name}: {e.Message}", false, Helper.LogSeverity.Warning);
             }
             if (CDFPedData.HasRealPed && Holder != null && Holder.IsValid()) {
                 try {
@@ -122,6 +136,21 @@ namespace MDTPro.Data {
             CDFPedData.Citations = Citations.Count;
 
             TimesStopped = CDFPedData.TimesStopped;
+
+            TryParseNameIntoFirstLast();
+        }
+
+        /// <summary>When we have Name but empty FirstName/LastName (e.g. callout peds, CDF/LSPDFR minimal records), derive first/last from full name.</summary>
+        internal void TryParseNameIntoFirstLast() {
+            if (string.IsNullOrEmpty(Name)) return;
+            if (!string.IsNullOrEmpty(FirstName) && !string.IsNullOrEmpty(LastName)) return;
+            var parts = Name.Trim().Split(new[] { ' ' }, 2, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2) {
+                if (string.IsNullOrEmpty(FirstName)) FirstName = parts[0];
+                if (string.IsNullOrEmpty(LastName)) LastName = parts[1];
+            } else if (parts.Length == 1 && string.IsNullOrEmpty(FirstName) && string.IsNullOrEmpty(LastName)) {
+                FirstName = parts[0];
+            }
         }
 
         /// <summary>Read weapon permit type from CDF, normalizing PR/CDF variations (e.g. "CCW Permit") to our language keys.</summary>
@@ -163,6 +192,7 @@ namespace MDTPro.Data {
                 ModelHash = (uint)Holder.Model.Hash;
                 ModelName = Holder.Model.Name;
             } catch { /* LSPDFR not available or ped invalid */ }
+            TryParseNameIntoFirstLast();
         }
 
         public class IdentificationEntry {
@@ -197,6 +227,8 @@ namespace MDTPro.Data {
             if (!string.IsNullOrEmpty(source.HuntingPermitStatus)) HuntingPermitStatus = source.HuntingPermitStatus;
             if (!string.IsNullOrEmpty(source.HuntingPermitExpiration)) HuntingPermitExpiration = source.HuntingPermitExpiration;
             if (!string.IsNullOrEmpty(source.IncarceratedUntil)) IncarceratedUntil = source.IncarceratedUntil;
+            IsDeceased = source.IsDeceased;
+            DeceasedAt = source.DeceasedAt;
 
             Citations = source.Citations?
                 .Select(charge => new CitationGroup.Charge {

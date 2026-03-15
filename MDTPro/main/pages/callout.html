@@ -8,27 +8,17 @@
     <link rel="stylesheet" href="/style/callout.css" />
   </head>
   <body>
-    <div class="searchResponseWrapper">
-      <div class="inputWrapper grid">
-        <div>
-          <label for="addressInput" data-language="address">Address</label>
-          <input type="text" id="addressInput" disabled />
+    <div class="calloutPage">
+      <div class="calloutStatusBar" id="calloutStatusBar">
+        <span class="calloutTimeline" id="calloutTimeline"></span>
+      </div>
+      <div class="calloutList" id="calloutList">
+        <div class="calloutEmpty" id="calloutEmpty">
+          <span data-language="callout.noActiveCall">No active callout</span>
         </div>
-        <div>
-          <label for="areaInput" data-language="area">Area</label>
-          <input type="text" id="areaInput" disabled />
-        </div>
-        <div>
-          <label for="countyInput" data-language="county">County</label>
-          <input type="text" id="countyInput" disabled />
-        </div>
-        <div>
-          <label for="priorityInput" data-language="priority">Priority</label>
-          <input type="text" id="priorityInput" disabled />
-        </div>
+        <div class="calloutCardsContainer hidden" id="calloutCardsContainer"></div>
       </div>
     </div>
-    <div class="calloutInfo"></div>
   </body>
   <script src="/script/root.js"></script>
   <script src="/script/callout.js"></script>

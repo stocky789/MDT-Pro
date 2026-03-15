@@ -205,12 +205,11 @@ namespace MDTPro.EventListeners {
             }
 
             if (identificationEventTypes.ContainsKey(eventName) && args.Length >= 2 && args[0] is Ped idPed) {
-                string idType = MapIdentificationEnum(args[1]);
-                if (idType != null) {
-                    if (eventName == "OnOccupantIdentificationGiven") idType = idType + " (occupant)";
-                    DataController.AddIdentificationEvent(idPed, idType);
-                    return;
-                }
+                string idType = MapIdentificationEnum(args[1]) ?? "Identification";
+                if (eventName == "OnOccupantIdentificationGiven") idType = idType + " (occupant)";
+                DataController.ResolvePedForReEncounter(idPed);
+                DataController.AddIdentificationEvent(idPed, idType);
+                return;
             }
 
             // OnDeadPedSearched (PedDelegate): fires when PR search finds ID on a corpse. Add to ID History and capture firearms/drugs.
@@ -274,7 +273,11 @@ namespace MDTPro.EventListeners {
                 }
                 DataController.ResolvePedForReEncounter(ped);
                 if (eventName == "OnPedArrested") DataController.CaptureEvidenceForPed(ped);
-                else if (eventName == "OnPedPatDown") DataController.MarkPedPatDown(ped);
+                else if (eventName == "OnPedPatDown") {
+                    DataController.MarkPedPatDown(ped);
+                    DataController.AddIdentificationEvent(ped, "Pat-down");
+                }
+                else if (eventName == "OnPedSurrendered") DataController.MarkPedFleeing(ped);
                 else if (identificationEventTypes.TryGetValue(eventName, out string idType)) DataController.AddIdentificationEvent(ped, idType);
                 return;
             }
@@ -290,7 +293,11 @@ namespace MDTPro.EventListeners {
                     if (pedValue is Ped nestedPed) {
                         DataController.ResolvePedForReEncounter(nestedPed);
                         if (eventName == "OnPedArrested") DataController.CaptureEvidenceForPed(nestedPed);
-                        else if (eventName == "OnPedPatDown") DataController.MarkPedPatDown(nestedPed);
+                        else if (eventName == "OnPedPatDown") {
+                            DataController.MarkPedPatDown(nestedPed);
+                            DataController.AddIdentificationEvent(nestedPed, "Pat-down");
+                        }
+                        else if (eventName == "OnPedSurrendered") DataController.MarkPedFleeing(nestedPed);
                         else if (identificationEventTypes.TryGetValue(eventName, out string idType)) DataController.AddIdentificationEvent(nestedPed, idType);
                     }
                 } catch {

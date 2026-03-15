@@ -122,6 +122,7 @@ namespace MDTPro.UI {
 
             var anchorDisplay = new List<object> { "Top Left", "Top Right", "Bottom Left", "Bottom Right" };
             int anchorIdx = AnchorToIndex(cfg?.alprHudAnchor ?? "TopRight");
+#pragma warning disable CS0618
             _alprAnchorItem = new UIMenuListItem("Anchor", anchorDisplay, anchorIdx, "Screen corner for the ALPR panel.");
             _alprPositionMenu.AddItem(_alprAnchorItem);
             _alprAnchorItem.OnListChanged += (sender, newIndex) => ApplyAlprHudAnchor(AnchorValues[newIndex]);
@@ -138,6 +139,7 @@ namespace MDTPro.UI {
             int oy = Math.Max(OffsetMin, Math.Min(OffsetMax, cfg?.alprHudOffsetY ?? 150));
             _alprOffsetXItem = new UIMenuListItem("Offset X", offsetOptions, SnapOffsetToStep(ox) / OffsetStep, "Horizontal offset in pixels from the anchor corner.");
             _alprOffsetYItem = new UIMenuListItem("Offset Y", offsetOptions, SnapOffsetToStep(oy) / OffsetStep, "Vertical offset in pixels from the anchor corner.");
+#pragma warning restore CS0618
             _alprPositionMenu.AddItem(_alprOffsetXItem);
             _alprPositionMenu.AddItem(_alprOffsetYItem);
             _alprOffsetXItem.OnListChanged += (sender, newIndex) => ApplyAlprHudOffsetX(OffsetMin + newIndex * OffsetStep);

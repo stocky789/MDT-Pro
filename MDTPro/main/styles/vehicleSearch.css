@@ -113,3 +113,104 @@ body {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* Add BOLO modal */
+.addBoloModal {
+  position: fixed;
+  inset: 0;
+  background: var(--color-shadow, rgba(0,0,0,0.6));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.addBoloModal.hidden {
+  display: none;
+}
+
+.addBoloModalContent {
+  background: var(--color-surface, #1a1a1a);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 20px;
+  min-width: 320px;
+  max-width: 90vw;
+}
+
+.addBoloModalTitle {
+  margin: 0 0 6px 0;
+  font-size: 1.15rem;
+}
+
+.addBoloModalSubtitle {
+  margin: 0 0 16px 0;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary, #888);
+}
+
+.addBoloModalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.addBoloFormRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.addBoloFormRow label {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.addBoloFormRow input {
+  padding: 8px 10px;
+  font-size: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-background);
+  color: var(--color-text-primary);
+}
+
+.addBoloFormRow input:disabled {
+  opacity: 0.8;
+  cursor: default;
+}
+
+.addBoloModalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.addBoloModalCancel,
+.addBoloModalSubmit {
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.addBoloModalCancel {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.addBoloModalCancel:hover {
+  background: var(--color-background-half, rgba(255,255,255,0.06));
+}
+
+.addBoloModalSubmit {
+  background: var(--color-success, #22c55e);
+  color: #fff;
+  border: none;
+}
+
+.addBoloModalSubmit:hover {
+  opacity: 0.9;
+}

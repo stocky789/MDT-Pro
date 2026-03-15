@@ -1,0 +1,119 @@
+async function getInjurySection (data = {}, isList = false) {
+  const language = await getLanguage()
+  const section = document.createElement('div')
+  section.classList.add('section', 'injurySection')
+  if (isList) section.classList.add('searchResponseWrapper')
+
+  const labels = language.reports?.sections?.injury || {}
+
+  const title = document.createElement('div')
+  title.classList.add(isList ? 'searchResponseSectionTitle' : 'title')
+  title.innerHTML = labels.title || 'Injury Details'
+  section.appendChild(title)
+
+  if (!isList) {
+    const recentIdsRow = document.createElement('div')
+    recentIdsRow.classList.add('inputWrapper', 'injuryRecentIdsRow')
+    const recentIdsLabel = document.createElement('label')
+    recentIdsLabel.textContent = labels.selectFromRecentIds || 'Select injured party (Recent IDs)'
+    const recentIdsList = document.createElement('div')
+    recentIdsList.className = 'injuryRecentIdsList'
+    recentIdsRow.appendChild(recentIdsLabel)
+    recentIdsRow.appendChild(recentIdsList)
+    section.appendChild(recentIdsRow)
+    ;(async function () {
+      try {
+        const res = await fetch('/data/recentIds')
+        const recentIds = await res.json()
+        recentIdsList.innerHTML = ''
+        if (recentIds && recentIds.length > 0) {
+          for (const entry of recentIds) {
+            const btn = document.createElement('button')
+            btn.type = 'button'
+            btn.className = 'injuryRecentIdItem'
+            btn.dataset.pedName = entry.Name || ''
+            btn.textContent = entry.Name || '—'
+            if (entry.Type) {
+              const span = document.createElement('span')
+              span.className = 'injuryRecentIdType'
+              span.textContent = ` (${entry.Type})`
+              btn.appendChild(span)
+            }
+            btn.addEventListener('click', function () {
+              const name = (btn.dataset.pedName || '').trim()
+              if (!name) return
+              const pedNameInput = section.querySelector('#injurySectionInjuredPartyInput')
+              if (pedNameInput) pedNameInput.value = name
+            })
+            recentIdsList.appendChild(btn)
+          }
+        } else {
+          recentIdsList.textContent = labels.noRecentIds || 'No recent IDs. Collect an ID from a ped (e.g. traffic stop) to show them here.'
+        }
+      } catch (e) {
+        recentIdsList.textContent = labels.recentIdsError || 'Could not load Recent IDs.'
+      }
+    })()
+  }
+
+  const injuryTypeOptions = ['', 'Gunshot', 'Fall', 'Stab wound', 'Blunt trauma', 'Assault (unarmed)', 'Burns', 'Vehicle impact', 'Explosion', 'Less lethal', 'Drowning', 'Animal attack']
+  const severityOptions = ['', 'Minor', 'Moderate', 'Serious', 'Critical', 'Fatal']
+  const treatmentOptions = ['', 'First aid on scene', 'EMS on scene', 'Transported to hospital', 'Pronounced deceased on scene', 'DOA', 'Refused treatment']
+
+  const fields = [
+    { id: 'injurySectionInjuredPartyInput', key: 'InjuredPartyName', label: labels.injuredParty || 'Injured party' },
+    { id: 'injurySectionInjuryTypeInput', key: 'InjuryType', label: labels.injuryType || 'Injury type', options: injuryTypeOptions },
+    { id: 'injurySectionSeverityInput', key: 'Severity', label: labels.severity || 'Severity', options: severityOptions },
+    { id: 'injurySectionTreatmentInput', key: 'Treatment', label: labels.treatment || 'Treatment', options: treatmentOptions },
+    { id: 'injurySectionContextInput', key: 'IncidentContext', label: labels.incidentContext || 'Incident context', tag: 'textarea' },
+    { id: 'injurySectionLinkedReportInput', key: 'LinkedReportId', label: labels.linkedReportId || 'Linked report ID' }
+  ]
+
+  const wrapper = document.createElement('div')
+  wrapper.classList.add('inputWrapper', 'grid')
+
+  for (const f of fields) {
+    const cell = document.createElement('div')
+    const lbl = document.createElement('label')
+    lbl.htmlFor = f.id
+    lbl.innerHTML = f.label
+    let input
+    if (f.options && f.options.length > 0) {
+      input = document.createElement('select')
+      input.id = f.id
+      input.disabled = isList
+      input.autocomplete = 'off'
+      const currentVal = data?.[f.key] || ''
+      f.options.forEach((opt) => {
+        const o = document.createElement('option')
+        o.value = opt
+        o.textContent = opt || '—'
+        input.appendChild(o)
+      })
+      if (currentVal && !f.options.includes(currentVal)) {
+        const o = document.createElement('option')
+        o.value = currentVal
+        o.textContent = currentVal
+        input.appendChild(o)
+      }
+      input.value = currentVal
+    } else {
+      input = f.tag === 'textarea'
+        ? document.createElement('textarea')
+        : document.createElement('input')
+      input.id = f.id
+      if (input.tagName === 'INPUT') input.type = 'text'
+      input.disabled = isList
+      if (input.tagName === 'INPUT') input.autocomplete = 'off'
+      input.value = data?.[f.key] || ''
+    }
+    if (f.tag === 'textarea') cell.classList.add('fullWidth')
+    cell.appendChild(lbl)
+    cell.appendChild(input)
+    wrapper.appendChild(cell)
+  }
+
+  section.appendChild(wrapper)
+
+  return section
+}

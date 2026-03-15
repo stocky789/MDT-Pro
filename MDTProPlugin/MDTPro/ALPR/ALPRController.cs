@@ -26,8 +26,8 @@ namespace MDTPro.ALPR {
 
         private const int ScanIntervalMs = 2000;
         private const int CooldownSeconds = 90;
-        private const float ScanRangeMeters = 25f;
-        private const float ReadRangeMeters = 20f;
+        private const float ScanRangeMeters = 50f;
+        private const float ReadRangeMeters = 40f;
         private const float ConeAngleDegrees = 22f;
 
         internal static ALPRHit CurrentHit { get; private set; }
@@ -167,7 +167,7 @@ namespace MDTPro.ALPR {
                             string modelDisplayName;
 
                             if (vd.CDFVehicleData?.Owner != null) {
-                                flags = BuildFlags(vd);
+                                flags = BuildFlags(vd, dbVehicle);
                                 modelDisplayName = vd.ModelDisplayName ?? vd.ModelName ?? "";
                                 // Prefer MDT DB owner over CDF for re-encounters: CDF assigns a fresh persona per spawn,
                                 // but our DB has the persistent identity (correct owner) from prior stops.
@@ -177,7 +177,7 @@ namespace MDTPro.ALPR {
                             } else {
                                 // No CDF data: use MDT database (stolen/expired from prior stops or saved data)
                                 if (dbVehicle != null) {
-                                    flags = BuildFlags(dbVehicle);
+                                    flags = BuildFlags(dbVehicle, null);
                                     owner = dbVehicle.Owner ?? "—";
                                     modelDisplayName = dbVehicle.ModelDisplayName ?? dbVehicle.ModelName ?? "";
                                 } else {
@@ -279,11 +279,13 @@ namespace MDTPro.ALPR {
             return null;
         }
 
-        private static List<string> BuildFlags(MDTProVehicleData vd) {
+        private static List<string> BuildFlags(MDTProVehicleData vd, MDTProVehicleData dbVehicle) {
             var flags = new List<string>();
 
-            if (vd.IsStolen)
+            if (vd != null && vd.IsStolen)
                 flags.Add("Stolen");
+            if (DataController.HasActiveBOLOs(vd) || (dbVehicle != null && DataController.HasActiveBOLOs(dbVehicle)))
+                flags.Add("BOLO");
 
             string reg = vd.RegistrationStatus ?? "";
             if (reg.Equals("Expired", StringComparison.OrdinalIgnoreCase))
