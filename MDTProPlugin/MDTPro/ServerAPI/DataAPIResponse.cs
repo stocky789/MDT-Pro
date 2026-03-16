@@ -31,25 +31,13 @@ namespace MDTPro.ServerAPI {
                 if (limit < 1) limit = 1;
                 if (limit > 20) limit = 20;
 
-                bool hasPlayer = Main.Player != null && Main.Player.Exists();
-
-                var nearbyVehicles = DataController.VehicleDatabase
-                    .Where(vehicleData => !string.IsNullOrEmpty(vehicleData.LicensePlate))
-                    .Select(vehicleData => new {
-                        vehicleData,
-                        distance = hasPlayer && vehicleData.Holder != null && vehicleData.Holder.Exists()
-                            ? Main.Player.DistanceTo(vehicleData.Holder)
-                            : float.MaxValue
-                    })
-                    .OrderBy(x => x.distance)
-                    .ThenBy(x => x.vehicleData.LicensePlate)
-                    .Take(limit)
-                    .Select(x => new {
-                        x.vehicleData.LicensePlate,
-                        x.vehicleData.ModelDisplayName,
-                        Distance = x.distance == float.MaxValue ? (float?)null : (float?)Math.Round(x.distance, 1),
-                        x.vehicleData.IsStolen
-                    });
+                var cached = DataController.GetCachedNearbyVehicles(limit);
+                var nearbyVehicles = cached.Select(x => new {
+                    x.LicensePlate,
+                    x.ModelDisplayName,
+                    Distance = x.Distance,
+                    x.IsStolen
+                });
 
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(nearbyVehicles));
                 status = 200;
