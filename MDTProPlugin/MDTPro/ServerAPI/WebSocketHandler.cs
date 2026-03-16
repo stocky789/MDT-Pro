@@ -22,9 +22,24 @@ namespace MDTPro.ServerAPI {
         private static readonly Dictionary<WebSocket, CancellationTokenSource> IntervalTokens = new Dictionary<WebSocket, CancellationTokenSource>();
 
         internal static async void HandleWebSocket(HttpListenerContext ctx) {
+            WebSocket webSocket = null;
+            Action shiftHistoryHandler = null;
+            CalloutEvents.CalloutEventHandler calloutEventHandler = null;
+
+            void UnsubscribeIfNeeded() {
+                if (shiftHistoryHandler != null) {
+                    DataController.ShiftHistoryUpdated -= shiftHistoryHandler;
+                    shiftHistoryHandler = null;
+                }
+                if (calloutEventHandler != null) {
+                    CalloutEvents.OnCalloutEvent -= calloutEventHandler;
+                    calloutEventHandler = null;
+                }
+            }
+
             try {
                 HttpListenerWebSocketContext wsContext = await ctx.AcceptWebSocketAsync(null);
-                WebSocket webSocket = wsContext.WebSocket;
+                webSocket = wsContext.WebSocket;
                 byte[] buffer = new byte[1024];
 
                 lock (WebSocketLock) {
@@ -37,15 +52,6 @@ namespace MDTPro.ServerAPI {
                     var result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
 
                     if (result.MessageType == WebSocketMessageType.Close) {
-                        lock (WebSocketLock) {
-                            WebSockets.Remove(webSocket);
-                            AlprSubscribers.Remove(webSocket);
-                            if (IntervalTokens.TryGetValue(webSocket, out var cts)) {
-                                cts.Cancel();
-                                IntervalTokens.Remove(webSocket);
-                            }
-                        }
-                        await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
                         break;
                     }
 
@@ -68,28 +74,20 @@ namespace MDTPro.ServerAPI {
                                 await SendData(webSocket, "\"subscribed\"", clientMsg);
                                 break;
                             case "shiftHistoryUpdated":
-                                DataController.ShiftHistoryUpdated += OnShiftHistoryUpdated;
-
-                                void OnShiftHistoryUpdated() {
-                                    if (webSocket.State != WebSocketState.Open || !Server.RunServer) {
-                                        DataController.ShiftHistoryUpdated -= OnShiftHistoryUpdated;
-                                        return;
-                                    }
+                                shiftHistoryHandler = () => {
+                                    if (webSocket.State != WebSocketState.Open || !Server.RunServer) return;
                                     SendData(webSocket, "\"Shift history updated\"", clientMsg).Wait();
-                                }
+                                };
+                                DataController.ShiftHistoryUpdated += shiftHistoryHandler;
                                 break;
                             case "calloutEvent":
                                 SendData(webSocket, JsonConvert.SerializeObject(new { callouts = CalloutEvents.CalloutList }), clientMsg).Wait();
 
-                                CalloutEvents.OnCalloutEvent += OnCalloutEvent;
-
-                                void OnCalloutEvent(CalloutEvents.CalloutInformation calloutInfo) {
-                                    if (webSocket.State != WebSocketState.Open || !Server.RunServer) {
-                                        CalloutEvents.OnCalloutEvent -= OnCalloutEvent;
-                                        return;
-                                    }
+                                calloutEventHandler = (calloutInfo) => {
+                                    if (webSocket.State != WebSocketState.Open || !Server.RunServer) return;
                                     SendData(webSocket, JsonConvert.SerializeObject(new { callouts = CalloutEvents.CalloutList }), clientMsg).Wait();
-                                }
+                                };
+                                CalloutEvents.OnCalloutEvent += calloutEventHandler;
                                 break;
                             default:
                                 await SendData(webSocket, $"\"Unknown command: '{clientMsg}'\"", clientMsg);
@@ -99,7 +97,24 @@ namespace MDTPro.ServerAPI {
                 }
             } catch (Exception e) {
                 if (Server.RunServer) Log($"WebSocket Error: {e.Message}", true, LogSeverity.Error);
-            } 
+            } finally {
+                UnsubscribeIfNeeded();
+                if (webSocket != null) {
+                    lock (WebSocketLock) {
+                        WebSockets.Remove(webSocket);
+                        AlprSubscribers.Remove(webSocket);
+                        if (IntervalTokens.TryGetValue(webSocket, out var cts)) {
+                            try { cts.Cancel(); } catch { }
+                            IntervalTokens.Remove(webSocket);
+                        }
+                    }
+                    if (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.OpenSent) {
+                        try {
+                            webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None).Wait(500);
+                        } catch { }
+                    }
+                }
+            }
         }
 
         private static Task SendUpdatesOnInterval(WebSocket webSocket, string clientMsg, CancellationToken token) {

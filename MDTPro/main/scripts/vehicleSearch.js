@@ -23,8 +23,8 @@
   await loadNearbyVehicles()
   await loadSearchHistory()
 
-  // Auto-refresh nearby vehicles and search history every 1 second for real-time updates
-  const REFRESH_INTERVAL_MS = 1000
+  // Auto-refresh nearby vehicles and search history for real-time updates (3s to avoid excessive server/game load)
+  const REFRESH_INTERVAL_MS = 3000
   let refreshTimer = null
   function startRefreshTimer() {
     if (refreshTimer) return
