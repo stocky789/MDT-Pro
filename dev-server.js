@@ -486,6 +486,9 @@ const server = http.createServer((req, res) => {
   } else if (url === '/data/recentFirearmOwners') {
     send(res, 200, JSON.stringify(placeholderPeds.slice(0, 5).map(p => ({ Name: p.Name }))), 'application/json');
     return;
+  } else if (url === '/data/recentFirearms') {
+    send(res, 200, '[]', 'application/json');
+    return;
   } else if (req.method === 'POST' && url === '/data/pedReports') {
     readBody(req).then(body => {
       const name = (body || '').trim().toLowerCase();

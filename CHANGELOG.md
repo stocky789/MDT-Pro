@@ -4,6 +4,16 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
+## [0.9.6.0] — 2026-03-17
+
+### Firearms Check
+
+- **Recent weapons (serials + names)** — Firearms Check now shows **Recent weapons**: the actual guns you’ve seen on pat-downs and body searches, with their serial numbers and weapon names. No more “Recent IDs” with person names—just click a weapon (e.g. “ABC123 — Pistol”) to look it up.
+- **Lookups actually work** — Firearm lookups were failing a lot, especially when a gun was found in a car. That’s fixed: searching by serial or owner from Person Search or Firearms Check should work every time now.
+- **Guns in vehicle search** — When you find a weapon during a vehicle search, that weapon line is now clickable. Click it to jump straight into Firearms Check and run a search for that gun.
+
+---
+
 ## [0.9.5.1] — 2026-03-17
 
 ### Hotfixes

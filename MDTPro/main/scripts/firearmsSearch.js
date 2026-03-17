@@ -10,7 +10,7 @@ function escapeHtml(s) {
   if (config.updateDomWithLanguageOnLoad)
     await updateDomWithLanguage('firearmsSearch')
 
-  await loadRecentOwners()
+  await loadRecentWeapons()
 })()
 
 const searchInput = document.querySelector('.searchInputWrapper #firearmsSearchInput')
@@ -35,30 +35,34 @@ if (searchButton) {
   })
 }
 
-async function loadRecentOwners() {
-  let owners = []
+async function loadRecentWeapons() {
+  let firearms = []
   try {
-    const resp = await fetch('/data/recentFirearmOwners')
-    if (resp.ok) owners = await resp.json()
+    const resp = await fetch('/data/recentFirearms')
+    if (resp.ok) firearms = await resp.json()
   } catch {
-    owners = []
+    firearms = []
   }
   const wrapper = document.querySelector('.recentOwnersWrapper')
   const list = document.querySelector('.recentOwnersList')
   if (!list) return
   list.innerHTML = ''
 
-  if (!Array.isArray(owners) || owners.length === 0) {
+  if (!Array.isArray(firearms) || firearms.length === 0) {
     if (wrapper) wrapper.classList.add('hidden')
     return
   }
 
   if (wrapper) wrapper.classList.remove('hidden')
-  for (const name of owners) {
+  for (const f of firearms) {
+    const serialLabel = f.IsSerialScratched ? 'Scratched' : (f.SerialNumber || '—')
+    const weaponName = f.WeaponDisplayName || f.Description || f.WeaponModelId || ''
+    const displayText = weaponName ? `${serialLabel} — ${weaponName}` : serialLabel
+    const lookupKey = f.IsSerialScratched ? (f.OwnerPedName || '') : (f.SerialNumber || '')
     const item = document.createElement('button')
-    item.textContent = name
+    item.textContent = displayText
     item.addEventListener('click', function () {
-      if (searchInput) searchInput.value = name
+      if (searchInput) searchInput.value = lookupKey
       document.querySelector('.searchInputWrapper button')?.click()
     })
     list.appendChild(item)
