@@ -44,20 +44,36 @@ namespace MDTPro.Utility {
             return null;
         }
 
+        /// <summary>Write a line to MDTPro/MDTPro.log in the GTA V directory. Ensures the MDTPro folder exists. Also optionally sends to RAGE in-game log.</summary>
         internal static void Log(string message, bool logInGame = false, LogSeverity severity = LogSeverity.Info) {
             if (logInGame) Game.LogTrivial($"MDT Pro: [{severity}] {message}");
             try {
-                string oldLog = File.ReadAllText(Setup.SetupController.LogFilePath);
-                File.WriteAllText(Setup.SetupController.LogFilePath, $"{oldLog}\n[{DateTime.Now:O}] [{severity}] {message}");
-            } catch { }
+                string logPath = Setup.SetupController.LogFilePath;
+                string logDir = Path.GetDirectoryName(logPath);
+                if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                    Directory.CreateDirectory(logDir);
+                string line = $"[{DateTime.Now:O}] [{severity}] {message}\n";
+                File.AppendAllText(logPath, line);
+            } catch (Exception ex) {
+                try { Game.LogTrivial($"MDT Pro: Log write failed: {ex.Message}"); } catch { }
+            }
         }
 
         internal enum LogSeverity {
             Info, Warning, Error
         }
 
+        /// <summary>Reset the log file to a single initial line. Ensures the MDTPro folder exists.</summary>
         internal static void ClearLog() {
-            File.WriteAllText(Setup.SetupController.LogFilePath, $"[{DateTime.Now:O}] [{LogSeverity.Info}] MDT Pro log initialized");
+            try {
+                string logPath = Setup.SetupController.LogFilePath;
+                string logDir = Path.GetDirectoryName(logPath);
+                if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                    Directory.CreateDirectory(logDir);
+                File.WriteAllText(logPath, $"[{DateTime.Now:O}] [{LogSeverity.Info}] MDT Pro log initialized\n");
+            } catch (Exception ex) {
+                try { Game.LogTrivial($"MDT Pro: ClearLog failed: {ex.Message}"); } catch { }
+            }
         }
 
         internal static string GetRequestPostData(HttpListenerRequest req) {

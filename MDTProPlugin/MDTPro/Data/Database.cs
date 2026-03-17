@@ -37,6 +37,7 @@ namespace MDTPro.Data {
                     } else if (version < CurrentSchemaVersion) {
                         MigrateSchema(version);
                     }
+                    EnsureAllMissingSchemaColumns();
                 } catch (Exception e) {
                     Helper.Log($"Database initialization failed: {e.Message}", true, Helper.LogSeverity.Error);
                     connection?.Dispose();
@@ -203,7 +204,9 @@ namespace MDTPro.Data {
                     OutcomeNotes            TEXT,
                     OutcomeReasoning        TEXT,
                     SentenceReasoning       TEXT,
-                    LicenseRevocations      TEXT
+                    LicenseRevocations      TEXT,
+                    EvidenceUseOfForce      INTEGER NOT NULL DEFAULT 0,
+                    AttachedReportIds       TEXT
                 );
                 CREATE INDEX IF NOT EXISTS idx_court_cases_ped ON court_cases(PedName);
 
@@ -213,7 +216,10 @@ namespace MDTPro.Data {
                     Name         TEXT,
                     Fine         INTEGER NOT NULL DEFAULT 0,
                     Time         INTEGER,
-                    IsArrestable INTEGER
+                    IsArrestable INTEGER,
+                    Outcome      INTEGER NOT NULL DEFAULT 0,
+                    ConvictionChance INTEGER,
+                    SentenceDaysServed INTEGER
                 );
                 CREATE INDEX IF NOT EXISTS idx_court_charges_case ON court_charges(CaseNumber);
 
@@ -330,7 +336,10 @@ namespace MDTPro.Data {
                     UseOfForceJustification     TEXT,
                     UseOfForceInjurySuspect     INTEGER NOT NULL DEFAULT 0,
                     UseOfForceInjuryOfficer     INTEGER NOT NULL DEFAULT 0,
-                    UseOfForceWitnesses         TEXT
+                    UseOfForceWitnesses         TEXT,
+                    AttachedReportIds           TEXT,
+                    DocumentedDrugs             INTEGER NOT NULL DEFAULT 0,
+                    DocumentedFirearms          INTEGER NOT NULL DEFAULT 0
                 );
 
                 CREATE TABLE IF NOT EXISTS arrest_report_charges (
@@ -861,6 +870,79 @@ namespace MDTPro.Data {
             }
 
             SetSchemaVersion(CurrentSchemaVersion);
+        }
+
+        /// <summary>Runs every migration's ALTER/CREATE so DBs that had version=25 but old CreateSchema get all columns/tables. Safe to run every startup (duplicate column/table is ignored).</summary>
+        private static void EnsureAllMissingSchemaColumns() {
+            if (connection == null) return;
+            try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS search_history (Id INTEGER PRIMARY KEY AUTOINCREMENT, SearchType TEXT NOT NULL, SearchQuery TEXT NOT NULL, ResultName TEXT, Timestamp TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_search_history_type ON search_history(SearchType); CREATE INDEX IF NOT EXISTS idx_search_history_timestamp ON search_history(Timestamp);", connection)) { cmd.ExecuteNonQuery(); } } catch { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN Status INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN ModelHash INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN ModelName TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN IncarceratedUntil TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN IsJuryTrial INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN JurySize INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN JuryVotesForConviction INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN JuryVotesForAcquittal INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN PriorCitationCount INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN PriorArrestCount INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN PriorConvictionCount INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN RepeatOffenderScore INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN SentenceMultiplier REAL NOT NULL DEFAULT 1.0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN HasPublicDefender INTEGER NOT NULL DEFAULT 1", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN Plea TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN JudgeName TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN ProsecutorName TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN DefenseAttorneyName TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN HearingDateUtc TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN CreatedAtUtc TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN LastUpdatedUtc TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN OutcomeNotes TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN SeverityScore INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN CourtDistrict TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN CourtName TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN CourtType TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            foreach (string col in new[] { "EvidenceScore", "ProsecutionStrength", "DefenseStrength", "DocketPressure", "PolicyAdjustment" }) {
+                try { using (var cmd = new SQLiteCommand($"ALTER TABLE court_cases ADD COLUMN {col} {(col == "EvidenceScore" ? "INTEGER NOT NULL DEFAULT 0" : "REAL NOT NULL DEFAULT 0")}", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN OutcomeReasoning TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            foreach (string col in new[] { "EvidenceHadWeapon", "EvidenceWasWanted", "EvidenceWasPatDown", "EvidenceWasDrunk", "EvidenceWasFleeing", "EvidenceAssaultedPed", "EvidenceDamagedVehicle", "EvidenceIllegalWeapon", "EvidenceViolatedSupervision", "EvidenceResisted", "EvidenceHadDrugs", "EvidenceUseOfForce" }) {
+                try { using (var cmd = new SQLiteCommand($"ALTER TABLE court_cases ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN ConvictionChance INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN ResolveAtUtc TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN LicenseRevocations TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN SentenceReasoning TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN AttachedReportIds TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN IdentificationHistory TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE citation_reports ADD COLUMN FinalAmount INTEGER", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS firearm_records (Id INTEGER PRIMARY KEY AUTOINCREMENT, SerialNumber TEXT, OwnerPedName TEXT NOT NULL, WeaponModelId TEXT, WeaponModelHash INTEGER NOT NULL DEFAULT 0, IsStolen INTEGER NOT NULL DEFAULT 0, Description TEXT, Source TEXT, FirstSeenAt TEXT NOT NULL, LastSeenAt TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_firearm_records_owner ON firearm_records(OwnerPedName); CREATE INDEX IF NOT EXISTS idx_firearm_records_serial ON firearm_records(SerialNumber);", connection)) { cmd.ExecuteNonQuery(); } } catch { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE firearm_records ADD COLUMN WeaponDisplayName TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE firearm_records ADD COLUMN IsSerialScratched INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS drug_records (Id INTEGER PRIMARY KEY AUTOINCREMENT, OwnerPedName TEXT NOT NULL, DrugType TEXT, DrugCategory TEXT, Description TEXT, Source TEXT, FirstSeenAt TEXT NOT NULL, LastSeenAt TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_drug_records_owner ON drug_records(OwnerPedName); CREATE INDEX IF NOT EXISTS idx_drug_records_drugtype ON drug_records(DrugType);", connection)) { cmd.ExecuteNonQuery(); } } catch { }
+            try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS vehicle_search_records (Id INTEGER PRIMARY KEY AUTOINCREMENT, LicensePlate TEXT NOT NULL, ItemType TEXT, DrugType TEXT, ItemLocation TEXT, Description TEXT, WeaponModelHash INTEGER NOT NULL DEFAULT 0, WeaponModelId TEXT, Source TEXT, CapturedAt TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_vehicle_search_records_plate ON vehicle_search_records(LicensePlate);", connection)) { cmd.ExecuteNonQuery(); } } catch { }
+            foreach (string col in new[] { "VinStatus", "Make", "Model", "PrimaryColor", "SecondaryColor" }) {
+                try { using (var cmd = new SQLiteCommand($"ALTER TABLE vehicles ADD COLUMN {col} TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            }
+            foreach (string col in new[] { "UseOfForceType", "UseOfForceTypeOther", "UseOfForceJustification", "UseOfForceWitnesses" }) {
+                try { using (var cmd = new SQLiteCommand($"ALTER TABLE arrest_reports ADD COLUMN {col} TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            }
+            foreach (string col in new[] { "UseOfForceInjurySuspect", "UseOfForceInjuryOfficer" }) {
+                try { using (var cmd = new SQLiteCommand($"ALTER TABLE arrest_reports ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            }
+            try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS impound_reports (Id TEXT PRIMARY KEY, ShortYear INTEGER NOT NULL, OfficerFirstName TEXT, OfficerLastName TEXT, OfficerRank TEXT, OfficerCallSign TEXT, OfficerAgency TEXT, OfficerBadgeNumber INTEGER, LocationArea TEXT, LocationStreet TEXT, LocationCounty TEXT, LocationPostal TEXT, TimeStamp TEXT NOT NULL, Status INTEGER NOT NULL DEFAULT 1, Notes TEXT, LicensePlate TEXT, VehicleModel TEXT, Owner TEXT, Vin TEXT, ImpoundReason TEXT, TowCompany TEXT, ImpoundLot TEXT)", connection)) { cmd.ExecuteNonQuery(); } } catch { }
+            try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS traffic_incident_reports (Id TEXT PRIMARY KEY, ShortYear INTEGER NOT NULL, OfficerFirstName TEXT, OfficerLastName TEXT, OfficerRank TEXT, OfficerCallSign TEXT, OfficerAgency TEXT, OfficerBadgeNumber INTEGER, LocationArea TEXT, LocationStreet TEXT, LocationCounty TEXT, LocationPostal TEXT, TimeStamp TEXT NOT NULL, Status INTEGER NOT NULL DEFAULT 1, Notes TEXT, DriverNames TEXT, PassengerNames TEXT, PedestrianNames TEXT, VehiclePlates TEXT, VehicleModels TEXT, InjuryReported INTEGER NOT NULL DEFAULT 0, InjuryDetails TEXT, CollisionType TEXT)", connection)) { cmd.ExecuteNonQuery(); } } catch { }
+            try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS injury_reports (Id TEXT PRIMARY KEY, ShortYear INTEGER NOT NULL, OfficerFirstName TEXT, OfficerLastName TEXT, OfficerRank TEXT, OfficerCallSign TEXT, OfficerAgency TEXT, OfficerBadgeNumber INTEGER, LocationArea TEXT, LocationStreet TEXT, LocationCounty TEXT, LocationPostal TEXT, TimeStamp TEXT NOT NULL, Status INTEGER NOT NULL DEFAULT 1, Notes TEXT, InjuredPartyName TEXT, InjuryType TEXT, Severity TEXT, Treatment TEXT, IncidentContext TEXT, LinkedReportId TEXT)", connection)) { cmd.ExecuteNonQuery(); } } catch { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE injury_reports ADD COLUMN GameInjurySnapshot TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN IsDeceased INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN DeceasedAt TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS damage_cache (Id INTEGER PRIMARY KEY AUTOINCREMENT, VictimName TEXT NOT NULL, Damage INTEGER NOT NULL DEFAULT 0, ArmourDamage INTEGER NOT NULL DEFAULT 0, WeaponType TEXT, WeaponGroup TEXT, BodyRegion TEXT, VictimAlive INTEGER NOT NULL DEFAULT 1, AtUtc TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_damage_cache_victim ON damage_cache(VictimName); CREATE INDEX IF NOT EXISTS idx_damage_cache_at ON damage_cache(AtUtc);", connection)) { cmd.ExecuteNonQuery(); } } catch { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_charges ADD COLUMN Outcome INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_charges ADD COLUMN ConvictionChance INTEGER", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_charges ADD COLUMN SentenceDaysServed INTEGER", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE arrest_reports ADD COLUMN AttachedReportIds TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE arrest_reports ADD COLUMN DocumentedDrugs INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE arrest_reports ADD COLUMN DocumentedFirearms INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
         }
 
         #endregion

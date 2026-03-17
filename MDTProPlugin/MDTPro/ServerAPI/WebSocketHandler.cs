@@ -108,7 +108,7 @@ namespace MDTPro.ServerAPI {
                             IntervalTokens.Remove(webSocket);
                         }
                     }
-                    if (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.OpenSent) {
+                    if (webSocket.State == WebSocketState.Open) {
                         try {
                             webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None).Wait(500);
                         } catch { }
