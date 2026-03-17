@@ -146,48 +146,67 @@ namespace MDTPro.ServerAPI {
                 contentType = "text/plain";
                 status = 200;
             } else if (path == "createIncidentReport") {
-                IncidentReport report = JsonConvert.DeserializeObject<IncidentReport>(body);
-
-                DataController.AddReport(report);
-
-                Database.SaveIncidentReport(report);
-
-                buffer = Encoding.UTF8.GetBytes("OK");
-                contentType = "text/plain";
-                status = 200;
-            } else if (path == "createCitationReport") {
-                CitationReport report = JsonConvert.DeserializeObject<CitationReport>(body);
-
-                DataController.AddReport(report);
-
-                Database.SaveCitationReport(report);
-
-                buffer = Encoding.UTF8.GetBytes("OK");
-                contentType = "text/plain";
-                status = 200;
-            } else if (path == "createArrestReport") {
-                ArrestReport report = JsonConvert.DeserializeObject<ArrestReport>(body);
-                if (report.AttachedReportIds == null) report.AttachedReportIds = new System.Collections.Generic.List<string>();
-
-                // Once closed, arrest cannot be reopened (design: no re-open).
-                var existing = DataController.ArrestReports?.FirstOrDefault(x => x.Id == report.Id);
-                if (existing != null && !string.IsNullOrEmpty(existing.CourtCaseNumber) && report.Status == ReportStatus.Pending) {
-                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "Arrest already closed; cannot reopen." }));
+                try {
+                    IncidentReport report = JsonConvert.DeserializeObject<IncidentReport>(body);
+                    if (report == null) { buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid report data." })); contentType = "application/json"; status = 400; return; }
+                    DataController.AddReport(report);
+                    Database.SaveIncidentReport(report);
+                    buffer = Encoding.UTF8.GetBytes("OK");
+                    contentType = "text/plain";
+                    status = 200;
+                } catch (Exception ex) {
+                    Utility.Helper.Log($"[createIncidentReport] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
+                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createIncidentReport:\n{ex}"); } catch { }
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
                     contentType = "application/json";
-                    status = 400;
-                    return;
+                    status = 500;
                 }
+            } else if (path == "createCitationReport") {
+                try {
+                    CitationReport report = JsonConvert.DeserializeObject<CitationReport>(body);
+                    if (report == null) { buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid report data." })); contentType = "application/json"; status = 400; return; }
+                    DataController.AddReport(report);
+                    Database.SaveCitationReport(report);
+                    buffer = Encoding.UTF8.GetBytes("OK");
+                    contentType = "text/plain";
+                    status = 200;
+                } catch (Exception ex) {
+                    Utility.Helper.Log($"[createCitationReport] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
+                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createCitationReport:\n{ex}"); } catch { }
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
+                    contentType = "application/json";
+                    status = 500;
+                }
+            } else if (path == "createArrestReport") {
+                try {
+                    ArrestReport report = JsonConvert.DeserializeObject<ArrestReport>(body);
+                    if (report == null) { buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid report data." })); contentType = "application/json"; status = 400; return; }
+                    if (report.AttachedReportIds == null) report.AttachedReportIds = new System.Collections.Generic.List<string>();
 
-                DataController.AddReport(report);
+                    var existing = DataController.ArrestReports?.FirstOrDefault(x => x.Id == report.Id);
+                    if (existing != null && !string.IsNullOrEmpty(existing.CourtCaseNumber) && report.Status == ReportStatus.Pending) {
+                        buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "Arrest already closed; cannot reopen." }));
+                        contentType = "application/json";
+                        status = 400;
+                        return;
+                    }
 
-                Database.SaveArrestReport(report);
+                    DataController.AddReport(report);
+                    Database.SaveArrestReport(report);
 
-                CourtData courtCase = DataController.courtDatabase.Find(x => x.Number == report.CourtCaseNumber);
-                if (courtCase != null) Database.SaveCourtCase(courtCase);
+                    CourtData courtCase = DataController.courtDatabase.Find(x => x.Number == report.CourtCaseNumber);
+                    if (courtCase != null) Database.SaveCourtCase(courtCase);
 
-                buffer = Encoding.UTF8.GetBytes("OK");
-                contentType = "text/plain";
-                status = 200;
+                    buffer = Encoding.UTF8.GetBytes("OK");
+                    contentType = "text/plain";
+                    status = 200;
+                } catch (Exception ex) {
+                    Utility.Helper.Log($"[createArrestReport] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
+                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createArrestReport:\n{ex}"); } catch { }
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
+                    contentType = "application/json";
+                    status = 500;
+                }
             } else if (path == "attachReportToArrest") {
                 var data = JsonConvert.DeserializeAnonymousType(body, new { arrestReportId = "", reportId = "" });
                 if (data == null || string.IsNullOrWhiteSpace(data.arrestReportId) || string.IsNullOrWhiteSpace(data.reportId)) {
@@ -303,26 +322,53 @@ namespace MDTPro.ServerAPI {
                 contentType = "text/plain";
                 status = 200;
             } else if (path == "createImpoundReport") {
-                ImpoundReport report = JsonConvert.DeserializeObject<ImpoundReport>(body);
-                DataController.AddReport(report);
-                Database.SaveImpoundReport(report);
-                buffer = Encoding.UTF8.GetBytes("OK");
-                contentType = "text/plain";
-                status = 200;
+                try {
+                    ImpoundReport report = JsonConvert.DeserializeObject<ImpoundReport>(body);
+                    if (report == null) { buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid report data." })); contentType = "application/json"; status = 400; return; }
+                    DataController.AddReport(report);
+                    Database.SaveImpoundReport(report);
+                    buffer = Encoding.UTF8.GetBytes("OK");
+                    contentType = "text/plain";
+                    status = 200;
+                } catch (Exception ex) {
+                    Utility.Helper.Log($"[createImpoundReport] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
+                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createImpoundReport:\n{ex}"); } catch { }
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
+                    contentType = "application/json";
+                    status = 500;
+                }
             } else if (path == "createTrafficIncidentReport") {
-                TrafficIncidentReport report = JsonConvert.DeserializeObject<TrafficIncidentReport>(body);
-                DataController.AddReport(report);
-                Database.SaveTrafficIncidentReport(report);
-                buffer = Encoding.UTF8.GetBytes("OK");
-                contentType = "text/plain";
-                status = 200;
+                try {
+                    TrafficIncidentReport report = JsonConvert.DeserializeObject<TrafficIncidentReport>(body);
+                    if (report == null) { buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid report data." })); contentType = "application/json"; status = 400; return; }
+                    DataController.AddReport(report);
+                    Database.SaveTrafficIncidentReport(report);
+                    buffer = Encoding.UTF8.GetBytes("OK");
+                    contentType = "text/plain";
+                    status = 200;
+                } catch (Exception ex) {
+                    Utility.Helper.Log($"[createTrafficIncidentReport] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
+                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createTrafficIncidentReport:\n{ex}"); } catch { }
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
+                    contentType = "application/json";
+                    status = 500;
+                }
             } else if (path == "createInjuryReport") {
-                InjuryReport report = JsonConvert.DeserializeObject<InjuryReport>(body);
-                DataController.AddReport(report);
-                Database.SaveInjuryReport(report);
-                buffer = Encoding.UTF8.GetBytes("OK");
-                contentType = "text/plain";
-                status = 200;
+                try {
+                    InjuryReport report = JsonConvert.DeserializeObject<InjuryReport>(body);
+                    if (report == null) { buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid report data." })); contentType = "application/json"; status = 400; return; }
+                    DataController.AddReport(report);
+                    Database.SaveInjuryReport(report);
+                    buffer = Encoding.UTF8.GetBytes("OK");
+                    contentType = "text/plain";
+                    status = 200;
+                } catch (Exception ex) {
+                    Utility.Helper.Log($"[createInjuryReport] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
+                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createInjuryReport:\n{ex}"); } catch { }
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
+                    contentType = "application/json";
+                    status = 500;
+                }
             } else if (path == "updateCourtCaseStatus") {
                 var data = JsonConvert.DeserializeAnonymousType(body, new {
                     Number = "",
