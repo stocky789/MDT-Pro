@@ -168,9 +168,55 @@ namespace MDTPro.Data {
             SetVehicleDatabase();
         }
 
+        /// <summary>Cached on game thread for /data/nearbyVehicles so the HTTP handler never touches game entities.</summary>
+        internal static List<CachedNearbyVehicleEntry> CachedNearbyVehicles = new List<CachedNearbyVehicleEntry>();
+        private static readonly object _cachedNearbyLock = new object();
+        internal struct CachedNearbyVehicleEntry {
+            public string LicensePlate;
+            public string ModelDisplayName;
+            public float? Distance;
+            public bool IsStolen;
+        }
+
         internal static void SetDynamicData() {
             UpdatePlayerLocation();
             CurrentTime = World.TimeOfDay.ToString();
+            UpdateCachedNearbyVehicles();
+        }
+
+        private static void UpdateCachedNearbyVehicles() {
+            var list = new List<CachedNearbyVehicleEntry>();
+            if (Main.Player != null && Main.Player.Exists()) {
+                lock (_vehicleDbLock) {
+                    foreach (var v in vehicleDatabase) {
+                        if (string.IsNullOrEmpty(v.LicensePlate)) continue;
+                        float? dist = null;
+                        try {
+                            if (v.Holder != null && v.Holder.Exists())
+                                dist = (float?)Math.Round(Main.Player.DistanceTo(v.Holder), 1);
+                        } catch { }
+                        list.Add(new CachedNearbyVehicleEntry {
+                            LicensePlate = v.LicensePlate,
+                            ModelDisplayName = v.ModelDisplayName,
+                            Distance = dist,
+                            IsStolen = v.IsStolen
+                        });
+                    }
+                }
+                list.Sort((a, b) => (a.Distance ?? float.MaxValue).CompareTo(b.Distance ?? float.MaxValue));
+            }
+            lock (_cachedNearbyLock) {
+                CachedNearbyVehicles = list;
+            }
+        }
+
+        /// <summary>Called from HTTP handler; returns cached list so handler never touches game entities.</summary>
+        internal static List<CachedNearbyVehicleEntry> GetCachedNearbyVehicles(int limit) {
+            if (limit < 1) limit = 1;
+            if (limit > 20) limit = 20;
+            lock (_cachedNearbyLock) {
+                return (CachedNearbyVehicles ?? new List<CachedNearbyVehicleEntry>()).Take(limit).ToList();
+            }
         }
 
         private static void PopulatePedDatabase() {

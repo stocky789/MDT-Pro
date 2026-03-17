@@ -60,6 +60,11 @@ Your GTA V folder should have:
   - Edit `MDTPro/config.json` in a text editor and set the value (e.g. `"webSocketUpdateInterval": 1000`), then save the file.
 - No need to wipe data or config unless you want a full reset (see [Resetting data](#resetting-data-optional)).
 
+### Logs and troubleshooting
+
+- **Log file:** `MDTPro/MDTPro.log` inside your GTA V folder (same folder as `GTA5.exe`). The plugin writes startup info, errors, and (when a report save fails) the full exception and stack trace.
+- **RAGE/LSPDFR:** In-game notifications and `RAGEPluginHook.log` in the GTA V folder can also show plugin load or runtime errors.
+
 ## Setup
 
 - Go on duty with LSPDFR. MDT Pro will start its web server and show in-game notifications with the addresses to open the MDT.
