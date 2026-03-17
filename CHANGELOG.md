@@ -4,6 +4,19 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
+## [0.9.5.1] — 2026-03-17
+
+### Hotfixes
+
+- **“Failed to save report” fixed** — Saving any report (Incident, Citation, Arrest, Injury, Traffic Incident, Impound) could fail with a generic error. This was caused by the database missing columns added in 0.9.5.0. The game now adds those columns automatically when you go on duty, so existing installs are fixed without losing data. New installs get the correct database from the start.
+- **Clearer errors when a save fails** — If a report still fails to save, the MDT now shows the real error message from the game instead of only “Failed to save report.” Full details are also written to the log file for troubleshooting.
+- **Log file (MDTPro.log)** — The log in your GTA V folder (`MDTPro\MDTPro.log`) is now created reliably on first run and when report saves fail the full error and stack trace are written there. Helpful for tracking down issues and when reporting bugs.
+- **WebSocket handler leak** — Callout and shift-history event handlers are now unsubscribed when an MDT client disconnects (in a `finally` block). Previously, each client that opened the callout or map page added a handler that was only removed when the handler ran and saw the socket closed. Handlers could accumulate over time; when a callout fired, every handler ran on the LSPDFR thread and blocked with `SendData(...).Wait()`, leading to freezes and other plugins crashing after extended play.
+- **Nearby vehicles and game thread** — The `/data/nearbyVehicles` API no longer touches game entities (e.g. `Main.Player`, vehicle `Holder`) from the HTTP thread. Nearby vehicles with distance are now computed on the game thread in `SetDynamicData()` and cached; the API returns the cached list. This avoids cross-thread RAGE API use that could cause instability when Vehicle Search was open with 1-second auto-refresh.
+- **Real-time refresh interval** — Person Search and Vehicle Search auto-refresh interval increased from 1 second to 3 seconds to reduce server and game load while keeping Recent IDs, Nearby Vehicles, and search history up to date.
+
+---
+
 ## [0.9.5.0] — 2026-03-15
 
 ### Court & evidence
