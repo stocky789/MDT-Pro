@@ -18,6 +18,18 @@ namespace MDTPro.Data {
 
         private const int CurrentSchemaVersion = 25;
 
+        /// <summary>Reads an INTEGER column from SQLite as uint. SQLite returns INTEGER as Int64; values outside uint range are clamped to 0.</summary>
+        private static uint ReadUInt32FromReader(object value) {
+            if (value == null || value is DBNull) return 0;
+            try {
+                long l = Convert.ToInt64(value);
+                if (l < 0 || l > uint.MaxValue) return 0;
+                return (uint)l;
+            } catch {
+                return 0;
+            }
+        }
+
         internal static void Initialize() {
             lock (dbLock) {
                 try {
@@ -2584,7 +2596,7 @@ namespace MDTPro.Data {
             }
         }
 
-        /// <summary>Returns recent owners (distinct OwnerPedName) ordered by latest LastSeenAt, for Firearms Check page Recent IDs.</summary>
+        /// <summary>Returns recent owners (distinct OwnerPedName) ordered by latest LastSeenAt.</summary>
         internal static List<string> LoadRecentFirearmOwnerNames(int limit = 12) {
             lock (dbLock) {
                 if (connection == null) return new List<string>();
@@ -2606,6 +2618,24 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>Returns recent firearm records (CDF/PR) ordered by LastSeenAt for Firearms Check "Recent weapons" — serials and weapon names for lookup.</summary>
+        internal static List<FirearmRecord> LoadRecentFirearms(int limit = 12) {
+            lock (dbLock) {
+                if (connection == null) return new List<FirearmRecord>();
+                var list = new List<FirearmRecord>();
+                using (var cmd = new SQLiteCommand(@"
+                    SELECT Id, SerialNumber, IsSerialScratched, OwnerPedName, WeaponModelId, WeaponDisplayName, WeaponModelHash, IsStolen, Description, Source, FirstSeenAt, LastSeenAt
+                    FROM firearm_records ORDER BY LastSeenAt DESC LIMIT @limit
+                ", connection)) {
+                    cmd.Parameters.AddWithValue("@limit", limit);
+                    using (var rdr = cmd.ExecuteReader()) {
+                        while (rdr.Read()) list.Add(ReadFirearmFromReader(rdr));
+                    }
+                }
+                return list;
+            }
+        }
+
         private static FirearmRecord ReadFirearmFromReader(SQLiteDataReader rdr) {
             return new FirearmRecord {
                 Id = rdr.GetInt32(rdr.GetOrdinal("Id")),
@@ -2614,7 +2644,7 @@ namespace MDTPro.Data {
                 OwnerPedName = rdr["OwnerPedName"] as string ?? "",
                 WeaponModelId = rdr["WeaponModelId"] as string,
                 WeaponDisplayName = rdr["WeaponDisplayName"] as string,
-                WeaponModelHash = Convert.ToUInt32(rdr["WeaponModelHash"] ?? 0),
+                WeaponModelHash = ReadUInt32FromReader(rdr["WeaponModelHash"]),
                 IsStolen = Convert.ToInt32(rdr["IsStolen"] ?? 0) != 0,
                 Description = rdr["Description"] as string,
                 Source = rdr["Source"] as string,
@@ -2754,7 +2784,7 @@ namespace MDTPro.Data {
                                 DrugType = rdr["DrugType"] as string,
                                 ItemLocation = rdr["ItemLocation"] as string,
                                 Description = rdr["Description"] as string,
-                                WeaponModelHash = (rdr["WeaponModelHash"] is DBNull || rdr["WeaponModelHash"] == null) ? 0u : Convert.ToUInt32(rdr["WeaponModelHash"]),
+                                WeaponModelHash = ReadUInt32FromReader(rdr["WeaponModelHash"]),
                                 WeaponModelId = rdr["WeaponModelId"] as string,
                                 Source = rdr["Source"] as string,
                                 CapturedAt = rdr["CapturedAt"] as string

@@ -257,6 +257,11 @@ namespace MDTPro.ServerAPI {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(owners));
                 status = 200;
                 contentType = "text/json";
+            } else if (path == "recentFirearms") {
+                var firearms = Database.LoadRecentFirearms(12);
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(firearms));
+                status = 200;
+                contentType = "text/json";
             } else if (path == "drugsByOwner") {
                 string pedName = Helper.GetRequestBodyAsString(req);
                 var drugs = string.IsNullOrWhiteSpace(pedName) ? new System.Collections.Generic.List<DrugRecord>() : Database.LoadDrugsByOwner(pedName);
