@@ -61,6 +61,8 @@ namespace MDTPro.Setup {
         public float courtEvidenceSupervisionViolationBonus = 22f;
         public float courtEvidenceResistedBonus = 15f;
         public float courtEvidenceDrugsBonus = 12f;
+        /// <summary>Additional evidence when drug quantity is documented in seizure report. Max bonus = this value × quantity weight (0–1). Higher quantities (bundle, kilo, etc.) increase conviction likelihood.</summary>
+        public float courtEvidenceDrugQuantityBonus = 6f;
         public float courtEvidenceUseOfForceBonus = 10f;
         /// <summary>Per attached incident report (evidence for court).</summary>
         public float courtEvidenceIncidentReportBonus = 10f;
@@ -72,6 +74,10 @@ namespace MDTPro.Setup {
         public float courtEvidenceTrafficIncidentReportBonus = 6f;
         /// <summary>Per attached impound report (e.g. stolen recovery, evidence).</summary>
         public float courtEvidenceImpoundReportBonus = 5f;
+        /// <summary>Per attached Property and Evidence Receipt (seized contraband documentation). Charge-specific drug/firearm matching handled in court integration.</summary>
+        public float courtEvidencePropertyEvidenceReportBonus = 8f;
+        /// <summary>Per attached seizure report (Property and Evidence Receipt). Optional bonus similar to incident/citation. Uses courtEvidencePropertyEvidenceReportBonus when 0.</summary>
+        public float courtEvidenceSeizureReportBonus = 8f;
         /// <summary>Per attached report that does not meet relevance (e.g. impound on a drug case, incident that doesn't name defendant). Still counts so tangential evidence (e.g. stolen firearm in a drug case) is not ignored; just carries less weight than directly relevant reports.</summary>
         public float courtEvidenceOtherAttachedReportBonus = 3f;
         /// <summary>Bonus when primary arrest report Notes length exceeds courtEvidenceReportNotesMinLength.</summary>

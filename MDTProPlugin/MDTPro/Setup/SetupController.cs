@@ -42,6 +42,7 @@ namespace MDTPro.Setup {
         internal static string ArrestOptionsPath => Path.Combine(MDTProPath, "arrestOptions.json");
         internal static string CitationOptionsDefaultsPath => Path.Combine(DefaultsPath, "citationOptions.json");
         internal static string ArrestOptionsDefaultsPath => Path.Combine(DefaultsPath, "arrestOptions.json");
+        internal static string SeizureOptionsDefaultsPath => Path.Combine(DefaultsPath, "seizureOptions.json");
         internal static string PedDataPath => Path.Combine(DataPath, "peds.json");
         internal static string VehicleDataPath => Path.Combine(DataPath, "vehicles.json");
         internal static string CourtDataPath => Path.Combine(DataPath, "court.json");
@@ -88,6 +89,7 @@ namespace MDTPro.Setup {
             DataController.impoundReports = Database.LoadImpoundReports() ?? new List<ImpoundReport>();
             DataController.trafficIncidentReports = Database.LoadTrafficIncidentReports() ?? new List<TrafficIncidentReport>();
             DataController.injuryReports = Database.LoadInjuryReports() ?? new List<InjuryReport>();
+            DataController.propertyEvidenceReports = Database.LoadPropertyEvidenceReceiptReports() ?? new List<PropertyEvidenceReceiptReport>();
 
             DataController.LoadPedDatabaseFromFile();
             DataController.LoadVehicleDatabaseFromFile();
@@ -209,6 +211,7 @@ namespace MDTPro.Setup {
             if (string.IsNullOrEmpty(map.impound)) map.impound = "IMP";
             if (string.IsNullOrEmpty(map.trafficIncident)) map.trafficIncident = "TIR";
             if (string.IsNullOrEmpty(map.injury)) map.injury = "INJ";
+            if (string.IsNullOrEmpty(map.propertyEvidence)) map.propertyEvidence = "PER";
         }
 
         private static List<CitationGroup> cachedCitationOptions;
@@ -221,6 +224,10 @@ namespace MDTPro.Setup {
         internal static List<ArrestGroup> GetArrestOptions() {
             cachedArrestOptions ??= Helper.ReadFromJsonFile<List<ArrestGroup>>(ArrestOptionsPath);
             return cachedArrestOptions;
+        }
+
+        internal static SeizureOptions GetSeizureOptions() {
+            return Helper.ReadFromJsonFile<SeizureOptions>(SeizureOptionsDefaultsPath) ?? new SeizureOptions();
         }
 
         internal static List<MDTProPedData> GetMDTProPedData() {

@@ -364,6 +364,7 @@ namespace MDTPro.Setup {
                         public string impound = "Impound Reports";
                         public string trafficIncident = "Traffic Incident Reports";
                         public string injury = "Injury Reports";
+                        public string propertyEvidence = "Property and Evidence Receipts";
                     }
                 }
 
@@ -380,6 +381,7 @@ namespace MDTPro.Setup {
                         public string impound = "Impound Report";
                         public string trafficIncident = "Traffic Incident Report";
                         public string injury = "Injury Report";
+                        public string propertyEvidence = "Property and Evidence Receipt";
                     }
                 }
             }
@@ -401,6 +403,8 @@ namespace MDTPro.Setup {
                 public string noOffender = "Offender name required.";
                 public string prefilledFromPersonSearch = "Prefilled from Person Search";
                 public string prefilledFromVehicleSearch = "Prefilled from Vehicle Search";
+                public string prefilledFromArrest = "Prefilled from arrest. Report will be attached after save.";
+                public string savedAndAttachedToArrest = "Report saved and attached to arrest.";
                 public string closeArrestSuccess = "Arrest closed and submitted for court.";
                 public string closeArrestError = "Failed to close arrest.";
             }
@@ -472,8 +476,9 @@ namespace MDTPro.Setup {
                     public string title = "Arrest Charges";
                     public string searchChargesPlaceholder = "Search charges";
                     public string evidenceSeized = "Evidence seized";
-                    public string documentedDrugs = "Drugs found / documented";
-                    public string documentedFirearms = "Firearm(s) found / documented";
+                    public string evidenceSeizedHelp = "Document drugs and firearms via a Property and Evidence Receipt report. Attach it below to support court evidence.";
+                    public string documentSeizedContraband = "Document seized contraband";
+                    public string createPropertyEvidenceReceipt = "Create Property and Evidence Receipt";
                     public string attachedReports = "Attached reports (evidence for court)";
                     /// <summary>Explains that attached reports count as evidence; relevant ones carry full weight, others still count but less.</summary>
                     public string attachedReportsHelp = "Reports you attach here are used as evidence when this arrest goes to court. Reports that directly support the case (Incident/Citation naming this defendant, Injury documenting harm, Traffic Incident with defendant as driver or vehicle-related charges, Impound for vehicle-related charges) carry full weight. Other attached reports (e.g. impound on a drug case, incident that doesn't name the defendant) still count but carry less weight—so tangential evidence like a stolen firearm in a drug case is not ignored.";
@@ -488,6 +493,7 @@ namespace MDTPro.Setup {
                 public Impound impound = new Impound();
                 public TrafficIncident trafficIncident = new TrafficIncident();
                 public Injury injury = new Injury();
+                public PropertyEvidence propertyEvidence = new PropertyEvidence();
 
                 public class Impound {
                     public string title = "Vehicle & Impound Details";
@@ -544,6 +550,27 @@ namespace MDTPro.Setup {
                     public string recentIdsError = "Could not load Recent IDs.";
                 }
 
+                public class PropertyEvidence {
+                    public string title = "Property and Evidence Details";
+                    public string subjectsTitle = "Subjects (persons from whom seized)";
+                    public string subjectPedName = "Subject (person from whom seized)";
+                    public string subjectPedNamePlaceholder = "Full name";
+                    public string selectFromRecentIds = "Select from Recent IDs";
+                    public string noRecentIds = "No recent IDs. Collect an ID from a ped to show them here.";
+                    public string recentIdsError = "Could not load Recent IDs.";
+                    public string addSubjectPlaceholder = "Add subject name";
+                    public string addSubject = "Add";
+                    public string drugsSeized = "Drugs seized";
+                    public string addDrugsHelp = "Select drug type and quantity, then click Add";
+                    public string firearmsSeized = "Firearms seized";
+                    public string addFirearmsHelp = "Select firearm type, then click Add";
+                    public string add = "Add";
+                    public string otherContrabandNotes = "Other contraband (optional)";
+                    public string otherContrabandPlaceholder = "Describe other items seized";
+                    public string seizedSummary = "Seized";
+                    public string attachPropertyReceiptHint = "Attach a Property and Evidence Receipt to document seized contraband.";
+                }
+
                 public class UseOfForce {
                     public string title = "Use of Force";
                     public string type = "Type";
@@ -563,6 +590,7 @@ namespace MDTPro.Setup {
                 public string impound = "IMP";
                 public string trafficIncident = "TIR";
                 public string injury = "INJ";
+                public string propertyEvidence = "PER";
             }
 
             public class List {

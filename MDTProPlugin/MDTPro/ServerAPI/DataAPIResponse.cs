@@ -140,6 +140,10 @@ namespace MDTPro.ServerAPI {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.injuryReports));
                 status = 200;
                 contentType = "text/json";
+            } else if (path == "propertyEvidenceReports" || path == "propertyEvidenceReceiptReports") {
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.propertyEvidenceReports));
+                status = 200;
+                contentType = "text/json";
             } else if (path == "playerLocation") {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.PlayerLocation));
                 status = 200;
@@ -168,6 +172,9 @@ namespace MDTPro.ServerAPI {
                     incidents = DataController.incidentReports
                         .Where(r => (r.OffenderPedsNames != null && r.OffenderPedsNames.Any(n => n.ToLower() == pedName))
                                  || (r.WitnessPedsNames != null && r.WitnessPedsNames.Any(n => n.ToLower() == pedName)))
+                        .Select(r => new { r.Id, r.TimeStamp, r.Status }),
+                    propertyEvidence = DataController.PropertyEvidenceReports
+                        ?.Where(r => r.SubjectPedNames != null && r.SubjectPedNames.Any(n => (n ?? "").ToLower() == pedName))
                         .Select(r => new { r.Id, r.TimeStamp, r.Status })
                 };
 
@@ -249,6 +256,7 @@ namespace MDTPro.ServerAPI {
             } else if (path == "firearmsForPed") {
                 string pedName = Helper.GetRequestBodyAsString(req);
                 var firearms = Database.LoadFirearmsByOwner(pedName);
+                firearms = DataController.FilterToActualFirearms(firearms ?? new System.Collections.Generic.List<FirearmRecord>());
                 if (firearms != null && firearms.Count > 0)
                     Database.TouchFirearmRecordsByOwner(pedName);
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(firearms));
@@ -257,6 +265,8 @@ namespace MDTPro.ServerAPI {
             } else if (path == "firearmBySerial") {
                 string serial = Helper.GetRequestBodyAsString(req);
                 var firearm = Database.LoadFirearmBySerial(serial);
+                if (firearm != null && DataController.FilterToActualFirearms(new System.Collections.Generic.List<FirearmRecord> { firearm }).Count == 0)
+                    firearm = null; // Exclude melee/knives from serial lookup
                 if (firearm != null && !string.IsNullOrWhiteSpace(firearm.OwnerPedName))
                     Database.TouchFirearmRecordsByOwner(firearm.OwnerPedName);
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(firearm ?? new object()));
@@ -268,7 +278,8 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/json";
             } else if (path == "recentFirearms") {
-                var firearms = Database.LoadRecentFirearms(12);
+                var firearms = Database.LoadRecentFirearms(30);
+                firearms = DataController.FilterToActualFirearms(firearms ?? new System.Collections.Generic.List<FirearmRecord>(), maxCount: 12);
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(firearms));
                 status = 200;
                 contentType = "text/json";
@@ -354,6 +365,23 @@ namespace MDTPro.ServerAPI {
                     if (imp != null) {
                         string sub = !string.IsNullOrEmpty(imp.LicensePlate) ? imp.LicensePlate : imp.VehicleModel;
                         summaries.Add(new { id = imp.Id, type = "impound", typeLabel = "Impound", date = imp.TimeStamp.ToString("yyyy-MM-dd"), subtitle = sub });
+                        continue;
+                    }
+                    var per = DataController.PropertyEvidenceReports?.FirstOrDefault(r => r.Id == tid);
+                    if (per != null) {
+                        string sub = (per.SubjectPedNames != null && per.SubjectPedNames.Count > 0) ? string.Join(", ", per.SubjectPedNames.Where(s => !string.IsNullOrEmpty(s))) : (per.SeizedDrugTypes?.Count > 0 || per.SeizedFirearmTypes?.Count > 0 ? "Contraband seized" : null);
+                        var items = new System.Collections.Generic.List<string>();
+                        if (per.SeizedDrugs != null && per.SeizedDrugs.Count > 0) {
+                            foreach (var d in per.SeizedDrugs) {
+                                if (d == null || string.IsNullOrEmpty(d.DrugType)) continue;
+                                items.Add(string.IsNullOrEmpty(d.Quantity) ? d.DrugType : $"{d.DrugType} ({d.Quantity})");
+                            }
+                        } else if (per.SeizedDrugTypes != null && per.SeizedDrugTypes.Count > 0) {
+                            foreach (var t in per.SeizedDrugTypes) { if (!string.IsNullOrEmpty(t)) items.Add(t); }
+                        }
+                        if (per.SeizedFirearmTypes != null) foreach (var f in per.SeizedFirearmTypes) { if (!string.IsNullOrEmpty(f)) items.Add(f); }
+                        if (!string.IsNullOrWhiteSpace(per.OtherContrabandNotes)) items.Add(per.OtherContrabandNotes);
+                        summaries.Add(new { id = per.Id, type = "propertyEvidence", typeLabel = "Property & Evidence", date = per.TimeStamp.ToString("yyyy-MM-dd"), subtitle = sub, items = items });
                         continue;
                     }
                     summaries.Add(new { id = tid, type = (string)null, typeLabel = "—", date = (string)null, subtitle = (string)null });

@@ -56,8 +56,9 @@ async function loadRecentWeapons() {
   if (wrapper) wrapper.classList.remove('hidden')
   for (const f of firearms) {
     const serialLabel = f.IsSerialScratched ? 'Scratched' : (f.SerialNumber || '—')
-    const weaponName = f.WeaponDisplayName || f.Description || f.WeaponModelId || ''
+    const weaponName = (f.WeaponDisplayName || f.Description || f.WeaponModelId || '').trim()
     const displayText = weaponName ? `${serialLabel} — ${weaponName}` : serialLabel
+    if (!weaponName && serialLabel === '—') continue // Skip empty "—" entries
     const lookupKey = f.IsSerialScratched ? (f.OwnerPedName || '') : (f.SerialNumber || '')
     const item = document.createElement('button')
     item.textContent = displayText
@@ -127,13 +128,27 @@ async function performSearch(query) {
   }
 
   if (byOwner && Array.isArray(byOwner) && byOwner.length > 0) {
+    const meleePattern = /KNIFE|KNUCKLE|NIGHTSTICK|HAMMER|WEAPON_BAT|CROWBAR|GOLFCLUB|DAGGER|MACHETE|SWITCHBLADE|BATTLEAXE|POOLCUE|WRENCH|FLASHLIGHT|HATCHET|UNARMED/i
+    const actualFirearms = byOwner.filter((f) => {
+      const modelId = (f.WeaponModelId || '').toUpperCase()
+      return !meleePattern.test(modelId)
+    })
+    if (actualFirearms.length === 0) {
+      topWindow.showNotification(
+        language.firearmsSearch?.notifications?.notFound ||
+          'No firearm or owner found.',
+        'warning'
+      )
+      document.title = 'Firearms Check'
+      return
+    }
     document.querySelector('.searchResponseWrapper').classList.remove('hidden')
     document.title = `Firearms Check: ${query}`
     const title = document.createElement('div')
     title.className = 'firearmsOwnerTitle'
     title.textContent = `Firearms for ${query}`
     resultEl.appendChild(title)
-    for (const f of byOwner) {
+    for (const f of actualFirearms) {
       renderFirearmCard(resultEl, f)
     }
   } else {

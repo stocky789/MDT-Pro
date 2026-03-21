@@ -418,6 +418,13 @@
         "isArrestable": false
       },
       {
+        "name": "Failure To Present Drivers License Upon Demand",
+        "minFine": 250,
+        "maxFine": 1000,
+        "canRevokeLicense": false,
+        "isArrestable": true
+      },
+      {
         "name": "Expired Drivers License",
         "minFine": 197,
         "maxFine": 250,
@@ -487,6 +494,20 @@
       },
       {
         "name": "Possession Of Stolen Property",
+        "minFine": 250,
+        "maxFine": 1000,
+        "canRevokeLicense": false,
+        "isArrestable": true
+      },
+      {
+        "name": "Possession Of Burglary Tools",
+        "minFine": 250,
+        "maxFine": 1000,
+        "canRevokeLicense": false,
+        "isArrestable": true
+      },
+      {
+        "name": "Possession Of Counterfeit Items",
         "minFine": 250,
         "maxFine": 1000,
         "canRevokeLicense": false,

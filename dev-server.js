@@ -288,6 +288,14 @@ const server = http.createServer((req, res) => {
       send(res, 200, '[]', 'application/json');
     }
     return;
+  } else if (url === '/seizureOptions') {
+    try {
+      const data = fs.readFileSync(path.join(ROOT, 'defaults', 'seizureOptions.json'), 'utf8');
+      send(res, 200, data, 'application/json');
+    } catch {
+      send(res, 200, JSON.stringify({ drugTypes: [], firearmTypes: [] }), 'application/json');
+    }
+    return;
   } else if (url === '/pluginInfo') {
     const pluginsDir = path.join(ROOT, 'plugins');
     const pluginDirs = fs.existsSync(pluginsDir) ? fs.readdirSync(pluginsDir, { withFileTypes: true }).filter(d => d.isDirectory()) : [];
@@ -395,7 +403,7 @@ const server = http.createServer((req, res) => {
   } else if (url === '/data/recentIds') {
     send(res, 200, JSON.stringify(getRecentIds()), 'application/json');
     return;
-  } else if (url === '/data/impoundReports' || url === '/data/trafficIncidentReports' || url === '/data/injuryReports') {
+  } else if (url === '/data/impoundReports' || url === '/data/trafficIncidentReports' || url === '/data/injuryReports' || url === '/data/propertyEvidenceReports' || url === '/data/propertyEvidenceReceiptReports') {
     send(res, 200, '[]', 'application/json');
     return;
   } else if (url === '/data/court') {

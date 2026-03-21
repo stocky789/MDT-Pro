@@ -95,11 +95,35 @@ async function applyReportPrefill(type) {
     const injuredInput = el.querySelector('#injurySectionInjuredPartyInput')
     if (d.pedName && injuredInput) injuredInput.value = d.pedName
 
+    if (d.pedName && type === 'propertyEvidence') {
+      const subjectsList = el.querySelector('.propertyEvidenceSubjectsList')
+      if (subjectsList && !Array.from(subjectsList.querySelectorAll('.propertyEvidenceSubjectItem')).some(item => (item.dataset.pedName || '') === d.pedName)) {
+        const wrapper = document.createElement('div')
+        wrapper.classList.add('propertyEvidenceSubjectItem', 'chargeWrapper')
+        wrapper.dataset.pedName = d.pedName
+        const nameEl = document.createElement('div')
+        nameEl.classList.add('chargeName')
+        nameEl.textContent = d.pedName
+        const delBtn = document.createElement('button')
+        delBtn.classList.add('deleteChargeButton')
+        delBtn.innerHTML = (typeof topDoc !== 'undefined' && topDoc?.querySelector('.iconAccess .trash')?.innerHTML) || '×'
+        delBtn.addEventListener('click', () => wrapper.remove())
+        wrapper.appendChild(nameEl)
+        wrapper.appendChild(delBtn)
+        subjectsList.appendChild(wrapper)
+      }
+    }
+
     sessionStorage.removeItem('mdtproReportPrefill')
     const lang = await getLanguage()
-    const msg = d.source === 'vehicleSearch'
-      ? (lang.reports?.notifications?.prefilledFromVehicleSearch || 'Prefilled from Vehicle Search')
-      : (lang.reports?.notifications?.prefilledFromPersonSearch || 'Prefilled from Person Search')
+    let msg
+    if (sessionStorage.getItem('mdtproAttachPropertyEvidenceToArrestId')) {
+      msg = lang.reports?.notifications?.prefilledFromArrest ?? 'Prefilled from arrest. Report will be attached after save.'
+    } else {
+      msg = d.source === 'vehicleSearch'
+        ? (lang.reports?.notifications?.prefilledFromVehicleSearch || 'Prefilled from Vehicle Search')
+        : (lang.reports?.notifications?.prefilledFromPersonSearch || 'Prefilled from Person Search')
+    }
     if (typeof topWindow !== 'undefined' && topWindow.showNotification) {
       topWindow.showNotification(msg, 'info')
     }
@@ -136,7 +160,7 @@ async function onCreateButtonClick() {
     const prefillRaw = sessionStorage.getItem('mdtproReportPrefill')
     if (prefillRaw) {
       const prefill = JSON.parse(prefillRaw)
-      if (prefill.reportType && ['impound', 'injury', 'trafficIncident'].includes(prefill.reportType)) {
+      if (prefill.reportType && ['impound', 'injury', 'trafficIncident', 'propertyEvidence'].includes(prefill.reportType)) {
         type = prefill.reportType
       }
     }
@@ -565,6 +589,22 @@ async function renderReports(reports, type) {
           textWrapper.appendChild(typeEl)
         }
         break
+      case 'propertyEvidence': {
+        const subjectNames = report.SubjectPedNames || (report.SubjectPedName ? [report.SubjectPedName] : [])
+        const subjectEl = document.createElement('div')
+        subjectEl.innerHTML = `${language.reports?.sections?.propertyEvidence?.subjectsTitle || 'Subjects'}: <span>${subjectNames.length > 0 ? subjectNames.join(', ') : '—'}</span>`
+        textWrapper.appendChild(subjectEl)
+        const drugsStr = (report.SeizedDrugs || []).map(d => d && d.DrugType ? (d.Quantity ? `${d.DrugType} (${d.Quantity})` : d.DrugType) : '').filter(Boolean).join(', ')
+        const drugsLegacy = (report.SeizedDrugTypes || []).join(', ')
+        const drugs = drugsStr || drugsLegacy
+        const firearms = (report.SeizedFirearmTypes || []).join(', ')
+        if (drugs || firearms) {
+          const seizedEl = document.createElement('div')
+          seizedEl.innerHTML = `${language.reports?.sections?.propertyEvidence?.seizedSummary || 'Seized'}: <span>${[drugs, firearms].filter(Boolean).join(' | ')}</span>`
+          textWrapper.appendChild(seizedEl)
+        }
+        break
+      }
     }
 
     const statusElement = document.createElement('div')
@@ -735,8 +775,11 @@ async function renderReportInformation(report, type, isList) {
       }
       if (type === 'arrest' && report.CourtCaseNumber)
         reportInformationEl.dataset.courtCaseNumber = report.CourtCaseNumber
-      if (type === 'arrest')
+      if (type === 'arrest') {
         reportInformationEl.dataset.attachedReportIds = JSON.stringify(report.AttachedReportIds || [])
+        reportInformationEl.dataset.documentedDrugs = String(!!report.DocumentedDrugs)
+        reportInformationEl.dataset.documentedFirearms = String(!!report.DocumentedFirearms)
+      }
       if (type === 'arrest' && (!isList || (report.UseOfForce && report.UseOfForce.Type))) {
         reportInformationEl.appendChild(
           await getUseOfForceSection(report.UseOfForce || {}, isList)
@@ -801,14 +844,30 @@ async function renderReportInformation(report, type, isList) {
         )
       )
       break
+    case 'propertyEvidence':
+      reportInformationEl.appendChild(
+        await getPropertyEvidenceSection(
+          {
+            SubjectPedNames: report.SubjectPedNames || [],
+            SubjectPedName: report.SubjectPedName,
+            SeizedDrugs: report.SeizedDrugs || [],
+            SeizedDrugTypes: report.SeizedDrugTypes || [],
+            SeizedFirearmTypes: report.SeizedFirearmTypes || [],
+            OtherContrabandNotes: report.OtherContrabandNotes
+          },
+          isList
+        )
+      )
+      break
   }
 
   reportInformationEl.appendChild(await getNotesSection(report.Notes, isList))
 }
 
 /**
- * Arrest report: Evidence seized (drugs / firearms documented). Used for court evidence when in-game/PR did not capture.
- * @param {object} report - Arrest report with DocumentedDrugs, DocumentedFirearms
+ * Arrest report: Seized contraband from attached Property and Evidence Receipt (PER) reports.
+ * Audits PER reports attached to this arrest and lists all items (drugs, firearms, other).
+ * @param {object} report - Arrest report with AttachedReportIds
  * @param {boolean} isList - If true, show read-only
  * @returns {Promise<HTMLElement>}
  */
@@ -822,29 +881,44 @@ async function getEvidenceSeizedSection(report, isList) {
   title.className = 'sectionTitle'
   title.textContent = section.dataset.title
   section.appendChild(title)
-  const wrapper = document.createElement('div')
-  wrapper.className = 'inputWrapper grid'
-  const drugsLabel = document.createElement('label')
-  drugsLabel.htmlFor = 'evidenceSeizedDrugs'
-  drugsLabel.textContent = labels.documentedDrugs || 'Drugs found / documented'
-  const drugsCheck = document.createElement('input')
-  drugsCheck.type = 'checkbox'
-  drugsCheck.id = 'evidenceSeizedDrugs'
-  drugsCheck.checked = !!report.DocumentedDrugs
-  drugsCheck.disabled = isList
-  drugsLabel.appendChild(drugsCheck)
-  wrapper.appendChild(drugsLabel)
-  const firearmsLabel = document.createElement('label')
-  firearmsLabel.htmlFor = 'evidenceSeizedFirearms'
-  firearmsLabel.textContent = labels.documentedFirearms || 'Firearm(s) found / documented'
-  const firearmsCheck = document.createElement('input')
-  firearmsCheck.type = 'checkbox'
-  firearmsCheck.id = 'evidenceSeizedFirearms'
-  firearmsCheck.checked = !!report.DocumentedFirearms
-  firearmsCheck.disabled = isList
-  firearmsLabel.appendChild(firearmsCheck)
-  wrapper.appendChild(firearmsLabel)
-  section.appendChild(wrapper)
+
+  const attachedIds = report.AttachedReportIds || []
+  let items = []
+  if (attachedIds.length > 0) {
+    try {
+      const res = await fetch('/data/reportSummaries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(attachedIds)
+      })
+      if (res.ok) {
+        const summaries = await res.json()
+        for (const s of summaries) {
+          if (s && s.type === 'propertyEvidence' && Array.isArray(s.items)) {
+            for (const item of s.items) {
+              if (item && typeof item === 'string') items.push(item)
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (items.length > 0) {
+    const listEl = document.createElement('ul')
+    listEl.className = 'evidenceSeizedItemsList'
+    for (const item of items) {
+      const li = document.createElement('li')
+      li.textContent = item
+      listEl.appendChild(li)
+    }
+    section.appendChild(listEl)
+  } else {
+    const help = document.createElement('p')
+    help.className = 'evidenceSeizedHelp'
+    help.textContent = labels.evidenceSeizedHelp ?? 'Attach a Property and Evidence Receipt report below to document seized drugs and firearms. Items from attached PER reports appear here.'
+    section.appendChild(help)
+  }
   return section
 }
 
@@ -949,11 +1023,37 @@ async function getArrestAttachedReportsSection(report) {
   })
   section.appendChild(listWrap)
 
+  const quickActionRow = document.createElement('div')
+  quickActionRow.className = 'attachReportQuickActionRow'
+  const createPerBtn = document.createElement('button')
+  createPerBtn.type = 'button'
+  createPerBtn.className = 'createPropertyEvidenceReceiptButton'
+  createPerBtn.textContent = language.reports?.sections?.arrest?.createPropertyEvidenceReceipt ?? 'Create Property and Evidence Receipt'
+  createPerBtn.addEventListener('click', async function () {
+    sessionStorage.setItem('mdtproReportPrefill', JSON.stringify({
+      reportType: 'propertyEvidence',
+      data: { pedName: report.OffenderPedName || '' },
+      expires: Date.now() + 5 * 60 * 1000
+    }))
+    sessionStorage.setItem('mdtproAttachPropertyEvidenceToArrestId', report.Id)
+    document.querySelector('.createPage .listWrapper').style.display = 'grid'
+    document.querySelector('.createPage .typeSelector').classList.remove('hidden')
+    document.querySelectorAll('.createPage .typeSelector .selected').forEach((b) => b.classList.remove('selected'))
+    const propBtn = document.querySelector('.createPage .typeSelector [data-type="propertyEvidence"]')
+    if (propBtn) propBtn.classList.add('selected')
+    await onCreatePageTypeSelectorButtonClick('propertyEvidence')
+    document.querySelector('.listPage').classList.add('hidden')
+    document.querySelector('.createPage').classList.remove('hidden')
+    reportIsOnCreatePageBool = true
+  })
+  quickActionRow.appendChild(createPerBtn)
+  section.appendChild(quickActionRow)
+
   const attachWrap = document.createElement('div')
   attachWrap.className = 'attachReportWrap'
   const attachInput = document.createElement('input')
   attachInput.type = 'text'
-  attachInput.placeholder = language.reports?.sections?.arrest?.attachReportIdPlaceholder ?? 'Report ID (e.g. INC-25-0001)'
+  attachInput.placeholder = language.reports?.sections?.arrest?.attachReportIdPlaceholder ?? 'Report ID (e.g. INC-25-0001, PER-25-0001)'
   attachInput.className = 'attachReportIdInput'
   const attachBtn = document.createElement('button')
   attachBtn.type = 'button'
@@ -1143,7 +1243,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     const prefillRaw = sessionStorage.getItem('mdtproReportPrefill')
     if (prefillRaw) {
       const prefill = JSON.parse(prefillRaw)
-      if (prefill.reportType && ['impound', 'injury', 'trafficIncident'].includes(prefill.reportType)) {
+      if (prefill.reportType && ['impound', 'injury', 'trafficIncident', 'propertyEvidence'].includes(prefill.reportType)) {
         initialType = prefill.reportType
         document.querySelector('.listPage .createButton')?.click()
       }
@@ -1163,7 +1263,7 @@ async function generateReportId(type) {
     if (report.ShortYear == shortYear) index++
   }
   const typeMap = language.reports?.idTypeMap || {}
-  const defaultPrefixes = { impound: 'IMP', trafficIncident: 'TIR', injury: 'INJ' }
+  const defaultPrefixes = { impound: 'IMP', trafficIncident: 'TIR', injury: 'INJ', propertyEvidence: 'PER' }
   const typePrefix = typeMap[type] ?? defaultPrefixes[type] ?? type?.slice(0, 3)?.toUpperCase() ?? 'RPT'
   let id = config.reportIdFormat
   id = id.replace('{type}', typePrefix)
@@ -1359,8 +1459,10 @@ async function saveReport(type, options = {}) {
           Witnesses: el.querySelector('#useOfForceWitnessesInput')?.value?.trim() || null
         }
       }
-      report.DocumentedDrugs = el.querySelector('#evidenceSeizedDrugs')?.checked === true
-      report.DocumentedFirearms = el.querySelector('#evidenceSeizedFirearms')?.checked === true
+      const drugsEl = el.querySelector('#evidenceSeizedDrugs')
+      const firearmsEl = el.querySelector('#evidenceSeizedFirearms')
+      report.DocumentedDrugs = drugsEl ? drugsEl.checked === true : el.dataset.documentedDrugs === 'true'
+      report.DocumentedFirearms = firearmsEl ? firearmsEl.checked === true : el.dataset.documentedFirearms === 'true'
 
       response = await (
         await fetch('/post/createArrestReport', {
@@ -1415,6 +1517,25 @@ async function saveReport(type, options = {}) {
       ).text()
       break
     }
+    case 'propertyEvidence': {
+      report.SubjectPedNames = Array.from(el.querySelectorAll('.propertyEvidenceSubjectItem')).map(item => item.dataset.pedName || '').filter(Boolean)
+      report.SubjectPedName = report.SubjectPedNames.length > 0 ? report.SubjectPedNames[0] : null
+      report.SeizedDrugs = Array.from(el.querySelectorAll('.propertyEvidenceDrugItem')).map(item => ({
+        DrugType: item.dataset.drugType || '',
+        Quantity: item.dataset.quantity || ''
+      })).filter(d => d.DrugType)
+      report.SeizedDrugTypes = report.SeizedDrugs.map(d => d.DrugType)
+      report.SeizedFirearmTypes = Array.from(el.querySelectorAll('.propertyEvidenceFirearmItem')).map(item => item.dataset.firearmType || '').filter(Boolean)
+      report.OtherContrabandNotes = el.querySelector('#propertyEvidenceOtherInput')?.value?.trim() || null
+      response = await (
+        await fetch('/post/createPropertyEvidenceReceiptReport', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(report)
+        })
+      ).text()
+      break
+    }
     case 'injury': {
       const injurySection = el.querySelector('.injurySection')
       report.InjuredPartyName = el.querySelector('#injurySectionInjuredPartyInput')?.value?.trim() || ''
@@ -1444,10 +1565,33 @@ async function saveReport(type, options = {}) {
     topWindow.showNotification(msg, 'error')
     return
   }
-  topWindow.showNotification(
-    language.reports.notifications.saveSuccess,
-    'success'
-  )
+  const attachToArrestId = sessionStorage.getItem('mdtproAttachPropertyEvidenceToArrestId')
+  if (type === 'propertyEvidence' && attachToArrestId && report.Id) {
+    sessionStorage.removeItem('mdtproAttachPropertyEvidenceToArrestId')
+    try {
+      const attachRes = await fetch('/post/attachReportToArrest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ arrestReportId: attachToArrestId, reportId: report.Id })
+      })
+      const attachText = await attachRes.text()
+      if (attachText === 'OK') {
+        topWindow.showNotification(
+          language.reports?.notifications?.savedAndAttachedToArrest ?? 'Report saved and attached to arrest.',
+          'success'
+        )
+      } else {
+        topWindow.showNotification(language.reports?.notifications?.saveSuccess, 'success')
+      }
+    } catch (_) {
+      topWindow.showNotification(language.reports?.notifications?.saveSuccess, 'success')
+    }
+  } else {
+    topWindow.showNotification(
+      language.reports.notifications.saveSuccess,
+      'success'
+    )
+  }
 
   if (type === 'arrest' && !options.skipArrestCaution) {
     await showArrestSaveCautionDialog(language)
