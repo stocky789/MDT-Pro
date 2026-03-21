@@ -44,6 +44,11 @@ namespace MDTPro.EventListeners {
             "OnVehicleRanThroughDispatch"
         };
 
+        /// <summary>Optional PR events for vehicle search — capture contraband when vehicle is actually searched (not just when plate is run).</summary>
+        private static readonly HashSet<string> vehicleSearchEventNames = new HashSet<string>(
+            new[] { "OnVehicleSearched", "OnVehicleSearchComplete", "OnVehicleSearchFinished" },
+            StringComparer.OrdinalIgnoreCase);
+
         internal static void SubscribeToPREvents() {
             if (subscribed) return;
 
@@ -62,6 +67,7 @@ namespace MDTPro.EventListeners {
                 SubscribeToOnFootTrafficStopStarted();
                 SubscribeToOnFootTrafficStopEnded();
                 SubscribeToOptionalWeaponFirearmEvents(eventsApiType);
+                SubscribeToOptionalVehicleSearchEvents(eventsApiType);
                 subscribed = true;
             } catch (Exception e) {
                 Game.LogTrivial($"MDT Pro: [Warning] Failed to subscribe to PR events: {e.Message}");
@@ -79,6 +85,27 @@ namespace MDTPro.EventListeners {
                 eventInfo.AddEventHandler(null, handler);
             } catch (Exception e) {
                 Game.LogTrivial($"MDT Pro: [Warning] Failed to subscribe to PR OnFootTrafficStopStarted: {e.Message}");
+            }
+        }
+
+        /// <summary>Tries to subscribe to PR vehicle search events if they exist. Capture runs when vehicle is actually searched, not just when plate is run.</summary>
+        private static void SubscribeToOptionalVehicleSearchEvents(Type eventsApiType) {
+            if (eventsApiType == null) return;
+            try {
+                foreach (string name in vehicleSearchEventNames) {
+                    EventInfo evt = eventsApiType.GetEvent(name, BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase);
+                    if (evt == null) continue;
+                    try {
+                        Delegate handler = CreateForwardingDelegate(evt.EventHandlerType, name);
+                        evt.AddEventHandler(null, handler);
+                        Game.LogTrivial($"[MDTPro] Subscribed to PR event: {name} (vehicle search contraband)");
+                        return; // One handler is enough
+                    } catch (Exception ex) {
+                        Game.LogTrivial($"[MDTPro] Could not subscribe to {name}: {ex.Message}");
+                    }
+                }
+            } catch (Exception ex) {
+                Game.LogTrivial($"[MDTPro] Optional vehicle search event subscription failed: {ex.Message}");
             }
         }
 
@@ -147,10 +174,37 @@ namespace MDTPro.EventListeners {
             if (vehicleDispatchEventNames.Contains(eventName) && args[0] is Vehicle dispatchVehicle) {
                 DataController.ResolveVehicleAndDriverForStop(dispatchVehicle);
                 try {
-                    if (dispatchVehicle != null && dispatchVehicle.Exists())
+                    if (dispatchVehicle != null && dispatchVehicle.Exists()) {
                         DataController.CaptureVehicleSearchItems(dispatchVehicle);
+                        // Delayed retry: player typically searches after running plate. Capture again in 8s.
+                        GameFiber.StartNew(() => {
+                            GameFiber.Wait(8000);
+                            try {
+                                if (dispatchVehicle != null && dispatchVehicle.Exists())
+                                    DataController.CaptureVehicleSearchItems(dispatchVehicle);
+                            } catch (Exception ex) {
+                                Game.LogTrivial($"MDT Pro: [Warning] Delayed vehicle search capture: {ex.Message}");
+                            }
+                        }, "MDTPro-vehicle-search-delayed");
+                    }
                 } catch (Exception ex) {
                     Game.LogTrivial($"MDT Pro: [Warning] OnVehicleRanThroughDispatch capture: {ex.Message}");
+                }
+                return;
+            }
+
+            // Vehicle search events (if PR exposes OnVehicleSearched etc.)
+            if (vehicleSearchEventNames.Contains(eventName) && args != null && args.Length >= 1) {
+                Vehicle searchVehicle = null;
+                foreach (object arg in args) {
+                    if (arg is Vehicle v && v.Exists()) { searchVehicle = v; break; }
+                }
+                if (searchVehicle != null) {
+                    try {
+                        DataController.CaptureVehicleSearchItems(searchVehicle);
+                    } catch (Exception ex) {
+                        Game.LogTrivial($"MDT Pro: [Warning] {eventName} capture: {ex.Message}");
+                    }
                 }
                 return;
             }

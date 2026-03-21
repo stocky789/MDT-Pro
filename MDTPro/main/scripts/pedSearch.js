@@ -232,6 +232,28 @@ async function performSearch(query) {
 
   document.querySelector('.searchResponseWrapper').classList.remove('hidden')
 
+  // ID photo: use FiveM ped model image when ModelName is available (vanilla GTA peds)
+  const photoImg = document.getElementById('pedIdPhotoImg')
+  const photoPlaceholder = document.querySelector('.pedIdPhotoPlaceholder')
+  if (photoImg && photoPlaceholder) {
+    const modelName = (response.ModelName || '').trim().toLowerCase()
+    if (modelName) {
+      photoImg.src = `https://docs.fivem.net/peds/${modelName}.webp`
+      photoImg.classList.remove('hidden')
+      photoImg.alt = response.Name || ''
+      photoPlaceholder.classList.add('hidden')
+      photoImg.onerror = () => {
+        photoImg.classList.add('hidden')
+        photoImg.removeAttribute('src')
+        photoPlaceholder.classList.remove('hidden')
+      }
+    } else {
+      photoImg.classList.add('hidden')
+      photoImg.removeAttribute('src')
+      photoPlaceholder.classList.remove('hidden')
+    }
+  }
+
   for (const key of Object.keys(response)) {
     const el = document.querySelector(
       `.searchResponseWrapper [data-property="${key}"]`

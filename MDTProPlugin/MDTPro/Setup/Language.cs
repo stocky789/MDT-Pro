@@ -180,12 +180,14 @@ namespace MDTPro.Setup {
                 public string legalInfoTitle = "Legal Information";
                 public string licensesTitle = "Licenses & Permits";
                 public string historyTitle = "History";
+                public string noPhoto = "No photo available";
                 public string vehiclesOwnedTitle = "Vehicles Owned";
                 public string registeredFirearmsTitle = "Registered Firearms";
                 public string reportsTitle = "Associated Reports";
                 public Labels labels = new Labels();
 
                 public class Labels {
+                    public string idPhoto = "Photo";
                     public string firstName = "First Name";
                     public string lastName = "Last Name";
                     public string gender = "Gender";
