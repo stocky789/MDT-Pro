@@ -4,13 +4,21 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
-## [0.9.6.0] — 2026-03-17
+## [0.9.6.0] — 2026-03-21
+
+### Person Search
+
+- **ID photo** — Person Search now shows a photo of the person's in-game character model in the Basic Information section. For vanilla GTA V peds, the MDT displays their PED mugshot from the game. If no photo is available (e.g. addon character packs or peds without a stored model), a "No photo available" placeholder is shown instead.
 
 ### Firearms Check
 
 - **Recent weapons (serials + names)** — Firearms Check now shows **Recent weapons**: the actual guns you’ve seen on pat-downs and body searches, with their serial numbers and weapon names. No more “Recent IDs” with person names—just click a weapon (e.g. “ABC123 — Pistol”) to look it up.
 - **Lookups actually work** — Firearm lookups were failing a lot, especially when a gun was found in a car. That’s fixed: searching by serial or owner from Person Search or Firearms Check should work every time now.
 - **Guns in vehicle search** — When you find a weapon during a vehicle search, that weapon line is now clickable. Click it to jump straight into Firearms Check and run a search for that gun.
+
+### Vehicle Search
+
+- **Search Results (Contraband)** — Drugs, weapons, and contraband from vehicle searches now show up reliably in the MDT. Previously they often didn’t appear.
 
 ---
 

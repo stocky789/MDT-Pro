@@ -47,7 +47,17 @@ namespace MDTPro.ServerAPI {
                 string name = !string.IsNullOrEmpty(body) ? body.Trim() : "";
                 string reversedName = string.Join(" ", name.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Reverse());
 
-                MDTProPedData pedData = DataController.PedDatabase.FirstOrDefault(o => o.Name?.ToLower() == name.ToLower() || o.Name?.ToLower() == reversedName.ToLower());
+                // Prefer context ped when it matches the search name (person in front of you just got ID)
+                MDTProPedData pedData = null;
+                if (!string.IsNullOrEmpty(name) && name != "context" && name != "%context" && !name.Equals("current", StringComparison.OrdinalIgnoreCase)) {
+                    var contextPed = DataController.GetContextPedIfValid();
+                    if (contextPed != null && (contextPed.Name?.Equals(name, StringComparison.OrdinalIgnoreCase) == true || contextPed.Name?.Equals(reversedName, StringComparison.OrdinalIgnoreCase) == true)) {
+                        pedData = contextPed;
+                    }
+                }
+                if (pedData == null) {
+                    pedData = DataController.PedDatabase.FirstOrDefault(o => o.Name?.ToLower() == name.ToLower() || o.Name?.ToLower() == reversedName.ToLower());
+                }
                 if (pedData == null && (name == "context" || name == "%context" || name.Equals("current", StringComparison.OrdinalIgnoreCase))) {
                     pedData = DataController.GetContextPedIfValid();
                 }

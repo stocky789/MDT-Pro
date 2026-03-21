@@ -66,6 +66,50 @@ body {
   line-height: 1.35;
 }
 
+/* ID photo (PED model image) in person search — cropped to face area like a real ID card */
+.pedIdPhotoCell {
+  display: flex;
+  flex-direction: column;
+}
+
+.pedIdPhotoContainer {
+  position: relative;
+  width: 85px;
+  height: 105px;
+  overflow: hidden;
+  margin-top: 2px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-background);
+}
+
+.pedIdPhotoImg {
+  /* Zoom in on face area like a real ID mugshot — 2.5x scale, crop to top-center (head) */
+  width: 250%;
+  min-width: 250%;
+  height: 250%;
+  min-height: 250%;
+  object-fit: cover;
+  object-position: 50% 0%;
+  margin-left: 50%;
+  transform: translateX(-50%);
+  display: block;
+}
+
+.pedIdPhotoImg.hidden {
+  display: none;
+}
+
+.pedIdPhotoPlaceholder {
+  font-size: 12px;
+  color: var(--color-text-primary-half);
+  text-align: center;
+  padding: 12px;
+}
+
+.pedIdPhotoPlaceholder.hidden {
+  display: none;
+}
+
 .createReportButtons {
   display: flex;
   gap: 8px;

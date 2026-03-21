@@ -881,16 +881,22 @@ namespace MDTPro.Data {
 
             MDTProPedData pedData;
             lock (_pedDbLock) {
-                pedData = pedDatabase.FirstOrDefault(x => x.Name?.Equals(pedName, StringComparison.OrdinalIgnoreCase) == true)
-                    ?? keepInPedDatabase.FirstOrDefault(x => x.Name?.Equals(pedName, StringComparison.OrdinalIgnoreCase) == true)
-                    ?? pedDatabase.FirstOrDefault(x => x.Holder != null && x.Holder.IsValid() && x.Holder.Handle == ped.Handle);
+                // Prefer exact ped match (Holder) first — we're identifying THIS person, so use their record
+                pedData = pedDatabase.FirstOrDefault(x => x.Holder != null && x.Holder.IsValid() && x.Holder.Handle == ped.Handle)
+                    ?? pedDatabase.FirstOrDefault(x => x.Name?.Equals(pedName, StringComparison.OrdinalIgnoreCase) == true)
+                    ?? keepInPedDatabase.FirstOrDefault(x => x.Name?.Equals(pedName, StringComparison.OrdinalIgnoreCase) == true);
                 if (pedData == null) {
                     pedData = new MDTProPedData { Name = pedName };
+                    pedData.ModelHash = (uint)ped.Model.Hash;
+                    pedData.ModelName = ped.Model.Name;
                     pedData.TryParseNameIntoFirstLast();
                     pedData.IdentificationHistory = new List<MDTProPedData.IdentificationEntry>();
                     if (!pedDatabase.Any(x => x.Name == pedName)) pedDatabase.Add(pedData);
                 } else {
                     if (!pedDatabase.Any(x => x.Name == pedData.Name)) pedDatabase.Add(pedData);
+                    // Always update model from the ped we just identified — ensures ID photo matches the person in front of you
+                    pedData.ModelHash = (uint)ped.Model.Hash;
+                    pedData.ModelName = ped.Model.Name;
                 }
                 if (pedData.IdentificationHistory == null) pedData.IdentificationHistory = new List<MDTProPedData.IdentificationEntry>();
                 pedData.IdentificationHistory.Insert(0, new MDTProPedData.IdentificationEntry {
@@ -901,6 +907,7 @@ namespace MDTPro.Data {
             }
             KeepPedInDatabase(pedData);
             Database.SavePed(pedData);
+            SetContextPed(pedData);
         }
 
         internal static void LoadPedDatabaseFromFile() {
@@ -1288,8 +1295,9 @@ namespace MDTPro.Data {
                         if (!string.IsNullOrEmpty(mdtProPedData.Birthday)) existingPed.Birthday = existingPed.Birthday ?? mdtProPedData.Birthday;
                         if (!string.IsNullOrEmpty(mdtProPedData.Gender)) existingPed.Gender = existingPed.Gender ?? mdtProPedData.Gender;
                         if (!string.IsNullOrEmpty(mdtProPedData.Address)) existingPed.Address = existingPed.Address ?? mdtProPedData.Address;
-                        if (mdtProPedData.ModelHash != 0) existingPed.ModelHash = existingPed.ModelHash != 0 ? existingPed.ModelHash : mdtProPedData.ModelHash;
-                        if (!string.IsNullOrEmpty(mdtProPedData.ModelName)) existingPed.ModelName = existingPed.ModelName ?? mdtProPedData.ModelName;
+                        // Always update model from current encounter so ID photo matches the person in front of you
+                        if (mdtProPedData.ModelHash != 0) existingPed.ModelHash = mdtProPedData.ModelHash;
+                        if (!string.IsNullOrEmpty(mdtProPedData.ModelName)) existingPed.ModelName = mdtProPedData.ModelName;
                         existingPed.TryParseNameIntoFirstLast();
                     }
                 }
@@ -1337,8 +1345,8 @@ namespace MDTPro.Data {
                             if (!string.IsNullOrEmpty(updated.FishingPermitExpiration)) existing.FishingPermitExpiration = existing.FishingPermitExpiration ?? updated.FishingPermitExpiration;
                             if (!string.IsNullOrEmpty(updated.HuntingPermitStatus)) existing.HuntingPermitStatus = existing.HuntingPermitStatus ?? updated.HuntingPermitStatus;
                             if (!string.IsNullOrEmpty(updated.HuntingPermitExpiration)) existing.HuntingPermitExpiration = existing.HuntingPermitExpiration ?? updated.HuntingPermitExpiration;
-                            if (updated.ModelHash != 0 && existing.ModelHash == 0) existing.ModelHash = updated.ModelHash;
-                            if (!string.IsNullOrEmpty(updated.ModelName)) existing.ModelName = existing.ModelName ?? updated.ModelName;
+                            if (updated.ModelHash != 0) existing.ModelHash = updated.ModelHash;
+                            if (!string.IsNullOrEmpty(updated.ModelName)) existing.ModelName = updated.ModelName;
                             existing.TryParseNameIntoFirstLast();
                         }
                         KeepPedInDatabase(existing);
@@ -2147,14 +2155,18 @@ namespace MDTPro.Data {
             if (!Main.usePR) return;
             try {
                 MethodInfo getHasSearched = null;
-                Type searchApiType = Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined")
-                    ?? Type.GetType("PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined");
-                if (searchApiType != null)
-                    getHasSearched = searchApiType.GetMethod("GetHasVehicleBeenSearched", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(Rage.Vehicle) }, null);
-                if (getHasSearched == null) {
-                    Type vehicleApiType = Type.GetType("PolicingRedefined.API.VehicleAPI, PolicingRedefined");
-                    if (vehicleApiType != null)
-                        getHasSearched = vehicleApiType.GetMethod("GetHasVehicleBeenSearched", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(Rage.Vehicle) }, null);
+                var searchApiTypeNames = new[] {
+                    "PolicingRedefined.API.SearchItemsAPI, PolicingRedefined",
+                    "PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined",
+                    "PolicingRedefined.API.VehicleAPI, PolicingRedefined"
+                };
+                foreach (string typeName in searchApiTypeNames) {
+                    Type apiType = Type.GetType(typeName);
+                    if (apiType == null) continue;
+                    getHasSearched = apiType.GetMethod("GetHasVehicleBeenSearched",
+                        BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase,
+                        null, new[] { typeof(Rage.Vehicle) }, null);
+                    if (getHasSearched != null) break;
                 }
                 if (getHasSearched == null) return;
 
@@ -2313,15 +2325,23 @@ namespace MDTPro.Data {
 
                 string ownerForFirearms = GetVehicleDriverNameForFirearmOwner(vehicle, plate);
 
-                Type searchApiType = Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined")
-                    ?? Type.GetType("PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined");
-                if (searchApiType == null) return;
-                MethodInfo getItems = searchApiType.GetMethod("GetVehicleSearchItems", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(Rage.Vehicle) }, null);
+                MethodInfo getItems = null;
+                foreach (string typeName in new[] {
+                    "PolicingRedefined.API.SearchItemsAPI, PolicingRedefined",
+                    "PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined"
+                }) {
+                    Type searchApiType = Type.GetType(typeName);
+                    if (searchApiType == null) continue;
+                    getItems = searchApiType.GetMethod("GetVehicleSearchItems",
+                        BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase,
+                        null, new[] { typeof(Rage.Vehicle) }, null);
+                    if (getItems != null) break;
+                }
                 if (getItems == null) return;
 
                 object result = getItems.Invoke(null, new object[] { vehicle });
                 if (result == null) return;
-                System.Collections.IEnumerable list = result as System.Collections.IEnumerable;
+                var list = result as System.Collections.IEnumerable;
                 if (list == null) return;
 
                 var records = new List<VehicleSearchRecord>();
@@ -2343,18 +2363,23 @@ namespace MDTPro.Data {
 
                     if (t.Name.Contains("DrugItem") || t.Name.Contains("Drug")) {
                         itemType = "Drug";
+                        string amountStr = null;
                         foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
                             try {
                                 object val = prop.GetValue(item);
                                 if (val == null) continue;
-                                if (prop.Name == "DrugType") drugType = val.ToString();
-                                else if (prop.Name == "Value" || prop.Name == "Description") description = val?.ToString();
-                                else if (prop.Name == "Location") itemLocation = val?.ToString();
+                                string pn = prop.Name;
+                                if (pn == "DrugType") drugType = val.ToString();
+                                else if (pn == "Value" || pn == "Description" || pn == "FlavorText") description = description ?? val?.ToString();
+                                else if (pn == "Location" || pn == "ItemLocation") itemLocation = itemLocation ?? val?.ToString();
+                                else if (pn == "Amount" || pn == "Quantity") amountStr = val?.ToString();
                             } catch { }
                         }
-                    } else if (t.Name.Contains("WeaponItem") || t.Name.Contains("FirearmItem")) {
+                        if (string.IsNullOrEmpty(description) && !string.IsNullOrEmpty(amountStr))
+                            description = string.IsNullOrEmpty(drugType) ? amountStr : $"{drugType} ({amountStr})";
+                    } else if (t.Name.Contains("WeaponItem") || t.Name.Contains("FirearmItem") || (t.Name.Contains("Weapon") && t.Name.Contains("Item"))) {
                         itemType = "Weapon";
-                        string itemOwner = null; // PR may expose registered owner (e.g. from dispatch firearm check)
+                        string itemOwner = null;
                         foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
                             try {
                                 object val = prop.GetValue(item);
@@ -2362,8 +2387,8 @@ namespace MDTPro.Data {
                                 string pn = prop.Name;
                                 if (pn == "WeaponModelHash" || pn == "ModelHash") weaponHash = Convert.ToUInt32(val);
                                 else if (pn == "WeaponModelId" || pn == "ModelId") weaponModelId = val?.ToString();
-                                else if (pn == "Value" || pn == "Description") description = val?.ToString();
-                                else if (pn == "Location") itemLocation = val?.ToString();
+                                else if (pn == "Value" || pn == "Description" || pn == "FlavorText") description = description ?? val?.ToString();
+                                else if (pn == "Location" || pn == "ItemLocation") itemLocation = itemLocation ?? val?.ToString();
                                 else if (pn == "SerialNumber" || pn == "Serial") serial = serial ?? val?.ToString();
                                 else if (pn == "Owner" || pn == "RegisteredOwner" || pn == "OwnerName" || pn == "OwnerPedName")
                                     itemOwner = string.IsNullOrWhiteSpace(itemOwner) ? val?.ToString()?.Trim() : itemOwner;
@@ -2396,12 +2421,15 @@ namespace MDTPro.Data {
                         foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
                             try {
                                 object val = prop.GetValue(item);
-                                if (prop.Name == "Value" || prop.Name == "Description") description = val?.ToString();
-                                else if (prop.Name == "Location") itemLocation = val?.ToString();
+                                if (val == null) continue;
+                                string pn = prop.Name;
+                                if (pn == "Value" || pn == "Description" || pn == "FlavorText" || pn == "Name" || pn == "DisplayName" || pn == "Type")
+                                    description = description ?? val?.ToString();
+                                else if (pn == "Location" || pn == "ItemLocation") itemLocation = itemLocation ?? val?.ToString();
                             } catch { }
                         }
                     }
-                    if (itemType == "Contraband" && string.IsNullOrEmpty(description) && string.IsNullOrEmpty(drugType)) continue;
+                    if (string.IsNullOrEmpty(description) && string.IsNullOrEmpty(drugType)) description = itemType;
 
                     records.Add(new VehicleSearchRecord {
                         LicensePlate = plate,
@@ -2415,8 +2443,17 @@ namespace MDTPro.Data {
                         CapturedAt = now
                     });
                 }
-                if (records.Count > 0)
+                if (records.Count > 0) {
                     Database.SaveVehicleSearchRecords(records);
+                    lock (capturedVehicleSearchLock) {
+                        capturedVehicleSearchPlates.Add(plate);
+                        if (capturedVehicleSearchPlates.Count > MaxCapturedVehicleSearchPlates) {
+                            var toRemove = capturedVehicleSearchPlates.Take(MaxCapturedVehicleSearchPlates / 2).ToList();
+                            foreach (var p in toRemove) capturedVehicleSearchPlates.Remove(p);
+                        }
+                    }
+                    Helper.Log($"Vehicle search captured {records.Count} item(s) for plate {plate}", false, Helper.LogSeverity.Info);
+                }
                 if (firearmRecords.Count > 0)
                     Database.SaveFirearmRecords(firearmRecords);
             } catch (Exception e) {
