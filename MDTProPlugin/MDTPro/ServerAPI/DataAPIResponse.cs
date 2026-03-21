@@ -282,7 +282,7 @@ namespace MDTPro.ServerAPI {
                 string plate = Helper.GetRequestBodyAsString(req)?.Trim() ?? "";
                 var records = string.IsNullOrWhiteSpace(plate)
                     ? new System.Collections.Generic.List<VehicleSearchRecord>()
-                    : Database.LoadVehicleSearchRecordsByPlate(plate);
+                    : Database.LoadVehicleSearchRecordsByPlate(plate, limit: 12);
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(records ?? new System.Collections.Generic.List<VehicleSearchRecord>()));
                 status = 200;
                 contentType = "text/json";
