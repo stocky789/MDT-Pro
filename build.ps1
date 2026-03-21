@@ -377,6 +377,18 @@ $readmePath = Join-Path $release 'README.txt'
 MDT Pro - Install instructions
 ===============================
 
+Credits
+-------
+MDT Pro is derived from External Police Computer (EPC), an LSPDFR police computer mod.
+Thanks to the EPC authors and contributors for the original project and idea.
+
+License
+-------
+MDT Pro is licensed under the Eclipse Public License 2.0 (EPL-2.0).
+The full license text is in the LICENSE file included with this release (same folder as this README).
+Some data files (e.g. default charge lists) may be under the MIT License; see the project repository for details.
+
+
 OPENIV INSTALL (recommended)
 ----------------------------
 - MDTPro-*.oiv = Install package. In OpenIV: Edit mode -> drag the .oiv onto OpenIV, or Tools -> Package Installer, then install.
@@ -399,6 +411,14 @@ If SQL/database features stop working, ensure both System.Data.SQLite.dll (game 
 Requirements: LSPDFR, RagePluginHook, Common Data Framework. See the mod page for full requirements.
 "@ | Out-File -FilePath $readmePath -Encoding UTF8
 Write-Host "  -> $readmePath (install instructions)"
+
+# EPL-2.0: include license text with release distributions
+$licenseSrc = Join-Path $root 'LICENSE'
+$licenseDest = Join-Path $release 'LICENSE'
+if (Test-Path $licenseSrc) {
+    Copy-Item -Path $licenseSrc -Destination $licenseDest -Force
+    Write-Host "  -> $licenseDest (EPL-2.0)"
+}
 
 Write-Host "Done. Full mod release: $release"
 Write-Host "  Release\plugins\lspdfr\MDTPro.dll"

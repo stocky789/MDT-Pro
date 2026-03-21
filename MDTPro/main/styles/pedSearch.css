@@ -66,10 +66,17 @@ body {
   line-height: 1.35;
 }
 
-/* ID photo (PED model image) in person search — cropped to face area like a real ID card */
+/* Basic info grid: photo spans rows so name fields don't get huge empty gap below */
+.basicInfo {
+  align-items: start;
+  grid-template-rows: auto auto auto;
+}
+
+/* ID photo spans all rows — prevents tall row 1 that left gap between names and DOB/Age */
 .pedIdPhotoCell {
   display: flex;
   flex-direction: column;
+  grid-row: 1 / -1;
 }
 
 .pedIdPhotoContainer {

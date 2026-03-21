@@ -871,4 +871,89 @@ body {
 .propertyEvidenceSection .propertyEvidenceDrugsList,
 .propertyEvidenceSection .propertyEvidenceFirearmsList {
   margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Property evidence list items: card layout, text left + delete right (no tall placeholder boxes) */
+.propertyEvidenceSection .propertyEvidenceSubjectsList .chargeWrapper,
+.propertyEvidenceSection .propertyEvidenceDrugsList .chargeWrapper,
+.propertyEvidenceSection .propertyEvidenceFirearmsList .chargeWrapper {
+  background-color: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: 8px 10px;
+  font-size: 14px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.propertyEvidenceSection .chargeWrapper .chargeName {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.propertyEvidenceSection .chargeWrapper .deleteChargeButton {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  fill: var(--color-text-primary);
+  color: var(--color-text-primary);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.propertyEvidenceSection .chargeWrapper .deleteChargeButton svg {
+  width: 16px;
+  height: 16px;
+}
+
+.propertyEvidenceSection .chargeWrapper .deleteChargeButton:hover,
+.propertyEvidenceSection .chargeWrapper .deleteChargeButton:focus {
+  fill: var(--color-error);
+  color: var(--color-error);
+}
+
+.propertyEvidenceSection .chargeWrapper .deleteChargeButton::before {
+  display: none;
+}
+
+.propertyEvidenceSection .propertyEvidenceOtherRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  margin-bottom: 0;
+  max-width: 100%;
+}
+
+.propertyEvidenceSection .propertyEvidenceOtherRow label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary-dimmed);
+  display: block;
+  margin-bottom: 0;
+}
+
+.propertyEvidenceSection .propertyEvidenceOtherRow textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 8px 10px;
+  font-size: 14px;
+  box-sizing: border-box;
+  resize: vertical;
 }
