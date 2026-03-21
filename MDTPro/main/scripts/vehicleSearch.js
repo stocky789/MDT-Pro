@@ -435,7 +435,11 @@ async function performSearch(query) {
 
     const recordsSection = document.createElement('div')
     recordsSection.classList.add('inputWrapper', 'grid', 'vehicleSearchRecordsSection')
+    const seen = new Set()
     for (const r of searchRecordsResponse) {
+      const key = `${r.ItemType || ''}|${r.Description || ''}|${r.DrugType || ''}|${r.ItemLocation || ''}`
+      if (seen.has(key)) continue
+      seen.add(key)
       const el = document.createElement('div')
       const isWeapon = !!(r.WeaponModelId || (r.ItemType && /weapon|firearm|gun/i.test(r.ItemType)))
       if (isWeapon) el.classList.add('clickable')

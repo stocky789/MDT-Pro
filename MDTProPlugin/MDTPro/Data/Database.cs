@@ -2737,6 +2737,19 @@ namespace MDTPro.Data {
 
         #region Vehicle Search Records
 
+        internal static void DeleteVehicleSearchRecordsByPlate(string licensePlate) {
+            if (string.IsNullOrWhiteSpace(licensePlate)) return;
+            lock (dbLock) {
+                if (connection == null) return;
+                try {
+                    using (var cmd = new SQLiteCommand("DELETE FROM vehicle_search_records WHERE LOWER(TRIM(LicensePlate)) = LOWER(@plate)", connection)) {
+                        cmd.Parameters.AddWithValue("@plate", licensePlate.Trim());
+                        cmd.ExecuteNonQuery();
+                    }
+                } catch { }
+            }
+        }
+
         internal static void SaveVehicleSearchRecords(List<VehicleSearchRecord> records) {
             if (records == null || records.Count == 0) return;
             lock (dbLock) {
