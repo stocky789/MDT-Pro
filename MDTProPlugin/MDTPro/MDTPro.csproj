@@ -111,6 +111,8 @@
     <Compile Include="Data\Reports\CitationReport.cs" />
     <Compile Include="Data\Reports\IncidentReport.cs" />
     <Compile Include="Data\Reports\ImpoundReport.cs" />
+    <Compile Include="Data\Reports\PropertyEvidenceReceiptReport.cs" />
+    <Compile Include="Data\SeizureEvidenceHelper.cs" />
     <Compile Include="Data\Reports\TrafficIncidentReport.cs" />
     <Compile Include="Data\Reports\InjuryReport.cs" />
     <Compile Include="Data\Reports\Report.cs" />
@@ -141,6 +143,7 @@
     <Compile Include="Setup\SetupController.cs" />
     <Compile Include="Setup\ArrestGroup.cs" />
     <Compile Include="Setup\CitationGroup.cs" />
+    <Compile Include="Setup\SeizureOptions.cs" />
     <Compile Include="Setup\Config.cs" />
     <Compile Include="Setup\Language.cs" />
     <Compile Include="Utility\CitationArrestHelper.cs" />

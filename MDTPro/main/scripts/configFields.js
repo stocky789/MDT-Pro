@@ -91,7 +91,9 @@ const CONFIG_SECTIONS = [
       'courtEvidenceSupervisionViolationBonus',
       'courtEvidenceResistedBonus',
       'courtEvidenceDrugsBonus',
+      'courtEvidenceDrugQuantityBonus',
       'courtEvidenceUseOfForceBonus',
+      'courtEvidenceSeizureReportBonus',
     ],
   },
   {
@@ -399,9 +401,17 @@ const CONFIG_FIELD_META = {
     label: 'Drugs found bonus',
     tooltip: 'Evidence points when drugs were found on the person.',
   },
+  courtEvidenceDrugQuantityBonus: {
+    label: 'Drug quantity bonus',
+    tooltip: 'Extra evidence when drug quantity is documented in seizure report. Higher quantities (bundle, kilo, etc.) add more; max = this value × quantity weight.',
+  },
   courtEvidenceUseOfForceBonus: {
     label: 'Use of Force documented bonus',
     tooltip: 'Evidence points when use of force was documented on the arrest report.',
+  },
+  courtEvidenceSeizureReportBonus: {
+    label: 'Seizure report bonus',
+    tooltip: 'Evidence points per attached Property and Evidence Receipt (seizure) report.',
   },
   courtCaseResolutionMinBase: {
     label: 'Min resolution time (minutes)',

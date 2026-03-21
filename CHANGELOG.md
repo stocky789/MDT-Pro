@@ -6,6 +6,15 @@ All notable changes to MDT Pro are documented here.
 
 ## [0.9.6.0] — 2026-03-21
 
+### Property and Evidence Receipt (Seizure Reports)
+
+- **New report type** — Create **Property and Evidence Receipt** reports to document seized drugs and firearms in detail. Uses realistic police terminology (property and evidence receipt). **Multiple subjects** supported via Recent IDs (same as Person Search) and manual add. **Drugs seized** and **Firearms seized** use an add-button pattern (like charges): select type, click Add; each entry in a list with delete. **Drug quantities** (Baggie, Bundle, Grams, Ounce, Pill, etc.) align with Policing Redefined and street terminology. Optional other contraband notes. Attach to arrests for court evidence.
+- **Charge-specific evidence** — Court evidence now requires matching seizure types: e.g. a Possession of Heroin charge only gets drug evidence if Heroin is listed in the attached seizure report. Possession of Fentanyl requires Fentanyl documented. Generic charges (Possession Of Controlled Substance For Sale, Trafficking, Paraphernalia, etc.) accept any drug type. Firearm charges require at least one firearm type listed in the seizure report.
+- **Evidence breakdown in court** — Court evidence view shows specific types when documented: "Drugs found (Heroin, Cocaine)" or "Firearms seized (Pistol)" instead of generic labels. Config: `courtEvidenceSeizureReportBonus`, `courtEvidenceDrugQuantityBonus` (higher quantities—bundle, kilo, etc.—add evidence).
+- **Arrest integration** — In the arrest report's Attached reports section, use **Create Property and Evidence Receipt** to document contraband; subject pre-fills from the offender and the report auto-attaches on save. The **Evidence seized** section audits all attached PER reports and displays a simple list of seized items (drugs with quantity, firearms, other contraband).
+- **Removed arrest checkboxes** — The drugs/firearms tickboxes on arrest reports are removed. Use Property and Evidence Receipt reports instead. Existing arrests with DocumentedDrugs/DocumentedFirearms remain supported via court fallback (generic evidence).
+- **Verdict rationale** — Court sentencing text now reflects specific types when available (e.g. "Heroin and Cocaine were recovered" instead of "controlled substances were found").
+
 ### Person Search
 
 - **ID photo** — Person Search now shows a photo of the person's in-game character model in the Basic Information section. For vanilla GTA V peds, the MDT displays their PED mugshot from the game. If no photo is available (e.g. addon character packs or peds without a stored model), a "No photo available" placeholder is shown instead.
@@ -22,7 +31,13 @@ All notable changes to MDT Pro are documented here.
 
 ### Court
 
-- **Verdict & sentencing phrasing overhaul** — 200+ new wording variants for verdict reasoning, outcome reasoning, and sentencing rationale. Guilty pleas, no contest pleas, trial verdicts (guilty/acquitted), dismissed cases, charge-domain phrases, factor lead-ins, jury/docket notes, and sentencing rationale all use randomised legal language for more realistic, varied court documents. Logic unchanged—only phrasing expanded.
+- **Verdict & sentencing phrasing** — 200+ wording variants for verdict reasoning, outcome reasoning, and sentencing rationale. Jury vote phrasing no longer repeats "returned a guilty verdict."
+- **Evidence accuracy** — Outcome reasoning only mentions evidence that was actually documented. Vehicle damage is no longer inferred from evading charges (suspects can flee on foot). Verdict templates for vehicle damage, weapons, drugs, etc. are excluded unless that evidence was captured or documented in reports.
+
+### Charges
+
+- **Drug charges aligned with Policing Redefined** — Arrest charges and seizure options cover every drug type from PR's API: **Possession Of Amphetamine**, **Possession Of Benzodiazepine**, **Possession Of Controlled Substance** (generic). Seizure options: Amphetamine, Benzodiazepine, Mescaline, Psilocybin. Court evidence mapping matches PR drug types.
+- **Property and ID charges (California law)** — Arrest and citation charges: **Possession Of Burglary Tools** (PC § 466), **Possession Of Credit Card Scanning Device** (PC § 502.6), **Possession Of Counterfeit Items** (PC § 475), **Possession Of Stolen Debit / Credit Card**, **Refusing To Provide Identification**, **Failure To Present Drivers License Upon Demand** (VC 12951). Court verdict phrasing reflects these (theft/property, resisting/obstruction, vehicle-related) where applicable.
 
 ---
 

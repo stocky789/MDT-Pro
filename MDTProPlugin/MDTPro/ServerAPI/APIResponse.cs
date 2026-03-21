@@ -54,6 +54,10 @@ namespace MDTPro.ServerAPI {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(SetupController.GetArrestOptions()));
                 status = 200;
                 contentType = "text/json";
+            } else if (path == "/seizureOptions") {
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(SetupController.GetSeizureOptions()));
+                status = 200;
+                contentType = "text/json";
             } else if (path == "/pluginInfo") {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(PluginController.GetPlugins()));
                 status = 200;

@@ -127,6 +127,15 @@ namespace MDTPro.Data {
         private static readonly object capturedPickupHandlesLock = new object();
         private static readonly HashSet<uint> capturedPickupHandles = new HashSet<uint>();
 
+        /// <summary>GTA V weapon hashes for melee/throwables that should not appear in Firearms Check. PR/CDF return all weapons; we filter to actual firearms only.</summary>
+        private static readonly HashSet<uint> MeleeAndNonFirearmHashes = new HashSet<uint> {
+            2460120199u, 2508868239u, 3441901897u, 3638508604u, 4192643659u, 2227010557u, 2725352035u,
+            2343591895u, 1141786504u, 1317494643u, 4191993645u, 2578778090u, 3713923289u, 1737195953u,
+            419712736u, 2484171525u, 940833800u, 3756226112u, 600439132u, 2694266206u, 1233104067u,
+            2481070269u, 615608432u, 3125143736u, 2874559379u, 4256991824u, 126349499u, 741814745u,
+            101631238u, 3126027122u, 3215233542u, 4222310262u
+        };
+
         internal static List<CourtData> courtDatabase = new List<CourtData>();
         public static IReadOnlyList<CourtData> CourtDatabase => courtDatabase;
 
@@ -156,6 +165,9 @@ namespace MDTPro.Data {
 
         internal static List<InjuryReport> injuryReports = new List<InjuryReport>();
         public static IReadOnlyList<InjuryReport> InjuryReports => injuryReports;
+
+        internal static List<PropertyEvidenceReceiptReport> propertyEvidenceReports = new List<PropertyEvidenceReceiptReport>();
+        public static IReadOnlyList<PropertyEvidenceReceiptReport> PropertyEvidenceReports => propertyEvidenceReports;
 
         internal static Location PlayerLocation = new Location();
         internal static string CurrentTime = World.TimeOfDay.ToString();
@@ -1230,6 +1242,10 @@ namespace MDTPro.Data {
                 int index = injuryReports.FindIndex(x => x.Id == injuryReport.Id);
                 if (index != -1) injuryReports[index] = injuryReport;
                 else injuryReports.Add(injuryReport);
+            } else if (report is PropertyEvidenceReceiptReport perReport) {
+                int index = propertyEvidenceReports.FindIndex(x => x.Id == perReport.Id);
+                if (index != -1) propertyEvidenceReports[index] = perReport;
+                else propertyEvidenceReports.Add(perReport);
             }
             AddReportToCurrentShift(report.Id);
         }
@@ -1638,6 +1654,7 @@ namespace MDTPro.Data {
                 || n.Contains("vehicular") || n.Contains("evading") || n.Contains("vin ") || n.Contains("vin tampering") || n.Contains("defaced vin")
                 || n.Contains("hit and run") || n.Contains("hit-and-run") || n.Contains("reckless driving") || n.Contains("street racing")
                 || n.Contains("carjacking") || n.Contains("driving on suspended") || n.Contains("driving without license") || n.Contains("driving without valid license") || n.Contains("driving with license expired")
+                || n.Contains("failure to present") || n.Contains("refusing to provide identification")
                 || n.Contains("refusal to sign traffic") || n.Contains("wrong side of road") || n.Contains("driving on wrong side")
                 || (n.Contains("vehicle") && (n.Contains("theft") || n.Contains("stolen") || n.Contains("evidence")));
         }
@@ -1691,14 +1708,6 @@ namespace MDTPro.Data {
             return n.Contains("evading") || n.Contains("evad ") || n.Contains("pursuit") || n.Contains("flee");
         }
 
-        /// <summary>True if the charge typically involves vehicle damage (evading, reckless evading, hit and run). Used to infer EvidenceDamagedVehicle when game natives miss.</summary>
-        private static bool IsVehicleDamageLikelyChargeName(string name) {
-            if (string.IsNullOrEmpty(name)) return false;
-            string n = name.ToLowerInvariant();
-            return n.Contains("evading") || n.Contains("reckless evading") || n.Contains("hit and run")
-                || n.Contains("hit-and-run") || (n.Contains("reckless") && n.Contains("evad"));
-        }
-
         /// <summary>True if this attached report is relevant to the case (same defendant, or report type matches charge type). Only relevant reports get evidence bonus.</summary>
         private static bool IsAttachedReportRelevantToCase(CourtData courtData, string reportId, string reportType) {
             if (courtData == null || string.IsNullOrWhiteSpace(reportId) || string.IsNullOrWhiteSpace(reportType)) return false;
@@ -1728,6 +1737,14 @@ namespace MDTPro.Data {
             if (reportType == "impound") {
                 // Impound only relevant for vehicle-related charges (GTA, stolen recovery, evidence, etc.).
                 return IsCaseVehicleRelated(courtData);
+            }
+            if (reportType == "propertyEvidence") {
+                // Seizure (Property/Evidence Receipt) is relevant when any subject matches defendant, or when attached to the arrest.
+                PropertyEvidenceReceiptReport r = PropertyEvidenceReports?.FirstOrDefault(x => x.Id == reportId);
+                if (r == null) return false;
+                if (r.SubjectPedNames != null && r.SubjectPedNames.Any(n => string.Equals((n ?? "").Trim(), defendant, StringComparison.OrdinalIgnoreCase))) return true;
+                // Attached to the arrest (we only evaluate reports in AttachedReportIds, so attachment implies relevance)
+                return true;
             }
             return false;
         }
@@ -2269,6 +2286,37 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>Filters firearm records to actual guns only (excludes melee, knives, throwables) and drops empty/meaningless entries. Call before returning to Firearms Check UI.</summary>
+        internal static List<FirearmRecord> FilterToActualFirearms(List<FirearmRecord> records, int? maxCount = null) {
+            if (records == null) return new List<FirearmRecord>();
+            var filtered = new List<FirearmRecord>();
+            foreach (var r in records) {
+                if (r == null) continue;
+                if (IsMeleeOrNonFirearm(r.WeaponModelHash, r.WeaponModelId)) continue;
+                string name = (r.WeaponDisplayName ?? r.Description ?? r.WeaponModelId ?? "").Trim();
+                bool hasSerialOrScratched = r.IsSerialScratched || !string.IsNullOrWhiteSpace(r.SerialNumber);
+                if (string.IsNullOrEmpty(name) && !hasSerialOrScratched) continue; // Empty "—" entries with nothing to show
+                filtered.Add(r);
+            }
+            if (maxCount.HasValue && filtered.Count > maxCount.Value)
+                return filtered.Take(maxCount.Value).ToList();
+            return filtered;
+        }
+
+        /// <summary>True if the weapon is melee/throwable/non-firearm. Firearms Check should only show actual guns.</summary>
+        private static bool IsMeleeOrNonFirearm(uint hash, string modelId) {
+            if (hash != 0u && MeleeAndNonFirearmHashes.Contains(hash)) return true;
+            if (string.IsNullOrWhiteSpace(modelId)) return false;
+            string m = modelId.Trim().ToUpperInvariant();
+            return m.Contains("KNIFE") || m.Contains("KNUCKLE") || m.Contains("NIGHTSTICK") || m.Contains("HAMMER")
+                || m.Contains("CROWBAR") || m.Contains("GOLFCLUB") || m.Contains("DAGGER") || m.Contains("MACHETE")
+                || m.Contains("SWITCHBLADE") || m.Contains("BATTLEAXE") || m.Contains("POOLCUE") || m.Contains("WRENCH")
+                || m.Contains("FLASHLIGHT") || m.Contains("HATCHET") || m.Contains("BOTTLE") || m.Contains("UNARMED")
+                || m.Contains("PETROLCAN") || m.Contains("JERRYCAN") || m.Contains("FIREEXTINGUISHER") || m.Contains("HAZARDCAN")
+                || m.Contains("FERTILIZER") || m.Contains("PARACHUTE") || m.Contains("GRENADE") || m.Contains("MOLOTOV")
+                || m.Contains("SNOWBALL") || m.Contains("BALL") || m.EndsWith("_BAT"); // WEAPON_BAT, not COMBATPISTOL
+        }
+
         /// <summary>Extracts FirearmRecords from PR search item list. Shared by CaptureFirearmsFromPed and pickup/player capture.</summary>
         private static List<FirearmRecord> ExtractFirearmRecordsFromItemList(System.Collections.IEnumerable list, string ownerName, string source) {
             var records = new List<FirearmRecord>();
@@ -2309,6 +2357,7 @@ namespace MDTPro.Data {
                     } catch { }
                 }
                 if (hash == 0u) continue;
+                if (IsMeleeOrNonFirearm(hash, modelId)) continue; // Knives, bats, etc. don't belong in Firearms Check
                 if (isSerialScratched) serial = null;
                 string displayName = GetWeaponDisplayNameFromHash(hash) ?? description ?? modelId;
                 records.Add(new FirearmRecord {
@@ -2416,7 +2465,7 @@ namespace MDTPro.Data {
                             } catch { }
                         }
                         string firearmOwner = !string.IsNullOrWhiteSpace(itemOwner) ? itemOwner : ownerForFirearms;
-                        if (weaponHash != 0u && firearmOwner != null) {
+                        if (weaponHash != 0u && firearmOwner != null && !IsMeleeOrNonFirearm(weaponHash, weaponModelId)) {
                             string displayName = GetWeaponDisplayNameFromHash(weaponHash) ?? description ?? weaponModelId;
                             firearmRecords.Add(new FirearmRecord {
                                 SerialNumber = isSerialScratched ? null : (string.IsNullOrWhiteSpace(serial) ? null : serial.Trim()),
@@ -2689,6 +2738,7 @@ namespace MDTPro.Data {
             if (CitationReports?.Any(r => r.Id == reportId) == true) return "citation";
             if (TrafficIncidentReports?.Any(r => r.Id == reportId) == true) return "trafficIncident";
             if (ImpoundReports?.Any(r => r.Id == reportId) == true) return "impound";
+            if (PropertyEvidenceReports?.Any(r => r.Id == reportId) == true) return "propertyEvidence";
             return null;
         }
 
@@ -2721,6 +2771,10 @@ namespace MDTPro.Data {
                             score += config.courtEvidenceTrafficIncidentReportBonus;
                         else if (reportType == "impound" && config.courtEvidenceImpoundReportBonus > 0)
                             score += config.courtEvidenceImpoundReportBonus;
+                        else if (reportType == "propertyEvidence") {
+                            float seizureBonus = config.courtEvidenceSeizureReportBonus > 0 ? config.courtEvidenceSeizureReportBonus : config.courtEvidencePropertyEvidenceReportBonus;
+                            if (seizureBonus > 0) score += seizureBonus;
+                        }
                     } else if (config.courtEvidenceOtherAttachedReportBonus > 0) {
                         score += config.courtEvidenceOtherAttachedReportBonus;
                     }
@@ -2763,23 +2817,55 @@ namespace MDTPro.Data {
                     courtData.EvidenceWasFleeing = true;
                     if (config.courtEvidenceFleeingBonus > 0) score += config.courtEvidenceFleeingBonus;
                 }
-                // Infer Damaged Vehicle from evading/reckless/hit-and-run charges when game natives missed (collision damage attributed to vehicle, not ped)
-                if (!courtData.EvidenceDamagedVehicle && courtData.Charges != null && courtData.Charges.Any(c => c != null && IsVehicleDamageLikelyChargeName(c.Name ?? ""))) {
-                    courtData.EvidenceDamagedVehicle = true;
-                    if (config.courtEvidenceVehicleDamageBonus > 0) score += config.courtEvidenceVehicleDamageBonus;
-                }
-                // Drug records: from DB (pat-down, dead body search) or from arrest report "Evidence seized" when officer documented it
+                // Do NOT infer vehicle damage from charges: evading can be on foot, hit-and-run may lack collision evidence. Only use PedEvidenceContext or documented report evidence.
+                // Drug evidence: charge-specific from seizure reports, else drug_records, else DocumentedDrugs (backward compat).
+                // Add bonus once if ANY drug charge is satisfied by seizure OR drug_records OR DocumentedDrugs.
                 if (config.courtEvidenceDrugsBonus > 0) {
-                    var drugs = Database.LoadDrugsByOwner(courtData.PedName, 1);
-                    if (drugs != null && drugs.Count > 0) {
+                    var drugTypesFromSeizure = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    bool satisfiedBySeizure = false;
+                    if (courtData.AttachedReportIds != null && courtData.Charges != null) {
+                        foreach (string rid in courtData.AttachedReportIds) {
+                            if (string.IsNullOrWhiteSpace(rid)) continue;
+                            var per = PropertyEvidenceReports?.FirstOrDefault(r => r.Id == rid);
+                            if (per == null || per.SeizedDrugTypes == null || per.SeizedDrugTypes.Count == 0) continue;
+                            if (!IsAttachedReportRelevantToCase(courtData, rid, "propertyEvidence")) continue;
+                            foreach (CourtData.Charge ch in courtData.Charges) {
+                                if (ch == null || !IsDrugRelatedChargeName(ch.Name ?? "")) continue;
+                                if (SeizureEvidenceHelper.ChargeSatisfiedBySeizedDrugs(ch.Name, per.SeizedDrugTypes)) {
+                                    satisfiedBySeizure = true;
+                                    foreach (string dt in per.SeizedDrugTypes) if (!string.IsNullOrEmpty(dt)) drugTypesFromSeizure.Add(dt);
+                                }
+                            }
+                        }
+                    }
+                    if (satisfiedBySeizure) {
                         score += config.courtEvidenceDrugsBonus;
                         courtData.EvidenceHadDrugs = true;
-                    } else if (primaryArrest != null && primaryArrest.DocumentedDrugs) {
-                        score += config.courtEvidenceDrugsBonus;
-                        courtData.EvidenceHadDrugs = true;
+                        courtData.EvidenceDrugTypesBreakdown = drugTypesFromSeizure.Count > 0 ? drugTypesFromSeizure.ToList() : null;
+                        // Quantity bonus: when drug evidence comes from seizure report with SeizedDrugs (drug + quantity), add extra based on quantity weight
+                        if (config.courtEvidenceDrugQuantityBonus > 0 && courtData.AttachedReportIds != null) {
+                            foreach (string rid in courtData.AttachedReportIds) {
+                                if (string.IsNullOrWhiteSpace(rid)) continue;
+                                var per = PropertyEvidenceReports?.FirstOrDefault(r => r.Id == rid);
+                                if (per?.SeizedDrugs == null || per.SeizedDrugs.Count == 0) continue;
+                                if (!IsAttachedReportRelevantToCase(courtData, rid, "propertyEvidence")) continue;
+                                float qWeight = SeizureEvidenceHelper.GetTotalQuantityWeight(per.SeizedDrugs);
+                                score += config.courtEvidenceDrugQuantityBonus * Math.Min(1f, qWeight);
+                                break; // apply once per case
+                            }
+                        }
+                    } else {
+                        var drugs = Database.LoadDrugsByOwner(courtData.PedName, 1);
+                        if (drugs != null && drugs.Count > 0) {
+                            score += config.courtEvidenceDrugsBonus;
+                            courtData.EvidenceHadDrugs = true;
+                        } else if (primaryArrest != null && primaryArrest.DocumentedDrugs) {
+                            score += config.courtEvidenceDrugsBonus;
+                            courtData.EvidenceHadDrugs = true;
+                        }
                     }
                 }
-                // Firearms: from cache (at arrest) or from arrest report "Evidence seized" when officer documented it
+                // Firearms: DocumentedFirearms (backward compat) first, else from attached seizure reports (must have firearm charge AND seizure lists at least one firearm)
                 if (primaryArrest != null && primaryArrest.DocumentedFirearms) {
                     bool hadWeaponAlready = courtData.EvidenceHadWeapon;
                     bool hadIllegalAlready = courtData.EvidenceIllegalWeapon;
@@ -2787,6 +2873,21 @@ namespace MDTPro.Data {
                     courtData.EvidenceIllegalWeapon = true;
                     if (!hadWeaponAlready && config.courtEvidenceWeaponBonus > 0) score += config.courtEvidenceWeaponBonus;
                     if (!hadIllegalAlready && config.courtEvidenceIllegalWeaponBonus > 0) score += config.courtEvidenceIllegalWeaponBonus;
+                } else if (!courtData.EvidenceHadWeapon && IsCaseFirearmRelated(courtData) && courtData.AttachedReportIds != null) {
+                    foreach (string rid in courtData.AttachedReportIds) {
+                        if (string.IsNullOrWhiteSpace(rid)) continue;
+                        var per = PropertyEvidenceReports?.FirstOrDefault(r => r.Id == rid);
+                        if (per == null || per.SeizedFirearmTypes == null || per.SeizedFirearmTypes.Count == 0) continue;
+                        if (!IsAttachedReportRelevantToCase(courtData, rid, "propertyEvidence")) continue;
+                        if (SeizureEvidenceHelper.IsFirearmChargeSatisfiedBySeizedFirearms(true, per.SeizedFirearmTypes)) {
+                            courtData.EvidenceHadWeapon = true;
+                            courtData.EvidenceIllegalWeapon = true;
+                            courtData.EvidenceFirearmTypesBreakdown = per.SeizedFirearmTypes.Where(s => !string.IsNullOrEmpty(s)).ToList();
+                            if (config.courtEvidenceWeaponBonus > 0) score += config.courtEvidenceWeaponBonus;
+                            if (config.courtEvidenceIllegalWeaponBonus > 0) score += config.courtEvidenceIllegalWeaponBonus;
+                            break;
+                        }
+                    }
                 }
                 // Fallback: MDT is authoritative for warrants; if cache didn't set EvidenceWasWanted, set from ped record (both pedDatabase and keepInPedDatabase)
                 if (!courtData.EvidenceWasWanted) {
@@ -2899,21 +3000,46 @@ namespace MDTPro.Data {
             return count;
         }
 
+        /// <summary>True if template's evidence tags are all satisfied. Never use evidence-specific wording when that evidence is absent.</summary>
+        private static bool TemplateEvidenceSatisfied(CourtData courtData, string[] tags) {
+            if (tags == null || tags.Length == 0) return true;
+            foreach (string tag in tags) {
+                if (tag == "Weapon" && !courtData.EvidenceHadWeapon) return false;
+                if (tag == "Wanted" && !courtData.EvidenceWasWanted) return false;
+                if (tag == "PatDown" && !courtData.EvidenceWasPatDown) return false;
+                if (tag == "Drunk" && !courtData.EvidenceWasDrunk) return false;
+                if (tag == "Fleeing" && !courtData.EvidenceWasFleeing) return false;
+                if (tag == "Assault" && !courtData.EvidenceAssaultedPed) return false;
+                if (tag == "VehicleDamage" && !courtData.EvidenceDamagedVehicle) return false;
+                if (tag == "IllegalWeapon" && !courtData.EvidenceIllegalWeapon) return false;
+                if (tag == "Supervision" && !courtData.EvidenceViolatedSupervision) return false;
+                if (tag == "Resisted" && !courtData.EvidenceResisted) return false;
+                if (tag == "Drugs" && !courtData.EvidenceHadDrugs) return false;
+                if (tag == "UseOfForce" && !courtData.EvidenceUseOfForce) return false;
+            }
+            return true;
+        }
+
         private static string SelectWeightedOutcome(CourtData courtData, (string text, string[] evidenceTags)[] pool) {
             if (pool == null || pool.Length == 0) return "";
-            var weights = new List<int>();
+            var eligible = new List<(string text, string[] tags, int weight)>();
             foreach (var entry in pool) {
+                if (!TemplateEvidenceSatisfied(courtData, entry.evidenceTags)) continue;
                 int w = 1 + (CountMatchingEvidenceTags(courtData, entry.evidenceTags) * 18);
-                weights.Add(Math.Max(1, w));
+                eligible.Add((entry.text, entry.evidenceTags, Math.Max(1, w)));
             }
-            int total = weights.Sum();
-            if (total <= 0) return pool[0].text;
+            if (eligible.Count == 0) {
+                var generic = pool.FirstOrDefault(e => e.evidenceTags == null || e.evidenceTags.Length == 0);
+                return generic.text ?? (pool.Length > 0 ? pool[0].text : "");
+            }
+            int total = eligible.Sum(e => e.weight);
+            if (total <= 0) return eligible[0].text;
             int r = Helper.GetRandomInt(0, Math.Max(0, total - 1));
-            for (int i = 0; i < pool.Length; i++) {
-                r -= weights[i];
-                if (r < 0) return pool[i].text;
+            foreach (var e in eligible) {
+                r -= e.weight;
+                if (r < 0) return e.text;
             }
-            return pool[pool.Length - 1].text;
+            return eligible[eligible.Count - 1].text;
         }
 
         private static string BuildOutcomeReasoning(CourtData courtData, int convictionChance, int resolvedStatus) {
@@ -3095,8 +3221,16 @@ namespace MDTPro.Data {
                 if (courtData.EvidenceAssaultedPed) factors.Add("the defendant committed assault");
                 if (courtData.EvidenceResisted) factors.Add("the defendant resisted arrest");
                 if (courtData.EvidenceDamagedVehicle) factors.Add("the defendant caused vehicle damage");
-                if (courtData.EvidenceIllegalWeapon) factors.Add("an illegal weapon was recovered");
-                if (courtData.EvidenceHadDrugs) factors.Add("controlled substances were found");
+                if (courtData.EvidenceIllegalWeapon) {
+                    if (courtData.EvidenceFirearmTypesBreakdown != null && courtData.EvidenceFirearmTypesBreakdown.Count > 0)
+                        factors.Add((courtData.EvidenceFirearmTypesBreakdown.Count == 1 ? courtData.EvidenceFirearmTypesBreakdown[0] + " was" : string.Join(" and ", courtData.EvidenceFirearmTypesBreakdown) + " were") + " recovered");
+                    else factors.Add("an illegal weapon was recovered");
+                }
+                if (courtData.EvidenceHadDrugs) {
+                    if (courtData.EvidenceDrugTypesBreakdown != null && courtData.EvidenceDrugTypesBreakdown.Count > 0)
+                        factors.Add((courtData.EvidenceDrugTypesBreakdown.Count == 1 ? courtData.EvidenceDrugTypesBreakdown[0] + " was" : string.Join(" and ", courtData.EvidenceDrugTypesBreakdown) + " were") + " recovered");
+                    else factors.Add("controlled substances were found");
+                }
                 if (factors.Count > 0) {
                     string[] factorLeadIns = new[] {
                         "Key factors: ",
@@ -3124,9 +3258,9 @@ namespace MDTPro.Data {
                 if (courtData.IsJuryTrial) {
                     string[] juryConviction = new[] {
                         $"The jury voted {courtData.JuryVotesForConviction}-{courtData.JuryVotesForAcquittal} in favour of conviction.",
-                        $"The jury reached a {courtData.JuryVotesForConviction}-{courtData.JuryVotesForAcquittal} verdict for conviction.",
+                        $"The jury reached a {courtData.JuryVotesForConviction}-{courtData.JuryVotesForAcquittal} verdict.",
                         $"The jury split {courtData.JuryVotesForConviction}-{courtData.JuryVotesForAcquittal} in favour of guilt.",
-                        $"A {courtData.JuryVotesForConviction}-{courtData.JuryVotesForAcquittal} jury vote returned a guilty verdict.",
+                        $"The vote was {courtData.JuryVotesForConviction} to {courtData.JuryVotesForAcquittal}.",
                         $"The jury voted {courtData.JuryVotesForConviction} to {courtData.JuryVotesForAcquittal} for conviction.",
                     };
                     b.Append(" " + juryConviction[Helper.GetRandomInt(0, juryConviction.Length - 1)]);
@@ -3337,7 +3471,7 @@ namespace MDTPro.Data {
                 };
                 phrases.Add(resolvedStatus == 1 ? assaultConv[Helper.GetRandomInt(0, assaultConv.Length - 1)] : assaultAcq[Helper.GetRandomInt(0, assaultAcq.Length - 1)]);
             }
-            if (HasChargeKeyword(courtData, "resisting") || HasChargeKeyword(courtData, "obstruction")) {
+            if (HasChargeKeyword(courtData, "resisting") || HasChargeKeyword(courtData, "obstruction") || HasChargeKeyword(courtData, "refusing") || HasChargeKeyword(courtData, "failure to present")) {
                 string[] resistConv = new[] {
                     "The defendant's conduct toward law enforcement was considered.",
                     "Resisting arrest was a factor in the outcome.",
@@ -3356,7 +3490,7 @@ namespace MDTPro.Data {
                 };
                 phrases.Add(resolvedStatus == 1 ? resistConv[Helper.GetRandomInt(0, resistConv.Length - 1)] : resistAcq[Helper.GetRandomInt(0, resistAcq.Length - 1)]);
             }
-            if (HasChargeKeyword(courtData, "theft") || HasChargeKeyword(courtData, "burglary") || HasChargeKeyword(courtData, "robbery") || HasChargeKeyword(courtData, "larceny")) {
+            if (HasChargeKeyword(courtData, "theft") || HasChargeKeyword(courtData, "burglary") || HasChargeKeyword(courtData, "robbery") || HasChargeKeyword(courtData, "larceny") || HasChargeKeyword(courtData, "counterfeit") || HasChargeKeyword(courtData, "stolen") || HasChargeKeyword(courtData, "credit card scanning")) {
                 string[] theftConv = new[] {
                     "The theft-related charges were central to the verdict.",
                     "Property crime evidence factored heavily in the outcome.",

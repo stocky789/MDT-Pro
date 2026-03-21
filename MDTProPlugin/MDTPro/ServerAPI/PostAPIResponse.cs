@@ -369,6 +369,22 @@ namespace MDTPro.ServerAPI {
                     contentType = "application/json";
                     status = 500;
                 }
+            } else if (path == "createPropertyEvidenceReceiptReport") {
+                try {
+                    PropertyEvidenceReceiptReport report = JsonConvert.DeserializeObject<PropertyEvidenceReceiptReport>(body);
+                    if (report == null) { buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid report data." })); contentType = "application/json"; status = 400; return; }
+                    DataController.AddReport(report);
+                    Database.SavePropertyEvidenceReceiptReport(report);
+                    buffer = Encoding.UTF8.GetBytes("OK");
+                    contentType = "text/plain";
+                    status = 200;
+                } catch (Exception ex) {
+                    Utility.Helper.Log($"[createPropertyEvidenceReceiptReport] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
+                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createPropertyEvidenceReceiptReport:\n{ex}"); } catch { }
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
+                    contentType = "application/json";
+                    status = 500;
+                }
             } else if (path == "updateCourtCaseStatus") {
                 var data = JsonConvert.DeserializeAnonymousType(body, new {
                     Number = "",
@@ -597,7 +613,8 @@ namespace MDTPro.ServerAPI {
                 || (DataController.InjuryReports?.Any(r => r.Id == reportId) ?? false)
                 || (DataController.CitationReports?.Any(r => r.Id == reportId) ?? false)
                 || (DataController.TrafficIncidentReports?.Any(r => r.Id == reportId) ?? false)
-                || (DataController.ImpoundReports?.Any(r => r.Id == reportId) ?? false);
+                || (DataController.ImpoundReports?.Any(r => r.Id == reportId) ?? false)
+                || (DataController.PropertyEvidenceReports?.Any(r => r.Id == reportId) ?? false);
         }
     }
 }

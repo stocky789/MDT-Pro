@@ -424,13 +424,19 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   evidenceBreakdown.appendChild(multiplierRow)
 
   // Scene evidence flags — only show items we can track reliably (see DataController PedEvidenceContext comment)
+  const drugLabel = (courtCase.EvidenceDrugTypesBreakdown?.length > 0)
+    ? `Drugs found (${courtCase.EvidenceDrugTypesBreakdown.join(', ')})`
+    : (language.court.evidenceDrugs || 'Drugs Found on Person')
+  const weaponLabel = (courtCase.EvidenceFirearmTypesBreakdown?.length > 0)
+    ? `Firearms seized (${courtCase.EvidenceFirearmTypesBreakdown.join(', ')})`
+    : (language.court.evidenceWeapon || 'Armed at Arrest')
   const evidenceItems = [
-    { label: language.court.evidenceWeapon || 'Armed at Arrest', value: courtCase.EvidenceHadWeapon ?? false, active: courtCase.EvidenceHadWeapon ?? false },
+    { label: weaponLabel, value: courtCase.EvidenceHadWeapon ?? false, active: courtCase.EvidenceHadWeapon ?? false },
     { label: language.court.evidenceWanted || 'Active Warrant at Encounter', value: courtCase.EvidenceWasWanted ?? false, active: courtCase.EvidenceWasWanted ?? false },
     { label: language.court.evidenceAssault || 'Assaulted Another Person', value: courtCase.EvidenceAssaultedPed ?? false, active: courtCase.EvidenceAssaultedPed ?? false },
     { label: language.court.evidenceVehicleDamage || 'Damaged Vehicle / Property', value: courtCase.EvidenceDamagedVehicle ?? false, active: courtCase.EvidenceDamagedVehicle ?? false },
     { label: language.court.evidenceResisted || 'Resisted Arrest', value: courtCase.EvidenceResisted ?? false, active: courtCase.EvidenceResisted ?? false },
-    { label: language.court.evidenceDrugs || 'Drugs Found on Person', value: courtCase.EvidenceHadDrugs ?? false, active: courtCase.EvidenceHadDrugs ?? false },
+    { label: drugLabel, value: courtCase.EvidenceHadDrugs ?? false, active: courtCase.EvidenceHadDrugs ?? false },
     { label: language.court.evidenceUseOfForce || 'Use of Force Documented', value: courtCase.EvidenceUseOfForce ?? false, active: courtCase.EvidenceUseOfForce ?? false },
     { label: language.court.evidenceDrunk || 'Intoxicated at Encounter', value: courtCase.EvidenceWasDrunk ?? false, active: courtCase.EvidenceWasDrunk ?? false },
     { label: language.court.evidenceFleeing || 'Attempted to Flee', value: courtCase.EvidenceWasFleeing ?? false, active: courtCase.EvidenceWasFleeing ?? false },

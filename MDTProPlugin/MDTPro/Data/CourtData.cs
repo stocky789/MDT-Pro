@@ -39,6 +39,10 @@ namespace MDTPro.Data {
         public bool EvidenceResisted = false;
         public bool EvidenceHadDrugs = false;
         public bool EvidenceUseOfForce = false;
+        /// <summary>When drug evidence comes from seizure report: specific types documented (e.g. "Heroin", "Cocaine"). Null or empty = generic evidence (drug_records or DocumentedDrugs).</summary>
+        public List<string> EvidenceDrugTypesBreakdown;
+        /// <summary>When firearm evidence comes from seizure report: specific types documented (e.g. "Pistol", "Rifle"). Null or empty = generic (DocumentedFirearms or in-game).</summary>
+        public List<string> EvidenceFirearmTypesBreakdown;
         public int RepeatOffenderScore = 0;
         public int ConvictionChance = 0;
         public string ResolveAtUtc;

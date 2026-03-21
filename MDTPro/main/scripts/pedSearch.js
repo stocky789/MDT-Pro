@@ -508,7 +508,8 @@ async function performSearch(query) {
   const citations = Array.isArray(reportsResponse?.citations) ? reportsResponse.citations : []
   const arrests = Array.isArray(reportsResponse?.arrests) ? reportsResponse.arrests : []
   const incidents = Array.isArray(reportsResponse?.incidents) ? reportsResponse.incidents : []
-  const totalReports = citations.length + arrests.length + incidents.length
+  const propertyEvidence = Array.isArray(reportsResponse?.propertyEvidence) ? reportsResponse.propertyEvidence : []
+  const totalReports = citations.length + arrests.length + incidents.length + propertyEvidence.length
 
   if (totalReports > 0) {
     const sectionTitle = document.createElement('div')
@@ -525,6 +526,7 @@ async function performSearch(query) {
       ...citations.map((r) => ({ ...r, type: 'citation' })),
       ...arrests.map((r) => ({ ...r, type: 'arrest' })),
       ...incidents.map((r) => ({ ...r, type: 'incident' })),
+      ...propertyEvidence.map((r) => ({ ...r, type: 'propertyEvidence' })),
     ].sort((a, b) => new Date(b.TimeStamp) - new Date(a.TimeStamp))
 
     for (const report of allReports) {
@@ -534,8 +536,8 @@ async function performSearch(query) {
         openIdInReport(report.Id, report.type)
       )
       const label = document.createElement('label')
-      label.innerHTML =
-        report.type.charAt(0).toUpperCase() + report.type.slice(1)
+      const typeLabel = report.type === 'propertyEvidence' ? 'Property & Evidence' : report.type.charAt(0).toUpperCase() + report.type.slice(1)
+      label.innerHTML = typeLabel
       const input = document.createElement('input')
       input.type = 'text'
       input.disabled = true
