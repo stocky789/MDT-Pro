@@ -1337,11 +1337,13 @@ namespace MDTPro.Data {
             // Delayed CDF retry: if CDF was null or minimal, PR may populate shortly; re-read after 2s and merge identity
             if (mdtProPedData.CDFPedData == null || MDTProPedData.IsMinimalIdentity(mdtProPedData)) {
                 uint pedHandle = ped.Handle;
+                if (pedHandle == 0) return; // invalid handle - skip retry
                 string pedName = mdtProPedData.Name;
                 GameFiber.StartNew(() => {
                     GameFiber.Wait(2000);
                     try {
-                        Ped p = World.GetEntityByHandle<Ped>(pedHandle);
+                        Ped p = null;
+                        try { p = World.GetEntityByHandle<Ped>(pedHandle); } catch { return; } // ped despawned - expected, no log
                         if (p == null || !p.IsValid()) return;
                         MDTProPedData updated = new MDTProPedData(p);
                         if (updated.CDFPedData == null || MDTProPedData.IsMinimalIdentity(updated)) return;
@@ -1369,7 +1371,12 @@ namespace MDTPro.Data {
                         Database.SavePed(existing);
                         Helper.Log($"[MDTPro] Delayed CDF retry filled identity for: {pedName}", false, Helper.LogSeverity.Info);
                     } catch (Exception ex) {
-                        Helper.Log($"[MDTPro] Delayed CDF retry failed: {ex.Message}", false, Helper.LogSeverity.Warning);
+                        // Expected when ped despawned before retry - don't spam log
+                        bool isStaleHandle = ex.Message?.IndexOf("Invalid handle", StringComparison.OrdinalIgnoreCase) >= 0
+                            || ex.Message?.IndexOf("EntityType", StringComparison.OrdinalIgnoreCase) >= 0
+                            || ex.Message?.IndexOf("not a handle to an entity", StringComparison.OrdinalIgnoreCase) >= 0;
+                        if (!isStaleHandle)
+                            Helper.Log($"[MDTPro] Delayed CDF retry failed: {ex.Message}", false, Helper.LogSeverity.Warning);
                     }
                 }, "MDTPro-CDF-retry");
             }
@@ -1928,13 +1935,22 @@ namespace MDTPro.Data {
                 Ped[] nearbyPeds = ped.GetNearbyPeds(50);
                 bool assaultedPed = false;
                 Ped playerPed = Main.Player;
-                if (playerPed != null && playerPed.IsValid() && playerPed != ped &&
-                    NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(playerPed, ped, false))
-                    assaultedPed = true;
+                if (playerPed != null && playerPed.IsValid() && playerPed != ped) {
+                    try {
+                        assaultedPed = NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(playerPed, ped, false);
+                    } catch { /* ped/player may have been invalidated */ }
+                }
                 if (!assaultedPed && nearbyPeds != null) {
-                    assaultedPed = nearbyPeds.Any(victim =>
-                        victim != ped && victim.IsValid() &&
-                        NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(victim, ped, false));
+                    foreach (Ped victim in nearbyPeds) {
+                        if (victim == null || victim == ped || !victim.IsValid()) continue;
+                        if (!ped.IsValid()) break; // suspect despawned mid-loop
+                        try {
+                            if (NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(victim, ped, false)) {
+                                assaultedPed = true;
+                                break;
+                            }
+                        } catch { /* victim/ped invalid - skip */ }
+                    }
                 }
 
                 // Vehicle damage: any vehicle damaged by suspect counts (body damage, not just totalled). (1) Vehicles within 50m (chase wreckage spread out). (2) Suspect's current vehicle if they're still in it. Capture at arrest is best-effort; pursuit damage is also logged when they surrender (MarkPedFleeing).
@@ -1961,6 +1977,9 @@ namespace MDTPro.Data {
 
                 bool resisted = GetPedResistanceFromPR(ped) || assaultedPed;
 
+                // Re-validate ped before using Handle (may have been invalidated during long operations above)
+                if (!ped.IsValid()) return;
+
                 string cacheKey = dbPed?.Name ?? persona.FullName;
                 lock (pedEvidenceLock) {
                     PruneStaleEvidenceEntries();
@@ -1973,7 +1992,7 @@ namespace MDTPro.Data {
                         damagedVehicleByHandle = damagedVehicleHandles.Remove(ped.Handle);
                         assaultedByHandle = assaultedPedHandles.Remove(ped.Handle);
                         hadWeaponByHandle = hadWeaponHandles.Remove(ped.Handle);
-                    } catch { }
+                    } catch { /* ped invalidated - Handle may throw */ }
                     if (!pedEvidenceCache.TryGetValue(cacheKey, out PedEvidenceContext ctx)) {
                         ctx = new PedEvidenceContext();
                         pedEvidenceCache[cacheKey] = ctx;
@@ -2001,7 +2020,12 @@ namespace MDTPro.Data {
                     ctx.CapturedAt = DateTime.UtcNow;
                 }
             } catch (Exception e) {
-                Helper.Log($"Evidence capture failed: {e.Message}", false, Helper.LogSeverity.Warning);
+                // "address cannot be zero" / invalid entity - expected when ped despawned mid-capture; don't warn
+                bool isInvalidEntity = e.Message?.IndexOf("address cannot be zero", StringComparison.OrdinalIgnoreCase) >= 0
+                    || e.Message?.IndexOf("Invalid handle", StringComparison.OrdinalIgnoreCase) >= 0
+                    || e.Message?.IndexOf("not a handle to an entity", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (!isInvalidEntity)
+                    Helper.Log($"Evidence capture failed: {e.Message}", false, Helper.LogSeverity.Warning);
             }
         }
 
@@ -2119,22 +2143,23 @@ namespace MDTPro.Data {
             }
         }
 
-        /// <summary>Captures firearms from ped using an explicit owner (e.g. "Evidence (pickup)" for player-held weapons).</summary>
-        private static void CaptureFirearmsFromPedWithOwner(Ped ped, string ownerName, string source) {
-            if (ped == null || !ped.IsValid() || !Main.usePR || string.IsNullOrWhiteSpace(ownerName)) return;
+        /// <summary>Captures firearms from ped using an explicit owner (e.g. "Evidence (pickup)" for player-held weapons). Returns count of firearm records captured.</summary>
+        private static int CaptureFirearmsFromPedWithOwner(Ped ped, string ownerName, string source) {
+            if (ped == null || !ped.IsValid() || !Main.usePR || string.IsNullOrWhiteSpace(ownerName)) return 0;
             try {
                 Type searchApiType = Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined")
+                    ?? Type.GetType("PolicingRedefined.API.SearchItemAPI, PolicingRedefined")
                     ?? Type.GetType("PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined");
-                if (searchApiType == null) return;
+                if (searchApiType == null) return 0;
 
-                MethodInfo getItems = searchApiType.GetMethod("GetPedSearchItems", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(Rage.Ped) }, null);
-                if (getItems == null) return;
+                MethodInfo getItems = searchApiType.GetMethod("GetPedSearchItems", BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase, null, new[] { typeof(Rage.Ped) }, null);
+                if (getItems == null) return 0;
 
                 object result = getItems.Invoke(null, new object[] { ped });
-                if (result == null) return;
+                if (result == null) return 0;
 
                 System.Collections.IEnumerable list = result as System.Collections.IEnumerable;
-                if (list == null) return;
+                if (list == null) return 0;
 
                 var records = ExtractFirearmRecordsFromItemList(list, ownerName, source);
                 var drugRecords = new List<DrugRecord>();
@@ -2170,12 +2195,44 @@ namespace MDTPro.Data {
                 }
 
                 if (records.Count > 0 || drugRecords.Count > 0) {
-                    if (!ped.Exists()) return;
+                    if (!ped.Exists()) return 0;
                     if (records.Count > 0) Database.SaveFirearmRecords(records);
                     if (drugRecords.Count > 0) Database.SaveDrugRecords(drugRecords);
                 }
+                return records.Count;
             } catch (Exception e) {
                 Helper.Log($"Firearm/drug capture failed: {e.Message}", false, Helper.LogSeverity.Warning);
+                return 0;
+            }
+        }
+
+        /// <summary>Fallback when PR GetPedSearchItems returns nothing: capture player's held weapon via game native. PR often doesn't add pickup weapons to player search items, so this ensures something shows in Firearms Check.</summary>
+        private static void TryCapturePlayerHeldWeaponFallback() {
+            if (Main.Player == null || !Main.Player.IsValid()) return;
+            try {
+                uint weaponHash = NativeFunction.Natives.GET_SELECTED_PED_WEAPON<uint>(Main.Player, false);
+                if (weaponHash == 0u || weaponHash == 0xA2719263u) return; // WEAPON_UNARMED
+                if (IsMeleeOrNonFirearm(weaponHash, null)) return;
+
+                string displayName = GetWeaponDisplayNameFromHash(weaponHash);
+                if (string.IsNullOrWhiteSpace(displayName)) displayName = $"Weapon ({weaponHash})";
+
+                var record = new FirearmRecord {
+                    SerialNumber = null,
+                    IsSerialScratched = false,
+                    OwnerPedName = "Evidence (pickup)",
+                    WeaponModelId = null,
+                    WeaponDisplayName = displayName,
+                    WeaponModelHash = weaponHash,
+                    IsStolen = false,
+                    Description = null,
+                    Source = "Evidence (pickup)",
+                    FirstSeenAt = DateTime.UtcNow.ToString("o"),
+                    LastSeenAt = DateTime.UtcNow.ToString("o")
+                };
+                Database.SaveFirearmRecords(new List<FirearmRecord> { record });
+            } catch (Exception e) {
+                Helper.Log($"Firearm fallback failed: {e.Message}", false, Helper.LogSeverity.Warning);
             }
         }
 
@@ -2238,10 +2295,13 @@ namespace MDTPro.Data {
             if (!Main.usePR || Main.Player == null || !Main.Player.IsValid()) return;
             try {
                 // Try GetPedSearchItems on the player - when you pick up a weapon and run a firearm check, PR may add it to the player's search items. Use "Evidence (pickup)" as owner so it appears in Firearms Check.
-                CaptureFirearmsFromPedWithOwner(Main.Player, "Evidence (pickup)", "Evidence (pickup)");
+                int prCount = CaptureFirearmsFromPedWithOwner(Main.Player, "Evidence (pickup)", "Evidence (pickup)");
+                // Fallback: PR often doesn't add pickup weapons to player search items. When holding a firearm, capture via game native so it at least shows in Recent.
+                if (prCount == 0) TryCapturePlayerHeldWeaponFallback();
 
-                // Try GetPickupSearchItems via reflection - PR may expose this for weapons on the ground. Use Object type for Rage compatibility.
+                // Try GetPickupSearchItems via reflection - PR WeaponItem supports (item, Pickup pickup, weaponModelId). Use Object type for Rage compatibility.
                 Type searchApiType = Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined")
+                    ?? Type.GetType("PolicingRedefined.API.SearchItemAPI, PolicingRedefined")
                     ?? Type.GetType("PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined");
                 if (searchApiType == null) return;
 
@@ -2284,6 +2344,33 @@ namespace MDTPro.Data {
             } catch (Exception e) {
                 Helper.Log($"TryCapturePickupAndPlayerFirearms failed: {e.Message}", false, Helper.LogSeverity.Warning);
             }
+        }
+
+        /// <summary>Accepts firearm check result from Dispatch or external system. Call when Dispatch returns serial/owner so it shows in MDT Firearms Check. Source will be "Dispatch".</summary>
+        internal static bool SaveFirearmCheckResultFromDispatch(string serialNumber, string ownerName, string weaponType, string status = null, string weaponModelId = null) {
+            if (string.IsNullOrWhiteSpace(ownerName)) return false;
+            string serial = string.IsNullOrWhiteSpace(serialNumber) ? null : serialNumber.Trim();
+            string weapon = (weaponType ?? weaponModelId ?? "Firearm").Trim();
+            if (string.IsNullOrEmpty(weapon)) weapon = "Firearm";
+            bool isStolen = !string.IsNullOrEmpty(status) && status.IndexOf("stolen", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool isScratched = !string.IsNullOrEmpty(status) && status.IndexOf("scratched", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (isScratched) serial = null;
+
+            var record = new FirearmRecord {
+                SerialNumber = serial,
+                IsSerialScratched = isScratched,
+                OwnerPedName = ownerName.Trim(),
+                WeaponModelId = weaponModelId,
+                WeaponDisplayName = weapon,
+                WeaponModelHash = 0u,
+                IsStolen = isStolen,
+                Description = status,
+                Source = "Dispatch",
+                FirstSeenAt = DateTime.UtcNow.ToString("o"),
+                LastSeenAt = DateTime.UtcNow.ToString("o")
+            };
+            Database.SaveFirearmRecords(new List<FirearmRecord> { record });
+            return true;
         }
 
         /// <summary>Filters firearm records to actual guns only (excludes melee, knives, throwables) and drops empty/meaningless entries. Call before returning to Firearms Check UI.</summary>
@@ -2345,8 +2432,8 @@ namespace MDTPro.Data {
                             else { try { hash = Convert.ToUInt32(val); } catch { } }
                         } else if (name == "WeaponModelId" || name == "ModelId") modelId = val?.ToString();
                         else if (name == "IsStolen") { try { isStolen = Convert.ToBoolean(val); } catch { } }
-                        else if (name == "Value" || name == "Description") description = val?.ToString();
-                        else if (name == "SerialNumber") serial = val?.ToString();
+                        else if (name == "Value" || name == "Description") description = description ?? val?.ToString();
+                        else if ((name == "SerialNumber" || name == "Serial") && serial == null) serial = val?.ToString();
                         else if ((name == "State" || name == "FirearmState" || name == "SerialState") && val != null) {
                             string stateStr = val.ToString();
                             if (string.Equals(stateStr, "ScratchedSN", StringComparison.OrdinalIgnoreCase) || (int.TryParse(stateStr, out int si) && si == 1)) {
@@ -2631,15 +2718,20 @@ namespace MDTPro.Data {
             courtData.DefenseStrength = GetDefenseStrength(courtData, config);
 
             float outcomeMomentum = (courtData.ProsecutionStrength - courtData.DefenseStrength) / 100f;
+            float repeatW = config.courtSentenceMultiplierRepeatWeight > 0 ? config.courtSentenceMultiplierRepeatWeight : 0.035f;
+            float severityW = config.courtSentenceMultiplierSeverityWeight > 0 ? config.courtSentenceMultiplierSeverityWeight : 0.01f;
+            float outcomeW = config.courtSentenceMultiplierOutcomeWeight > 0 ? config.courtSentenceMultiplierOutcomeWeight : 0.15f;
+            float docketW = config.courtSentenceMultiplierDocketWeight > 0 ? config.courtSentenceMultiplierDocketWeight : 0.08f;
+            float maxMult = config.courtSentenceMultiplierMax > 0 ? config.courtSentenceMultiplierMax : MaxSentenceMultiplier;
             courtData.SentenceMultiplier = Math.Min(
-                MaxSentenceMultiplier,
+                maxMult,
                 Math.Max(
                     1f,
                     1f
-                    + (repeatScore * 0.08f)
-                    + (severity * 0.02f)
-                    + (outcomeMomentum * 0.35f)
-                    + (courtData.DocketPressure * 0.2f)
+                    + (repeatScore * repeatW)
+                    + (severity * severityW)
+                    + (outcomeMomentum * outcomeW)
+                    + (courtData.DocketPressure * docketW)
                     + courtData.PolicyAdjustment));
 
             int juryThreshold = config.courtJurySeverityThreshold > 0
@@ -2977,14 +3069,50 @@ namespace MDTPro.Data {
             return courtData.Charges.Any(c => (c.Name ?? "").ToLowerInvariant().Contains(k));
         }
 
-        /// <summary>Evidence tag names used to weight outcome templates. Must match the checks in CountMatchingEvidenceTags.</summary>
-        private static readonly string[] EvidenceTagNames = new[] { "Weapon", "Wanted", "PatDown", "Drunk", "Fleeing", "Assault", "VehicleDamage", "IllegalWeapon", "Supervision", "Resisted", "Drugs", "UseOfForce" };
+        /// <summary>Evidence tag names used to weight outcome templates. Must match the checks in CountMatchingEvidenceTags. Homicide/SexOffense/Kidnapping/Arson are charge-based.</summary>
+        private static readonly string[] EvidenceTagNames = new[] { "Homicide", "SexOffense", "Kidnapping", "Arson", "Weapon", "Wanted", "PatDown", "Drunk", "Fleeing", "Assault", "VehicleDamage", "IllegalWeapon", "Supervision", "Resisted", "Drugs", "UseOfForce" };
+
+        private static bool HasSexOffenseCharge(CourtData courtData) {
+            if (courtData?.Charges == null) return false;
+            return courtData.Charges.Any(c => {
+                string n = (c?.Name ?? "").ToLowerInvariant();
+                return n.Contains("rape") || n.Contains("sexual assault") || n.Contains("sexual battery")
+                    || n.Contains("prostitut") || n.Contains("lewd conduct") || n.Contains("indecent exposure")
+                    || n.Contains("failure to register as sex offender");
+            });
+        }
+
+        private static bool HasKidnappingCharge(CourtData courtData) {
+            return HasChargeKeyword(courtData, "kidnapping");
+        }
+
+        private static bool HasArsonCharge(CourtData courtData) {
+            return HasChargeKeyword(courtData, "arson") || HasChargeKeyword(courtData, "unlawful burning") || HasChargeKeyword(courtData, "reckless burning");
+        }
+
+        /// <summary>True when drug/narcotic charges apply (avoids matching firearm/stolen "possession").</summary>
+        private static bool HasDrugCrimeCharge(CourtData courtData) {
+            if (courtData?.Charges == null) return false;
+            return courtData.Charges.Any(c => {
+                string n = (c?.Name ?? "").ToLowerInvariant();
+                return n.Contains("paraphernalia") || n.Contains("controlled substance") || n.Contains("trafficking")
+                    || n.Contains("manufacturing meth") || n.Contains("transport or sale of meth") || n.Contains("sale or transport of cannabis")
+                    || n.Contains("cannabis over") || n.Contains("under influence of controlled")
+                    || n.Contains("cocaine") || n.Contains("heroin") || n.Contains("fentanyl") || n.Contains("methamphetamine")
+                    || (n.Contains("amphetamine") && !n.Contains("methamphetamine"))
+                    || n.Contains("benzodiazepine") || n.Contains("hallucinogen") || n.Contains("ecstasy") || n.Contains("mdma") || n.Contains("pcp");
+            });
+        }
 
         private static int CountMatchingEvidenceTags(CourtData courtData, string[] tags) {
             if (courtData == null || tags == null || tags.Length == 0) return 0;
             int count = 0;
             foreach (string tag in tags) {
-                if (tag == "Weapon" && courtData.EvidenceHadWeapon) count++;
+                if (tag == "Homicide" && (HasChargeKeyword(courtData, "murder") || HasChargeKeyword(courtData, "manslaughter"))) count++;
+                else if (tag == "SexOffense" && HasSexOffenseCharge(courtData)) count++;
+                else if (tag == "Kidnapping" && HasKidnappingCharge(courtData)) count++;
+                else if (tag == "Arson" && HasArsonCharge(courtData)) count++;
+                else if (tag == "Weapon" && courtData.EvidenceHadWeapon) count++;
                 else if (tag == "Wanted" && courtData.EvidenceWasWanted) count++;
                 else if (tag == "PatDown" && courtData.EvidenceWasPatDown) count++;
                 else if (tag == "Drunk" && courtData.EvidenceWasDrunk) count++;
@@ -3004,6 +3132,10 @@ namespace MDTPro.Data {
         private static bool TemplateEvidenceSatisfied(CourtData courtData, string[] tags) {
             if (tags == null || tags.Length == 0) return true;
             foreach (string tag in tags) {
+                if (tag == "Homicide" && !(HasChargeKeyword(courtData, "murder") || HasChargeKeyword(courtData, "manslaughter"))) return false;
+                if (tag == "SexOffense" && !HasSexOffenseCharge(courtData)) return false;
+                if (tag == "Kidnapping" && !HasKidnappingCharge(courtData)) return false;
+                if (tag == "Arson" && !HasArsonCharge(courtData)) return false;
                 if (tag == "Weapon" && !courtData.EvidenceHadWeapon) return false;
                 if (tag == "Wanted" && !courtData.EvidenceWasWanted) return false;
                 if (tag == "PatDown" && !courtData.EvidenceWasPatDown) return false;
@@ -3208,11 +3340,39 @@ namespace MDTPro.Data {
                         ("The {0} returned a guilty verdict. Documentation of force used during arrest was consistent with the charges and admissible.", new[] { "UseOfForce" }),
                         ("The {0} found the defendant guilty. Multiple factors—including the defendant's conduct at arrest and the evidence gathered—supported the verdict.", new[] { "Resisted", "Weapon" }),
                         ("The {0} returned a guilty verdict. The combination of an outstanding warrant and the defendant's conduct at arrest left no reasonable doubt.", new[] { "Wanted", "Fleeing" }),
+                        ("The {0} found the defendant guilty. The murder charges were the defining element of the case.", new[] { "Homicide" }),
+                        ("The {0} returned a guilty verdict. The gravity of the homicide charges dominated the proceeding.", new[] { "Homicide" }),
+                        ("The {0} found the defendant guilty. The murder and manslaughter charges were central to the prosecution's case.", new[] { "Homicide" }),
+                        ("The {0} returned a guilty verdict. The homicide-related charges were paramount in the {0}'s decision.", new[] { "Homicide" }),
+                        ("The {0} found the defendant guilty. The murder charges warranted the most serious consideration by the court.", new[] { "Homicide" }),
+                        ("The {0} returned a guilty verdict. The defendant's conviction on murder charges was the focal point of the case.", new[] { "Homicide" }),
+                        ("The {0} found the defendant guilty. The sexual offence charges were central to the prosecution's case.", new[] { "SexOffense" }),
+                        ("The {0} returned a guilty verdict. The gravity of the rape and sexual violence charges dominated the proceeding.", new[] { "SexOffense" }),
+                        ("The {0} found the defendant guilty. Kidnapping and related charges were paramount in the {0}'s decision.", new[] { "Kidnapping" }),
+                        ("The {0} returned a guilty verdict. The kidnapping charges warranted the most serious consideration.", new[] { "Kidnapping" }),
+                        ("The {0} found the defendant guilty. The arson charges were a defining element of the case.", new[] { "Arson" }),
+                        ("The {0} returned a guilty verdict. Fire-related offences and property destruction were central to the verdict.", new[] { "Arson" }),
                     };
                     string chosen = SelectWeightedOutcome(courtData, guiltyTrialPool);
                     b.AppendFormat(chosen, tribunal);
                 }
                 var factors = new List<string>();
+                if (HasChargeKeyword(courtData, "murder") || HasChargeKeyword(courtData, "manslaughter"))
+                    factors.Add("the defendant was convicted of murder or manslaughter");
+                if (HasSexOffenseCharge(courtData))
+                    factors.Add("the defendant was convicted of sexual or related offences");
+                if (HasKidnappingCharge(courtData))
+                    factors.Add("the defendant was convicted of kidnapping");
+                if (HasArsonCharge(courtData))
+                    factors.Add("the defendant was convicted of arson or unlawful burning");
+                if (HasChargeKeyword(courtData, "robbery") || HasChargeKeyword(courtData, "burglary") || HasChargeKeyword(courtData, "carjacking") || HasChargeKeyword(courtData, "home invasion"))
+                    factors.Add("serious property and robbery charges were proven");
+                if (HasDrugCrimeCharge(courtData))
+                    factors.Add("drug-related charges formed part of the case");
+                if (HasChargeKeyword(courtData, "escape") && !HasChargeKeyword(courtData, "evad"))
+                    factors.Add("escape or attempted escape from custody was established");
+                if (HasChargeKeyword(courtData, "violation of probation") || HasChargeKeyword(courtData, "violation of parole") || HasChargeKeyword(courtData, "protective order"))
+                    factors.Add("breach of court orders or supervision was established");
                 if (courtData.EvidenceHadWeapon) factors.Add("the defendant was armed at the time of arrest");
                 if (courtData.EvidenceWasWanted) factors.Add("an active warrant was outstanding");
                 if (courtData.EvidenceViolatedSupervision) factors.Add("the defendant was on probation or parole");
@@ -3242,7 +3402,7 @@ namespace MDTPro.Data {
                         "Significant factors: ",
                         "The court cited: ",
                     };
-                    b.Append(factorLeadIns[Helper.GetRandomInt(0, factorLeadIns.Length - 1)] + string.Join("; ", factors) + ".");
+                    b.Append(" " + factorLeadIns[Helper.GetRandomInt(0, factorLeadIns.Length - 1)] + string.Join("; ", factors) + ".");
                 }
                 if (courtData.RepeatOffenderScore >= 5) {
                     string[] repeatOffender = new[] {
@@ -3413,8 +3573,26 @@ namespace MDTPro.Data {
 
         private static void AppendChargeDomainPhrase(StringBuilder b, CourtData courtData, int resolvedStatus) {
             if (b == null || courtData?.Charges == null || courtData.Charges.Count == 0) return;
+            // Homicide/murder always mentioned when present—do not relegate to random pick
+            if (HasChargeKeyword(courtData, "murder") || HasChargeKeyword(courtData, "manslaughter")) {
+                string[] homicideConv = new[] {
+                    "The murder charges were the focal point of the case.",
+                    "The homicide charges were central to the verdict.",
+                    "The murder and manslaughter charges were paramount in the proceeding.",
+                    "The gravity of the murder charges dominated the case.",
+                    "The court weighed the homicide-related charges heavily in reaching its decision.",
+                    "The murder charges were central to the prosecution and the verdict.",
+                };
+                string[] homicideAcq = new[] {
+                    "The defence challenged intent, identification, and the prosecution's theory of the homicide.",
+                    "Reasonable doubt as to the defendant's involvement in the death was raised by the defence.",
+                    "The defence contested the causation and intent elements of the homicide charges.",
+                };
+                b.Append(" " + (resolvedStatus == 1 ? homicideConv[Helper.GetRandomInt(0, homicideConv.Length - 1)] : homicideAcq[Helper.GetRandomInt(0, homicideAcq.Length - 1)]));
+            }
             var phrases = new List<string>();
-            if (HasChargeKeyword(courtData, "DUI") || HasChargeKeyword(courtData, "DWI") || HasChargeKeyword(courtData, "driving under")) {
+            if (HasChargeKeyword(courtData, "DUI") || HasChargeKeyword(courtData, "DWI") || HasChargeKeyword(courtData, "driving under")
+                || HasChargeKeyword(courtData, "chemical test") || HasChargeKeyword(courtData, "field sobriety") || HasChargeKeyword(courtData, "dui causing")) {
                 string[] duiConv = new[] {
                     "The impaired driving charge was central to the case.",
                     "The DUI charge was a focal point of the proceeding.",
@@ -3433,14 +3611,14 @@ namespace MDTPro.Data {
                 };
                 phrases.Add(resolvedStatus == 1 ? duiConv[Helper.GetRandomInt(0, duiConv.Length - 1)] : duiAcq[Helper.GetRandomInt(0, duiAcq.Length - 1)]);
             }
-            if (HasChargeKeyword(courtData, "possession") || HasChargeKeyword(courtData, "drug") || HasChargeKeyword(courtData, "controlled")) {
+            if (HasDrugCrimeCharge(courtData)) {
                 string[] drugConv = new[] {
                     "Drug possession and related conduct were addressed in the verdict.",
                     "The drug charges were a central element of the case.",
-                    "Possession evidence was weighed in the outcome.",
+                    "Narcotics evidence was weighed in the outcome.",
                     "The controlled substance charges factored heavily in the verdict.",
                     "Drug-related conduct was reflected in the court's decision.",
-                    "The possession charges were central to the prosecution's case.",
+                    "The drug and paraphernalia charges were central to the prosecution's case.",
                 };
                 string[] drugAcq = new[] {
                     "Chain of custody and search legality were contested.",
@@ -3452,7 +3630,8 @@ namespace MDTPro.Data {
                 };
                 phrases.Add(resolvedStatus == 1 ? drugConv[Helper.GetRandomInt(0, drugConv.Length - 1)] : drugAcq[Helper.GetRandomInt(0, drugAcq.Length - 1)]);
             }
-            if (HasChargeKeyword(courtData, "assault") || HasChargeKeyword(courtData, "battery") || HasChargeKeyword(courtData, "violence")) {
+            if (HasChargeKeyword(courtData, "assault") || HasChargeKeyword(courtData, "battery") || HasChargeKeyword(courtData, "violence")
+                || HasChargeKeyword(courtData, "mayhem") || HasChargeKeyword(courtData, "malicious wounding") || HasChargeKeyword(courtData, "wounding")) {
                 string[] assaultConv = new[] {
                     "The violent nature of the offence was reflected in the outcome.",
                     "The assault and battery charges were central to the verdict.",
@@ -3489,6 +3668,88 @@ namespace MDTPro.Data {
                     "The defence questioned whether the initial detention was justified.",
                 };
                 phrases.Add(resolvedStatus == 1 ? resistConv[Helper.GetRandomInt(0, resistConv.Length - 1)] : resistAcq[Helper.GetRandomInt(0, resistAcq.Length - 1)]);
+            }
+            if (HasKidnappingCharge(courtData)) {
+                string[] kidnapConv = new[] {
+                    "The kidnapping charges were central to the verdict.",
+                    "Abduction-related offences were a focal point of the case.",
+                    "The kidnapping counts factored heavily in the outcome.",
+                };
+                string[] kidnapAcq = new[] {
+                    "Consent, intent, and movement of the victim were contested by the defence.",
+                    "The defence challenged the elements of kidnapping and unlawful restraint.",
+                };
+                phrases.Add(resolvedStatus == 1 ? kidnapConv[Helper.GetRandomInt(0, kidnapConv.Length - 1)] : kidnapAcq[Helper.GetRandomInt(0, kidnapAcq.Length - 1)]);
+            }
+            if (HasSexOffenseCharge(courtData)) {
+                string[] sexConv = new[] {
+                    "The sexual offence charges were central to the verdict.",
+                    "Sex crimes and related conduct were a focal point of the proceeding.",
+                    "The court weighed the sexual violence charges heavily.",
+                };
+                string[] sexAcq = new[] {
+                    "Consent and identification were central issues raised by the defence.",
+                    "The defence challenged the prosecution's theory of the sexual offences.",
+                };
+                phrases.Add(resolvedStatus == 1 ? sexConv[Helper.GetRandomInt(0, sexConv.Length - 1)] : sexAcq[Helper.GetRandomInt(0, sexAcq.Length - 1)]);
+            }
+            if (HasArsonCharge(courtData)) {
+                string[] arsonConv = new[] {
+                    "The arson and fire-related charges were central to the verdict.",
+                    "Property destruction by fire was a key element of the case.",
+                    "The arson counts factored heavily in the outcome.",
+                };
+                string[] arsonAcq = new[] {
+                    "Origin and cause of the fire were contested by the defence.",
+                    "The defence challenged intent and whether the burning was wilful.",
+                };
+                phrases.Add(resolvedStatus == 1 ? arsonConv[Helper.GetRandomInt(0, arsonConv.Length - 1)] : arsonAcq[Helper.GetRandomInt(0, arsonAcq.Length - 1)]);
+            }
+            if (HasChargeKeyword(courtData, "vandalism") || HasChargeKeyword(courtData, "trespass") || HasChargeKeyword(courtData, "destruction of property") || HasChargeKeyword(courtData, "prowling")) {
+                string[] propConv = new[] {
+                    "Criminal damage and trespass charges were addressed in the verdict.",
+                    "Property-related misdemeanours factored in the outcome.",
+                    "Vandalism and trespass evidence was weighed by the court.",
+                };
+                string[] propAcq = new[] {
+                    "The defence challenged damage valuation and lawful presence on the property.",
+                    "Intent and extent of property damage were disputed.",
+                };
+                phrases.Add(resolvedStatus == 1 ? propConv[Helper.GetRandomInt(0, propConv.Length - 1)] : propAcq[Helper.GetRandomInt(0, propAcq.Length - 1)]);
+            }
+            if (HasChargeKeyword(courtData, "escape") && !HasChargeKeyword(courtData, "evad")) {
+                string[] escConv = new[] {
+                    "Escape from custody or confinement charges were central to the case.",
+                    "The escape-related counts factored in the verdict.",
+                };
+                string[] escAcq = new[] {
+                    "The defence challenged whether a lawful escape charge was made out.",
+                };
+                phrases.Add(resolvedStatus == 1 ? escConv[Helper.GetRandomInt(0, escConv.Length - 1)] : escAcq[Helper.GetRandomInt(0, escAcq.Length - 1)]);
+            }
+            if (HasChargeKeyword(courtData, "violation of probation") || HasChargeKeyword(courtData, "violation of parole") || HasChargeKeyword(courtData, "protective order") || HasChargeKeyword(courtData, "failure to register as sex offender")) {
+                string[] courtOrdConv = new[] {
+                    "Breach of probation, parole, or court orders was weighed in the verdict.",
+                    "Supervision and registration violations were central to the case.",
+                };
+                string[] courtOrdAcq = new[] {
+                    "The defence contested whether a breach of conditions was proven.",
+                };
+                phrases.Add(resolvedStatus == 1 ? courtOrdConv[Helper.GetRandomInt(0, courtOrdConv.Length - 1)] : courtOrdAcq[Helper.GetRandomInt(0, courtOrdAcq.Length - 1)]);
+            }
+            if (HasChargeKeyword(courtData, "riot") || HasChargeKeyword(courtData, "disorderly conduct") || HasChargeKeyword(courtData, "disturbing the peace") || HasChargeKeyword(courtData, "stalking")
+                || HasChargeKeyword(courtData, "impersonating peace") || HasChargeKeyword(courtData, "false report") || HasChargeKeyword(courtData, "unlawful assembly")
+                || HasChargeKeyword(courtData, "accessory after") || HasChargeKeyword(courtData, "accessory before") || HasChargeKeyword(courtData, "harassment by electronic")
+                || HasChargeKeyword(courtData, "failure to disperse") || HasChargeKeyword(courtData, "wanton endangerment") || HasChargeKeyword(courtData, "reckless endangerment")
+                || HasChargeKeyword(courtData, "present during a riot") || HasChargeKeyword(courtData, "public intoxication") || HasChargeKeyword(courtData, "911 abuse")) {
+                string[] pubConv = new[] {
+                    "Public order and disorderly conduct charges were addressed in the verdict.",
+                    "The court weighed breaches of the peace and related offences.",
+                };
+                string[] pubAcq = new[] {
+                    "First Amendment and assembly issues were raised by the defence.",
+                };
+                phrases.Add(resolvedStatus == 1 ? pubConv[Helper.GetRandomInt(0, pubConv.Length - 1)] : pubAcq[Helper.GetRandomInt(0, pubAcq.Length - 1)]);
             }
             if (HasChargeKeyword(courtData, "theft") || HasChargeKeyword(courtData, "burglary") || HasChargeKeyword(courtData, "robbery") || HasChargeKeyword(courtData, "larceny") || HasChargeKeyword(courtData, "counterfeit") || HasChargeKeyword(courtData, "stolen") || HasChargeKeyword(courtData, "credit card scanning")) {
                 string[] theftConv = new[] {
@@ -3528,7 +3789,12 @@ namespace MDTPro.Data {
                 };
                 phrases.Add(resolvedStatus == 1 ? firearmConv[Helper.GetRandomInt(0, firearmConv.Length - 1)] : firearmAcq[Helper.GetRandomInt(0, firearmAcq.Length - 1)]);
             }
-            if (HasChargeKeyword(courtData, "traffic") || HasChargeKeyword(courtData, "reckless") || HasChargeKeyword(courtData, "speeding") || HasChargeKeyword(courtData, "evading")) {
+            // Traffic/evading: exclude arson charges that contain "reckless" (e.g. reckless burning)
+            if (!HasArsonCharge(courtData) && (HasChargeKeyword(courtData, "traffic") || HasChargeKeyword(courtData, "speeding") || HasChargeKeyword(courtData, "evading")
+                || HasChargeKeyword(courtData, "street racing") || HasChargeKeyword(courtData, "hit and run") || HasChargeKeyword(courtData, "wrong side")
+                || HasChargeKeyword(courtData, "driving on suspended") || HasChargeKeyword(courtData, "driving without license") || HasChargeKeyword(courtData, "license expired")
+                || HasChargeKeyword(courtData, "refusal to sign traffic") || HasChargeKeyword(courtData, "impeding traffic")
+                || (HasChargeKeyword(courtData, "reckless") && !HasChargeKeyword(courtData, "burning")))) {
                 string[] trafficConv = new[] {
                     "The traffic and driving charges were central to the verdict.",
                     "Reckless driving and related conduct factored in the outcome.",
@@ -3547,7 +3813,8 @@ namespace MDTPro.Data {
                 };
                 phrases.Add(resolvedStatus == 1 ? trafficConv[Helper.GetRandomInt(0, trafficConv.Length - 1)] : trafficAcq[Helper.GetRandomInt(0, trafficAcq.Length - 1)]);
             }
-            if (phrases.Count > 0 && Helper.GetRandomInt(0, 2) == 0)
+            // Always append one charge-domain phrase when any domain matched (was 33% random—too often silent)
+            if (phrases.Count > 0)
                 b.Append(" " + phrases[Helper.GetRandomInt(0, phrases.Count - 1)]);
         }
 
@@ -3602,6 +3869,42 @@ namespace MDTPro.Data {
                 b.Append(prior[Helper.GetRandomInt(0, prior.Length - 1)]);
             }
 
+            if (HasChargeKeyword(courtData, "murder") || HasChargeKeyword(courtData, "manslaughter")) {
+                if (b.Length > 0) b.Append(" ");
+                string[] homicideSent = new[] {
+                    "The murder and manslaughter charges were central to the sentencing decision.",
+                    "The court emphasised the gravity of the homicide charges in imposing sentence.",
+                    "The homicide-related convictions warranted the most serious sentencing response.",
+                    "The murder charges were the defining factor in the court's sentencing approach.",
+                    "The gravity of the murder convictions dominated the sentencing considerations.",
+                };
+                b.Append(homicideSent[Helper.GetRandomInt(0, homicideSent.Length - 1)]);
+            }
+            if (HasSexOffenseCharge(courtData)) {
+                if (b.Length > 0) b.Append(" ");
+                string[] sexSent = new[] {
+                    "The sexual offence convictions warranted a severe sentencing response.",
+                    "The court emphasised the gravity of the sex crimes in fashioning sentence.",
+                    "Protection of vulnerable persons and denunciation of sexual violence informed the sentence.",
+                };
+                b.Append(sexSent[Helper.GetRandomInt(0, sexSent.Length - 1)]);
+            }
+            if (HasKidnappingCharge(courtData)) {
+                if (b.Length > 0) b.Append(" ");
+                string[] kidnapSent = new[] {
+                    "The kidnapping convictions were central to the sentencing decision.",
+                    "The court treated abduction-related offences as highly aggravating.",
+                };
+                b.Append(kidnapSent[Helper.GetRandomInt(0, kidnapSent.Length - 1)]);
+            }
+            if (HasArsonCharge(courtData)) {
+                if (b.Length > 0) b.Append(" ");
+                string[] arsonSent = new[] {
+                    "The arson convictions factored heavily into the sentence imposed.",
+                    "Fire-related offences and risk to life and property were emphasised in sentencing.",
+                };
+                b.Append(arsonSent[Helper.GetRandomInt(0, arsonSent.Length - 1)]);
+            }
             if (courtData.SeverityScore >= 15 || hasLife) {
                 if (b.Length > 0) b.Append(" ");
                 string[] severity = new[] {
