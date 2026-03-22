@@ -171,6 +171,15 @@ namespace MDTPro.Data {
         internal static List<PropertyEvidenceReceiptReport> propertyEvidenceReports = new List<PropertyEvidenceReceiptReport>();
         public static IReadOnlyList<PropertyEvidenceReceiptReport> PropertyEvidenceReports => propertyEvidenceReports;
 
+        /// <summary>Real (UTC) creation time for reports added this session. Used by recentReports so "last 60 min" works even when useInGameTime is on.</summary>
+        private static readonly System.Collections.Generic.Dictionary<string, DateTime> _reportRealCreatedAt = new System.Collections.Generic.Dictionary<string, DateTime>();
+        internal static DateTime? GetReportRealCreatedAt(string reportId) {
+            if (string.IsNullOrEmpty(reportId)) return null;
+            lock (_reportRealCreatedAt) {
+                return _reportRealCreatedAt.TryGetValue(reportId, out var dt) ? (DateTime?)dt : null;
+            }
+        }
+
         internal static Location PlayerLocation = new Location();
         internal static string CurrentTime = World.TimeOfDay.ToString();
         internal static PlayerCoords PlayerCoords = new PlayerCoords();
@@ -1248,6 +1257,9 @@ namespace MDTPro.Data {
                 int index = propertyEvidenceReports.FindIndex(x => x.Id == perReport.Id);
                 if (index != -1) propertyEvidenceReports[index] = perReport;
                 else propertyEvidenceReports.Add(perReport);
+            }
+            lock (_reportRealCreatedAt) {
+                _reportRealCreatedAt[report.Id] = DateTime.UtcNow;
             }
             AddReportToCurrentShift(report.Id);
         }

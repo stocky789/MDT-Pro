@@ -194,12 +194,15 @@ namespace MDTPro.ServerAPI {
                             withinMinutes = parsed.withinMinutes;
                     } catch { }
                 }
-                var cutoff = DateTime.Now.AddMinutes(-withinMinutes);
+                var cutoff = DateTime.UtcNow.AddMinutes(-withinMinutes);
                 var list = new System.Collections.Generic.List<(string id, string type, DateTime timeStamp)>();
                 void AddIfRecent(System.Collections.IEnumerable reports, string type) {
                     if (reports == null) return;
                     foreach (Report r in reports) {
-                        if (r.TimeStamp >= cutoff && !string.IsNullOrEmpty(r.Id))
+                        if (string.IsNullOrEmpty(r.Id)) continue;
+                        var createdAt = DataController.GetReportRealCreatedAt(r.Id);
+                        var useForFilter = createdAt ?? r.TimeStamp.ToUniversalTime();
+                        if (useForFilter >= cutoff)
                             list.Add((r.Id, type, r.TimeStamp));
                     }
                 }
