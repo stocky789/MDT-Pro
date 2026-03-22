@@ -507,8 +507,9 @@ const server = http.createServer((req, res) => {
         incidents: [],
         propertyEvidence: [],
         injuries: [],
+        impounds: [],
       }), 'application/json');
-    }).catch(() => send(res, 200, JSON.stringify({ citations: [], arrests: [], incidents: [], propertyEvidence: [], injuries: [] }), 'application/json'));
+    }).catch(() => send(res, 200, JSON.stringify({ citations: [], arrests: [], incidents: [], propertyEvidence: [], injuries: [], impounds: [] }), 'application/json'));
     return;
   } else if (req.method === 'POST' && url === '/data/recentReports') {
     readBody(req).then(() => {

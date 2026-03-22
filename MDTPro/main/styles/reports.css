@@ -649,6 +649,41 @@ body {
   color: var(--color-error);
 }
 
+.impoundSection .impoundRecentIdsRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.impoundSection .impoundRecentIdsRow label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary-dimmed);
+}
+
+.impoundSection .impoundRecentIdsList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.impoundSection .impoundRecentIdsList .impoundRecentIdItem {
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.impoundSection .impoundRecentIdsList .impoundRecentIdItem:hover {
+  background: var(--color-surface);
+  border-color: var(--color-accent);
+}
+
 .injurySection .inputWrapper.grid .fullWidth textarea {
   width: 100%;
   min-height: 88px;

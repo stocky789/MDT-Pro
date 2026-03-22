@@ -16,7 +16,7 @@ namespace MDTPro.Data {
         private static SQLiteConnection connection;
         private static readonly object dbLock = new object();
 
-        private const int CurrentSchemaVersion = 28;
+        private const int CurrentSchemaVersion = 29;
 
         /// <summary>Reads an INTEGER column from SQLite as uint. SQLite returns INTEGER as Int64; values outside uint range are clamped to 0.</summary>
         private static uint ReadUInt32FromReader(object value) {
@@ -920,6 +920,12 @@ namespace MDTPro.Data {
                     Helper.Log("Database migrated to schema version 28 (SubjectPedNames, SeizedDrugs with quantity)");
                 } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             }
+            if (fromVersion < 29) {
+                try {
+                    using (var cmd = new SQLiteCommand("ALTER TABLE impound_reports ADD COLUMN PersonAtFaultName TEXT", connection)) { cmd.ExecuteNonQuery(); }
+                    Helper.Log("Database migrated to schema version 29 (impound_reports PersonAtFaultName)");
+                } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            }
 
             SetSchemaVersion(CurrentSchemaVersion);
         }
@@ -983,6 +989,7 @@ namespace MDTPro.Data {
                 try { using (var cmd = new SQLiteCommand($"ALTER TABLE arrest_reports ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             }
             try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS impound_reports (Id TEXT PRIMARY KEY, ShortYear INTEGER NOT NULL, OfficerFirstName TEXT, OfficerLastName TEXT, OfficerRank TEXT, OfficerCallSign TEXT, OfficerAgency TEXT, OfficerBadgeNumber INTEGER, LocationArea TEXT, LocationStreet TEXT, LocationCounty TEXT, LocationPostal TEXT, TimeStamp TEXT NOT NULL, Status INTEGER NOT NULL DEFAULT 1, Notes TEXT, LicensePlate TEXT, VehicleModel TEXT, Owner TEXT, Vin TEXT, ImpoundReason TEXT, TowCompany TEXT, ImpoundLot TEXT)", connection)) { cmd.ExecuteNonQuery(); } } catch { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE impound_reports ADD COLUMN PersonAtFaultName TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS traffic_incident_reports (Id TEXT PRIMARY KEY, ShortYear INTEGER NOT NULL, OfficerFirstName TEXT, OfficerLastName TEXT, OfficerRank TEXT, OfficerCallSign TEXT, OfficerAgency TEXT, OfficerBadgeNumber INTEGER, LocationArea TEXT, LocationStreet TEXT, LocationCounty TEXT, LocationPostal TEXT, TimeStamp TEXT NOT NULL, Status INTEGER NOT NULL DEFAULT 1, Notes TEXT, DriverNames TEXT, PassengerNames TEXT, PedestrianNames TEXT, VehiclePlates TEXT, VehicleModels TEXT, InjuryReported INTEGER NOT NULL DEFAULT 0, InjuryDetails TEXT, CollisionType TEXT)", connection)) { cmd.ExecuteNonQuery(); } } catch { }
             try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS injury_reports (Id TEXT PRIMARY KEY, ShortYear INTEGER NOT NULL, OfficerFirstName TEXT, OfficerLastName TEXT, OfficerRank TEXT, OfficerCallSign TEXT, OfficerAgency TEXT, OfficerBadgeNumber INTEGER, LocationArea TEXT, LocationStreet TEXT, LocationCounty TEXT, LocationPostal TEXT, TimeStamp TEXT NOT NULL, Status INTEGER NOT NULL DEFAULT 1, Notes TEXT, InjuredPartyName TEXT, InjuryType TEXT, Severity TEXT, Treatment TEXT, IncidentContext TEXT, LinkedReportId TEXT)", connection)) { cmd.ExecuteNonQuery(); } } catch { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE injury_reports ADD COLUMN GameInjurySnapshot TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
@@ -1508,6 +1515,7 @@ namespace MDTPro.Data {
                                     LicensePlate = reader["LicensePlate"] as string,
                                     VehicleModel = reader["VehicleModel"] as string,
                                     Owner = reader["Owner"] as string,
+                                    PersonAtFaultName = ReaderOptionalString(reader, "PersonAtFaultName"),
                                     Vin = reader["Vin"] as string,
                                     ImpoundReason = reader["ImpoundReason"] as string,
                                     TowCompany = reader["TowCompany"] as string,
@@ -2396,18 +2404,19 @@ namespace MDTPro.Data {
                             OfficerCallSign, OfficerAgency, OfficerBadgeNumber,
                             LocationArea, LocationStreet, LocationCounty, LocationPostal,
                             TimeStamp, Status, Notes,
-                            LicensePlate, VehicleModel, Owner, Vin, ImpoundReason, TowCompany, ImpoundLot
+                            LicensePlate, VehicleModel, Owner, PersonAtFaultName, Vin, ImpoundReason, TowCompany, ImpoundLot
                         ) VALUES (
                             @Id, @ShortYear, @OfficerFirstName, @OfficerLastName, @OfficerRank,
                             @OfficerCallSign, @OfficerAgency, @OfficerBadgeNumber,
                             @LocationArea, @LocationStreet, @LocationCounty, @LocationPostal,
                             @TimeStamp, @Status, @Notes,
-                            @LicensePlate, @VehicleModel, @Owner, @Vin, @ImpoundReason, @TowCompany, @ImpoundLot
+                            @LicensePlate, @VehicleModel, @Owner, @PersonAtFaultName, @Vin, @ImpoundReason, @TowCompany, @ImpoundLot
                         )", connection, transaction)) {
                         AddReportBaseParams(cmd, report);
                         cmd.Parameters.AddWithValue("@LicensePlate", (object)report.LicensePlate ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@VehicleModel", (object)report.VehicleModel ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@Owner", (object)report.Owner ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@PersonAtFaultName", (object)report.PersonAtFaultName ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@Vin", (object)report.Vin ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@ImpoundReason", (object)report.ImpoundReason ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@TowCompany", (object)report.TowCompany ?? DBNull.Value);

@@ -101,6 +101,51 @@ async function getImpoundSection (data = {}, isList = false) {
   // GTA 5 lore: tow companies in Los Santos (Camel Towing, Davis Towing / Davis Towing Impound)
   const TOW_COMPANIES = ['', 'Camel Towing', 'Davis Towing']
 
+  // Recent IDs for Person at fault (create form only)
+  if (!isList) {
+    const recentIdsRow = document.createElement('div')
+    recentIdsRow.classList.add('inputWrapper', 'impoundRecentIdsRow')
+    const recentIdsLabel = document.createElement('label')
+    recentIdsLabel.textContent = labels.selectFromRecentIds || 'Select person at fault (Recent IDs)'
+    const recentIdsList = document.createElement('div')
+    recentIdsList.className = 'impoundRecentIdsList'
+    recentIdsRow.appendChild(recentIdsLabel)
+    recentIdsRow.appendChild(recentIdsList)
+    section.appendChild(recentIdsRow)
+    ;(async function () {
+      try {
+        const res = await fetch('/data/recentIds')
+        const recentIds = res.ok ? await res.json() : []
+        recentIdsList.innerHTML = ''
+        if (recentIds && recentIds.length > 0) {
+          for (const entry of recentIds) {
+            const btn = document.createElement('button')
+            btn.type = 'button'
+            btn.className = 'impoundRecentIdItem'
+            btn.textContent = entry.Name || '—'
+            if (entry.Type) {
+              const span = document.createElement('span')
+              span.className = 'impoundRecentIdType'
+              span.textContent = ` (${entry.Type})`
+              btn.appendChild(span)
+            }
+            btn.addEventListener('click', function () {
+              const name = (entry.Name || '').trim()
+              if (!name) return
+              const inp = document.querySelector('.createPage .reportInformation #impoundSectionPersonAtFaultInput')
+              if (inp) inp.value = name
+            })
+            recentIdsList.appendChild(btn)
+          }
+        } else {
+          recentIdsList.textContent = labels.noRecentIds || 'No recent IDs. Collect an ID from a ped to show them here.'
+        }
+      } catch (e) {
+        recentIdsList.textContent = labels.recentIdsError || 'Could not load Recent IDs.'
+      }
+    })()
+  }
+
   // If creating new report and no lot set, randomize which impound lot
   const resolvedData = { ...data }
   if (!resolvedData.ImpoundLot && !isList) {
@@ -108,6 +153,7 @@ async function getImpoundSection (data = {}, isList = false) {
   }
 
   const fields = [
+    { id: 'impoundSectionPersonAtFaultInput', key: 'PersonAtFaultName', label: labels.personAtFault || 'Person at fault' },
     { id: 'impoundSectionPlateInput', key: 'LicensePlate', label: labels.licensePlate || 'License Plate' },
     { id: 'impoundSectionModelInput', key: 'VehicleModel', label: labels.model || 'Model' },
     { id: 'impoundSectionOwnerInput', key: 'Owner', label: labels.owner || 'Owner' },
