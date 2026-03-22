@@ -6,49 +6,55 @@ All notable changes to MDT Pro are documented here.
 
 ## [0.9.6.0] — 2026-03-22
 
-### Property and Evidence Receipt (Seizure Reports)
-
-- **New report type** — Create **Property and Evidence Receipt** reports to document seized drugs and firearms in detail. Uses realistic police terminology (property and evidence receipt). **Multiple subjects** supported via Recent IDs (same as Person Search) and manual add. **Drugs seized** and **Firearms seized** use an add-button pattern (like charges): select type, click Add; each entry in a list with delete. **Drug quantities** (Baggie, Bundle, Grams, Ounce, Pill, etc.) align with Policing Redefined and street terminology. Optional other contraband notes. Attach to arrests for court evidence.
-- **Charge-specific evidence** — Court evidence now requires matching seizure types: e.g. a Possession of Heroin charge only gets drug evidence if Heroin is listed in the attached seizure report. Possession of Fentanyl requires Fentanyl documented. Generic charges (Possession Of Controlled Substance For Sale, Trafficking, Paraphernalia, etc.) accept any drug type. Firearm charges require at least one firearm type listed in the seizure report.
-- **Evidence breakdown in court** — Court evidence view shows specific types when documented: "Drugs found (Heroin, Cocaine)" or "Firearms seized (Pistol)" instead of generic labels. Config: `courtEvidenceSeizureReportBonus`, `courtEvidenceDrugQuantityBonus` (higher quantities—bundle, kilo, etc.—add evidence).
-- **Arrest integration** — In the arrest report's Attached reports section, use **Create Property and Evidence Receipt** to document contraband; subject pre-fills from the offender and the report auto-attaches on save. The **Evidence seized** section audits all attached PER reports and displays a simple list of seized items (drugs with quantity, firearms, other contraband).
-- **Removed arrest checkboxes** — The drugs/firearms tickboxes on arrest reports are removed. Use Property and Evidence Receipt reports instead. Existing arrests with DocumentedDrugs/DocumentedFirearms remain supported via court fallback (generic evidence).
-- **Verdict rationale** — Court sentencing text now reflects specific types when available (e.g. "Heroin and Cocaine were recovered" instead of "controlled substances were found").
-
 ### Person Search
 
-- **ID photo** — Person Search now shows a photo of the person's in-game character model in the Basic Information section. For vanilla GTA V peds, the MDT displays their PED mugshot from the game. If no photo is available (e.g. addon character packs or peds without a stored model), a "No photo available" placeholder is shown instead.
+- **Injury reports in Associated Reports** — Injury reports involving the searched person (as injured party) now appear in the Associated Reports section alongside incidents, citations, arrests, and property/evidence receipts.
+- **ID photo** — Person Search now shows a photo of the person's character in the Basic Information section. A placeholder appears if no photo is available (e.g. addon character packs).
+
+### Arrest Reports
+
+- **Import recent reports** — When editing an arrest report (Open or Pending), a new **Import recent reports** button attaches all reports created in the last 60 minutes (incident, injury, citation, traffic incident, impound, property/evidence). Avoids copying report IDs when you've just created several reports during the same call.
+
+### Property and Evidence Receipt (Seizure Reports)
+
+- **New report type** — Create **Property and Evidence Receipt** reports to document seized drugs and firearms. Supports multiple subjects via Recent IDs or manual add. Add drugs and firearms with quantity types (Baggie, Bundle, Grams, Ounce, Pill, etc.). Attach to arrests for court evidence.
+- **Charge-specific evidence** — Court evidence now matches what you seized: a Possession of Heroin charge only counts drug evidence if Heroin is in the seizure report; firearm charges require firearms listed. Generic charges (Trafficking, Paraphernalia, etc.) accept any drug type.
+- **Evidence in court** — Court shows specific types when documented ("Drugs found: Heroin, Cocaine" or "Firearms seized: Pistol"). Higher quantities add more evidence. Tune in Config → Court if needed.
+- **Arrest workflow** — Use **Create Property and Evidence Receipt** from the arrest's Attached reports section; subject pre-fills and the report auto-attaches. Evidence seized lists all items from attached receipts.
+- **Removed arrest checkboxes** — The drugs/firearms tickboxes on arrest reports are removed. Use Property and Evidence Receipt reports instead. Existing arrests still work in court.
+- **Verdict wording** — Sentencing text now mentions specific types when available (e.g. "Heroin and Cocaine were recovered" instead of "controlled substances were found").
 
 ### Firearms Check
 
-- **Dispatch integration** — Firearm results from your Dispatch system (or any external source) can now appear in the MDT. When Dispatch returns a serial check (e.g. serial `pldcqm`, owner `Marion ASoif`), have it POST to `http://localhost:9000/post/firearmCheckResult` with the result. Then searches in Firearms Check will find it. See `docs/DISPATCH-FIREARM-INTEGRATION.md`.
-- **Faster capture** — Capture runs every 500ms and triggers immediately on PR events (OnRequestPedCheck, OnPedRanThroughDispatch, OnRequestVehicleCheck). Player-held weapons are captured via fallback when PR returns no data.
+- **Dispatch integration** — External systems (e.g. voice dispatch) can push firearm check results into the MDT, but your dispatch or voice mod would need to support it — nothing does out of the box.
+- **Faster updates** — Weapon data from pat-downs and searches is captured and refreshed more quickly.
 - **Melee filtered** — Knives, bats, and other non-firearms are no longer shown in Firearms Check.
-- **Recent weapons (serials + names)** — Firearms Check now shows **Recent weapons**: the actual guns you've seen on pat-downs and body searches, with their serial numbers and weapon names. No more "Recent IDs" with person names—just click a weapon (e.g. "ABC123 — Pistol") to look it up.
-- **Lookups actually work** — Firearm lookups were failing a lot, especially when a gun was found in a car. That's fixed: searching by serial or owner from Person Search or Firearms Check should work every time now.
-- **Guns in vehicle search** — When you find a weapon during a vehicle search, that weapon line is now clickable. Click it to jump straight into Firearms Check and run a search for that gun.
+- **Recent weapons** — Firearms Check shows **Recent weapons** from pat-downs and body searches. Serial and owner appear when the game provides them. Click a weapon to look it up.
+- **Lookups improved** — Firearm lookups (especially for guns found in vehicles) work better than before.
+- **Guns in vehicle search** — Weapon lines from vehicle searches are clickable; click to jump into Firearms Check.
+- **What works and what doesn't:** Weapons from pat-downs and body searches show up. So do guns found when you search a vehicle (after running the plate through dispatch) and guns you're holding. Weapons you put in your trunk and then run a serial check on from the trunk menu often won't appear — the game doesn't pass us that data. Same for voice-based serial checks unless another mod is set up to feed those results in.
 
 ### Vehicle Search
 
-- **Search Results (Contraband)** — Drugs, weapons, and contraband from vehicle searches now show up reliably in the MDT. Previously they often didn't appear.
+- **Search Results (Contraband)** — Drugs, weapons, and contraband from vehicle searches show up in the MDT when the game provides them (after running the plate through dispatch and searching the vehicle).
 
 ### Court
 
-- **Sentence multiplier rebalanced** — Court was hitting the max sentence multiplier (2.5×) on almost every arrest. It's now tuned so harsher sentences are reserved for the worst cases: career criminals, serious felonies, and strong prosecution. Routine arrests stay closer to baseline. Adjust in **Court — Sentence Multiplier** under MDT settings.
-- **Verdict & sentencing phrasing** — 200+ wording variants for verdict reasoning, outcome reasoning, and sentencing rationale. Jury vote phrasing no longer repeats "returned a guilty verdict."
-- **Evidence accuracy** — Outcome reasoning only mentions evidence that was actually documented. Vehicle damage is no longer inferred from evading charges (suspects can flee on foot). Verdict templates for vehicle damage, weapons, drugs, etc. are excluded unless that evidence was captured or documented in reports.
-- **Homicide and murder prioritised** — Cases with murder or manslaughter charges now prominently mention them in verdict reasoning, sentencing rationale, and aggravating factors. Previously the system could focus on lesser charges (e.g. resisting arrest) while barely acknowledging homicide.
-- **Full charge-domain coverage** — Verdict and sentencing text now map **all major arrest charge families** (audit of 132 arrest charges): sexual offences, kidnapping, arson (no longer misclassified as traffic via “reckless burning”), property damage/trespass, escape from custody, probation/parole/protective-order/sex-offender registration breaches, public-order crimes, refined **drug** detection (avoids generic “possession” matching firearms/stolen property), broader **traffic** keywords (suspended licence, impeding traffic, etc.), and **DUI-adjacent** charges (chemical test, field sobriety). **Guilty-trial templates** gain weighted lines for SexOffense, Kidnapping, and Arson (charge-based tags, like Homicide). **Aggravating factors** include robbery/burglary/carjacking, drugs, escape, and court-order violations when charged. **Charge-domain closing phrase** is always appended when any domain matches (was only ~33% of the time).
+- **Sentence multiplier rebalanced** — Court was hitting the max sentence multiplier (2.5×) too often. It's now tuned so harsher sentences are reserved for the worst cases: career criminals, serious felonies, and strong prosecution. Routine arrests stay closer to baseline. Adjust in **Court — Sentence Multiplier** under MDT settings.
+- **Verdict & sentencing phrasing** — Many wording variants for verdict reasoning, outcome reasoning, and sentencing rationale. Jury vote phrasing no longer repeats "returned a guilty verdict."
+- **Evidence accuracy** — Outcome reasoning only mentions evidence you actually documented. Vehicle damage is no longer assumed from evading charges.
+- **Homicide prioritised** — Murder and manslaughter charges are now prominently mentioned in verdicts and sentencing instead of being overshadowed by lesser charges.
+- **Broader charge coverage** — Verdict and sentencing text now correctly handle sexual offences, kidnapping, property damage, escape, probation breaches, traffic offences, DUI-related charges, and more. Aggravating factors (robbery, drugs, escape, court-order violations) are applied when charged.
 
 ### Charges
 
-- **Drug charges aligned with Policing Redefined** — Arrest charges and seizure options cover every drug type from PR's API: **Possession Of Amphetamine**, **Possession Of Benzodiazepine**, **Possession Of Controlled Substance** (generic). Seizure options: Amphetamine, Benzodiazepine, Mescaline, Psilocybin. Court evidence mapping matches PR drug types.
-- **Property and ID charges (California law)** — Arrest and citation charges: **Possession Of Burglary Tools** (PC § 466), **Possession Of Credit Card Scanning Device** (PC § 502.6), **Possession Of Counterfeit Items** (PC § 475), **Possession Of Stolen Debit / Credit Card**, **Refusing To Provide Identification**, **Failure To Present Drivers License Upon Demand** (VC 12951). Court verdict phrasing reflects these (theft/property, resisting/obstruction, vehicle-related) where applicable.
+- **Drug charges** — Arrest charges and seizure options now cover Amphetamine, Benzodiazepine, Mescaline, Psilocybin, and generic Possession Of Controlled Substance.
+- **Property and ID charges** — New charges: Possession Of Burglary Tools, Possession Of Credit Card Scanning Device, Possession Of Counterfeit Items, Possession Of Stolen Debit/Credit Card, Refusing To Provide Identification, Failure To Present Drivers License Upon Demand.
 
 ### Bug fixes
 
-- **Evidence capture robustness** — Evidence capture (arrest, fleeing, assault, vehicle damage) no longer fails when peds despawn during capture. Player assault and nearby-ped assault checks now use per-entity try/catch so one invalid entity does not abort the whole capture. Ped is re-validated before using `Handle` in the evidence lock. "Evidence capture failed: address cannot be zero" and similar invalid-entity errors are no longer logged as warnings (expected when suspects are cuffed/transported mid-capture).
-- **Delayed CDF retry** — The delayed CDF retry (2 seconds after first encounter) no longer logs "Invalid handle" or "EntityType" when the ped has despawned before the retry runs. Invalid handle is checked before starting the retry; `GetEntityByHandle` is wrapped to catch despawned-entity exceptions silently.
+- **Evidence capture** — Evidence (arrest, fleeing, assault, vehicle damage) no longer fails when suspects despawn or are transported mid-capture.
+- **Person Search** — Fixed errors when searching for someone who had already left the area.
 
 ---
 

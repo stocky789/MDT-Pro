@@ -175,10 +175,43 @@ namespace MDTPro.ServerAPI {
                         .Select(r => new { r.Id, r.TimeStamp, r.Status }),
                     propertyEvidence = DataController.PropertyEvidenceReports
                         ?.Where(r => r.SubjectPedNames != null && r.SubjectPedNames.Any(n => (n ?? "").ToLower() == pedName))
+                        .Select(r => new { r.Id, r.TimeStamp, r.Status }),
+                    injuries = (DataController.InjuryReports ?? Enumerable.Empty<InjuryReport>())
+                        .Where(r => r.InjuredPartyName != null && r.InjuredPartyName.ToLower() == pedName)
                         .Select(r => new { r.Id, r.TimeStamp, r.Status })
                 };
 
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(result));
+                status = 200;
+                contentType = "text/json";
+            } else if (path == "recentReports") {
+                string body = Helper.GetRequestPostData(req);
+                int withinMinutes = 60;
+                if (!string.IsNullOrEmpty(body)) {
+                    try {
+                        var parsed = JsonConvert.DeserializeAnonymousType(body, new { withinMinutes = 60 });
+                        if (parsed != null && parsed.withinMinutes > 0 && parsed.withinMinutes <= 120)
+                            withinMinutes = parsed.withinMinutes;
+                    } catch { }
+                }
+                var cutoff = DateTime.Now.AddMinutes(-withinMinutes);
+                var list = new System.Collections.Generic.List<(string id, string type, DateTime timeStamp)>();
+                void AddIfRecent(System.Collections.IEnumerable reports, string type) {
+                    if (reports == null) return;
+                    foreach (Report r in reports) {
+                        if (r.TimeStamp >= cutoff && !string.IsNullOrEmpty(r.Id))
+                            list.Add((r.Id, type, r.TimeStamp));
+                    }
+                }
+                AddIfRecent(DataController.IncidentReports, "incident");
+                AddIfRecent(DataController.InjuryReports, "injury");
+                AddIfRecent(DataController.CitationReports, "citation");
+                AddIfRecent(DataController.TrafficIncidentReports, "trafficIncident");
+                AddIfRecent(DataController.ImpoundReports, "impound");
+                AddIfRecent(DataController.PropertyEvidenceReports, "propertyEvidence");
+                var sorted = list.OrderByDescending(x => x.timeStamp)
+                    .Select(x => new { id = x.id, type = x.type, timeStamp = x.timeStamp }).ToList();
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(sorted));
                 status = 200;
                 contentType = "text/json";
             } else if (path == "pedVehicles") {

@@ -262,6 +262,36 @@ namespace MDTPro.ServerAPI {
                 buffer = Encoding.UTF8.GetBytes("OK");
                 contentType = "text/plain";
                 status = 200;
+            } else if (path == "attachReportsToArrest") {
+                var data = JsonConvert.DeserializeAnonymousType(body, new { arrestReportId = "", reportIds = new string[0] });
+                if (data == null || string.IsNullOrWhiteSpace(data.arrestReportId) || data.reportIds == null) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "arrestReportId and reportIds required" }));
+                    contentType = "application/json";
+                    status = 400;
+                    return;
+                }
+                var arrest = DataController.ArrestReports?.FirstOrDefault(x => x.Id == data.arrestReportId);
+                bool arrestCanAttach = arrest != null && (arrest.Status == ReportStatus.Pending || arrest.Status == ReportStatus.Open);
+                if (!arrestCanAttach) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "Arrest not found or already closed for court" }));
+                    contentType = "application/json";
+                    status = 400;
+                    return;
+                }
+                if (arrest.AttachedReportIds == null) arrest.AttachedReportIds = new System.Collections.Generic.List<string>();
+                int added = 0;
+                foreach (var reportId in data.reportIds) {
+                    if (string.IsNullOrWhiteSpace(reportId) || reportId == arrest.Id) continue;
+                    if (!ReportExistsAndIsAttachable(reportId)) continue;
+                    if (!arrest.AttachedReportIds.Contains(reportId)) {
+                        arrest.AttachedReportIds.Add(reportId);
+                        added++;
+                    }
+                }
+                if (added > 0) Database.SaveArrestReport(arrest);
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = true, added }));
+                contentType = "application/json";
+                status = 200;
             } else if (path == "attachReportToCourtCase") {
                 var data = JsonConvert.DeserializeAnonymousType(body, new { courtCaseNumber = "", reportId = "" });
                 if (data == null || string.IsNullOrWhiteSpace(data.courtCaseNumber) || string.IsNullOrWhiteSpace(data.reportId)) {

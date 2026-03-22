@@ -145,6 +145,8 @@ namespace MDTPro.Setup {
 
             Config config = GetConfig();
             Helper.Log($"Config:\n{JsonConvert.SerializeObject(config, Formatting.Indented)}");
+            if (config.firearmDebugLogging)
+                Helper.Log("[Firearm] Debug logging ENABLED – firearm capture flow will be logged to this file.", false, Helper.LogSeverity.Info);
 
             string[] MDTProDirectoryFiles = Directory.GetFiles(MDTProPath).Select(item => $"[File] {Path.GetFileName(item)}").ToArray();
             string[] MDTProDirectoryDirs = Directory.GetDirectories(MDTProPath).Select(item => $"[Directory] {Path.GetFileName(item)}").ToArray();

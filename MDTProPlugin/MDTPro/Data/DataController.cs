@@ -127,6 +127,8 @@ namespace MDTPro.Data {
         private static readonly object capturedPickupHandlesLock = new object();
         private static readonly HashSet<uint> capturedPickupHandles = new HashSet<uint>();
 
+        private static DateTime lastFirearmPollDebugLog = DateTime.MinValue;
+
         /// <summary>GTA V weapon hashes for melee/throwables that should not appear in Firearms Check. PR/CDF return all weapons; we filter to actual firearms only.</summary>
         private static readonly HashSet<uint> MeleeAndNonFirearmHashes = new HashSet<uint> {
             2460120199u, 2508868239u, 3441901897u, 3638508604u, 4192643659u, 2227010557u, 2725352035u,
@@ -2129,15 +2131,57 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>When firearmDebugLogging is true, reflects PolicingRedefined assembly and logs public types/events that might relate to weapons. Run once on load to discover what PR exposes.</summary>
+        internal static void LogPRAssemblyFirearmDiagnostics() {
+            if (!Main.usePR || !SetupController.GetConfig().firearmDebugLogging) return;
+            try {
+                Type knownType = Type.GetType("PolicingRedefined.API.EventsAPI, PolicingRedefined")
+                    ?? Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined");
+                if (knownType == null) return;
+                var asm = knownType.Assembly;
+                var types = asm.GetExportedTypes();
+                var keywords = new[] { "Weapon", "Firearm", "Serial", "Dispatch", "Search", "WeaponItem", "FirearmItem" };
+                var relevant = new List<string>();
+                foreach (var t in types) {
+                    string fn = t.FullName ?? "";
+                    if (keywords.Any(k => fn.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0))
+                        relevant.Add(t.IsClass ? $"Type: {fn}" : (t.IsEnum ? $"Enum: {fn}" : $"Event/Other: {fn}"));
+                }
+                foreach (var t in types) {
+                    try {
+                        foreach (var e in t.GetEvents(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance)) {
+                            string en = e.Name ?? "";
+                            if (keywords.Any(k => en.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0))
+                                relevant.Add($"Event: {t.FullName}.{en}");
+                        }
+                    } catch { }
+                }
+                relevant.Sort();
+                Helper.Log($"[Firearm] PR assembly ({asm.GetName().Name} {asm.GetName().Version}): {relevant.Count} relevant types/events:\n  " + string.Join("\n  ", relevant.Take(60)), false, Helper.LogSeverity.Info);
+                if (relevant.Count > 60)
+                    Helper.Log($"[Firearm] ... and {relevant.Count - 60} more. See docs/FIREARM-DATA-SOURCES.md", false, Helper.LogSeverity.Info);
+            } catch (Exception ex) {
+                Helper.Log($"[Firearm] PR assembly diagnostics failed: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
         /// <summary>Uses PR SearchItemsAPI.GetPedSearchItems to capture weapon/firearm items and persist to firearm_records.</summary>
         internal static void CaptureFirearmsFromPed(Ped ped, string source = "Search") {
             if (ped == null || !ped.IsValid() || !Main.usePR) return;
             try {
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"[Firearm] CaptureFirearmsFromPed called: source={source}, pedHandle={ped?.Handle}", false, Helper.LogSeverity.Info);
                 string ownerName = (GetPedDataForPed(ped)?.Name ?? LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped)?.FullName)?.Trim();
                 if (string.IsNullOrWhiteSpace(ownerName))
                     ownerName = source.Contains("Dead") ? "Unknown (unidentified body)" : "Unknown";
-                if (string.IsNullOrWhiteSpace(ownerName)) return;
-                CaptureFirearmsFromPedWithOwner(ped, ownerName, source);
+                if (string.IsNullOrWhiteSpace(ownerName)) {
+                    if (SetupController.GetConfig().firearmDebugLogging)
+                        Helper.Log($"[Firearm] CaptureFirearmsFromPed skipped: no owner name for source={source}", false, Helper.LogSeverity.Info);
+                    return;
+                }
+                int count = CaptureFirearmsFromPedWithOwner(ped, ownerName, source);
+                if (SetupController.GetConfig().firearmDebugLogging && count > 0)
+                    Helper.Log($"[Firearm] CaptureFirearmsFromPed saved {count} record(s) from {source}", false, Helper.LogSeverity.Info);
             } catch (Exception e) {
                 Helper.Log($"Firearm/drug capture failed: {e.Message}", false, Helper.LogSeverity.Warning);
             }
@@ -2146,22 +2190,41 @@ namespace MDTPro.Data {
         /// <summary>Captures firearms from ped using an explicit owner (e.g. "Evidence (pickup)" for player-held weapons). Returns count of firearm records captured.</summary>
         private static int CaptureFirearmsFromPedWithOwner(Ped ped, string ownerName, string source) {
             if (ped == null || !ped.IsValid() || !Main.usePR || string.IsNullOrWhiteSpace(ownerName)) return 0;
+            bool debug = SetupController.GetConfig().firearmDebugLogging;
             try {
                 Type searchApiType = Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined")
                     ?? Type.GetType("PolicingRedefined.API.SearchItemAPI, PolicingRedefined")
                     ?? Type.GetType("PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined");
-                if (searchApiType == null) return 0;
+                if (searchApiType == null) {
+                    if (debug) Helper.Log("[Firearm] CaptureFirearmsFromPedWithOwner: SearchItemsAPI type not found (PR not loaded or API changed)", false, Helper.LogSeverity.Info);
+                    return 0;
+                }
 
                 MethodInfo getItems = searchApiType.GetMethod("GetPedSearchItems", BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase, null, new[] { typeof(Rage.Ped) }, null);
-                if (getItems == null) return 0;
+                if (getItems == null) {
+                    if (debug) Helper.Log("[Firearm] CaptureFirearmsFromPedWithOwner: GetPedSearchItems method not found", false, Helper.LogSeverity.Info);
+                    return 0;
+                }
 
                 object result = getItems.Invoke(null, new object[] { ped });
-                if (result == null) return 0;
+                if (result == null) {
+                    if (debug) Helper.Log($"[Firearm] CaptureFirearmsFromPedWithOwner: GetPedSearchItems returned null for source={source}, owner={ownerName}", false, Helper.LogSeverity.Info);
+                    return 0;
+                }
 
                 System.Collections.IEnumerable list = result as System.Collections.IEnumerable;
-                if (list == null) return 0;
+                if (list == null) {
+                    if (debug) Helper.Log($"[Firearm] CaptureFirearmsFromPedWithOwner: GetPedSearchItems result not IEnumerable for source={source}", false, Helper.LogSeverity.Info);
+                    return 0;
+                }
+
+                int rawCount = 0;
+                foreach (var _ in list) { rawCount++; }
+                if (debug) Helper.Log($"[Firearm] CaptureFirearmsFromPedWithOwner: GetPedSearchItems returned {rawCount} raw item(s) for source={source}", false, Helper.LogSeverity.Info);
 
                 var records = ExtractFirearmRecordsFromItemList(list, ownerName, source);
+                if (debug && rawCount > 0 && records.Count == 0)
+                    Helper.Log($"[Firearm] CaptureFirearmsFromPedWithOwner: {rawCount} item(s) but 0 firearm records extracted (possibly melee/non-firearm filtered)", false, Helper.LogSeverity.Info);
                 var drugRecords = new List<DrugRecord>();
                 string now = DateTime.UtcNow.ToString("o");
 
@@ -2196,7 +2259,10 @@ namespace MDTPro.Data {
 
                 if (records.Count > 0 || drugRecords.Count > 0) {
                     if (!ped.Exists()) return 0;
-                    if (records.Count > 0) Database.SaveFirearmRecords(records);
+                    if (records.Count > 0) {
+                        Database.SaveFirearmRecords(records);
+                        Helper.Log($"[Firearm] Saved {records.Count} firearm record(s) from {source} (owner: {ownerName})", false, Helper.LogSeverity.Info);
+                    }
                     if (drugRecords.Count > 0) Database.SaveDrugRecords(drugRecords);
                 }
                 return records.Count;
@@ -2217,6 +2283,9 @@ namespace MDTPro.Data {
                 string displayName = GetWeaponDisplayNameFromHash(weaponHash);
                 if (string.IsNullOrWhiteSpace(displayName)) displayName = $"Weapon ({weaponHash})";
 
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"[Firearm] Fallback saving player-held weapon: {displayName} (hash={weaponHash})", false, Helper.LogSeverity.Info);
+
                 var record = new FirearmRecord {
                     SerialNumber = null,
                     IsSerialScratched = false,
@@ -2231,6 +2300,7 @@ namespace MDTPro.Data {
                     LastSeenAt = DateTime.UtcNow.ToString("o")
                 };
                 Database.SaveFirearmRecords(new List<FirearmRecord> { record });
+                Helper.Log($"[Firearm] Saved 1 firearm record from fallback (player-held: {displayName})", false, Helper.LogSeverity.Info);
             } catch (Exception e) {
                 Helper.Log($"Firearm fallback failed: {e.Message}", false, Helper.LogSeverity.Warning);
             }
@@ -2296,6 +2366,15 @@ namespace MDTPro.Data {
             try {
                 // Try GetPedSearchItems on the player - when you pick up a weapon and run a firearm check, PR may add it to the player's search items. Use "Evidence (pickup)" as owner so it appears in Firearms Check.
                 int prCount = CaptureFirearmsFromPedWithOwner(Main.Player, "Evidence (pickup)", "Evidence (pickup)");
+                if (SetupController.GetConfig().firearmDebugLogging && prCount == 0) {
+                    var now = DateTime.UtcNow;
+                    if ((now - lastFirearmPollDebugLog).TotalSeconds >= 15) {
+                        lastFirearmPollDebugLog = now;
+                        uint heldHash = NativeFunction.Natives.GET_SELECTED_PED_WEAPON<uint>(Main.Player, false);
+                        string heldName = heldHash == 0u || heldHash == 0xA2719263u ? "none" : (GetWeaponDisplayNameFromHash(heldHash) ?? $"hash_{heldHash}");
+                        Helper.Log($"[Firearm] Poll: PR returned 0 for player, holding {heldName}, fallback would run={!IsMeleeOrNonFirearm(heldHash, null)}", false, Helper.LogSeverity.Info);
+                    }
+                }
                 // Fallback: PR often doesn't add pickup weapons to player search items. When holding a firearm, capture via game native so it at least shows in Recent.
                 if (prCount == 0) TryCapturePlayerHeldWeaponFallback();
 
@@ -2327,6 +2406,7 @@ namespace MDTPro.Data {
                                 var records = ExtractFirearmRecordsFromItemList(list, "Evidence (ground)", "Evidence (ground)");
                                 if (records.Count > 0) {
                                     Database.SaveFirearmRecords(records);
+                                    Helper.Log($"[Firearm] Saved {records.Count} firearm record(s) from pickup (Evidence ground)", false, Helper.LogSeverity.Info);
                                     lock (capturedPickupHandlesLock) {
                                         capturedPickupHandles.Add(ent.Handle);
                                         if (capturedPickupHandles.Count > 200) {
@@ -2349,6 +2429,7 @@ namespace MDTPro.Data {
         /// <summary>Accepts firearm check result from Dispatch or external system. Call when Dispatch returns serial/owner so it shows in MDT Firearms Check. Source will be "Dispatch".</summary>
         internal static bool SaveFirearmCheckResultFromDispatch(string serialNumber, string ownerName, string weaponType, string status = null, string weaponModelId = null) {
             if (string.IsNullOrWhiteSpace(ownerName)) return false;
+            Helper.Log($"[Firearm] SaveFirearmCheckResultFromDispatch: serial={serialNumber ?? "(none)"}, owner={ownerName}, weapon={weaponType ?? weaponModelId ?? "Firearm"}, status={status ?? "—"}", false, Helper.LogSeverity.Info);
             string serial = string.IsNullOrWhiteSpace(serialNumber) ? null : serialNumber.Trim();
             string weapon = (weaponType ?? weaponModelId ?? "Firearm").Trim();
             if (string.IsNullOrEmpty(weapon)) weapon = "Firearm";
@@ -2470,6 +2551,8 @@ namespace MDTPro.Data {
             try {
                 string plate = vehicle.LicensePlate?.Trim();
                 if (string.IsNullOrEmpty(plate)) return;
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"[Firearm] CaptureVehicleSearchItems called for plate {plate}", false, Helper.LogSeverity.Info);
 
                 string ownerForFirearms = GetVehicleDriverNameForFirearmOwner(vehicle, plate);
 
@@ -2485,10 +2568,18 @@ namespace MDTPro.Data {
                         null, new[] { typeof(Rage.Vehicle) }, null);
                     if (getItems != null) break;
                 }
-                if (getItems == null) return;
+                if (getItems == null) {
+                    if (SetupController.GetConfig().firearmDebugLogging)
+                        Helper.Log("[Firearm] CaptureVehicleSearchItems: GetVehicleSearchItems not found", false, Helper.LogSeverity.Info);
+                    return;
+                }
 
                 object result = getItems.Invoke(null, new object[] { vehicle });
-                if (result == null) return;
+                if (result == null) {
+                    if (SetupController.GetConfig().firearmDebugLogging)
+                        Helper.Log($"[Firearm] CaptureVehicleSearchItems: GetVehicleSearchItems returned null for plate {plate}", false, Helper.LogSeverity.Info);
+                    return;
+                }
                 var list = result as System.Collections.IEnumerable;
                 if (list == null) return;
 
@@ -2612,8 +2703,10 @@ namespace MDTPro.Data {
                     }
                     Helper.Log($"Vehicle search captured {records.Count} item(s) for plate {plate}", false, Helper.LogSeverity.Info);
                 }
-                if (firearmRecords.Count > 0)
+                if (firearmRecords.Count > 0) {
                     Database.SaveFirearmRecords(firearmRecords);
+                    Helper.Log($"[Firearm] Saved {firearmRecords.Count} firearm record(s) from vehicle search (plate {plate})", false, Helper.LogSeverity.Info);
+                }
             } catch (Exception e) {
                 Helper.Log($"CaptureVehicleSearchItems failed: {e.Message}", false, Helper.LogSeverity.Warning);
             }

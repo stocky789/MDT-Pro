@@ -786,10 +786,14 @@ body {
 }
 
 .arrestAttachedReportsSection .attachReportQuickActionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-bottom: 12px;
 }
 
-.arrestAttachedReportsSection .createPropertyEvidenceReceiptButton {
+.arrestAttachedReportsSection .createPropertyEvidenceReceiptButton,
+.arrestAttachedReportsSection .importRecentReportsButton {
   font-size: 14px;
   padding: 6px 12px;
 }
