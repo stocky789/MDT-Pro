@@ -4,7 +4,7 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
-## [0.9.6.0] — 2026-03-21
+## [0.9.6.0] — 2026-03-22
 
 ### Property and Evidence Receipt (Seizure Reports)
 
@@ -21,6 +21,9 @@ All notable changes to MDT Pro are documented here.
 
 ### Firearms Check
 
+- **Dispatch integration** — Firearm results from your Dispatch system (or any external source) can now appear in the MDT. When Dispatch returns a serial check (e.g. serial `pldcqm`, owner `Marion ASoif`), have it POST to `http://localhost:9000/post/firearmCheckResult` with the result. Then searches in Firearms Check will find it. See `docs/DISPATCH-FIREARM-INTEGRATION.md`.
+- **Faster capture** — Capture runs every 500ms and triggers immediately on PR events (OnRequestPedCheck, OnPedRanThroughDispatch, OnRequestVehicleCheck). Player-held weapons are captured via fallback when PR returns no data.
+- **Melee filtered** — Knives, bats, and other non-firearms are no longer shown in Firearms Check.
 - **Recent weapons (serials + names)** — Firearms Check now shows **Recent weapons**: the actual guns you've seen on pat-downs and body searches, with their serial numbers and weapon names. No more "Recent IDs" with person names—just click a weapon (e.g. "ABC123 — Pistol") to look it up.
 - **Lookups actually work** — Firearm lookups were failing a lot, especially when a gun was found in a car. That's fixed: searching by serial or owner from Person Search or Firearms Check should work every time now.
 - **Guns in vehicle search** — When you find a weapon during a vehicle search, that weapon line is now clickable. Click it to jump straight into Firearms Check and run a search for that gun.
@@ -31,13 +34,21 @@ All notable changes to MDT Pro are documented here.
 
 ### Court
 
+- **Sentence multiplier rebalanced** — Court was hitting the max sentence multiplier (2.5×) on almost every arrest. It's now tuned so harsher sentences are reserved for the worst cases: career criminals, serious felonies, and strong prosecution. Routine arrests stay closer to baseline. Adjust in **Court — Sentence Multiplier** under MDT settings.
 - **Verdict & sentencing phrasing** — 200+ wording variants for verdict reasoning, outcome reasoning, and sentencing rationale. Jury vote phrasing no longer repeats "returned a guilty verdict."
 - **Evidence accuracy** — Outcome reasoning only mentions evidence that was actually documented. Vehicle damage is no longer inferred from evading charges (suspects can flee on foot). Verdict templates for vehicle damage, weapons, drugs, etc. are excluded unless that evidence was captured or documented in reports.
+- **Homicide and murder prioritised** — Cases with murder or manslaughter charges now prominently mention them in verdict reasoning, sentencing rationale, and aggravating factors. Previously the system could focus on lesser charges (e.g. resisting arrest) while barely acknowledging homicide.
+- **Full charge-domain coverage** — Verdict and sentencing text now map **all major arrest charge families** (audit of 132 arrest charges): sexual offences, kidnapping, arson (no longer misclassified as traffic via “reckless burning”), property damage/trespass, escape from custody, probation/parole/protective-order/sex-offender registration breaches, public-order crimes, refined **drug** detection (avoids generic “possession” matching firearms/stolen property), broader **traffic** keywords (suspended licence, impeding traffic, etc.), and **DUI-adjacent** charges (chemical test, field sobriety). **Guilty-trial templates** gain weighted lines for SexOffense, Kidnapping, and Arson (charge-based tags, like Homicide). **Aggravating factors** include robbery/burglary/carjacking, drugs, escape, and court-order violations when charged. **Charge-domain closing phrase** is always appended when any domain matches (was only ~33% of the time).
 
 ### Charges
 
 - **Drug charges aligned with Policing Redefined** — Arrest charges and seizure options cover every drug type from PR's API: **Possession Of Amphetamine**, **Possession Of Benzodiazepine**, **Possession Of Controlled Substance** (generic). Seizure options: Amphetamine, Benzodiazepine, Mescaline, Psilocybin. Court evidence mapping matches PR drug types.
 - **Property and ID charges (California law)** — Arrest and citation charges: **Possession Of Burglary Tools** (PC § 466), **Possession Of Credit Card Scanning Device** (PC § 502.6), **Possession Of Counterfeit Items** (PC § 475), **Possession Of Stolen Debit / Credit Card**, **Refusing To Provide Identification**, **Failure To Present Drivers License Upon Demand** (VC 12951). Court verdict phrasing reflects these (theft/property, resisting/obstruction, vehicle-related) where applicable.
+
+### Bug fixes
+
+- **Evidence capture robustness** — Evidence capture (arrest, fleeing, assault, vehicle damage) no longer fails when peds despawn during capture. Player assault and nearby-ped assault checks now use per-entity try/catch so one invalid entity does not abort the whole capture. Ped is re-validated before using `Handle` in the evidence lock. "Evidence capture failed: address cannot be zero" and similar invalid-entity errors are no longer logged as warnings (expected when suspects are cuffed/transported mid-capture).
+- **Delayed CDF retry** — The delayed CDF retry (2 seconds after first encounter) no longer logs "Invalid handle" or "EntityType" when the ped has despawned before the retry runs. Invalid handle is checked before starting the retry; `GetEntityByHandle` is wrapped to catch despawned-entity exceptions silently.
 
 ---
 

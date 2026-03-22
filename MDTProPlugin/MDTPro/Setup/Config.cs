@@ -100,6 +100,17 @@ namespace MDTPro.Setup {
         public float courtDefensePublicDefenderBonus = 8f;
         public float courtDefensePrivateCounselBonus = 14f;
 
+        /// <summary>Sentence multiplier: weight for repeat offender score (prior arrests, probation, etc.). 0 = use built-in default. Rebalanced so 2.5x is rare (career criminal + serious charges).</summary>
+        public float courtSentenceMultiplierRepeatWeight = 0.035f;
+        /// <summary>Sentence multiplier: weight for case severity. 0 = use built-in default.</summary>
+        public float courtSentenceMultiplierSeverityWeight = 0.01f;
+        /// <summary>Sentence multiplier: weight for prosecution vs defense outcome. 0 = use built-in default.</summary>
+        public float courtSentenceMultiplierOutcomeWeight = 0.15f;
+        /// <summary>Sentence multiplier: weight for docket pressure. 0 = use built-in default.</summary>
+        public float courtSentenceMultiplierDocketWeight = 0.08f;
+        /// <summary>Maximum sentence multiplier cap (e.g. 2.5 = 250% of base). 0 = use built-in default (2.5).</summary>
+        public float courtSentenceMultiplierMax = 2.5f;
+
         public int mapPlayerIconSize = 30;
         public float mapTurnPenaltySecondsPerRadian = 1.0f;
         public bool mapDrawPostalCodeSet = true;
