@@ -178,7 +178,9 @@ function renderFirearmCard(container, f) {
   const name = f.WeaponDisplayName || f.Description || f.WeaponModelId || `Weapon (${f.WeaponModelHash || 0})`
   const serial = f.IsSerialScratched ? 'Scratched' : (f.SerialNumber || 'N/A')
   const stolen = f.IsStolen ? ' [STOLEN]' : ''
-  const ownerVal = f.OwnerPedName || ''
+  const ownerVal = f.IsSerialScratched ? '' : (f.OwnerPedName || '')
+  const ownerDisplay = ownerVal ? escapeHtml(ownerVal) : '—'
+  const ownerClickable = ownerVal ? ` class="clickable" data-owner="${escapeHtml(ownerVal)}"` : ''
   card.innerHTML = `
     <div class="firearmRow firearmRowWithImage">
       <div class="firearmImageWrapper">
@@ -195,7 +197,7 @@ function renderFirearmCard(container, f) {
         </div>
         <div class="firearmRow">
           <label>Owner</label>
-          <span class="clickable" data-owner="${escapeHtml(ownerVal)}">${escapeHtml(ownerVal || '—')}</span>
+          <span${ownerClickable}>${ownerDisplay}</span>
         </div>
         <div class="firearmRow">
           <label>Source</label>

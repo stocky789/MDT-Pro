@@ -178,6 +178,10 @@ namespace MDTPro.ServerAPI {
                         .Select(r => new { r.Id, r.TimeStamp, r.Status }),
                     injuries = (DataController.InjuryReports ?? Enumerable.Empty<InjuryReport>())
                         .Where(r => r.InjuredPartyName != null && r.InjuredPartyName.ToLower() == pedName)
+                        .Select(r => new { r.Id, r.TimeStamp, r.Status }),
+                    impounds = (DataController.ImpoundReports ?? Enumerable.Empty<ImpoundReport>())
+                        .Where(r => (r.PersonAtFaultName != null && r.PersonAtFaultName.ToLower() == pedName)
+                                 || (r.Owner != null && r.Owner.ToLower() == pedName))
                         .Select(r => new { r.Id, r.TimeStamp, r.Status })
                 };
 
@@ -187,31 +191,40 @@ namespace MDTPro.ServerAPI {
             } else if (path == "recentReports") {
                 string body = Helper.GetRequestPostData(req);
                 int withinMinutes = 60;
+                string pedName = null;
                 if (!string.IsNullOrEmpty(body)) {
                     try {
-                        var parsed = JsonConvert.DeserializeAnonymousType(body, new { withinMinutes = 60 });
-                        if (parsed != null && parsed.withinMinutes > 0 && parsed.withinMinutes <= 120)
-                            withinMinutes = parsed.withinMinutes;
+                        var parsed = JsonConvert.DeserializeAnonymousType(body, new { withinMinutes = 60, pedName = (string)null });
+                        if (parsed != null) {
+                            if (parsed.withinMinutes > 0 && parsed.withinMinutes <= 120)
+                                withinMinutes = parsed.withinMinutes;
+                            pedName = !string.IsNullOrEmpty(parsed.pedName) ? parsed.pedName.Trim().ToLowerInvariant() : null;
+                        }
                     } catch { }
                 }
                 var cutoff = DateTime.UtcNow.AddMinutes(-withinMinutes);
                 var list = new System.Collections.Generic.List<(string id, string type, DateTime timeStamp)>();
-                void AddIfRecent(System.Collections.IEnumerable reports, string type) {
+                bool MatchesPed(string name) => !string.IsNullOrEmpty(pedName) && !string.IsNullOrEmpty(name) && name.Trim().ToLowerInvariant() == pedName;
+                bool MatchesPedInArray(string[] arr) => arr != null && arr.Any(n => MatchesPed(n ?? ""));
+                void AddIfRecent(System.Collections.IEnumerable reports, string type, Func<Report, bool> matchesPed = null) {
                     if (reports == null) return;
                     foreach (Report r in reports) {
                         if (string.IsNullOrEmpty(r.Id)) continue;
                         var createdAt = DataController.GetReportRealCreatedAt(r.Id);
                         var useForFilter = createdAt ?? r.TimeStamp.ToUniversalTime();
-                        if (useForFilter >= cutoff)
+                        if (useForFilter >= cutoff && (string.IsNullOrEmpty(pedName) || (matchesPed != null && matchesPed(r))))
                             list.Add((r.Id, type, r.TimeStamp));
                     }
                 }
-                AddIfRecent(DataController.IncidentReports, "incident");
-                AddIfRecent(DataController.InjuryReports, "injury");
-                AddIfRecent(DataController.CitationReports, "citation");
-                AddIfRecent(DataController.TrafficIncidentReports, "trafficIncident");
-                AddIfRecent(DataController.ImpoundReports, "impound");
-                AddIfRecent(DataController.PropertyEvidenceReports, "propertyEvidence");
+                AddIfRecent(DataController.IncidentReports, "incident", r => MatchesPedInArray((r as IncidentReport)?.OffenderPedsNames) || MatchesPedInArray((r as IncidentReport)?.WitnessPedsNames));
+                AddIfRecent(DataController.InjuryReports, "injury", r => MatchesPed((r as InjuryReport)?.InjuredPartyName));
+                AddIfRecent(DataController.CitationReports, "citation", r => MatchesPed((r as CitationReport)?.OffenderPedName));
+                AddIfRecent(DataController.TrafficIncidentReports, "trafficIncident", r => MatchesPedInArray((r as TrafficIncidentReport)?.DriverNames) || MatchesPedInArray((r as TrafficIncidentReport)?.PassengerNames) || MatchesPedInArray((r as TrafficIncidentReport)?.PedestrianNames));
+                AddIfRecent(DataController.ImpoundReports, "impound", r => MatchesPed((r as ImpoundReport)?.PersonAtFaultName) || MatchesPed((r as ImpoundReport)?.Owner));
+                AddIfRecent(DataController.PropertyEvidenceReports, "propertyEvidence", r => {
+                    var per = r as PropertyEvidenceReceiptReport;
+                    return MatchesPed(per?.SubjectPedName) || (per?.SubjectPedNames != null && per.SubjectPedNames.Any(n => MatchesPed(n ?? "")));
+                });
                 var sorted = list.OrderByDescending(x => x.timeStamp)
                     .Select(x => new { id = x.id, type = x.type, timeStamp = x.timeStamp }).ToList();
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(sorted));

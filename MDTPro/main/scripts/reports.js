@@ -923,6 +923,83 @@ async function getEvidenceSeizedSection(report, isList) {
 }
 
 /**
+ * Updates dataset and adds a row for an attached report. Used for both API and local (draft) attach.
+ * @param {HTMLElement} listWrap - List container
+ * @param {HTMLElement} reportInfoEl - Report info element with dataset.attachedReportIds
+ * @param {object} report - Arrest report
+ * @param {string} reportId - Report ID to add
+ * @param {object} summary - Optional { typeLabel, date, subtitle } for display
+ * @param {object} language - Language strings
+ * @param {Function} onDetach - Async (row) => void, handles detach (API or local)
+ */
+function addAttachedReportRow(listWrap, reportInfoEl, report, reportId, summary, language, onDetach) {
+  const typeLabel = summary?.typeLabel ?? '—'
+  const date = summary?.date ? new Date(summary.date + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : ''
+  const subtitle = summary?.subtitle ? String(summary.subtitle).trim() : ''
+  const row = document.createElement('div')
+  row.className = 'attachedReportIdRow'
+  row.dataset.reportId = reportId
+  const info = document.createElement('div')
+  info.className = 'attachedReportIdRowInfo'
+  const idBlock = document.createElement('span')
+  idBlock.className = 'attachedReportIdRowId'
+  idBlock.textContent = reportId
+  info.appendChild(idBlock)
+  const meta = document.createElement('span')
+  meta.className = 'attachedReportIdRowMeta'
+  meta.textContent = [typeLabel, date, subtitle].filter(Boolean).join(' · ')
+  info.appendChild(meta)
+  row.appendChild(info)
+  const detachBtn = document.createElement('button')
+  detachBtn.type = 'button'
+  detachBtn.className = 'detachReportButton'
+  detachBtn.textContent = language.reports?.sections?.arrest?.detach ?? 'Detach'
+  detachBtn.addEventListener('click', async function () {
+    if (detachBtn.classList.contains('loading')) return
+    detachBtn.classList.add('loading')
+    await onDetach(row)
+    detachBtn.classList.remove('loading')
+  })
+  row.appendChild(detachBtn)
+  listWrap.appendChild(row)
+}
+
+/**
+ * Local attach for draft arrests (not yet saved). Updates dataset and adds rows.
+ */
+async function localAttachReports(reportInfoEl, listWrap, report, reportIds, language, typeLabelByType) {
+  let current = []
+  try {
+    current = JSON.parse(reportInfoEl.dataset.attachedReportIds || '[]')
+  } catch (_) {}
+  const toAdd = reportIds.filter((id) => id && id !== report.Id && !current.includes(id))
+  if (toAdd.length === 0) return 0
+  const nextIds = [...current, ...toAdd]
+  reportInfoEl.dataset.attachedReportIds = JSON.stringify(nextIds)
+  let summaries = []
+  if (toAdd.length > 0) {
+    try {
+      const res = await fetch('/data/reportSummaries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(toAdd) })
+      if (res.ok) summaries = await res.json()
+    } catch (_) {}
+  }
+  const doDetach = async (row) => {
+    const rid = row.dataset.reportId
+    let ids = []
+    try { ids = JSON.parse(reportInfoEl.dataset.attachedReportIds || '[]') } catch (_) {}
+    ids = ids.filter((id) => id !== rid)
+    reportInfoEl.dataset.attachedReportIds = JSON.stringify(ids)
+    row.remove()
+  }
+  toAdd.forEach((rid) => {
+    const sum = Array.isArray(summaries) ? summaries.find((s) => s && s.id === rid) : null
+    const typeLabel = typeLabelByType && typeLabelByType[rid] ? typeLabelByType[rid] : (sum?.typeLabel ?? '—')
+    addAttachedReportRow(listWrap, reportInfoEl, report, rid, sum || { typeLabel }, language, doDetach)
+  })
+  return toAdd.length
+}
+
+/**
  * Section shown when editing an arrest report with Status Pending: attached report IDs,
  * attach/detach controls, and "Close arrest (submit for court)" button.
  * @param {object} report - Arrest report with Id, Status, AttachedReportIds
@@ -943,6 +1020,8 @@ async function getArrestAttachedReportsSection(report) {
     section.classList.add('hidden')
     return section
   }
+
+  const reportInfoEl = document.querySelector('.createPage .listWrapper .reportInformation')
 
   const title = document.createElement('div')
   title.className = 'sectionTitle'
@@ -971,32 +1050,15 @@ async function getArrestAttachedReportsSection(report) {
     } catch (_) {}
   }
 
+  const isArrestNotFound = (err) => (err && (String(err.error || '').toLowerCase().includes('not found') || String(err.error || '').toLowerCase().includes('already closed')))
+
   attachedIds.forEach((reportId) => {
     const sum = summaries.find((s) => s.id === reportId)
     const typeLabel = sum?.typeLabel ?? '—'
     const date = sum?.date ? new Date(sum.date + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : ''
     const subtitle = sum?.subtitle ? String(sum.subtitle).trim() : ''
 
-    const row = document.createElement('div')
-    row.className = 'attachedReportIdRow'
-    const info = document.createElement('div')
-    info.className = 'attachedReportIdRowInfo'
-    const idBlock = document.createElement('span')
-    idBlock.className = 'attachedReportIdRowId'
-    idBlock.textContent = reportId
-    info.appendChild(idBlock)
-    const meta = document.createElement('span')
-    meta.className = 'attachedReportIdRowMeta'
-    meta.textContent = [typeLabel, date, subtitle].filter(Boolean).join(' · ')
-    info.appendChild(meta)
-    row.appendChild(info)
-    const detachBtn = document.createElement('button')
-    detachBtn.type = 'button'
-    detachBtn.className = 'detachReportButton'
-    detachBtn.textContent = language.reports?.sections?.arrest?.detach ?? 'Detach'
-    detachBtn.addEventListener('click', async function () {
-      if (detachBtn.classList.contains('loading')) return
-      detachBtn.classList.add('loading')
+    const onDetach = async (row) => {
       const res = await (
         await fetch('/post/detachReportFromArrest', {
           method: 'POST',
@@ -1004,22 +1066,25 @@ async function getArrestAttachedReportsSection(report) {
           body: JSON.stringify({ arrestReportId: report.Id, reportId })
         })
       ).text()
-      detachBtn.classList.remove('loading')
       if (res === 'OK') {
         const list = await (await fetch('/data/arrestReports')).json()
         const updated = list.find((r) => r.Id === report.Id)
         if (updated) await renderReportInformation(updated, 'arrest', false)
       } else {
-        let msg = language.reports?.notifications?.saveError ?? 'Error'
-        try {
-          const err = JSON.parse(res)
-          if (err && err.error) msg = err.error
-        } catch (_) {}
-        topWindow.showNotification(msg, 'error')
+        let err = null
+        try { err = JSON.parse(res) } catch (_) {}
+        if (reportInfoEl && isArrestNotFound(err)) {
+          let ids = []
+          try { ids = JSON.parse(reportInfoEl.dataset.attachedReportIds || '[]') } catch (_) {}
+          ids = ids.filter((id) => id !== reportId)
+          reportInfoEl.dataset.attachedReportIds = JSON.stringify(ids)
+          row.remove()
+        } else {
+          topWindow.showNotification(err?.error || language.reports?.notifications?.saveError || 'Error', 'error')
+        }
       }
-    })
-    row.appendChild(detachBtn)
-    listWrap.appendChild(row)
+    }
+    addAttachedReportRow(listWrap, reportInfoEl, report, reportId, sum, language, onDetach)
   })
   section.appendChild(listWrap)
 
@@ -1057,17 +1122,24 @@ async function getArrestAttachedReportsSection(report) {
     if (importRecentBtn.classList.contains('loading')) return
     importRecentBtn.classList.add('loading')
     try {
+      const offenderInput = document.querySelector('.createPage #offenderSectionPedNameInput')
+      const offenderName = (offenderInput?.value?.trim() || report.OffenderPedName || '').trim()
       const res = await fetch('/data/recentReports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ withinMinutes: 60 })
+        body: JSON.stringify({ withinMinutes: 60, pedName: offenderName || undefined })
       })
       if (!res.ok) throw new Error('Failed to fetch recent reports')
       const recent = await res.json()
-      const attachedIds = report.AttachedReportIds || []
+      let currentAttached = []
+      if (reportInfoEl) {
+        try { currentAttached = JSON.parse(reportInfoEl.dataset.attachedReportIds || '[]') } catch (_) {}
+      } else {
+        currentAttached = report.AttachedReportIds || []
+      }
       const reportIds = (Array.isArray(recent) ? recent : [])
         .map((r) => r && r.id)
-        .filter((id) => id && id !== report.Id && !attachedIds.includes(id))
+        .filter((id) => id && id !== report.Id && !currentAttached.includes(id))
       if (reportIds.length === 0) {
         topWindow.showNotification(
           language.reports?.sections?.arrest?.importRecentReportsNone ?? 'No new recent reports to import (last 60 min).',
@@ -1081,8 +1153,8 @@ async function getArrestAttachedReportsSection(report) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ arrestReportId: report.Id, reportIds })
       })
-      const attachData = attachRes.ok ? await attachRes.json().catch(() => ({})) : null
-      if (attachData && attachData.added > 0) {
+      const attachData = await attachRes.json().catch(() => ({}))
+      if (attachRes.ok && attachData.added > 0) {
         const list = await (await fetch('/data/arrestReports')).json()
         const updated = list.find((r) => r.Id === report.Id)
         if (updated) await renderReportInformation(updated, 'arrest', false)
@@ -1090,11 +1162,23 @@ async function getArrestAttachedReportsSection(report) {
           `${attachData.added} report(s) attached.`,
           'success'
         )
-      } else {
+      } else if (reportInfoEl && !attachRes.ok && isArrestNotFound(attachData)) {
+        const typeLabelByType = {}
+        ;(Array.isArray(recent) ? recent : []).forEach((r) => { if (r && r.id && r.type) typeLabelByType[r.id] = (r.type === 'propertyEvidence' ? 'Property & Evidence' : r.type === 'injury' ? 'Injury' : (r.type || '').charAt(0).toUpperCase() + (r.type || '').slice(1)) })
+        const added = await localAttachReports(reportInfoEl, listWrap, report, reportIds, language, typeLabelByType)
+        topWindow.showNotification(
+          added > 0
+            ? (language.reports?.sections?.arrest?.attachReportDraftHint ?? 'Reports will be attached when you save the arrest.') + ` (${added})`
+            : (language.reports?.sections?.arrest?.importRecentReportsNone ?? 'No new recent reports to import.'),
+          added > 0 ? 'success' : 'info'
+        )
+      } else if (attachRes.ok && attachData.added === 0) {
         topWindow.showNotification(
           language.reports?.sections?.arrest?.importRecentReportsNone ?? 'No new recent reports to import.',
           'info'
         )
+      } else {
+        topWindow.showNotification(attachData?.error || language.reports?.notifications?.saveError ?? 'Error', 'error')
       }
     } catch (e) {
       topWindow.showNotification(
@@ -1137,12 +1221,22 @@ async function getArrestAttachedReportsSection(report) {
       const updated = list.find((r) => r.Id === report.Id)
       if (updated) await renderReportInformation(updated, 'arrest', false)
     } else {
-      let msg = language.reports?.notifications?.saveError ?? 'Error'
-      try {
-        const err = JSON.parse(res)
-        if (err && err.error) msg = err.error
-      } catch (_) {}
-      topWindow.showNotification(msg, 'error')
+      let err = null
+      try { err = JSON.parse(res) } catch (_) {}
+      if (reportInfoEl && isArrestNotFound(err)) {
+        const added = await localAttachReports(reportInfoEl, listWrap, report, [reportId], language, null)
+        if (added > 0) {
+          attachInput.value = ''
+          topWindow.showNotification(
+            language.reports?.sections?.arrest?.attachReportDraftHint ?? 'Report will be attached when you save the arrest.',
+            'success'
+          )
+        } else {
+          topWindow.showNotification(language.reports?.notifications?.saveError ?? 'Error', 'error')
+        }
+      } else {
+        topWindow.showNotification(err?.error || language.reports?.notifications?.saveError ?? 'Error', 'error')
+      }
     }
   })
   attachWrap.appendChild(attachInput)
@@ -1152,7 +1246,7 @@ async function getArrestAttachedReportsSection(report) {
   const closeArrestBtn = document.createElement('button')
   closeArrestBtn.type = 'button'
   closeArrestBtn.className = 'closeArrestButton'
-  closeArrestBtn.textContent = language.reports?.sections?.arrest?.closeArrestSubmit ?? 'Close arrest (submit for court)'
+  closeArrestBtn.textContent = language.reports?.sections?.arrest?.closeArrestSubmit ?? 'Save and close (submit for court)'
   closeArrestBtn.addEventListener('click', async function () {
     if (closeArrestBtn.classList.contains('loading')) return
     const statusBtn = document.querySelector('.createPage .statusInput button[data-status="0"]')
@@ -1160,12 +1254,14 @@ async function getArrestAttachedReportsSection(report) {
     document.querySelectorAll('.createPage .statusInput button').forEach((b) => b.classList.remove('selected'))
     statusBtn.classList.add('selected')
     closeArrestBtn.classList.add('loading')
-    await saveReport('arrest', { skipArrestCaution: true })
+    const saved = await saveReport('arrest', { skipArrestCaution: true })
     closeArrestBtn.classList.remove('loading')
-    topWindow.showNotification(
-      language.reports?.notifications?.closeArrestSuccess ?? 'Arrest closed and submitted for court.',
-      'success'
-    )
+    if (saved) {
+      topWindow.showNotification(
+        language.reports?.notifications?.closeArrestSuccess ?? 'Arrest closed and submitted for court.',
+        'success'
+      )
+    }
   })
   section.appendChild(closeArrestBtn)
 
@@ -1353,11 +1449,12 @@ async function saveReport(type, options = {}) {
   }
 
   if (!isValidDate(generalInformation.TimeStamp)) {
-    return topWindow.showNotification(
+    topWindow.showNotification(
       `${language.reports.notifications.saveError} ${language.reports.notifications.invalidTimeStamp}`,
       'error',
       6000
     )
+    return false
   }
 
   const officerInformation = {
@@ -1475,10 +1572,11 @@ async function saveReport(type, options = {}) {
         .value.trim()
 
       if (!report.OffenderPedName) {
-        return topWindow.showNotification(
+        topWindow.showNotification(
           `${language.reports.notifications.saveError} ${language.reports.notifications.noOffender}`,
           'error'
         )
+        return false
       }
 
       report.OffenderVehicleLicensePlate = el
@@ -1494,10 +1592,11 @@ async function saveReport(type, options = {}) {
       }
 
       if (report.Charges.length < 1) {
-        return topWindow.showNotification(
+        topWindow.showNotification(
           `${language.reports.notifications.saveError} ${language.reports.notifications.noCharges}`,
           'error'
         )
+        return false
       }
 
       report.CourtCaseNumber = el.dataset.courtCaseNumber ?? null
@@ -1534,6 +1633,7 @@ async function saveReport(type, options = {}) {
       ).text()
       break
     case 'impound':
+      report.PersonAtFaultName = el.querySelector('#impoundSectionPersonAtFaultInput')?.value?.trim() || null
       report.LicensePlate = el.querySelector('#impoundSectionPlateInput')?.value?.trim() || ''
       report.VehicleModel = el.querySelector('#impoundSectionModelInput')?.value?.trim() || ''
       report.Owner = el.querySelector('#impoundSectionOwnerInput')?.value?.trim() || ''
@@ -1622,7 +1722,7 @@ async function saveReport(type, options = {}) {
       if (err && err.error) msg = err.error
     } catch (_) {}
     topWindow.showNotification(msg, 'error')
-    return
+    return false
   }
   const attachToArrestId = sessionStorage.getItem('mdtproAttachPropertyEvidenceToArrestId')
   if (type === 'propertyEvidence' && attachToArrestId && report.Id) {
@@ -1664,6 +1764,7 @@ async function saveReport(type, options = {}) {
   reportIsOnCreatePageBool = false
 
   await onListPageTypeSelectorButtonClick(type)
+  return true
 }
 
 /**

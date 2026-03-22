@@ -10,12 +10,13 @@ All notable changes to MDT Pro are documented here.
 
 - **Property and Evidence Receipt (Seizure Reports)** — New report type to document seized drugs and firearms. Supports multiple subjects via Recent IDs or manual add. Add drugs and firearms with quantity types (Baggie, Bundle, Grams, Ounce, Pill, etc.). Attach to arrests for court evidence. Charge-specific evidence: court now matches what you seized (e.g. Possession of Heroin only counts if Heroin is in the seizure report). Court shows specific types when documented ("Drugs found: Heroin, Cocaine" or "Firearms seized: Pistol"). The drugs/firearms tickboxes on arrest reports are removed — use Property and Evidence Receipt reports instead. Create from the arrest's Attached reports section; subject pre-fills and the report auto-attaches.
 - **Court rebalanced** — Sentence multiplier was hitting the max too often. Now tuned so harsher sentences are reserved for career criminals, serious felonies, and strong prosecution. Routine arrests stay closer to baseline. Many new wording variants for verdicts and sentencing. Outcome reasoning only mentions evidence you actually documented. Murder and manslaughter are now prominently mentioned. Broader charge coverage for sexual offences, kidnapping, property damage, escape, probation breaches, traffic, DUI, and more. Adjust in Config → Court if needed.
-- **Firearms Check improvements** — Recent weapons from pat-downs and body searches. Serial and owner appear when the game provides them. Faster capture, melee filtered, lookups improved. Weapon lines from vehicle searches are clickable — click to jump into Firearms Check. External systems can push firearm results into the MDT, but your dispatch or voice mod would need to support it — nothing does out of the box.
+- **Firearms Check improvements** — Recent weapons from pat-downs and body searches. Serial and owner appear when the game provides them. Faster capture, melee filtered, lookups improved. Weapon lines from vehicle searches are clickable — click to jump into Firearms Check.
 
 ### Minor Features
 
-- **Person Search** — Injury reports in Associated Reports; ID photo in Basic Information (placeholder if unavailable).
-- **Arrest Reports** — Import recent reports button attaches all reports from the last 60 minutes when editing an arrest.
+- **Person Search** — Injury reports and impound reports (person at fault or owner) in Associated Reports; ID photo in Basic Information (placeholder if unavailable).
+- **Arrest Reports** — **Import recent reports** button attaches reports from the last 60 minutes that involve the arrested person (incident, injury, citation, traffic, impound, property/evidence). Works before first save (draft mode). **Save and close (submit for court)** — label clarifies it saves first; success notification only shows when save actually succeeds.
+- **Impound Reports** — **Person at fault** field with Recent IDs to tie impounds to a person for import filtering and person search.
 - **Vehicle Search** — Search Results (Contraband) shows drugs, weapons, and contraband when the game provides them (after running the plate and searching the vehicle).
 - **Charges** — New drug charges: Amphetamine, Benzodiazepine, Mescaline, Psilocybin, generic Possession Of Controlled Substance. New property/ID charges: Possession Of Burglary Tools, Possession Of Credit Card Scanning Device, Possession Of Counterfeit Items, Possession Of Stolen Debit/Credit Card, Refusing To Provide Identification, Failure To Present Drivers License Upon Demand.
 
@@ -23,11 +24,11 @@ All notable changes to MDT Pro are documented here.
 
 - **Evidence capture** — No longer fails when suspects despawn or are transported mid-capture.
 - **Person Search** — Fixed errors when searching for someone who had already left the area.
+- **Import recent reports** — Now works when useInGameTime is enabled (uses real creation time for the 60-minute window).
 
 ### Misc
 
-- **Firearms Check — what works and what doesn't:** Weapons from pat-downs and body searches show up. So do guns found when you search a vehicle (after running the plate through dispatch) and guns you're holding. Weapons you put in your trunk and then run a serial check on from the trunk menu often won't appear — the game doesn't pass us that data. Same for voice-based serial checks unless another mod is set up to feed those results in.
-
+- **Firearms Check — what works and what doesn't:** Weapons from pat-downs and body searches show up. So do guns found when you search a vehicle (after running the plate through dispatch) and guns you're holding. Weapons you put in your trunk and then run a serial check on from the trunk menu often won't appear — yet to figure out a method to make this work.
 ---
 
 ## [0.9.5.1] — 2026-03-17
