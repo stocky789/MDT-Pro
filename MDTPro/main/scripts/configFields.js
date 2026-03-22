@@ -91,7 +91,9 @@ const CONFIG_SECTIONS = [
       'courtEvidenceSupervisionViolationBonus',
       'courtEvidenceResistedBonus',
       'courtEvidenceDrugsBonus',
+      'courtEvidenceDrugQuantityBonus',
       'courtEvidenceUseOfForceBonus',
+      'courtEvidenceSeizureReportBonus',
     ],
   },
   {
@@ -115,6 +117,16 @@ const CONFIG_SECTIONS = [
       'courtProsecutionRecidivismWeight',
       'courtDefensePublicDefenderBonus',
       'courtDefensePrivateCounselBonus',
+    ],
+  },
+  {
+    title: 'Court — Sentence Multiplier',
+    keys: [
+      'courtSentenceMultiplierRepeatWeight',
+      'courtSentenceMultiplierSeverityWeight',
+      'courtSentenceMultiplierOutcomeWeight',
+      'courtSentenceMultiplierDocketWeight',
+      'courtSentenceMultiplierMax',
     ],
   },
   {
@@ -399,9 +411,17 @@ const CONFIG_FIELD_META = {
     label: 'Drugs found bonus',
     tooltip: 'Evidence points when drugs were found on the person.',
   },
+  courtEvidenceDrugQuantityBonus: {
+    label: 'Drug quantity bonus',
+    tooltip: 'Extra evidence when drug quantity is documented in seizure report. Higher quantities (bundle, kilo, etc.) add more; max = this value × quantity weight.',
+  },
   courtEvidenceUseOfForceBonus: {
     label: 'Use of Force documented bonus',
     tooltip: 'Evidence points when use of force was documented on the arrest report.',
+  },
+  courtEvidenceSeizureReportBonus: {
+    label: 'Seizure report bonus',
+    tooltip: 'Evidence points per attached Property and Evidence Receipt (seizure) report.',
   },
   courtCaseResolutionMinBase: {
     label: 'Min resolution time (minutes)',
@@ -454,6 +474,26 @@ const CONFIG_FIELD_META = {
   courtDefensePrivateCounselBonus: {
     label: 'Defense: private counsel bonus',
     tooltip: 'Strength bonus when the defendant has private counsel.',
+  },
+  courtSentenceMultiplierRepeatWeight: {
+    label: 'Repeat offender weight',
+    tooltip: 'How much prior arrests/convictions/probation increase the sentence multiplier. Default 0.035. Higher = repeat offenders get steeper sentences.',
+  },
+  courtSentenceMultiplierSeverityWeight: {
+    label: 'Severity weight',
+    tooltip: 'How much case severity affects the sentence multiplier. Default 0.01.',
+  },
+  courtSentenceMultiplierOutcomeWeight: {
+    label: 'Outcome momentum weight',
+    tooltip: 'How much prosecution vs defense strength affects the multiplier. Default 0.15.',
+  },
+  courtSentenceMultiplierDocketWeight: {
+    label: 'Docket pressure weight',
+    tooltip: 'How much busy court dockets increase sentences. Default 0.08.',
+  },
+  courtSentenceMultiplierMax: {
+    label: 'Maximum multiplier cap',
+    tooltip: 'Hard cap on sentence multiplier (e.g. 2.5 = 250% of base sentence). 2.5x should be rare—only worst cases. Default 2.5.',
   },
   mapPlayerIconSize: {
     label: 'Map player icon size (px)',

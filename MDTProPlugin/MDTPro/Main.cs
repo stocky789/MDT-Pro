@@ -97,6 +97,8 @@ namespace MDTPro {
 
                         if (usePR) {
                             EventListeners.PREvents.SubscribeToPREvents();
+                            if (GetConfig().firearmDebugLogging)
+                                Data.DataController.LogPRAssemblyFirearmDiagnostics();
                         }
                         EventListeners.CDFEvents.Subscribe();
                         // Always subscribe to LSPDFR OnPedArrested: PR's OnPedArrested only fires for arrests through PR.

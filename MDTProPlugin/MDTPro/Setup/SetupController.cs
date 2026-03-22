@@ -42,6 +42,7 @@ namespace MDTPro.Setup {
         internal static string ArrestOptionsPath => Path.Combine(MDTProPath, "arrestOptions.json");
         internal static string CitationOptionsDefaultsPath => Path.Combine(DefaultsPath, "citationOptions.json");
         internal static string ArrestOptionsDefaultsPath => Path.Combine(DefaultsPath, "arrestOptions.json");
+        internal static string SeizureOptionsDefaultsPath => Path.Combine(DefaultsPath, "seizureOptions.json");
         internal static string PedDataPath => Path.Combine(DataPath, "peds.json");
         internal static string VehicleDataPath => Path.Combine(DataPath, "vehicles.json");
         internal static string CourtDataPath => Path.Combine(DataPath, "court.json");
@@ -88,6 +89,7 @@ namespace MDTPro.Setup {
             DataController.impoundReports = Database.LoadImpoundReports() ?? new List<ImpoundReport>();
             DataController.trafficIncidentReports = Database.LoadTrafficIncidentReports() ?? new List<TrafficIncidentReport>();
             DataController.injuryReports = Database.LoadInjuryReports() ?? new List<InjuryReport>();
+            DataController.propertyEvidenceReports = Database.LoadPropertyEvidenceReceiptReports() ?? new List<PropertyEvidenceReceiptReport>();
 
             DataController.LoadPedDatabaseFromFile();
             DataController.LoadVehicleDatabaseFromFile();
@@ -112,10 +114,16 @@ namespace MDTPro.Setup {
                     DataController.SetDatabases();
                     DataController.CheckAndResolvePendingCases();
                     DataController.TryCaptureVehicleSearches();
-                    DataController.TryCapturePickupAndPlayerFirearms();
                     GameFiber.Wait(GetConfig().databaseUpdateInterval);
                 }
             }, "data-update-interval");
+
+            GameFiber.StartNew(() => {
+                while (Server.RunServer) {
+                    DataController.TryCapturePickupAndPlayerFirearms();
+                    GameFiber.Wait(500);
+                }
+            }, "firearm-capture-interval");
 
             GameFiber.StartNew(() => {
                 while (Server.RunServer) {
@@ -137,6 +145,8 @@ namespace MDTPro.Setup {
 
             Config config = GetConfig();
             Helper.Log($"Config:\n{JsonConvert.SerializeObject(config, Formatting.Indented)}");
+            if (config.firearmDebugLogging)
+                Helper.Log("[Firearm] Debug logging ENABLED – firearm capture flow will be logged to this file.", false, Helper.LogSeverity.Info);
 
             string[] MDTProDirectoryFiles = Directory.GetFiles(MDTProPath).Select(item => $"[File] {Path.GetFileName(item)}").ToArray();
             string[] MDTProDirectoryDirs = Directory.GetDirectories(MDTProPath).Select(item => $"[Directory] {Path.GetFileName(item)}").ToArray();
@@ -209,6 +219,7 @@ namespace MDTPro.Setup {
             if (string.IsNullOrEmpty(map.impound)) map.impound = "IMP";
             if (string.IsNullOrEmpty(map.trafficIncident)) map.trafficIncident = "TIR";
             if (string.IsNullOrEmpty(map.injury)) map.injury = "INJ";
+            if (string.IsNullOrEmpty(map.propertyEvidence)) map.propertyEvidence = "PER";
         }
 
         private static List<CitationGroup> cachedCitationOptions;
@@ -221,6 +232,10 @@ namespace MDTPro.Setup {
         internal static List<ArrestGroup> GetArrestOptions() {
             cachedArrestOptions ??= Helper.ReadFromJsonFile<List<ArrestGroup>>(ArrestOptionsPath);
             return cachedArrestOptions;
+        }
+
+        internal static SeizureOptions GetSeizureOptions() {
+            return Helper.ReadFromJsonFile<SeizureOptions>(SeizureOptionsDefaultsPath) ?? new SeizureOptions();
         }
 
         internal static List<MDTProPedData> GetMDTProPedData() {

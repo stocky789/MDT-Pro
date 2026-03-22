@@ -262,6 +262,36 @@ namespace MDTPro.ServerAPI {
                 buffer = Encoding.UTF8.GetBytes("OK");
                 contentType = "text/plain";
                 status = 200;
+            } else if (path == "attachReportsToArrest") {
+                var data = JsonConvert.DeserializeAnonymousType(body, new { arrestReportId = "", reportIds = new string[0] });
+                if (data == null || string.IsNullOrWhiteSpace(data.arrestReportId) || data.reportIds == null) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "arrestReportId and reportIds required" }));
+                    contentType = "application/json";
+                    status = 400;
+                    return;
+                }
+                var arrest = DataController.ArrestReports?.FirstOrDefault(x => x.Id == data.arrestReportId);
+                bool arrestCanAttach = arrest != null && (arrest.Status == ReportStatus.Pending || arrest.Status == ReportStatus.Open);
+                if (!arrestCanAttach) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "Arrest not found or already closed for court" }));
+                    contentType = "application/json";
+                    status = 400;
+                    return;
+                }
+                if (arrest.AttachedReportIds == null) arrest.AttachedReportIds = new System.Collections.Generic.List<string>();
+                int added = 0;
+                foreach (var reportId in data.reportIds) {
+                    if (string.IsNullOrWhiteSpace(reportId) || reportId == arrest.Id) continue;
+                    if (!ReportExistsAndIsAttachable(reportId)) continue;
+                    if (!arrest.AttachedReportIds.Contains(reportId)) {
+                        arrest.AttachedReportIds.Add(reportId);
+                        added++;
+                    }
+                }
+                if (added > 0) Database.SaveArrestReport(arrest);
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = true, added }));
+                contentType = "application/json";
+                status = 200;
             } else if (path == "attachReportToCourtCase") {
                 var data = JsonConvert.DeserializeAnonymousType(body, new { courtCaseNumber = "", reportId = "" });
                 if (data == null || string.IsNullOrWhiteSpace(data.courtCaseNumber) || string.IsNullOrWhiteSpace(data.reportId)) {
@@ -365,6 +395,22 @@ namespace MDTPro.ServerAPI {
                 } catch (Exception ex) {
                     Utility.Helper.Log($"[createInjuryReport] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
                     try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createInjuryReport:\n{ex}"); } catch { }
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
+                    contentType = "application/json";
+                    status = 500;
+                }
+            } else if (path == "createPropertyEvidenceReceiptReport") {
+                try {
+                    PropertyEvidenceReceiptReport report = JsonConvert.DeserializeObject<PropertyEvidenceReceiptReport>(body);
+                    if (report == null) { buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid report data." })); contentType = "application/json"; status = 400; return; }
+                    DataController.AddReport(report);
+                    Database.SavePropertyEvidenceReceiptReport(report);
+                    buffer = Encoding.UTF8.GetBytes("OK");
+                    contentType = "text/plain";
+                    status = 200;
+                } catch (Exception ex) {
+                    Utility.Helper.Log($"[createPropertyEvidenceReceiptReport] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
+                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createPropertyEvidenceReceiptReport:\n{ex}"); } catch { }
                     buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
                     contentType = "application/json";
                     status = 500;
@@ -587,6 +633,31 @@ namespace MDTPro.ServerAPI {
                     contentType = "text/json";
                     status = 404;
                 }
+            } else if (path == "firearmCheckResult") {
+                var data = JsonConvert.DeserializeAnonymousType(body, new { serialNumber = (string)null, ownerName = (string)null, owner = (string)null, weaponType = (string)null, weapon = (string)null, status = (string)null, weaponModelId = (string)null });
+                if (data == null) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "Invalid JSON body." }));
+                    contentType = "text/json";
+                    status = 400;
+                    return;
+                }
+                string owner = !string.IsNullOrWhiteSpace(data.ownerName) ? data.ownerName : data.owner;
+                string weapon = !string.IsNullOrWhiteSpace(data.weaponType) ? data.weaponType : data.weapon;
+                if (string.IsNullOrWhiteSpace(owner)) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "ownerName (or owner) is required." }));
+                    contentType = "text/json";
+                    status = 400;
+                    return;
+                }
+                if (DataController.SaveFirearmCheckResultFromDispatch(data.serialNumber, owner, weapon, data.status, data.weaponModelId)) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = true }));
+                    contentType = "text/json";
+                    status = 200;
+                } else {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "Failed to save firearm check result." }));
+                    contentType = "text/json";
+                    status = 400;
+                }
             }
         }
 
@@ -597,7 +668,8 @@ namespace MDTPro.ServerAPI {
                 || (DataController.InjuryReports?.Any(r => r.Id == reportId) ?? false)
                 || (DataController.CitationReports?.Any(r => r.Id == reportId) ?? false)
                 || (DataController.TrafficIncidentReports?.Any(r => r.Id == reportId) ?? false)
-                || (DataController.ImpoundReports?.Any(r => r.Id == reportId) ?? false);
+                || (DataController.ImpoundReports?.Any(r => r.Id == reportId) ?? false)
+                || (DataController.PropertyEvidenceReports?.Any(r => r.Id == reportId) ?? false);
         }
     }
 }

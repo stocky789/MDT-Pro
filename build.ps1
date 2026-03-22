@@ -25,19 +25,28 @@ $mdtDest = Join-Path $release 'MDTPro'
 
 # SQLite dependency paths - check multiple locations:
 # 1. Dependencies folder (committed to repo for easy builds)
-# 2. NuGet packages folder (if restored)
+# 2. NuGet packages folder (if restored) - discover version dynamically
 # 3. Build output folder (if copied during build)
 $depsFolder = Join-Path $root 'Dependencies'
-$sqlitePackage = Join-Path $root 'MDTProPlugin\packages\System.Data.SQLite.Core.1.0.119.0'
+$packagesDir = Join-Path $root 'MDTProPlugin\packages'
+$sqlitePkg = Get-ChildItem -Path $packagesDir -Directory -Filter 'System.Data.SQLite.Core*' -ErrorAction SilentlyContinue | Select-Object -First 1
+$sqlitePackageDir = if ($sqlitePkg) { $sqlitePkg.FullName } else { $null }
 
 $sqliteDllPaths = @(
-    (Join-Path $depsFolder 'System.Data.SQLite.dll'),
-    (Join-Path $sqlitePackage 'lib\net46\System.Data.SQLite.dll')
+    (Join-Path $depsFolder 'System.Data.SQLite.dll')
 )
+if ($sqlitePackageDir) {
+    $sqliteDllPaths += (Join-Path $sqlitePackageDir 'lib\net46\System.Data.SQLite.dll')
+    $sqliteDllPaths += (Join-Path $sqlitePackageDir 'lib\net48\System.Data.SQLite.dll')
+}
+
 $sqliteInteropPaths = @(
-    (Join-Path $depsFolder 'x64\SQLite.Interop.dll'),
-    (Join-Path $sqlitePackage 'build\net46\x64\SQLite.Interop.dll')
+    (Join-Path $depsFolder 'x64\SQLite.Interop.dll')
 )
+if ($sqlitePackageDir) {
+    $sqliteInteropPaths += (Join-Path $sqlitePackageDir 'build\net46\x64\SQLite.Interop.dll')
+    $sqliteInteropPaths += (Join-Path $sqlitePackageDir 'build\net48\x64\SQLite.Interop.dll')
+}
 
 # 1) Wipe Release (unless incremental)
 if (-not $Incremental) {
@@ -67,11 +76,22 @@ if (Test-Path $dllDirect) {
     $dllSource = $dllNet48
     New-Item -ItemType Directory -Path $dllDestDir -Force | Out-Null
     Copy-Item -Path $dllSource -Destination $dllDest -Force
+    # Copy private dependencies (Newtonsoft.Json etc.) when build outputs to bin
+    $binDir = Split-Path $dllNet48
+    foreach ($dep in @('Newtonsoft.Json.dll')) {
+        $src = Join-Path $binDir $dep
+        if (Test-Path $src) { Copy-Item -Path $src -Destination (Join-Path $dllDestDir $dep) -Force }
+    }
     Write-Host "  -> $dllDest"
 } elseif (Test-Path $dllRelease) {
     $dllSource = $dllRelease
     New-Item -ItemType Directory -Path $dllDestDir -Force | Out-Null
     Copy-Item -Path $dllSource -Destination $dllDest -Force
+    $binDir = Split-Path $dllRelease
+    foreach ($dep in @('Newtonsoft.Json.dll')) {
+        $src = Join-Path $binDir $dep
+        if (Test-Path $src) { Copy-Item -Path $src -Destination (Join-Path $dllDestDir $dep) -Force }
+    }
     Write-Host "  -> $dllDest"
 } else {
     Write-Error "MDTPro.dll not found in Release\, bin\Release\, or bin\Release\net48\"
@@ -128,6 +148,34 @@ if ($sqliteInteropSource) {
     Write-Warning "SQLite.Interop.dll not found. Place it in Dependencies\x64\ or run NuGet restore."
 }
 
+# 6b) Validate required files for OpenIV package - fail early if SQLite is missing
+# (Users installing via .oiv report "SQL stops working" when these DLLs are absent)
+$newtonsoftInRelease = Join-Path $dllDestDir 'Newtonsoft.Json.dll'
+$sqliteInRelease = Join-Path $releaseRoot 'System.Data.SQLite.dll'
+$interopInRelease = Join-Path $releaseX64 'SQLite.Interop.dll'
+
+$oivRequired = @(
+    @{ Path = $dllDest; Name = 'MDTPro.dll' }
+    @{ Path = $newtonsoftInRelease; Name = 'Newtonsoft.Json.dll' }
+    @{ Path = $sqliteInRelease; Name = 'System.Data.SQLite.dll' }
+    @{ Path = $interopInRelease; Name = 'x64\SQLite.Interop.dll' }
+)
+$missing = $oivRequired | Where-Object { -not (Test-Path $_.Path) } | ForEach-Object { $_.Name }
+if ($missing) {
+    Write-Error @"
+Cannot create OpenIV package: the following required files are missing from Release:
+  $($missing -join "`n  ")
+
+SQL features will not work without System.Data.SQLite.dll and x64\SQLite.Interop.dll.
+Ensure you have run 'dotnet restore' and that Dependencies\ contains:
+  - System.Data.SQLite.dll
+  - x64\SQLite.Interop.dll
+
+Or run from a clean clone: dotnet restore MDTProPlugin\MDTPro.sln ; .\build.ps1
+"@
+    exit 1
+}
+
 # 7) Deploy to game if requested
 if ($Deploy) {
     $pluginsDest = Join-Path $GamePath 'plugins\LSPDFR'
@@ -177,18 +225,16 @@ if ($Deploy) {
     if (Test-Path $oivDir) { Remove-Item $oivDir -Recurse -Force }
     New-Item -ItemType Directory -Path $oivContent -Force | Out-Null
 
-    # Content structure for OIV (paths relative to GTA V root)
+    # Content structure for OIV - use Release folder as single source of truth
+    # (ensures OIV contains exactly what we validated and deployed)
     $pluginsOiv = Join-Path $oivContent 'plugins\LSPDFR'
     New-Item -ItemType Directory -Path $pluginsOiv -Force | Out-Null
     Copy-Item -Path $dllDest -Destination (Join-Path $pluginsOiv 'MDTPro.dll') -Force
-    $newtonsoftDll = Join-Path $dllDestDir 'Newtonsoft.Json.dll'
-    if (Test-Path $newtonsoftDll) { Copy-Item -Path $newtonsoftDll -Destination (Join-Path $pluginsOiv 'Newtonsoft.Json.dll') -Force }
-    if ($sqliteDllSource) { Copy-Item -Path $sqliteDllSource -Destination (Join-Path $oivContent 'System.Data.SQLite.dll') -Force }
-    if ($sqliteInteropSource) {
-        $x64Oiv = Join-Path $oivContent 'x64'
-        New-Item -ItemType Directory -Path $x64Oiv -Force | Out-Null
-        Copy-Item -Path $sqliteInteropSource -Destination (Join-Path $x64Oiv 'SQLite.Interop.dll') -Force
-    }
+    Copy-Item -Path $newtonsoftInRelease -Destination (Join-Path $pluginsOiv 'Newtonsoft.Json.dll') -Force
+    Copy-Item -Path $sqliteInRelease -Destination (Join-Path $oivContent 'System.Data.SQLite.dll') -Force
+    $x64Oiv = Join-Path $oivContent 'x64'
+    New-Item -ItemType Directory -Path $x64Oiv -Force | Out-Null
+    Copy-Item -Path $interopInRelease -Destination (Join-Path $x64Oiv 'SQLite.Interop.dll') -Force
     Copy-Item -Path $mdtDest -Destination (Join-Path $oivContent 'MDTPro') -Recurse -Force
 
     # Generate assembly.xml add and delete commands for MDTPro folder (OIV uses forward slashes)
@@ -331,6 +377,18 @@ $readmePath = Join-Path $release 'README.txt'
 MDT Pro - Install instructions
 ===============================
 
+Credits
+-------
+MDT Pro is derived from External Police Computer (EPC), an LSPDFR police computer mod.
+Thanks to the EPC authors and contributors for the original project and idea.
+
+License
+-------
+MDT Pro is licensed under the Eclipse Public License 2.0 (EPL-2.0).
+The full license text is in the LICENSE file included with this release (same folder as this README).
+Some data files (e.g. default charge lists) may be under the MIT License; see the project repository for details.
+
+
 OPENIV INSTALL (recommended)
 ----------------------------
 - MDTPro-*.oiv = Install package. In OpenIV: Edit mode -> drag the .oiv onto OpenIV, or Tools -> Package Installer, then install.
@@ -342,16 +400,25 @@ MANUAL INSTALL (no OpenIV)
 Copy everything from this folder into your GTA V folder (the folder containing GTA5.exe), EXCEPT the .oiv files.
 
 Copy:
-  - plugins\   (into GTA V\plugins\)
+  - plugins\   (into GTA V\plugins\)   <- MDTPro.dll and Newtonsoft.Json.dll
   - MDTPro\    (into GTA V\MDTPro\)
-  - x64\       (into GTA V\x64\)
-  - System.Data.SQLite.dll  (into GTA V root)
+  - x64\       (into GTA V\x64\)       <- SQLite.Interop.dll (required for database)
+  - System.Data.SQLite.dll  (into GTA V root)  <- required for database
 
 Do NOT copy the .oiv files into your game folder; they are only for OpenIV.
 
+If SQL/database features stop working, ensure both System.Data.SQLite.dll (game root) and x64\SQLite.Interop.dll are present.
 Requirements: LSPDFR, RagePluginHook, Common Data Framework. See the mod page for full requirements.
 "@ | Out-File -FilePath $readmePath -Encoding UTF8
 Write-Host "  -> $readmePath (install instructions)"
+
+# EPL-2.0: include license text with release distributions
+$licenseSrc = Join-Path $root 'LICENSE'
+$licenseDest = Join-Path $release 'LICENSE'
+if (Test-Path $licenseSrc) {
+    Copy-Item -Path $licenseSrc -Destination $licenseDest -Force
+    Write-Host "  -> $licenseDest (EPL-2.0)"
+}
 
 Write-Host "Done. Full mod release: $release"
 Write-Host "  Release\plugins\lspdfr\MDTPro.dll"

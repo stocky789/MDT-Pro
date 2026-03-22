@@ -4,6 +4,8 @@ namespace MDTPro.Data.Reports {
         public string LicensePlate;
         public string VehicleModel;
         public string Owner;
+        /// <summary>Person at fault (e.g. arrested driver). Used for report association and import filtering.</summary>
+        public string PersonAtFaultName;
         public string Vin;
         public string ImpoundReason;
         public string TowCompany;

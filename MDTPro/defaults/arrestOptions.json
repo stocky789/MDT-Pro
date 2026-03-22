@@ -573,6 +573,16 @@
         "canRevokeLicense": false
       },
       {
+        "name": "Refusing To Provide Identification",
+        "minFine": 250,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
         "name": "Providing False Information To Peace Officer",
         "minFine": 250,
         "maxFine": 1000,
@@ -639,6 +649,16 @@
       },
       {
         "name": "Prowling",
+        "minFine": 250,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession Of Burglary Tools",
         "minFine": 250,
         "maxFine": 1000,
         "minDays": 0,
@@ -723,11 +743,21 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Possession Of Controlled Substance (Prescription/Narcotic)",
+        "name": "Possession Of Amphetamine",
         "minFine": 500,
         "maxFine": 2000,
         "minDays": 0,
         "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession Of Benzodiazepine",
+        "minFine": 250,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
         "probation": 0.4,
         "canBeWarrant": false,
         "canRevokeLicense": false
@@ -810,6 +840,26 @@
         "maxDays": 720,
         "probation": 0.4,
         "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession Of Controlled Substance (Prescription/Narcotic)",
+        "minFine": 500,
+        "maxFine": 2000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession Of Controlled Substance",
+        "minFine": 250,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
         "canRevokeLicense": false
       }
     ]
@@ -990,6 +1040,16 @@
         "maxDays": 365,
         "probation": 0.4,
         "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession Of Counterfeit Items",
+        "minFine": 250,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
         "canRevokeLicense": false
       },
       {

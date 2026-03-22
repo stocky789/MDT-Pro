@@ -649,6 +649,41 @@ body {
   color: var(--color-error);
 }
 
+.impoundSection .impoundRecentIdsRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.impoundSection .impoundRecentIdsRow label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary-dimmed);
+}
+
+.impoundSection .impoundRecentIdsList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.impoundSection .impoundRecentIdsList .impoundRecentIdItem {
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.impoundSection .impoundRecentIdsList .impoundRecentIdItem:hover {
+  background: var(--color-surface);
+  border-color: var(--color-accent);
+}
+
 .injurySection .inputWrapper.grid .fullWidth textarea {
   width: 100%;
   min-height: 88px;
@@ -785,6 +820,35 @@ body {
   color: var(--color-text-primary-half, #888);
 }
 
+.arrestAttachedReportsSection .attachReportQuickActionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.arrestAttachedReportsSection .createPropertyEvidenceReceiptButton,
+.arrestAttachedReportsSection .importRecentReportsButton {
+  font-size: 14px;
+  padding: 6px 12px;
+}
+
+.evidenceSeizedSection .evidenceSeizedItemsList {
+  margin: 0.5em 0 0 1.25em;
+  padding: 0;
+  list-style-type: disc;
+}
+
+.evidenceSeizedSection .evidenceSeizedItemsList li {
+  margin-bottom: 0.25em;
+}
+
+.evidenceSeizedSection .evidenceSeizedHelp {
+  font-size: 0.9em;
+  color: var(--color-text-primary-half, #888);
+  margin-bottom: 0.75em;
+}
+
 .arrestAttachedReportsSection .attachReportWrap {
   display: flex;
   gap: 10px;
@@ -799,4 +863,136 @@ body {
 
 .arrestAttachedReportsSection .closeArrestButton {
   margin-top: 8px;
+}
+
+/* Property and Evidence Receipt section */
+.propertyEvidenceSection .propertyEvidenceSubsectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+.propertyEvidenceSection .propertyEvidenceRecentIdsList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.propertyEvidenceSection .propertyEvidenceRecentIdItem {
+  font-size: 13px;
+  padding: 4px 10px;
+}
+
+.propertyEvidenceSection .propertyEvidenceAddSubjectRow,
+.propertyEvidenceSection .propertyEvidenceDrugsAddRow,
+.propertyEvidenceSection .propertyEvidenceFirearmsAddRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.propertyEvidenceSection .propertyEvidenceAddSubjectInput {
+  flex: 1;
+  min-width: 120px;
+}
+
+.propertyEvidenceSection .propertyEvidenceDrugTypeSelect,
+.propertyEvidenceSection .propertyEvidenceQuantitySelect,
+.propertyEvidenceSection .propertyEvidenceFirearmSelect {
+  min-width: 140px;
+}
+
+.propertyEvidenceSection .propertyEvidenceSubjectsList,
+.propertyEvidenceSection .propertyEvidenceDrugsList,
+.propertyEvidenceSection .propertyEvidenceFirearmsList {
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Property evidence list items: card layout, text left + delete right (no tall placeholder boxes) */
+.propertyEvidenceSection .propertyEvidenceSubjectsList .chargeWrapper,
+.propertyEvidenceSection .propertyEvidenceDrugsList .chargeWrapper,
+.propertyEvidenceSection .propertyEvidenceFirearmsList .chargeWrapper {
+  background-color: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: 8px 10px;
+  font-size: 14px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.propertyEvidenceSection .chargeWrapper .chargeName {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.propertyEvidenceSection .chargeWrapper .deleteChargeButton {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  fill: var(--color-text-primary);
+  color: var(--color-text-primary);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.propertyEvidenceSection .chargeWrapper .deleteChargeButton svg {
+  width: 16px;
+  height: 16px;
+}
+
+.propertyEvidenceSection .chargeWrapper .deleteChargeButton:hover,
+.propertyEvidenceSection .chargeWrapper .deleteChargeButton:focus {
+  fill: var(--color-error);
+  color: var(--color-error);
+}
+
+.propertyEvidenceSection .chargeWrapper .deleteChargeButton::before {
+  display: none;
+}
+
+.propertyEvidenceSection .propertyEvidenceOtherRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  margin-bottom: 0;
+  max-width: 100%;
+}
+
+.propertyEvidenceSection .propertyEvidenceOtherRow label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary-dimmed);
+  display: block;
+  margin-bottom: 0;
+}
+
+.propertyEvidenceSection .propertyEvidenceOtherRow textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 8px 10px;
+  font-size: 14px;
+  box-sizing: border-box;
+  resize: vertical;
 }

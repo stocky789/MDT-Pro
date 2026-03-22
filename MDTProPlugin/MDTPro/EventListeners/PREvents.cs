@@ -1,4 +1,6 @@
 using MDTPro.Data;
+using MDTPro.Setup;
+using MDTPro.Utility;
 using Rage;
 using System;
 using System.Collections.Generic;
@@ -44,6 +46,11 @@ namespace MDTPro.EventListeners {
             "OnVehicleRanThroughDispatch"
         };
 
+        /// <summary>Optional PR events for vehicle search — capture contraband when vehicle is actually searched (not just when plate is run).</summary>
+        private static readonly HashSet<string> vehicleSearchEventNames = new HashSet<string>(
+            new[] { "OnVehicleSearched", "OnVehicleSearchComplete", "OnVehicleSearchFinished" },
+            StringComparer.OrdinalIgnoreCase);
+
         internal static void SubscribeToPREvents() {
             if (subscribed) return;
 
@@ -62,6 +69,7 @@ namespace MDTPro.EventListeners {
                 SubscribeToOnFootTrafficStopStarted();
                 SubscribeToOnFootTrafficStopEnded();
                 SubscribeToOptionalWeaponFirearmEvents(eventsApiType);
+                SubscribeToOptionalVehicleSearchEvents(eventsApiType);
                 subscribed = true;
             } catch (Exception e) {
                 Game.LogTrivial($"MDT Pro: [Warning] Failed to subscribe to PR events: {e.Message}");
@@ -79,6 +87,27 @@ namespace MDTPro.EventListeners {
                 eventInfo.AddEventHandler(null, handler);
             } catch (Exception e) {
                 Game.LogTrivial($"MDT Pro: [Warning] Failed to subscribe to PR OnFootTrafficStopStarted: {e.Message}");
+            }
+        }
+
+        /// <summary>Tries to subscribe to PR vehicle search events if they exist. Capture runs when vehicle is actually searched, not just when plate is run.</summary>
+        private static void SubscribeToOptionalVehicleSearchEvents(Type eventsApiType) {
+            if (eventsApiType == null) return;
+            try {
+                foreach (string name in vehicleSearchEventNames) {
+                    EventInfo evt = eventsApiType.GetEvent(name, BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase);
+                    if (evt == null) continue;
+                    try {
+                        Delegate handler = CreateForwardingDelegate(evt.EventHandlerType, name);
+                        evt.AddEventHandler(null, handler);
+                        Game.LogTrivial($"[MDTPro] Subscribed to PR event: {name} (vehicle search contraband)");
+                        return; // One handler is enough
+                    } catch (Exception ex) {
+                        Game.LogTrivial($"[MDTPro] Could not subscribe to {name}: {ex.Message}");
+                    }
+                }
+            } catch (Exception ex) {
+                Game.LogTrivial($"[MDTPro] Optional vehicle search event subscription failed: {ex.Message}");
             }
         }
 
@@ -145,18 +174,63 @@ namespace MDTPro.EventListeners {
             }
 
             if (vehicleDispatchEventNames.Contains(eventName) && args[0] is Vehicle dispatchVehicle) {
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"[Firearm] PR event fired: {eventName}, plate={dispatchVehicle?.LicensePlate ?? "—"}", false, Helper.LogSeverity.Info);
                 DataController.ResolveVehicleAndDriverForStop(dispatchVehicle);
                 try {
-                    if (dispatchVehicle != null && dispatchVehicle.Exists())
+                    if (dispatchVehicle != null && dispatchVehicle.Exists()) {
                         DataController.CaptureVehicleSearchItems(dispatchVehicle);
+                        if (eventName == "OnRequestVehicleCheck") DataController.TryCapturePickupAndPlayerFirearms();
+                        // Delayed retry: player typically searches after running plate. Capture again in 8s.
+                        GameFiber.StartNew(() => {
+                            GameFiber.Wait(8000);
+                            try {
+                                if (dispatchVehicle != null && dispatchVehicle.Exists())
+                                    DataController.CaptureVehicleSearchItems(dispatchVehicle);
+                            } catch (Exception ex) {
+                                Game.LogTrivial($"MDT Pro: [Warning] Delayed vehicle search capture: {ex.Message}");
+                            }
+                        }, "MDTPro-vehicle-search-delayed");
+                    }
                 } catch (Exception ex) {
                     Game.LogTrivial($"MDT Pro: [Warning] OnVehicleRanThroughDispatch capture: {ex.Message}");
                 }
                 return;
             }
 
+            // Vehicle search events (if PR exposes OnVehicleSearched etc.)
+            if (vehicleSearchEventNames.Contains(eventName) && args != null && args.Length >= 1) {
+                Vehicle searchVehicle = null;
+                foreach (object arg in args) {
+                    if (arg is Vehicle v && v.Exists()) { searchVehicle = v; break; }
+                }
+                if (searchVehicle != null) {
+                    try {
+                        DataController.CaptureVehicleSearchItems(searchVehicle);
+                    } catch (Exception ex) {
+                        Game.LogTrivial($"MDT Pro: [Warning] {eventName} capture: {ex.Message}");
+                    }
+                }
+                return;
+            }
+
+            // OnRequestPedCheck: player just requested dispatch to run this ped. Capture immediately (PR may have search items from prior pat-down). Also capture player-held weapon in case they're checking that.
+            if (eventName == "OnRequestPedCheck" && args.Length >= 1 && args[0] is Ped requestPed) {
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"[Firearm] PR event fired: OnRequestPedCheck, pedHandle={requestPed?.Handle ?? 0}", false, Helper.LogSeverity.Info);
+                try {
+                    if (requestPed != null && requestPed.IsValid())
+                        DataController.CaptureFirearmsFromPed(requestPed, "Firearm check (request)");
+                    DataController.TryCapturePickupAndPlayerFirearms();
+                } catch (Exception ex) {
+                    Game.LogTrivial($"MDT Pro: [Warning] OnRequestPedCheck capture: {ex.Message}");
+                }
+            }
+
             // OnPedRanThroughDispatch: when dispatch returns ped info (may include warrant/firearm results). Refresh wanted status from CDF so MDT Person Search shows warrants; capture firearms for Firearms Check.
             if (eventName == "OnPedRanThroughDispatch" && args.Length >= 1 && args[0] is Ped dispatchPed) {
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"[Firearm] PR event fired: OnPedRanThroughDispatch, pedHandle={dispatchPed?.Handle ?? 0}", false, Helper.LogSeverity.Info);
                 try {
                     if (dispatchPed != null && dispatchPed.IsValid()) {
                         DataController.RefreshPedWantedStatusFromCDF(dispatchPed);
@@ -167,18 +241,25 @@ namespace MDTPro.EventListeners {
                 }
             }
 
-            // Optional weapon/firearm check events: if PR fires these, capture from the ped in args so firearm shows in MDT.
+            // Optional weapon/firearm check events: if PR fires these, capture so firearm shows in MDT.
+            // PR may pass (Ped) when checking someone else's weapon, or no Ped when checking player's held weapon.
             if ((eventName.Contains("Weapon") || eventName.Contains("Firearm")) && args != null) {
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"[Firearm] PR event fired: {eventName}", false, Helper.LogSeverity.Info);
+                bool captured = false;
                 foreach (object arg in args) {
                     if (arg is Ped wpnPed && wpnPed.IsValid()) {
                         try {
                             DataController.CaptureFirearmsFromPed(wpnPed, "Firearm check");
+                            captured = true;
                             break;
                         } catch (Exception ex) {
                             Game.LogTrivial($"MDT Pro: [Warning] {eventName} firearm capture: {ex.Message}");
                         }
                     }
                 }
+                // When checking player's held weapon, PR often doesn't pass a Ped. Trigger immediate capture attempt.
+                if (!captured) DataController.TryCapturePickupAndPlayerFirearms();
             }
 
             if (eventName == "OnFootTrafficStopStarted" && args.Length > 0) {
@@ -214,6 +295,8 @@ namespace MDTPro.EventListeners {
 
             // OnDeadPedSearched (PedDelegate): fires when PR search finds ID on a corpse. Add to ID History and capture firearms/drugs.
             if (eventName == "OnDeadPedSearched" && args.Length >= 1 && args[0] is Ped deadPed) {
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"[Firearm] PR event fired: OnDeadPedSearched, pedHandle={deadPed?.Handle ?? 0}", false, Helper.LogSeverity.Info);
                 DataController.AddIdentificationEvent(deadPed, "Dead body search");
                 DataController.CaptureFirearmsFromPed(deadPed, "Dead body search");
                 return;

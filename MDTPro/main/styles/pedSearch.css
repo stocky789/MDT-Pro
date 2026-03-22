@@ -66,6 +66,57 @@ body {
   line-height: 1.35;
 }
 
+/* Basic info grid: photo spans rows so name fields don't get huge empty gap below */
+.basicInfo {
+  align-items: start;
+  grid-template-rows: auto auto auto;
+}
+
+/* ID photo spans all rows — prevents tall row 1 that left gap between names and DOB/Age */
+.pedIdPhotoCell {
+  display: flex;
+  flex-direction: column;
+  grid-row: 1 / -1;
+}
+
+.pedIdPhotoContainer {
+  position: relative;
+  width: 85px;
+  height: 105px;
+  overflow: hidden;
+  margin-top: 2px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-background);
+}
+
+.pedIdPhotoImg {
+  /* Zoom in on face area like a real ID mugshot — 2.5x scale, crop to top-center (head) */
+  width: 250%;
+  min-width: 250%;
+  height: 250%;
+  min-height: 250%;
+  object-fit: cover;
+  object-position: 50% 0%;
+  margin-left: 50%;
+  transform: translateX(-50%);
+  display: block;
+}
+
+.pedIdPhotoImg.hidden {
+  display: none;
+}
+
+.pedIdPhotoPlaceholder {
+  font-size: 12px;
+  color: var(--color-text-primary-half);
+  text-align: center;
+  padding: 12px;
+}
+
+.pedIdPhotoPlaceholder.hidden {
+  display: none;
+}
+
 .createReportButtons {
   display: flex;
   gap: 8px;
