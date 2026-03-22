@@ -1178,7 +1178,7 @@ async function getArrestAttachedReportsSection(report) {
           'info'
         )
       } else {
-        topWindow.showNotification(attachData?.error || language.reports?.notifications?.saveError ?? 'Error', 'error')
+        topWindow.showNotification((attachData?.error || language.reports?.notifications?.saveError) || 'Error', 'error')
       }
     } catch (e) {
       topWindow.showNotification(
@@ -1235,7 +1235,7 @@ async function getArrestAttachedReportsSection(report) {
           topWindow.showNotification(language.reports?.notifications?.saveError ?? 'Error', 'error')
         }
       } else {
-        topWindow.showNotification(err?.error || language.reports?.notifications?.saveError ?? 'Error', 'error')
+        topWindow.showNotification((err?.error || language.reports?.notifications?.saveError) || 'Error', 'error')
       }
     }
   })
