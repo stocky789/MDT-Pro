@@ -150,5 +150,8 @@ namespace MDTPro.Setup {
 
         /// <summary>Show the Quick Actions bar (backup, panic, set GPS, clear ALPR) on the desktop.</summary>
         public bool quickActionsBarEnabled = true;
+
+        /// <summary>When true, log detailed firearm capture flow (PR API results, fallback, event triggers) to MDT Pro log. Use for debugging Firearms Check.</summary>
+        public bool firearmDebugLogging = false;
     }
 }

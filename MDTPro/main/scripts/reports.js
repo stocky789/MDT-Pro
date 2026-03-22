@@ -1047,6 +1047,65 @@ async function getArrestAttachedReportsSection(report) {
     reportIsOnCreatePageBool = true
   })
   quickActionRow.appendChild(createPerBtn)
+
+  const importRecentBtn = document.createElement('button')
+  importRecentBtn.type = 'button'
+  importRecentBtn.className = 'importRecentReportsButton'
+  importRecentBtn.title = language.reports?.sections?.arrest?.importRecentReportsHelp ?? 'Attaches all reports created in the last 60 minutes.'
+  importRecentBtn.textContent = language.reports?.sections?.arrest?.importRecentReports ?? 'Import recent reports'
+  importRecentBtn.addEventListener('click', async function () {
+    if (importRecentBtn.classList.contains('loading')) return
+    importRecentBtn.classList.add('loading')
+    try {
+      const res = await fetch('/data/recentReports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ withinMinutes: 60 })
+      })
+      if (!res.ok) throw new Error('Failed to fetch recent reports')
+      const recent = await res.json()
+      const attachedIds = report.AttachedReportIds || []
+      const reportIds = (Array.isArray(recent) ? recent : [])
+        .map((r) => r && r.id)
+        .filter((id) => id && id !== report.Id && !attachedIds.includes(id))
+      if (reportIds.length === 0) {
+        topWindow.showNotification(
+          language.reports?.sections?.arrest?.importRecentReportsNone ?? 'No new recent reports to import (last 60 min).',
+          'info'
+        )
+        importRecentBtn.classList.remove('loading')
+        return
+      }
+      const attachRes = await fetch('/post/attachReportsToArrest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ arrestReportId: report.Id, reportIds })
+      })
+      const attachData = attachRes.ok ? await attachRes.json().catch(() => ({})) : null
+      if (attachData && attachData.added > 0) {
+        const list = await (await fetch('/data/arrestReports')).json()
+        const updated = list.find((r) => r.Id === report.Id)
+        if (updated) await renderReportInformation(updated, 'arrest', false)
+        topWindow.showNotification(
+          `${attachData.added} report(s) attached.`,
+          'success'
+        )
+      } else {
+        topWindow.showNotification(
+          language.reports?.sections?.arrest?.importRecentReportsNone ?? 'No new recent reports to import.',
+          'info'
+        )
+      }
+    } catch (e) {
+      topWindow.showNotification(
+        language.reports?.notifications?.saveError ?? 'Error',
+        'error'
+      )
+    }
+    importRecentBtn.classList.remove('loading')
+  })
+  quickActionRow.appendChild(importRecentBtn)
+
   section.appendChild(quickActionRow)
 
   const attachWrap = document.createElement('div')

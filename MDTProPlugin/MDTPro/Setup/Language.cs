@@ -479,6 +479,9 @@ namespace MDTPro.Setup {
                     public string evidenceSeizedHelp = "Document drugs and firearms via a Property and Evidence Receipt report. Attach it below to support court evidence.";
                     public string documentSeizedContraband = "Document seized contraband";
                     public string createPropertyEvidenceReceipt = "Create Property and Evidence Receipt";
+                    public string importRecentReports = "Import recent reports";
+                    public string importRecentReportsHelp = "Attaches all reports created in the last 60 minutes (incident, injury, citation, traffic, impound, property/evidence) to this arrest.";
+                    public string importRecentReportsNone = "No new recent reports to import (last 60 min).";
                     public string attachedReports = "Attached reports (evidence for court)";
                     /// <summary>Explains that attached reports count as evidence; relevant ones carry full weight, others still count but less.</summary>
                     public string attachedReportsHelp = "Reports you attach here are used as evidence when this arrest goes to court. Reports that directly support the case (Incident/Citation naming this defendant, Injury documenting harm, Traffic Incident with defendant as driver or vehicle-related charges, Impound for vehicle-related charges) carry full weight. Other attached reports (e.g. impound on a drug case, incident that doesn't name the defendant) still count but carry less weight—so tangential evidence like a stolen firearm in a drug case is not ignored.";

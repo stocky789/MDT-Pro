@@ -505,11 +505,24 @@ const server = http.createServer((req, res) => {
         citations: name ? [{ Id: 'C-1', TimeStamp: d.toISOString(), Status: 1 }] : [],
         arrests: [],
         incidents: [],
+        propertyEvidence: [],
+        injuries: [],
       }), 'application/json');
-    }).catch(() => send(res, 200, JSON.stringify({ citations: [], arrests: [], incidents: [] }), 'application/json'));
+    }).catch(() => send(res, 200, JSON.stringify({ citations: [], arrests: [], incidents: [], propertyEvidence: [], injuries: [] }), 'application/json'));
+    return;
+  } else if (req.method === 'POST' && url === '/data/recentReports') {
+    readBody(req).then(() => {
+      send(res, 200, '[]', 'application/json');
+    }).catch(() => send(res, 200, '[]', 'application/json'));
     return;
   } else if (req.method === 'POST' && (url === '/data/reportSummaries' || url === '/data/reportSummaries/')) {
     readBody(req).then(() => send(res, 200, '[]', 'application/json')).catch(() => send(res, 200, '[]', 'application/json'));
+    return;
+  } else if (req.method === 'POST' && url === '/post/attachReportsToArrest') {
+    readBody(req).then(() => send(res, 200, JSON.stringify({ success: true, added: 0 }), 'application/json')).catch(() => send(res, 200, JSON.stringify({ success: true, added: 0 }), 'application/json'));
+    return;
+  } else if (req.method === 'POST' && url === '/post/attachReportToArrest') {
+    readBody(req).then(() => send(res, 200, 'OK', 'text/plain')).catch(() => send(res, 200, 'OK', 'text/plain'));
     return;
   } else if (url.startsWith('/page/')) {
     const name = url.slice('/page/'.length).replace(/\.html$/, '') || 'index';

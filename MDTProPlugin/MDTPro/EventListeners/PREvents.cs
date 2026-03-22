@@ -1,4 +1,6 @@
 using MDTPro.Data;
+using MDTPro.Setup;
+using MDTPro.Utility;
 using Rage;
 using System;
 using System.Collections.Generic;
@@ -172,6 +174,8 @@ namespace MDTPro.EventListeners {
             }
 
             if (vehicleDispatchEventNames.Contains(eventName) && args[0] is Vehicle dispatchVehicle) {
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"[Firearm] PR event fired: {eventName}, plate={dispatchVehicle?.LicensePlate ?? "—"}", false, Helper.LogSeverity.Info);
                 DataController.ResolveVehicleAndDriverForStop(dispatchVehicle);
                 try {
                     if (dispatchVehicle != null && dispatchVehicle.Exists()) {
@@ -212,6 +216,8 @@ namespace MDTPro.EventListeners {
 
             // OnRequestPedCheck: player just requested dispatch to run this ped. Capture immediately (PR may have search items from prior pat-down). Also capture player-held weapon in case they're checking that.
             if (eventName == "OnRequestPedCheck" && args.Length >= 1 && args[0] is Ped requestPed) {
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"[Firearm] PR event fired: OnRequestPedCheck, pedHandle={requestPed?.Handle ?? 0}", false, Helper.LogSeverity.Info);
                 try {
                     if (requestPed != null && requestPed.IsValid())
                         DataController.CaptureFirearmsFromPed(requestPed, "Firearm check (request)");
@@ -223,6 +229,8 @@ namespace MDTPro.EventListeners {
 
             // OnPedRanThroughDispatch: when dispatch returns ped info (may include warrant/firearm results). Refresh wanted status from CDF so MDT Person Search shows warrants; capture firearms for Firearms Check.
             if (eventName == "OnPedRanThroughDispatch" && args.Length >= 1 && args[0] is Ped dispatchPed) {
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"[Firearm] PR event fired: OnPedRanThroughDispatch, pedHandle={dispatchPed?.Handle ?? 0}", false, Helper.LogSeverity.Info);
                 try {
                     if (dispatchPed != null && dispatchPed.IsValid()) {
                         DataController.RefreshPedWantedStatusFromCDF(dispatchPed);
@@ -236,6 +244,8 @@ namespace MDTPro.EventListeners {
             // Optional weapon/firearm check events: if PR fires these, capture so firearm shows in MDT.
             // PR may pass (Ped) when checking someone else's weapon, or no Ped when checking player's held weapon.
             if ((eventName.Contains("Weapon") || eventName.Contains("Firearm")) && args != null) {
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"[Firearm] PR event fired: {eventName}", false, Helper.LogSeverity.Info);
                 bool captured = false;
                 foreach (object arg in args) {
                     if (arg is Ped wpnPed && wpnPed.IsValid()) {
@@ -285,6 +295,8 @@ namespace MDTPro.EventListeners {
 
             // OnDeadPedSearched (PedDelegate): fires when PR search finds ID on a corpse. Add to ID History and capture firearms/drugs.
             if (eventName == "OnDeadPedSearched" && args.Length >= 1 && args[0] is Ped deadPed) {
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"[Firearm] PR event fired: OnDeadPedSearched, pedHandle={deadPed?.Handle ?? 0}", false, Helper.LogSeverity.Info);
                 DataController.AddIdentificationEvent(deadPed, "Dead body search");
                 DataController.CaptureFirearmsFromPed(deadPed, "Dead body search");
                 return;
