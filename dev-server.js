@@ -16,8 +16,8 @@ const ROOT = path.join(__dirname, 'MDTPro');
 // ---------- Placeholder data (dev only; never shipped with product) ----------
 const ts = () => new Date().toISOString();
 const placeholderPeds = [
-  { Name: 'John Doe', FirstName: 'John', LastName: 'Doe', Gender: 'Male', Address: '123 Vinewood Blvd, Vinewood', Birthday: '1985-06-15', LicenseStatus: 'Valid', LicenseExpiration: '2026-12-31', WeaponPermitStatus: 'Valid', WeaponPermitType: 'Concealed Carry', WeaponPermitExpiration: '2026-06-30', IsWanted: false, WarrantText: null, IsOnProbation: false, IsOnParole: false, IsInGang: false, AdvisoryText: null, TimesStopped: 2, IdentificationHistory: [{ Type: 'State ID', Timestamp: ts() }], Citations: [], Arrests: [], HuntingPermitStatus: 'None', HuntingPermitExpiration: null, FishingPermitStatus: 'None', FishingPermitExpiration: null },
-  { Name: 'Jane Smith', FirstName: 'Jane', LastName: 'Smith', Gender: 'Female', Address: '456 Alta St, Downtown', Birthday: '1990-03-22', LicenseStatus: 'Valid', LicenseExpiration: '2027-01-15', WeaponPermitStatus: 'None', WeaponPermitType: null, WeaponPermitExpiration: null, IsWanted: false, WarrantText: null, IsOnProbation: false, IsOnParole: false, IsInGang: false, AdvisoryText: null, TimesStopped: 1, IdentificationHistory: [{ Type: 'State ID', Timestamp: ts() }], Citations: [], Arrests: [], HuntingPermitStatus: 'None', HuntingPermitExpiration: null, FishingPermitStatus: 'Valid', FishingPermitExpiration: '2025-08-01' },
+  { Name: 'John Doe', FirstName: 'John', LastName: 'Doe', ModelName: 'a_m_y_skater_01', Gender: 'Male', Address: '123 Vinewood Blvd, Vinewood', Birthday: '1985-06-15', LicenseStatus: 'Valid', LicenseExpiration: '2026-12-31', WeaponPermitStatus: 'Valid', WeaponPermitType: 'Concealed Carry', WeaponPermitExpiration: '2026-06-30', IsWanted: false, WarrantText: null, IsOnProbation: false, IsOnParole: false, IsInGang: false, AdvisoryText: null, TimesStopped: 2, IdentificationHistory: [{ Type: 'State ID', Timestamp: ts() }], Citations: [], Arrests: [], HuntingPermitStatus: 'None', HuntingPermitExpiration: null, FishingPermitStatus: 'None', FishingPermitExpiration: null },
+  { Name: 'Jane Smith', FirstName: 'Jane', LastName: 'Smith', ModelName: 'a_f_y_business_01', Gender: 'Female', Address: '456 Alta St, Downtown', Birthday: '1990-03-22', LicenseStatus: 'Valid', LicenseExpiration: '2027-01-15', WeaponPermitStatus: 'None', WeaponPermitType: null, WeaponPermitExpiration: null, IsWanted: false, WarrantText: null, IsOnProbation: false, IsOnParole: false, IsInGang: false, AdvisoryText: null, TimesStopped: 1, IdentificationHistory: [{ Type: 'State ID', Timestamp: ts() }], Citations: [], Arrests: [], HuntingPermitStatus: 'None', HuntingPermitExpiration: null, FishingPermitStatus: 'Valid', FishingPermitExpiration: '2025-08-01' },
   { Name: 'Mike Johnson', FirstName: 'Mike', LastName: 'Johnson', Gender: 'Male', Address: '789 Mirror Park Dr', Birthday: '1978-11-08', LicenseStatus: 'Suspended', LicenseExpiration: '2024-05-01', WeaponPermitStatus: 'None', WeaponPermitType: null, WeaponPermitExpiration: null, IsWanted: true, WarrantText: 'Failure to appear', IsOnProbation: false, IsOnParole: false, IsInGang: false, AdvisoryText: null, TimesStopped: 5, IdentificationHistory: [{ Type: 'State ID', Timestamp: ts() }], Citations: [], Arrests: [], HuntingPermitStatus: 'None', HuntingPermitExpiration: null, FishingPermitStatus: 'None', FishingPermitExpiration: null },
   { Name: 'Sarah Davis', FirstName: 'Sarah', LastName: 'Davis', Gender: 'Female', Address: '321 Davis Ave, Davis', Birthday: '1992-07-14', LicenseStatus: 'Valid', LicenseExpiration: '2026-09-20', WeaponPermitStatus: 'Valid', WeaponPermitType: 'Concealed Carry', WeaponPermitExpiration: '2026-03-01', IsWanted: false, WarrantText: null, IsOnProbation: false, IsOnParole: false, IsInGang: false, AdvisoryText: null, TimesStopped: 0, IdentificationHistory: [{ Type: 'State ID', Timestamp: ts() }], Citations: [], Arrests: [], HuntingPermitStatus: 'None', HuntingPermitExpiration: null, FishingPermitStatus: 'None', FishingPermitExpiration: null },
   { Name: 'Tom Miller', FirstName: 'Tom', LastName: 'Miller', Gender: 'Male', Address: '555 Palomino Ave, Sandy Shores', Birthday: '1988-01-30', LicenseStatus: 'Valid', LicenseExpiration: '2026-11-10', WeaponPermitStatus: 'None', WeaponPermitType: null, WeaponPermitExpiration: null, IsWanted: false, WarrantText: null, IsOnProbation: false, IsOnParole: false, IsInGang: false, AdvisoryText: null, TimesStopped: 3, IdentificationHistory: [{ Type: 'State ID', Timestamp: ts() }], Citations: [], Arrests: [], HuntingPermitStatus: 'Valid', HuntingPermitExpiration: '2025-12-01', FishingPermitStatus: 'None', FishingPermitExpiration: null },
@@ -151,7 +151,7 @@ const mockLanguage = {
   },
   desktop: { pedSearch: 'Person Search', vehicleSearch: 'Vehicle Search', reports: 'Reports', shiftHistory: 'Shift History', court: 'Court', map: 'GPS', callout: 'Active Call' },
   pedSearch: {
-    static: { title: 'Person Search', drugRecordsTitle: 'Substance History', vehiclesOwnedTitle: 'Vehicles Owned', registeredFirearmsTitle: 'Registered Firearms', reportsTitle: 'Associated Reports' },
+    static: { title: 'Person Search', noPhoto: 'No photo available', drugRecordsTitle: 'Substance History', vehiclesOwnedTitle: 'Vehicles Owned', registeredFirearmsTitle: 'Registered Firearms', reportsTitle: 'Associated Reports' },
     notifications: {
       emptySearchInput: 'Enter a name to search.',
       pedNotFound: 'Person not found.',
@@ -288,6 +288,14 @@ const server = http.createServer((req, res) => {
       send(res, 200, '[]', 'application/json');
     }
     return;
+  } else if (url === '/seizureOptions') {
+    try {
+      const data = fs.readFileSync(path.join(ROOT, 'defaults', 'seizureOptions.json'), 'utf8');
+      send(res, 200, data, 'application/json');
+    } catch {
+      send(res, 200, JSON.stringify({ drugTypes: [], firearmTypes: [] }), 'application/json');
+    }
+    return;
   } else if (url === '/pluginInfo') {
     const pluginsDir = path.join(ROOT, 'plugins');
     const pluginDirs = fs.existsSync(pluginsDir) ? fs.readdirSync(pluginsDir, { withFileTypes: true }).filter(d => d.isDirectory()) : [];
@@ -395,7 +403,7 @@ const server = http.createServer((req, res) => {
   } else if (url === '/data/recentIds') {
     send(res, 200, JSON.stringify(getRecentIds()), 'application/json');
     return;
-  } else if (url === '/data/impoundReports' || url === '/data/trafficIncidentReports' || url === '/data/injuryReports') {
+  } else if (url === '/data/impoundReports' || url === '/data/trafficIncidentReports' || url === '/data/injuryReports' || url === '/data/propertyEvidenceReports' || url === '/data/propertyEvidenceReceiptReports') {
     send(res, 200, '[]', 'application/json');
     return;
   } else if (url === '/data/court') {
@@ -486,6 +494,9 @@ const server = http.createServer((req, res) => {
   } else if (url === '/data/recentFirearmOwners') {
     send(res, 200, JSON.stringify(placeholderPeds.slice(0, 5).map(p => ({ Name: p.Name }))), 'application/json');
     return;
+  } else if (url === '/data/recentFirearms') {
+    send(res, 200, '[]', 'application/json');
+    return;
   } else if (req.method === 'POST' && url === '/data/pedReports') {
     readBody(req).then(body => {
       const name = (body || '').trim().toLowerCase();
@@ -494,11 +505,25 @@ const server = http.createServer((req, res) => {
         citations: name ? [{ Id: 'C-1', TimeStamp: d.toISOString(), Status: 1 }] : [],
         arrests: [],
         incidents: [],
+        propertyEvidence: [],
+        injuries: [],
+        impounds: [],
       }), 'application/json');
-    }).catch(() => send(res, 200, JSON.stringify({ citations: [], arrests: [], incidents: [] }), 'application/json'));
+    }).catch(() => send(res, 200, JSON.stringify({ citations: [], arrests: [], incidents: [], propertyEvidence: [], injuries: [], impounds: [] }), 'application/json'));
+    return;
+  } else if (req.method === 'POST' && url === '/data/recentReports') {
+    readBody(req).then(() => {
+      send(res, 200, '[]', 'application/json');
+    }).catch(() => send(res, 200, '[]', 'application/json'));
     return;
   } else if (req.method === 'POST' && (url === '/data/reportSummaries' || url === '/data/reportSummaries/')) {
     readBody(req).then(() => send(res, 200, '[]', 'application/json')).catch(() => send(res, 200, '[]', 'application/json'));
+    return;
+  } else if (req.method === 'POST' && url === '/post/attachReportsToArrest') {
+    readBody(req).then(() => send(res, 200, JSON.stringify({ success: true, added: 0 }), 'application/json')).catch(() => send(res, 200, JSON.stringify({ success: true, added: 0 }), 'application/json'));
+    return;
+  } else if (req.method === 'POST' && url === '/post/attachReportToArrest') {
+    readBody(req).then(() => send(res, 200, 'OK', 'text/plain')).catch(() => send(res, 200, 'OK', 'text/plain'));
     return;
   } else if (url.startsWith('/page/')) {
     const name = url.slice('/page/'.length).replace(/\.html$/, '') || 'index';

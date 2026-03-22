@@ -435,8 +435,14 @@ async function performSearch(query) {
 
     const recordsSection = document.createElement('div')
     recordsSection.classList.add('inputWrapper', 'grid', 'vehicleSearchRecordsSection')
+    const seen = new Set()
     for (const r of searchRecordsResponse) {
+      const key = `${r.ItemType || ''}|${r.Description || ''}|${r.DrugType || ''}|${r.ItemLocation || ''}`
+      if (seen.has(key)) continue
+      seen.add(key)
       const el = document.createElement('div')
+      const isWeapon = !!(r.WeaponModelId || (r.ItemType && /weapon|firearm|gun/i.test(r.ItemType)))
+      if (isWeapon) el.classList.add('clickable')
       const label = document.createElement('label')
       label.textContent = r.ItemType || 'Item'
       if (r.ItemLocation) label.textContent += ` (${r.ItemLocation})`
@@ -446,6 +452,10 @@ async function performSearch(query) {
       input.value = r.Description || r.DrugType || '-'
       el.appendChild(label)
       el.appendChild(input)
+      if (isWeapon) {
+        const lookupKey = (r.Description && r.Description.trim()) || r.WeaponModelId || response?.LicensePlate || ''
+        el.addEventListener('click', () => openFirearmsSearch(lookupKey))
+      }
       recordsSection.appendChild(el)
     }
     document.querySelector('.searchResponseWrapper').appendChild(recordsSection)

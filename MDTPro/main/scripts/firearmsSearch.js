@@ -10,7 +10,7 @@ function escapeHtml(s) {
   if (config.updateDomWithLanguageOnLoad)
     await updateDomWithLanguage('firearmsSearch')
 
-  await loadRecentOwners()
+  await loadRecentWeapons()
 })()
 
 const searchInput = document.querySelector('.searchInputWrapper #firearmsSearchInput')
@@ -35,30 +35,35 @@ if (searchButton) {
   })
 }
 
-async function loadRecentOwners() {
-  let owners = []
+async function loadRecentWeapons() {
+  let firearms = []
   try {
-    const resp = await fetch('/data/recentFirearmOwners')
-    if (resp.ok) owners = await resp.json()
+    const resp = await fetch('/data/recentFirearms')
+    if (resp.ok) firearms = await resp.json()
   } catch {
-    owners = []
+    firearms = []
   }
   const wrapper = document.querySelector('.recentOwnersWrapper')
   const list = document.querySelector('.recentOwnersList')
   if (!list) return
   list.innerHTML = ''
 
-  if (!Array.isArray(owners) || owners.length === 0) {
+  if (!Array.isArray(firearms) || firearms.length === 0) {
     if (wrapper) wrapper.classList.add('hidden')
     return
   }
 
   if (wrapper) wrapper.classList.remove('hidden')
-  for (const name of owners) {
+  for (const f of firearms) {
+    const serialLabel = f.IsSerialScratched ? 'Scratched' : (f.SerialNumber || '—')
+    const weaponName = (f.WeaponDisplayName || f.Description || f.WeaponModelId || '').trim()
+    const displayText = weaponName ? `${serialLabel} — ${weaponName}` : serialLabel
+    if (!weaponName && serialLabel === '—') continue // Skip empty "—" entries
+    const lookupKey = f.IsSerialScratched ? (f.OwnerPedName || '') : (f.SerialNumber || f.OwnerPedName || '')
     const item = document.createElement('button')
-    item.textContent = name
+    item.textContent = displayText
     item.addEventListener('click', function () {
-      if (searchInput) searchInput.value = name
+      if (searchInput) searchInput.value = lookupKey
       document.querySelector('.searchInputWrapper button')?.click()
     })
     list.appendChild(item)
@@ -123,13 +128,27 @@ async function performSearch(query) {
   }
 
   if (byOwner && Array.isArray(byOwner) && byOwner.length > 0) {
+    const meleePattern = /KNIFE|KNUCKLE|NIGHTSTICK|HAMMER|WEAPON_BAT|CROWBAR|GOLFCLUB|DAGGER|MACHETE|SWITCHBLADE|BATTLEAXE|POOLCUE|WRENCH|FLASHLIGHT|HATCHET|UNARMED/i
+    const actualFirearms = byOwner.filter((f) => {
+      const modelId = (f.WeaponModelId || '').toUpperCase()
+      return !meleePattern.test(modelId)
+    })
+    if (actualFirearms.length === 0) {
+      topWindow.showNotification(
+        language.firearmsSearch?.notifications?.notFound ||
+          'No firearm or owner found.',
+        'warning'
+      )
+      document.title = 'Firearms Check'
+      return
+    }
     document.querySelector('.searchResponseWrapper').classList.remove('hidden')
     document.title = `Firearms Check: ${query}`
     const title = document.createElement('div')
     title.className = 'firearmsOwnerTitle'
     title.textContent = `Firearms for ${query}`
     resultEl.appendChild(title)
-    for (const f of byOwner) {
+    for (const f of actualFirearms) {
       renderFirearmCard(resultEl, f)
     }
   } else {
@@ -159,7 +178,9 @@ function renderFirearmCard(container, f) {
   const name = f.WeaponDisplayName || f.Description || f.WeaponModelId || `Weapon (${f.WeaponModelHash || 0})`
   const serial = f.IsSerialScratched ? 'Scratched' : (f.SerialNumber || 'N/A')
   const stolen = f.IsStolen ? ' [STOLEN]' : ''
-  const ownerVal = f.OwnerPedName || ''
+  const ownerVal = f.IsSerialScratched ? '' : (f.OwnerPedName || '')
+  const ownerDisplay = ownerVal ? escapeHtml(ownerVal) : '—'
+  const ownerClickable = ownerVal ? ` class="clickable" data-owner="${escapeHtml(ownerVal)}"` : ''
   card.innerHTML = `
     <div class="firearmRow firearmRowWithImage">
       <div class="firearmImageWrapper">
@@ -176,7 +197,7 @@ function renderFirearmCard(container, f) {
         </div>
         <div class="firearmRow">
           <label>Owner</label>
-          <span class="clickable" data-owner="${escapeHtml(ownerVal)}">${escapeHtml(ownerVal || '—')}</span>
+          <span${ownerClickable}>${ownerDisplay}</span>
         </div>
         <div class="firearmRow">
           <label>Source</label>

@@ -61,6 +61,8 @@ namespace MDTPro.Setup {
         public float courtEvidenceSupervisionViolationBonus = 22f;
         public float courtEvidenceResistedBonus = 15f;
         public float courtEvidenceDrugsBonus = 12f;
+        /// <summary>Additional evidence when drug quantity is documented in seizure report. Max bonus = this value × quantity weight (0–1). Higher quantities (bundle, kilo, etc.) increase conviction likelihood.</summary>
+        public float courtEvidenceDrugQuantityBonus = 6f;
         public float courtEvidenceUseOfForceBonus = 10f;
         /// <summary>Per attached incident report (evidence for court).</summary>
         public float courtEvidenceIncidentReportBonus = 10f;
@@ -72,6 +74,10 @@ namespace MDTPro.Setup {
         public float courtEvidenceTrafficIncidentReportBonus = 6f;
         /// <summary>Per attached impound report (e.g. stolen recovery, evidence).</summary>
         public float courtEvidenceImpoundReportBonus = 5f;
+        /// <summary>Per attached Property and Evidence Receipt (seized contraband documentation). Charge-specific drug/firearm matching handled in court integration.</summary>
+        public float courtEvidencePropertyEvidenceReportBonus = 8f;
+        /// <summary>Per attached seizure report (Property and Evidence Receipt). Optional bonus similar to incident/citation. Uses courtEvidencePropertyEvidenceReportBonus when 0.</summary>
+        public float courtEvidenceSeizureReportBonus = 8f;
         /// <summary>Per attached report that does not meet relevance (e.g. impound on a drug case, incident that doesn't name defendant). Still counts so tangential evidence (e.g. stolen firearm in a drug case) is not ignored; just carries less weight than directly relevant reports.</summary>
         public float courtEvidenceOtherAttachedReportBonus = 3f;
         /// <summary>Bonus when primary arrest report Notes length exceeds courtEvidenceReportNotesMinLength.</summary>
@@ -93,6 +99,17 @@ namespace MDTPro.Setup {
         public float courtProsecutionRecidivismWeight = 0.15f;
         public float courtDefensePublicDefenderBonus = 8f;
         public float courtDefensePrivateCounselBonus = 14f;
+
+        /// <summary>Sentence multiplier: weight for repeat offender score (prior arrests, probation, etc.). 0 = use built-in default. Rebalanced so 2.5x is rare (career criminal + serious charges).</summary>
+        public float courtSentenceMultiplierRepeatWeight = 0.035f;
+        /// <summary>Sentence multiplier: weight for case severity. 0 = use built-in default.</summary>
+        public float courtSentenceMultiplierSeverityWeight = 0.01f;
+        /// <summary>Sentence multiplier: weight for prosecution vs defense outcome. 0 = use built-in default.</summary>
+        public float courtSentenceMultiplierOutcomeWeight = 0.15f;
+        /// <summary>Sentence multiplier: weight for docket pressure. 0 = use built-in default.</summary>
+        public float courtSentenceMultiplierDocketWeight = 0.08f;
+        /// <summary>Maximum sentence multiplier cap (e.g. 2.5 = 250% of base). 0 = use built-in default (2.5).</summary>
+        public float courtSentenceMultiplierMax = 2.5f;
 
         public int mapPlayerIconSize = 30;
         public float mapTurnPenaltySecondsPerRadian = 1.0f;
@@ -133,5 +150,8 @@ namespace MDTPro.Setup {
 
         /// <summary>Show the Quick Actions bar (backup, panic, set GPS, clear ALPR) on the desktop.</summary>
         public bool quickActionsBarEnabled = true;
+
+        /// <summary>When true, log detailed firearm capture flow (PR API results, fallback, event triggers) to MDT Pro log. Use for debugging Firearms Check.</summary>
+        public bool firearmDebugLogging = false;
     }
 }

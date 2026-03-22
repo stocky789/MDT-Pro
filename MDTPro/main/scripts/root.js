@@ -7,6 +7,7 @@ if (!isInIframe) {
   localStorage.removeItem('language')
   localStorage.removeItem('citationOptions')
   localStorage.removeItem('arrestOptions')
+  localStorage.removeItem('seizureOptions')
 }
 
 function sleep(ms) {
@@ -51,6 +52,16 @@ async function getArrestOptions() {
   const arrestOptions = await (await fetch('/arrestOptions')).json()
   localStorage.setItem('arrestOptions', JSON.stringify(arrestOptions))
   return arrestOptions
+}
+
+async function getSeizureOptions() {
+  const lsSeizureOptions = localStorage.getItem('seizureOptions')
+  if (lsSeizureOptions) {
+    return JSON.parse(lsSeizureOptions)
+  }
+  const seizureOptions = await (await fetch('/seizureOptions')).json()
+  localStorage.setItem('seizureOptions', JSON.stringify(seizureOptions))
+  return seizureOptions
 }
 
 function traverseObject(obj, callback, path = []) {
@@ -382,7 +393,7 @@ async function openIdInReport(id, type = null) {
     if (type) {
       found = await performSearch(win, type)
     } else {
-      const reportTypes = ['citation', 'arrest', 'incident', 'impound', 'trafficIncident', 'injury']
+      const reportTypes = ['citation', 'arrest', 'incident', 'impound', 'trafficIncident', 'injury', 'propertyEvidence']
       for (const reportType of reportTypes) {
         found = await performSearch(win, reportType)
         if (found) break
