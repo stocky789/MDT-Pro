@@ -120,6 +120,16 @@ const CONFIG_SECTIONS = [
     ],
   },
   {
+    title: 'Court — Sentence Multiplier',
+    keys: [
+      'courtSentenceMultiplierRepeatWeight',
+      'courtSentenceMultiplierSeverityWeight',
+      'courtSentenceMultiplierOutcomeWeight',
+      'courtSentenceMultiplierDocketWeight',
+      'courtSentenceMultiplierMax',
+    ],
+  },
+  {
     title: 'Map & GPS',
     keys: [
       'mapPlayerIconSize',
@@ -464,6 +474,26 @@ const CONFIG_FIELD_META = {
   courtDefensePrivateCounselBonus: {
     label: 'Defense: private counsel bonus',
     tooltip: 'Strength bonus when the defendant has private counsel.',
+  },
+  courtSentenceMultiplierRepeatWeight: {
+    label: 'Repeat offender weight',
+    tooltip: 'How much prior arrests/convictions/probation increase the sentence multiplier. Default 0.035. Higher = repeat offenders get steeper sentences.',
+  },
+  courtSentenceMultiplierSeverityWeight: {
+    label: 'Severity weight',
+    tooltip: 'How much case severity affects the sentence multiplier. Default 0.01.',
+  },
+  courtSentenceMultiplierOutcomeWeight: {
+    label: 'Outcome momentum weight',
+    tooltip: 'How much prosecution vs defense strength affects the multiplier. Default 0.15.',
+  },
+  courtSentenceMultiplierDocketWeight: {
+    label: 'Docket pressure weight',
+    tooltip: 'How much busy court dockets increase sentences. Default 0.08.',
+  },
+  courtSentenceMultiplierMax: {
+    label: 'Maximum multiplier cap',
+    tooltip: 'Hard cap on sentence multiplier (e.g. 2.5 = 250% of base sentence). 2.5x should be rare—only worst cases. Default 2.5.',
   },
   mapPlayerIconSize: {
     label: 'Map player icon size (px)',
