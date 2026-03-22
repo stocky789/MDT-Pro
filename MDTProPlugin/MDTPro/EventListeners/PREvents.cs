@@ -176,6 +176,7 @@ namespace MDTPro.EventListeners {
                 try {
                     if (dispatchVehicle != null && dispatchVehicle.Exists()) {
                         DataController.CaptureVehicleSearchItems(dispatchVehicle);
+                        if (eventName == "OnRequestVehicleCheck") DataController.TryCapturePickupAndPlayerFirearms();
                         // Delayed retry: player typically searches after running plate. Capture again in 8s.
                         GameFiber.StartNew(() => {
                             GameFiber.Wait(8000);
@@ -209,6 +210,17 @@ namespace MDTPro.EventListeners {
                 return;
             }
 
+            // OnRequestPedCheck: player just requested dispatch to run this ped. Capture immediately (PR may have search items from prior pat-down). Also capture player-held weapon in case they're checking that.
+            if (eventName == "OnRequestPedCheck" && args.Length >= 1 && args[0] is Ped requestPed) {
+                try {
+                    if (requestPed != null && requestPed.IsValid())
+                        DataController.CaptureFirearmsFromPed(requestPed, "Firearm check (request)");
+                    DataController.TryCapturePickupAndPlayerFirearms();
+                } catch (Exception ex) {
+                    Game.LogTrivial($"MDT Pro: [Warning] OnRequestPedCheck capture: {ex.Message}");
+                }
+            }
+
             // OnPedRanThroughDispatch: when dispatch returns ped info (may include warrant/firearm results). Refresh wanted status from CDF so MDT Person Search shows warrants; capture firearms for Firearms Check.
             if (eventName == "OnPedRanThroughDispatch" && args.Length >= 1 && args[0] is Ped dispatchPed) {
                 try {
@@ -221,18 +233,23 @@ namespace MDTPro.EventListeners {
                 }
             }
 
-            // Optional weapon/firearm check events: if PR fires these, capture from the ped in args so firearm shows in MDT.
+            // Optional weapon/firearm check events: if PR fires these, capture so firearm shows in MDT.
+            // PR may pass (Ped) when checking someone else's weapon, or no Ped when checking player's held weapon.
             if ((eventName.Contains("Weapon") || eventName.Contains("Firearm")) && args != null) {
+                bool captured = false;
                 foreach (object arg in args) {
                     if (arg is Ped wpnPed && wpnPed.IsValid()) {
                         try {
                             DataController.CaptureFirearmsFromPed(wpnPed, "Firearm check");
+                            captured = true;
                             break;
                         } catch (Exception ex) {
                             Game.LogTrivial($"MDT Pro: [Warning] {eventName} firearm capture: {ex.Message}");
                         }
                     }
                 }
+                // When checking player's held weapon, PR often doesn't pass a Ped. Trigger immediate capture attempt.
+                if (!captured) DataController.TryCapturePickupAndPlayerFirearms();
             }
 
             if (eventName == "OnFootTrafficStopStarted" && args.Length > 0) {

@@ -603,6 +603,31 @@ namespace MDTPro.ServerAPI {
                     contentType = "text/json";
                     status = 404;
                 }
+            } else if (path == "firearmCheckResult") {
+                var data = JsonConvert.DeserializeAnonymousType(body, new { serialNumber = (string)null, ownerName = (string)null, owner = (string)null, weaponType = (string)null, weapon = (string)null, status = (string)null, weaponModelId = (string)null });
+                if (data == null) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "Invalid JSON body." }));
+                    contentType = "text/json";
+                    status = 400;
+                    return;
+                }
+                string owner = !string.IsNullOrWhiteSpace(data.ownerName) ? data.ownerName : data.owner;
+                string weapon = !string.IsNullOrWhiteSpace(data.weaponType) ? data.weaponType : data.weapon;
+                if (string.IsNullOrWhiteSpace(owner)) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "ownerName (or owner) is required." }));
+                    contentType = "text/json";
+                    status = 400;
+                    return;
+                }
+                if (DataController.SaveFirearmCheckResultFromDispatch(data.serialNumber, owner, weapon, data.status, data.weaponModelId)) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = true }));
+                    contentType = "text/json";
+                    status = 200;
+                } else {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "Failed to save firearm check result." }));
+                    contentType = "text/json";
+                    status = 400;
+                }
             }
         }
 

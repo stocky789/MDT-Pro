@@ -59,7 +59,7 @@ async function loadRecentWeapons() {
     const weaponName = (f.WeaponDisplayName || f.Description || f.WeaponModelId || '').trim()
     const displayText = weaponName ? `${serialLabel} — ${weaponName}` : serialLabel
     if (!weaponName && serialLabel === '—') continue // Skip empty "—" entries
-    const lookupKey = f.IsSerialScratched ? (f.OwnerPedName || '') : (f.SerialNumber || '')
+    const lookupKey = f.IsSerialScratched ? (f.OwnerPedName || '') : (f.SerialNumber || f.OwnerPedName || '')
     const item = document.createElement('button')
     item.textContent = displayText
     item.addEventListener('click', function () {
