@@ -16,7 +16,7 @@ namespace MDTPro.Data {
         private static SQLiteConnection connection;
         private static readonly object dbLock = new object();
 
-        private const int CurrentSchemaVersion = 29;
+        private const int CurrentSchemaVersion = 30;
 
         /// <summary>Reads an INTEGER column from SQLite as uint. SQLite returns INTEGER as Int64; values outside uint range are clamped to 0.</summary>
         private static uint ReadUInt32FromReader(object value) {
@@ -218,7 +218,10 @@ namespace MDTPro.Data {
                     SentenceReasoning       TEXT,
                     LicenseRevocations      TEXT,
                     EvidenceUseOfForce      INTEGER NOT NULL DEFAULT 0,
-                    AttachedReportIds       TEXT
+                    AttachedReportIds       TEXT,
+                    EvidenceDrugTypesBreakdown   TEXT,
+                    EvidenceFirearmTypesBreakdown TEXT,
+                    OfficerTestimonySummary       TEXT
                 );
                 CREATE INDEX IF NOT EXISTS idx_court_cases_ped ON court_cases(PedName);
 
@@ -228,6 +231,8 @@ namespace MDTPro.Data {
                     Name         TEXT,
                     Fine         INTEGER NOT NULL DEFAULT 0,
                     Time         INTEGER,
+                    MinDays      INTEGER NOT NULL DEFAULT 0,
+                    MaxDays      INTEGER,
                     IsArrestable INTEGER,
                     Outcome      INTEGER NOT NULL DEFAULT 0,
                     ConvictionChance INTEGER,
@@ -456,6 +461,21 @@ namespace MDTPro.Data {
                     CapturedAt          TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_vehicle_search_records_plate ON vehicle_search_records(LicensePlate);
+
+                CREATE TABLE IF NOT EXISTS ped_evidence_cache (
+                    PedName                 TEXT PRIMARY KEY,
+                    CapturedAt              TEXT NOT NULL,
+                    HadWeapon               INTEGER NOT NULL DEFAULT 0,
+                    WasWanted               INTEGER NOT NULL DEFAULT 0,
+                    WasPatDown              INTEGER NOT NULL DEFAULT 0,
+                    WasDrunk                INTEGER NOT NULL DEFAULT 0,
+                    WasFleeing              INTEGER NOT NULL DEFAULT 0,
+                    AssaultedPed            INTEGER NOT NULL DEFAULT 0,
+                    DamagedVehicle          INTEGER NOT NULL DEFAULT 0,
+                    HadIllegalWeapon        INTEGER NOT NULL DEFAULT 0,
+                    ViolatedSupervision     INTEGER NOT NULL DEFAULT 0,
+                    Resisted                INTEGER NOT NULL DEFAULT 0
+                );
             ";
 
             using (var cmd = new SQLiteCommand(sql, connection)) {
@@ -926,6 +946,26 @@ namespace MDTPro.Data {
                     Helper.Log("Database migrated to schema version 29 (impound_reports PersonAtFaultName)");
                 } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             }
+            if (fromVersion < 30) {
+                try {
+                    using (var cmd = new SQLiteCommand(@"
+                        CREATE TABLE IF NOT EXISTS ped_evidence_cache (
+                            PedName                 TEXT PRIMARY KEY,
+                            CapturedAt              TEXT NOT NULL,
+                            HadWeapon               INTEGER NOT NULL DEFAULT 0,
+                            WasWanted               INTEGER NOT NULL DEFAULT 0,
+                            WasPatDown              INTEGER NOT NULL DEFAULT 0,
+                            WasDrunk                INTEGER NOT NULL DEFAULT 0,
+                            WasFleeing              INTEGER NOT NULL DEFAULT 0,
+                            AssaultedPed            INTEGER NOT NULL DEFAULT 0,
+                            DamagedVehicle          INTEGER NOT NULL DEFAULT 0,
+                            HadIllegalWeapon        INTEGER NOT NULL DEFAULT 0,
+                            ViolatedSupervision     INTEGER NOT NULL DEFAULT 0,
+                            Resisted                INTEGER NOT NULL DEFAULT 0
+                        )", connection)) { cmd.ExecuteNonQuery(); }
+                    Helper.Log("Database migrated to schema version 30 (ped_evidence_cache)");
+                } catch { }
+            }
 
             SetSchemaVersion(CurrentSchemaVersion);
         }
@@ -999,14 +1039,18 @@ namespace MDTPro.Data {
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_charges ADD COLUMN Outcome INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_charges ADD COLUMN ConvictionChance INTEGER", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_charges ADD COLUMN SentenceDaysServed INTEGER", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_charges ADD COLUMN MinDays INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_charges ADD COLUMN MaxDays INTEGER", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE arrest_reports ADD COLUMN AttachedReportIds TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE arrest_reports ADD COLUMN DocumentedDrugs INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE arrest_reports ADD COLUMN DocumentedFirearms INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS property_evidence_reports (Id TEXT PRIMARY KEY, ShortYear INTEGER NOT NULL, OfficerFirstName TEXT, OfficerLastName TEXT, OfficerRank TEXT, OfficerCallSign TEXT, OfficerAgency TEXT, OfficerBadgeNumber INTEGER, LocationArea TEXT, LocationStreet TEXT, LocationCounty TEXT, LocationPostal TEXT, TimeStamp TEXT NOT NULL, Status INTEGER NOT NULL DEFAULT 1, Notes TEXT, SubjectPedName TEXT, SeizedDrugTypes TEXT, SeizedFirearmTypes TEXT, OtherContrabandNotes TEXT)", connection)) { cmd.ExecuteNonQuery(); } } catch { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN EvidenceDrugTypesBreakdown TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN EvidenceFirearmTypesBreakdown TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN OfficerTestimonySummary TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE property_evidence_reports ADD COLUMN SubjectPedNames TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE property_evidence_reports ADD COLUMN SeizedDrugs TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS ped_evidence_cache (PedName TEXT PRIMARY KEY, CapturedAt TEXT NOT NULL, HadWeapon INTEGER NOT NULL DEFAULT 0, WasWanted INTEGER NOT NULL DEFAULT 0, WasPatDown INTEGER NOT NULL DEFAULT 0, WasDrunk INTEGER NOT NULL DEFAULT 0, WasFleeing INTEGER NOT NULL DEFAULT 0, AssaultedPed INTEGER NOT NULL DEFAULT 0, DamagedVehicle INTEGER NOT NULL DEFAULT 0, HadIllegalWeapon INTEGER NOT NULL DEFAULT 0, ViolatedSupervision INTEGER NOT NULL DEFAULT 0, Resisted INTEGER NOT NULL DEFAULT 0)", connection)) { cmd.ExecuteNonQuery(); } } catch { }
         }
 
         #endregion
@@ -1225,9 +1269,13 @@ namespace MDTPro.Data {
                                 OutcomeNotes = reader["OutcomeNotes"] as string,
                                 OutcomeReasoning = reader["OutcomeReasoning"] as string,
                                 SentenceReasoning = ReaderOptionalString(reader, "SentenceReasoning"),
-                                LicenseRevocations = ParseLicenseRevocations(reader["LicenseRevocations"] as string),
-                                AttachedReportIds = ParseAttachedReportIds(ReaderOptionalString(reader, "AttachedReportIds"))
+                                LicenseRevocations = ParseLicenseRevocations(ReaderOptionalString(reader, "LicenseRevocations")),
+                                AttachedReportIds = ParseAttachedReportIds(ReaderOptionalString(reader, "AttachedReportIds")),
+                                OfficerTestimonySummary = ReaderOptionalString(reader, "OfficerTestimonySummary")
                             };
+                            // EvidenceBand computed from EvidenceScore for API (0=Low, 1=Medium, 2=High)
+                            int score = courtCase.EvidenceScore;
+                            courtCase.EvidenceBand = score < 35 ? 0 : (score < 60 ? 1 : 2);
 
                             courtCase.Charges = LoadCourtCharges(courtCase.Number);
                             cases.Add(courtCase);
@@ -1247,10 +1295,20 @@ namespace MDTPro.Data {
 
                 using (var reader = cmd.ExecuteReader()) {
                     while (reader.Read()) {
+                        int? time = reader["Time"] is DBNull ? (int?)null : Convert.ToInt32(reader["Time"]);
+                        int minDays = ReaderOptionalInt(reader, "MinDays", 0);
+                        int? maxDays = ReaderOptionalIntNull(reader, "MaxDays");
+                        // Backward compat: old charges may lack MinDays/MaxDays. Default to Time for both when we have Time but no range.
+                        if (time.HasValue && time.Value > 0 && minDays == 0 && !maxDays.HasValue) {
+                            minDays = time.Value;
+                            maxDays = time.Value;
+                        }
                         charges.Add(new CourtData.Charge {
                             Name = reader["Name"] as string,
                             Fine = Convert.ToInt32(reader["Fine"]),
-                            Time = reader["Time"] is DBNull ? (int?)null : Convert.ToInt32(reader["Time"]),
+                            Time = time,
+                            MinDays = minDays,
+                            MaxDays = maxDays,
                             IsArrestable = reader["IsArrestable"] is DBNull ? (bool?)null : Convert.ToBoolean(reader["IsArrestable"]),
                             Outcome = ReaderOptionalInt(reader, "Outcome", 0),
                             ConvictionChance = ReaderOptionalIntNull(reader, "ConvictionChance"),
@@ -2011,7 +2069,7 @@ namespace MDTPro.Data {
                     CourtDistrict, CourtName, CourtType, HasPublicDefender, Plea,
                     JudgeName, ProsecutorName, DefenseAttorneyName,
                     HearingDateUtc, CreatedAtUtc, LastUpdatedUtc, OutcomeNotes, OutcomeReasoning, SentenceReasoning, LicenseRevocations, AttachedReportIds,
-                    EvidenceDrugTypesBreakdown, EvidenceFirearmTypesBreakdown
+                    EvidenceDrugTypesBreakdown, EvidenceFirearmTypesBreakdown, OfficerTestimonySummary
                 ) VALUES (
                     @Number, @PedName, @ReportId, @ShortYear, @Status,
                     @IsJuryTrial, @JurySize, @JuryVotesForConviction, @JuryVotesForAcquittal,
@@ -2024,7 +2082,7 @@ namespace MDTPro.Data {
                     @CourtDistrict, @CourtName, @CourtType, @HasPublicDefender, @Plea,
                     @JudgeName, @ProsecutorName, @DefenseAttorneyName,
                     @HearingDateUtc, @CreatedAtUtc, @LastUpdatedUtc, @OutcomeNotes, @OutcomeReasoning, @SentenceReasoning, @LicenseRevocations, @AttachedReportIds,
-                    @EvidenceDrugTypesBreakdown, @EvidenceFirearmTypesBreakdown
+                    @EvidenceDrugTypesBreakdown, @EvidenceFirearmTypesBreakdown, @OfficerTestimonySummary
                 )",
                 connection, transaction)) {
                 cmd.Parameters.AddWithValue("@Number", (object)courtCase.Number ?? DBNull.Value);
@@ -2087,6 +2145,7 @@ namespace MDTPro.Data {
                 string firearmBreakdownJson = courtCase.EvidenceFirearmTypesBreakdown != null && courtCase.EvidenceFirearmTypesBreakdown.Count > 0
                     ? Newtonsoft.Json.JsonConvert.SerializeObject(courtCase.EvidenceFirearmTypesBreakdown) : null;
                 cmd.Parameters.AddWithValue("@EvidenceFirearmTypesBreakdown", (object)firearmBreakdownJson ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@OfficerTestimonySummary", (object)courtCase.OfficerTestimonySummary ?? DBNull.Value);
                 cmd.ExecuteNonQuery();
             }
 
@@ -2097,14 +2156,17 @@ namespace MDTPro.Data {
 
             if (courtCase.Charges != null) {
                 foreach (var charge in courtCase.Charges) {
+                    if (charge == null) continue;
                     using (var cmd = new SQLiteCommand(@"
-                        INSERT INTO court_charges (CaseNumber, Name, Fine, Time, IsArrestable, Outcome, ConvictionChance, SentenceDaysServed)
-                        VALUES (@CaseNumber, @Name, @Fine, @Time, @IsArrestable, @Outcome, @ConvictionChance, @SentenceDaysServed)",
+                        INSERT INTO court_charges (CaseNumber, Name, Fine, Time, MinDays, MaxDays, IsArrestable, Outcome, ConvictionChance, SentenceDaysServed)
+                        VALUES (@CaseNumber, @Name, @Fine, @Time, @MinDays, @MaxDays, @IsArrestable, @Outcome, @ConvictionChance, @SentenceDaysServed)",
                         connection, transaction)) {
                         cmd.Parameters.AddWithValue("@CaseNumber", courtCase.Number);
                         cmd.Parameters.AddWithValue("@Name", (object)charge.Name ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@Fine", charge.Fine);
                         cmd.Parameters.AddWithValue("@Time", charge.Time.HasValue ? (object)charge.Time.Value : DBNull.Value);
+                        cmd.Parameters.AddWithValue("@MinDays", charge.MinDays);
+                        cmd.Parameters.AddWithValue("@MaxDays", charge.MaxDays.HasValue ? (object)charge.MaxDays.Value : DBNull.Value);
                         cmd.Parameters.AddWithValue("@IsArrestable", charge.IsArrestable.HasValue ? (object)(charge.IsArrestable.Value ? 1 : 0) : DBNull.Value);
                         cmd.Parameters.AddWithValue("@Outcome", charge.Outcome);
                         cmd.Parameters.AddWithValue("@ConvictionChance", charge.ConvictionChance.HasValue ? (object)charge.ConvictionChance.Value : DBNull.Value);
@@ -2951,6 +3013,97 @@ namespace MDTPro.Data {
                     }
                 }
                 return list;
+            }
+        }
+
+        #endregion
+
+        #region Ped Evidence Cache
+
+        /// <summary>Loads ped evidence cache from DB. Prunes entries older than maxAgeHours. Returns entries keyed for case-insensitive merge.</summary>
+        internal static List<PedEvidenceCacheEntry> LoadPedEvidenceCache(int maxAgeHours = 24) {
+            lock (dbLock) {
+                if (connection == null) return new List<PedEvidenceCacheEntry>();
+                try {
+                    if (maxAgeHours > 0) {
+                        var cutoff = DateTime.UtcNow.AddHours(-maxAgeHours).ToString("o");
+                        using (var cmd = new SQLiteCommand("DELETE FROM ped_evidence_cache WHERE CapturedAt < @cutoff", connection)) {
+                            cmd.Parameters.AddWithValue("@cutoff", cutoff);
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+                    var list = new List<PedEvidenceCacheEntry>();
+                    using (var cmd = new SQLiteCommand("SELECT PedName, CapturedAt, HadWeapon, WasWanted, WasPatDown, WasDrunk, WasFleeing, AssaultedPed, DamagedVehicle, HadIllegalWeapon, ViolatedSupervision, Resisted FROM ped_evidence_cache", connection)) {
+                        using (var rdr = cmd.ExecuteReader()) {
+                            while (rdr.Read()) {
+                                var capturedStr = rdr["CapturedAt"] as string;
+                                DateTime captured;
+                                if (!DateTime.TryParse(capturedStr, null, System.Globalization.DateTimeStyles.RoundtripKind, out captured))
+                                    captured = DateTime.UtcNow;
+                                list.Add(new PedEvidenceCacheEntry {
+                                    PedName = rdr["PedName"] as string ?? "",
+                                    CapturedAt = captured,
+                                    HadWeapon = GetBooleanFromReader(rdr, "HadWeapon"),
+                                    WasWanted = GetBooleanFromReader(rdr, "WasWanted"),
+                                    WasPatDown = GetBooleanFromReader(rdr, "WasPatDown"),
+                                    WasDrunk = GetBooleanFromReader(rdr, "WasDrunk"),
+                                    WasFleeing = GetBooleanFromReader(rdr, "WasFleeing"),
+                                    AssaultedPed = GetBooleanFromReader(rdr, "AssaultedPed"),
+                                    DamagedVehicle = GetBooleanFromReader(rdr, "DamagedVehicle"),
+                                    HadIllegalWeapon = GetBooleanFromReader(rdr, "HadIllegalWeapon"),
+                                    ViolatedSupervision = GetBooleanFromReader(rdr, "ViolatedSupervision"),
+                                    Resisted = GetBooleanFromReader(rdr, "Resisted"),
+                                });
+                            }
+                        }
+                    }
+                    return list;
+                } catch {
+                    return new List<PedEvidenceCacheEntry>();
+                }
+            }
+        }
+
+        /// <summary>Upserts ped evidence. Replaces any existing row for same ped (case-insensitive).</summary>
+        internal static void UpsertPedEvidenceEntry(PedEvidenceCacheEntry entry) {
+            if (string.IsNullOrWhiteSpace(entry.PedName)) return;
+            lock (dbLock) {
+                if (connection == null) return;
+                try {
+                    using (var cmd = new SQLiteCommand(@"
+                        DELETE FROM ped_evidence_cache WHERE LOWER(TRIM(PedName)) = LOWER(TRIM(@name));
+                        INSERT INTO ped_evidence_cache (PedName, CapturedAt, HadWeapon, WasWanted, WasPatDown, WasDrunk, WasFleeing, AssaultedPed, DamagedVehicle, HadIllegalWeapon, ViolatedSupervision, Resisted)
+                        VALUES (@name, @captured, @hw, @ww, @wp, @wd, @wf, @ap, @dv, @hiw, @vs, @res)",
+                        connection)) {
+                        cmd.Parameters.AddWithValue("@name", entry.PedName.Trim());
+                        cmd.Parameters.AddWithValue("@captured", entry.CapturedAt.ToString("o"));
+                        cmd.Parameters.AddWithValue("@hw", entry.HadWeapon ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@ww", entry.WasWanted ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@wp", entry.WasPatDown ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@wd", entry.WasDrunk ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@wf", entry.WasFleeing ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@ap", entry.AssaultedPed ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@dv", entry.DamagedVehicle ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@hiw", entry.HadIllegalWeapon ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@vs", entry.ViolatedSupervision ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@res", entry.Resisted ? 1 : 0);
+                        cmd.ExecuteNonQuery();
+                    }
+                } catch { }
+            }
+        }
+
+        /// <summary>Deletes ped evidence entries older than maxAgeHours. Call periodically to limit DB size.</summary>
+        internal static void PrunePedEvidenceCache(int maxAgeHours = 24) {
+            lock (dbLock) {
+                if (connection == null) return;
+                try {
+                    var cutoff = DateTime.UtcNow.AddHours(-maxAgeHours).ToString("o");
+                    using (var cmd = new SQLiteCommand("DELETE FROM ped_evidence_cache WHERE CapturedAt < @cutoff", connection)) {
+                        cmd.Parameters.AddWithValue("@cutoff", cutoff);
+                        cmd.ExecuteNonQuery();
+                    }
+                } catch { }
             }
         }
 

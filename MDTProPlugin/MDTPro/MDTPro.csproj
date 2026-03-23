@@ -97,6 +97,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Data\CourtData.cs" />
+    <Compile Include="Data\JudgeProfile.cs" />
+    <Compile Include="Data\PedEvidenceCacheEntry.cs" />
     <Compile Include="Data\VehicleSearchRecord.cs" />
     <Compile Include="Data\MDTProPedData.cs" />
     <Compile Include="Data\Database.cs" />

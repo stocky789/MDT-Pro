@@ -43,6 +43,7 @@ namespace MDTPro.Setup {
         internal static string CitationOptionsDefaultsPath => Path.Combine(DefaultsPath, "citationOptions.json");
         internal static string ArrestOptionsDefaultsPath => Path.Combine(DefaultsPath, "arrestOptions.json");
         internal static string SeizureOptionsDefaultsPath => Path.Combine(DefaultsPath, "seizureOptions.json");
+        internal static string JudgeProfilesDefaultsPath => Path.Combine(DefaultsPath, "judgeProfiles.json");
         internal static string PedDataPath => Path.Combine(DataPath, "peds.json");
         internal static string VehicleDataPath => Path.Combine(DataPath, "vehicles.json");
         internal static string CourtDataPath => Path.Combine(DataPath, "court.json");
@@ -93,6 +94,8 @@ namespace MDTPro.Setup {
 
             DataController.LoadPedDatabaseFromFile();
             DataController.LoadVehicleDatabaseFromFile();
+            DataController.LoadJudgeProfiles();
+            // Ped evidence cache is not loaded from DB — PR detection is unreliable; reports (PER, arrest checkboxes) are authoritative.
             DataController.SetOfficerInformation();
 
             try {
@@ -178,9 +181,9 @@ namespace MDTPro.Setup {
             if (string.IsNullOrEmpty(cfg.alprHudAnchor)) cfg.alprHudAnchor = def.alprHudAnchor ?? "TopRight";
         }
 
-        /// <summary>One-time migration: overwrite citation and arrest options from defaults so upgraders get updated charges (no VC/PC/HS in names, Stolen Possession, Evading, etc.). ALPR behavior is already hardcoded; this only updates the charge lists.</summary>
+        /// <summary>One-time migration: overwrite citation and arrest options from defaults so upgraders get updated charges. Bump version when adding charges (RICO, Federal, Wildlife, etc.) or expanding citations.</summary>
         private static void EnsureCitationArrestOptionsFromDefaults(Config cfg, Config def) {
-            const int currentCitationArrestOptionsVersion = 2;
+            const int currentCitationArrestOptionsVersion = 3;
             if (cfg.citationArrestOptionsVersion >= currentCitationArrestOptionsVersion) return;
             try {
                 if (File.Exists(CitationOptionsDefaultsPath)) {
@@ -192,7 +195,7 @@ namespace MDTPro.Setup {
                     cachedArrestOptions = null;
                 }
                 cfg.citationArrestOptionsVersion = currentCitationArrestOptionsVersion;
-                Helper.Log("Citation and arrest options updated from defaults (version 2: plain charge names, Stolen Possession, Evading).", true, Helper.LogSeverity.Info);
+                Helper.Log("Citation and arrest options updated from defaults (version 3: RICO, Federal, Wildlife, Larceny/Fraud, expanded DUI/DWI, firearms, and more).", true, Helper.LogSeverity.Info);
             } catch (Exception ex) {
                 Helper.Log($"Could not update citation/arrest options from defaults: {ex.Message}", true, Helper.LogSeverity.Warning);
             }

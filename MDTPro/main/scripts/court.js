@@ -4,6 +4,7 @@
   if (config.updateDomWithLanguageOnLoad) await updateDomWithLanguage('court')
 
   let courtCases = await (await fetch('/data/court')).json()
+  courtCases = Array.isArray(courtCases) ? courtCases : []
   const root = document.querySelector('.list')
   root.innerHTML = ''
 
@@ -30,6 +31,7 @@
 
   const refreshCourtList = async () => {
     courtCases = await (await fetch('/data/court')).json()
+    courtCases = Array.isArray(courtCases) ? courtCases : []
     await render()
   }
 
@@ -37,6 +39,7 @@
     listContainer.innerHTML = ''
 
     const filteredCases = courtCases
+      .filter((c) => c != null && typeof c === 'object')
       .filter((c) => {
         if (state.status !== 'all' && `${c.Status}` !== state.status) return false
         const query = state.query.trim().toLowerCase()
@@ -59,6 +62,19 @@
       listContainer.innerHTML = language.court.empty
       return
     }
+
+    // Docket-style column headers
+    const headerRow = document.createElement('div')
+    headerRow.classList.add('courtCaseListHeader')
+    headerRow.innerHTML = `
+      <span class="courtCaseListHeaderExpand"></span>
+      <span class="courtCaseListHeaderDefendant">${escapeHtml(language.court.defendant || 'Defendant')}</span>
+      <span class="courtCaseListHeaderCaseNumber">${escapeHtml(language.court.number || 'Case')}</span>
+      <span class="courtCaseListHeaderDistrict">${escapeHtml(language.court.courtDistrictCol || 'Court District')}</span>
+      <span class="courtCaseListHeaderDate">${escapeHtml(language.court.dateCol || 'Date')}</span>
+      <span class="courtCaseListHeaderStatus">${escapeHtml(language.court.status || 'Status')}</span>
+    `
+    listContainer.appendChild(headerRow)
 
     for (const courtCase of filteredCases) {
       listContainer.appendChild(await createCourtCaseElement(courtCase, language, refreshCourtList))
@@ -119,6 +135,21 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   const statusLabel = statusMap[courtCase.Status] || 'Unknown'
   const statusColor = courtStatusColorMap[courtCase.Status] || 'info'
 
+  const courtDateLabel = courtCase.Status === 0 ? (language.court.trialDate || 'Trial') : (language.court.courtDate || 'Court')
+  const dateForRow = courtCase.Status === 0 && courtCase.ResolveAtUtc
+    ? courtCase.ResolveAtUtc
+    : courtCase.HearingDateUtc || courtCase.ResolveAtUtc || courtCase.LastUpdatedUtc || ''
+  const dateFormatted = dateForRow
+    ? (() => {
+        try {
+          const d = new Date(dateForRow)
+          return Number.isNaN(d.getTime()) ? dateForRow : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+        } catch (_) {
+          return dateForRow
+        }
+      })()
+    : '–'
+
   const row = document.createElement('div')
   row.classList.add('courtCaseRow')
   row.setAttribute('role', 'button')
@@ -127,7 +158,9 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   row.innerHTML = `
     <span class="courtCaseRowExpandIcon" aria-hidden="true"></span>
     <span class="courtCaseRowName">${escapeHtml(courtCase.PedName || '–')}</span>
-    <span class="courtCaseRowCaseNumber">${language.court.number || 'Case'}: ${escapeHtml(courtCase.Number || '–')}</span>
+    <span class="courtCaseRowCaseNumber">${escapeHtml(courtCase.Number || '–')}</span>
+    <span class="courtCaseRowDistrict">${escapeHtml(courtCase.CourtDistrict || '–')}</span>
+    <span class="courtCaseRowDate">${courtCase.Status === 0 && (courtCase.ResolveAtUtc || courtCase.HearingDateUtc) ? escapeHtml(`${courtDateLabel}: ${dateFormatted}`) : escapeHtml(dateFormatted)}</span>
     <span class="courtCaseRowStatus courtCaseRowStatus--${statusColor}">${escapeHtml(statusLabel)}</span>
   `
   listItem.appendChild(row)
@@ -149,7 +182,7 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
 
   const chargesSearchResponseTitle = document.createElement('div')
   chargesSearchResponseTitle.classList.add('searchResponseSectionTitle')
-  chargesSearchResponseTitle.innerHTML = language.court.charges
+  chargesSearchResponseTitle.innerHTML = escapeHtml(language.court?.charges ?? 'Charges')
   chargesSearchResponseWrapper.appendChild(chargesSearchResponseTitle)
 
   const chargesInputWrapper = document.createElement('div')
@@ -160,17 +193,22 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   let totalTime = 0
   let lifeSentences = 0
   for (const charge of courtCase.Charges || []) {
+    if (!charge || typeof charge !== 'object') continue
     // Outcome 1 = Convicted; legacy data (Outcome 0) on resolved cases: treat as convicted when case Status === 1
     const convicted = isResolved && (charge.Outcome === 1 || (charge.Outcome === 0 && courtCase.Status === 1))
     if (!isResolved || convicted) {
       totalFine += charge.Fine || 0
-      totalTime += charge.Time || 0
+      // Resolved convicted: use SentenceDaysServed (actual imposed sentence); pending: use Time (statutory)
+      const daysForTime = isResolved && convicted && charge.SentenceDaysServed != null
+        ? charge.SentenceDaysServed
+        : (charge.Time ?? 0)
+      totalTime += typeof daysForTime === 'number' ? daysForTime : 0
       if (charge.Time === null) lifeSentences++
     }
 
     const chargeWrapper = document.createElement('div')
     const chargeLabel = document.createElement('label')
-    chargeLabel.innerHTML = charge.Name
+    chargeLabel.textContent = charge.Name || '–'
     chargeWrapper.appendChild(chargeLabel)
     let detailValue = await getChargeDetailsString(charge.Fine || 0, charge.Time)
     if (isResolved) {
@@ -197,7 +235,7 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
 
   const searchResponseTitle = document.createElement('div')
   searchResponseTitle.classList.add('searchResponseSectionTitle')
-  searchResponseTitle.innerHTML = `${language.court.number}: ${courtCase.Number}`
+  searchResponseTitle.innerHTML = `${escapeHtml(language.court.number || 'Case')}: ${escapeHtml(courtCase.Number ?? '–')}`
   searchResponseWrapper.appendChild(searchResponseTitle)
 
   const inputWrapper = document.createElement('div')
@@ -206,6 +244,28 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   inputWrapper.appendChild(
     createSectionHeader(language.court.sectionCaseProfile || 'Case Profile')
   )
+
+  // Case Timeline
+  const timelineDates = [
+    [language.court.hearingDate || 'Hearing Date', courtCase.HearingDateUtc],
+    [language.court.createdAt || 'Created', courtCase.CreatedAtUtc],
+    [language.court.lastUpdated || 'Last Updated', courtCase.LastUpdatedUtc],
+    [language.court.resolveAt || 'Court Date', courtCase.ResolveAtUtc]
+  ].filter(([, v]) => v)
+  if (timelineDates.length > 0) {
+    const timelineValues = await Promise.all(timelineDates.map(([, v]) => formatIsoDate(v)))
+    const timelineSection = document.createElement('div')
+    timelineSection.classList.add('courtTimelineSection')
+    timelineSection.appendChild(createSectionHeader(language.court.caseTimeline || 'Case Timeline'))
+    timelineDates.forEach(([label], i) => {
+      const r = document.createElement('div')
+      r.classList.add('courtTimelineRow')
+      r.appendChild(createLabel(label))
+      r.appendChild(createReadOnlyInput(timelineValues[i]))
+      timelineSection.appendChild(r)
+    })
+    inputWrapper.appendChild(timelineSection)
+  }
 
   const pedNameWrapper = document.createElement('div')
   pedNameWrapper.classList.add('clickable')
@@ -225,50 +285,93 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   reportWrapper.appendChild(createReadOnlyInput(courtCase.ReportId || ''))
   inputWrapper.appendChild(reportWrapper)
 
-  if (courtCase.Status === 0) {
+  const attachedIds = courtCase.AttachedReportIds || []
+  const hasAttachedReports = attachedIds.length > 0
+  if (courtCase.Status === 0 || hasAttachedReports) {
     const attachedSection = document.createElement('div')
     attachedSection.classList.add('courtAttachedReportsSection')
     attachedSection.appendChild(
       createSectionHeader(language.court.attachedReports || 'Attached reports (evidence)')
     )
-    const attachedHelp = document.createElement('p')
-    attachedHelp.className = 'courtAttachedReportsHelp'
-    attachedHelp.textContent = language.court.attachedReportsHelp || 'Attached reports count as evidence. Relevant ones (defendant named, or report type matches charges) carry full weight; others still count but carry less weight.'
-    attachedSection.appendChild(attachedHelp)
-    const attachedIds = courtCase.AttachedReportIds || []
+    if (courtCase.Status === 0) {
+      const attachedHelp = document.createElement('p')
+      attachedHelp.className = 'courtAttachedReportsHelp'
+      attachedHelp.textContent = language.court.attachedReportsHelp || 'Attached reports count as evidence. Relevant ones (defendant named, or report type matches charges) carry full weight; others still count but carry less weight.'
+      attachedSection.appendChild(attachedHelp)
+    }
     const listWrap = document.createElement('div')
     listWrap.classList.add('courtAttachedReportIdsList')
+
+    let reportSummaries = []
+    if (attachedIds.length > 0) {
+      try {
+        const res = await fetch('/data/reportSummaries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(attachedIds)
+        })
+        if (res.ok) {
+          const data = await res.json()
+          reportSummaries = Array.isArray(data) ? data : []
+        }
+      } catch (_) {}
+    }
+
+    const reportTypeLabels = {
+      incident: language.court.reportTypeIncident || 'Incident',
+      citation: language.court.reportTypeCitation || 'Citation',
+      arrest: language.court.reportTypeArrest || 'Arrest',
+      impound: language.court.reportTypeImpound || 'Impound',
+      trafficIncident: language.court.reportTypeTrafficIncident || 'Traffic Incident',
+      injury: language.court.reportTypeInjury || 'Injury',
+      propertyEvidence: language.court.reportTypePropertyEvidence || 'Property & Evidence'
+    }
+
     attachedIds.forEach((reportId) => {
+      const sum = reportSummaries.find((s) => s && s.id === reportId)
+      const typeLabel = sum?.type ? (reportTypeLabels[sum.type] || sum.typeLabel || '—') : '—'
       const row = document.createElement('div')
       row.classList.add('courtAttachedReportIdRow')
       const span = document.createElement('span')
-      span.textContent = reportId
-      const detachBtn = document.createElement('button')
-      detachBtn.type = 'button'
-      detachBtn.className = 'detachCourtReportButton'
-      detachBtn.textContent = language.court.detach || 'Detach'
-      detachBtn.addEventListener('click', async function () {
-        if (detachBtn.classList.contains('loading')) return
-        detachBtn.classList.add('loading')
-        const res = await (
-          await fetch('/post/detachReportFromCourtCase', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ courtCaseNumber: courtCase.Number, reportId })
-          })
-        ).text()
-        detachBtn.classList.remove('loading')
-        if (res === 'OK') await refreshCourtList()
-        else topWindow.showNotification(language.court.saveCaseError || 'Error', 'error')
-      })
+      span.textContent = courtCase.Status !== 0 ? `${reportId} (${typeLabel})` : reportId
       row.appendChild(span)
-      row.appendChild(detachBtn)
+      if (courtCase.Status === 0) {
+        const detachBtn = document.createElement('button')
+        detachBtn.type = 'button'
+        detachBtn.className = 'detachCourtReportButton'
+        detachBtn.textContent = language.court.detach || 'Detach'
+        detachBtn.addEventListener('click', async function () {
+          if (detachBtn.classList.contains('loading')) return
+          detachBtn.classList.add('loading')
+          const res = await (
+            await fetch('/post/detachReportFromCourtCase', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ courtCaseNumber: courtCase.Number, reportId })
+            })
+          ).text()
+          detachBtn.classList.remove('loading')
+          if (res === 'OK') await refreshCourtList()
+          else topWindow.showNotification(language.court.saveCaseError || 'Error', 'error')
+        })
+        row.appendChild(detachBtn)
+      } else {
+        const linkSpan = document.createElement('span')
+        linkSpan.classList.add('courtAttachedReportLink')
+        linkSpan.textContent = 'View'
+        linkSpan.setAttribute('role', 'button')
+        linkSpan.tabIndex = 0
+        const reportType = sum?.type || null
+        linkSpan.addEventListener('click', () => openIdInReport(reportId, reportType))
+        linkSpan.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openIdInReport(reportId, reportType) } })
+        row.appendChild(linkSpan)
+      }
       listWrap.appendChild(row)
     })
     attachedSection.appendChild(listWrap)
     const now = new Date()
     const resolveAt = courtCase.ResolveAtUtc ? new Date(courtCase.ResolveAtUtc) : null
-    const canAttach = !resolveAt || now < resolveAt
+    const canAttach = courtCase.Status === 0 && (!resolveAt || now < resolveAt)
     if (canAttach) {
       const attachWrap = document.createElement('div')
       attachWrap.classList.add('courtAttachReportWrap')
@@ -365,21 +468,41 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   judgeWrapper.appendChild(createReadOnlyInput(courtCase.JudgeName || '-'))
   inputWrapper.appendChild(judgeWrapper)
 
+  const prosecutorWrapper = document.createElement('div')
+  prosecutorWrapper.appendChild(createLabel(language.court.prosecutor || 'Prosecutor'))
+  prosecutorWrapper.appendChild(createReadOnlyInput(courtCase.ProsecutorName || '-'))
+  inputWrapper.appendChild(prosecutorWrapper)
+
+  const defenseAttorneyWrapper = document.createElement('div')
+  defenseAttorneyWrapper.appendChild(createLabel(language.court.defenseAttorney || 'Defense Attorney'))
+  defenseAttorneyWrapper.appendChild(createReadOnlyInput(courtCase.DefenseAttorneyName || '-'))
+  inputWrapper.appendChild(defenseAttorneyWrapper)
+
   const severityWrapper = document.createElement('div')
   severityWrapper.appendChild(createLabel(language.court.severityScore || 'Severity Score'))
   severityWrapper.appendChild(createReadOnlyInput(`${courtCase.SeverityScore || 0}`))
   inputWrapper.appendChild(severityWrapper)
 
+  const evidenceScore = Math.max(0, Number(courtCase.EvidenceScore) || 0)
+  const evidenceBand = evidenceScore < 35 ? 'Low' : evidenceScore < 60 ? 'Medium' : 'Strong'
+  const evidenceBandLabel = evidenceBand === 'Low' ? (language.court.evidenceBandLow || 'Low') : evidenceBand === 'Medium' ? (language.court.evidenceBandMedium || 'Medium') : (language.court.evidenceBandStrong || 'Strong')
   const evidenceWrapper = document.createElement('div')
   evidenceWrapper.appendChild(createLabel(language.court.evidenceScore || 'Evidence Score'))
-  evidenceWrapper.appendChild(createReadOnlyInput(`${courtCase.EvidenceScore || 0}`))
+  evidenceWrapper.appendChild(createReadOnlyInput(`${evidenceScore} (${evidenceBandLabel})`))
   inputWrapper.appendChild(evidenceWrapper)
+  if (evidenceBand === 'Low') {
+    const evidenceBandNote = document.createElement('div')
+    evidenceBandNote.classList.add('courtEvidenceBandNote')
+    evidenceBandNote.textContent = language.court.evidenceBandLowNote || 'Limited physical evidence – case may rely on officer testimony.'
+    inputWrapper.appendChild(evidenceBandNote)
+  }
 
   const evidenceToggleWrapper = document.createElement('div')
   evidenceToggleWrapper.classList.add('evidenceToggleWrapper')
   const evidenceToggleBtn = document.createElement('button')
   evidenceToggleBtn.classList.add('evidenceToggleBtn')
   evidenceToggleBtn.innerText = language.court.viewEvidenceBtn || 'View Evidence Breakdown'
+  evidenceToggleBtn.title = language.court.viewEvidenceBtn || 'View prosecution exhibits'
   evidenceToggleWrapper.appendChild(evidenceToggleBtn)
   inputWrapper.appendChild(evidenceToggleWrapper)
 
@@ -423,46 +546,43 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   multiplierRow.appendChild(multiplierVal)
   evidenceBreakdown.appendChild(multiplierRow)
 
-  // Scene evidence flags — only show items we can track reliably (see DataController PedEvidenceContext comment)
-  const drugLabel = (courtCase.EvidenceDrugTypesBreakdown?.length > 0)
-    ? `Drugs found (${courtCase.EvidenceDrugTypesBreakdown.join(', ')})`
-    : (language.court.evidenceDrugs || 'Drugs Found on Person')
-  const weaponLabel = (courtCase.EvidenceFirearmTypesBreakdown?.length > 0)
-    ? `Firearms seized (${courtCase.EvidenceFirearmTypesBreakdown.join(', ')})`
-    : (language.court.evidenceWeapon || 'Armed at Arrest')
-  const evidenceItems = [
-    { label: weaponLabel, value: courtCase.EvidenceHadWeapon ?? false, active: courtCase.EvidenceHadWeapon ?? false },
-    { label: language.court.evidenceWanted || 'Active Warrant at Encounter', value: courtCase.EvidenceWasWanted ?? false, active: courtCase.EvidenceWasWanted ?? false },
-    { label: language.court.evidenceAssault || 'Assaulted Another Person', value: courtCase.EvidenceAssaultedPed ?? false, active: courtCase.EvidenceAssaultedPed ?? false },
-    { label: language.court.evidenceVehicleDamage || 'Damaged Vehicle / Property', value: courtCase.EvidenceDamagedVehicle ?? false, active: courtCase.EvidenceDamagedVehicle ?? false },
-    { label: language.court.evidenceResisted || 'Resisted Arrest', value: courtCase.EvidenceResisted ?? false, active: courtCase.EvidenceResisted ?? false },
-    { label: drugLabel, value: courtCase.EvidenceHadDrugs ?? false, active: courtCase.EvidenceHadDrugs ?? false },
-    { label: language.court.evidenceUseOfForce || 'Use of Force Documented', value: courtCase.EvidenceUseOfForce ?? false, active: courtCase.EvidenceUseOfForce ?? false },
-    { label: language.court.evidenceDrunk || 'Intoxicated at Encounter', value: courtCase.EvidenceWasDrunk ?? false, active: courtCase.EvidenceWasDrunk ?? false },
-    { label: language.court.evidenceFleeing || 'Attempted to Flee', value: courtCase.EvidenceWasFleeing ?? false, active: courtCase.EvidenceWasFleeing ?? false },
-    { label: language.court.evidenceSupervision || 'Supervision Violation', value: courtCase.EvidenceViolatedSupervision ?? false, active: courtCase.EvidenceViolatedSupervision ?? false },
-    { label: language.court.evidencePatDown || 'Pat-Down / Search', value: courtCase.EvidenceWasPatDown ?? false, active: courtCase.EvidenceWasPatDown ?? false },
-    { label: language.court.evidenceIllegalWeapon || 'Illegal Weapon', value: courtCase.EvidenceIllegalWeapon ?? false, active: courtCase.EvidenceIllegalWeapon ?? false },
+  // Prosecution exhibits — map evidence flags to exhibit-style blocks
+  const exhibitLabels = [
+    { key: 'EvidenceHadWeapon', label: (language.court.exhibitFirearm || 'Firearm recovered') + (courtCase.EvidenceFirearmTypesBreakdown?.length > 0 ? ` (${courtCase.EvidenceFirearmTypesBreakdown.join(', ')})` : '') },
+    { key: 'EvidenceHadDrugs', label: (language.court.exhibitDrugs || 'Drugs') + (courtCase.EvidenceDrugTypesBreakdown?.length > 0 ? ` (${courtCase.EvidenceDrugTypesBreakdown.join(', ')})` : '') },
+    { key: '_arrestReport', label: language.court.exhibitArrestReport || 'Arrest report', always: true },
+    { key: 'EvidenceWasWanted', label: language.court.exhibitWarrant || 'Active warrant documentation' },
+    { key: 'EvidenceAssaultedPed', label: language.court.exhibitAssault || 'Assault evidence' },
+    { key: 'EvidenceDamagedVehicle', label: language.court.exhibitVehicleDamage || 'Vehicle/property damage evidence' },
+    { key: 'EvidenceResisted', label: language.court.exhibitResistance || 'Resistance evidence' },
+    { key: 'EvidenceUseOfForce', label: language.court.exhibitUseOfForce || 'Use of force documentation' },
+    { key: 'EvidenceWasDrunk', label: language.court.exhibitIntoxication || 'Intoxication evidence' },
+    { key: 'EvidenceWasFleeing', label: language.court.exhibitFleeing || 'Fleeing evidence' },
+    { key: 'EvidenceViolatedSupervision', label: language.court.exhibitSupervision || 'Supervision violation' },
+    { key: 'EvidenceWasPatDown', label: language.court.exhibitPatDown || 'Pat-down/search evidence' },
+    { key: 'EvidenceIllegalWeapon', label: language.court.exhibitIllegalWeapon || 'Illegal weapon evidence' }
   ]
-
-  for (const item of evidenceItems) {
-    const row = document.createElement('div')
-    row.classList.add('evidenceBreakdownRow')
-    if (item.active) row.classList.add('evidenceBreakdownRowActive')
+  const exhibitLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  let exhibitIndex = 0
+  for (const ex of exhibitLabels) {
+    const isActive = ex.always || (courtCase[ex.key] ?? false)
+    if (!isActive) continue
+    const letter = exhibitLetters[exhibitIndex++] || String(exhibitIndex)
+    const exhibitRow = document.createElement('div')
+    exhibitRow.classList.add('evidenceBreakdownRow', 'evidenceExhibitRow')
+    if (ex.always || courtCase[ex.key]) exhibitRow.classList.add('evidenceBreakdownRowActive')
     const lbl = document.createElement('span')
-    lbl.innerText = item.label
+    lbl.innerText = `Exhibit ${letter}: ${ex.label}`
     const val = document.createElement('span')
     val.classList.add('evidenceBreakdownValue')
-    val.innerText = item.value
-      ? (language.court.evidenceYes || 'YES')
-      : (language.court.evidenceNo || 'NO')
-    row.appendChild(lbl)
-    row.appendChild(val)
-    evidenceBreakdown.appendChild(row)
+    val.innerText = ex.always ? (courtCase.ReportId ? courtCase.ReportId : '—') : (language.court.evidenceYes || 'YES')
+    exhibitRow.appendChild(lbl)
+    exhibitRow.appendChild(val)
+    evidenceBreakdown.appendChild(exhibitRow)
   }
 
   // Charges filed
-  const charges = courtCase.Charges || []
+  const charges = (courtCase.Charges || []).filter(c => c != null && typeof c === 'object')
   charges.forEach(charge => {
     const chargeRow = document.createElement('div')
     chargeRow.classList.add('evidenceBreakdownRow', 'evidenceBreakdownCharges')
@@ -494,16 +614,14 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   inputWrapper.appendChild(
     createSectionHeader(language.court.sectionAdversarial || 'Trial Model')
   )
-  prosecutionWrapper.appendChild(
-    createLabel(language.court.prosecutionStrength || 'Prosecution Strength')
-  )
+  prosecutionWrapper.appendChild(createLabelWithTooltip(language.court.prosecutionStrength || 'Prosecution Strength', language.court.prosecutionStrengthTooltip || 'Prosecution\'s estimated strength based on evidence and case factors.'))
   prosecutionWrapper.appendChild(
     createReadOnlyInput(`${(courtCase.ProsecutionStrength || 0).toFixed(1)}`)
   )
   inputWrapper.appendChild(prosecutionWrapper)
 
   const defenseWrapper = document.createElement('div')
-  defenseWrapper.appendChild(createLabel(language.court.defenseStrength || 'Defense Strength'))
+  defenseWrapper.appendChild(createLabelWithTooltip(language.court.defenseStrength || 'Defense Strength', language.court.defenseStrengthTooltip || 'Defense\'s estimated strength based on representation and case factors.'))
   defenseWrapper.appendChild(
     createReadOnlyInput(`${(courtCase.DefenseStrength || 0).toFixed(1)}`)
   )
@@ -515,7 +633,7 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   inputWrapper.appendChild(convictionChanceWrapper)
 
   const docketWrapper = document.createElement('div')
-  docketWrapper.appendChild(createLabel(language.court.docketPressure || 'Docket Pressure'))
+  docketWrapper.appendChild(createLabelWithTooltip(language.court.docketPressure || 'Docket Pressure', language.court.docketPressureTooltip))
   docketWrapper.appendChild(
     createReadOnlyInput(`${((courtCase.DocketPressure || 0) * 100).toFixed(0)}%`)
   )
@@ -523,7 +641,7 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
 
   const policyWrapper = document.createElement('div')
   policyWrapper.appendChild(
-    createLabel(language.court.policyAdjustment || 'District Policy Adjustment')
+    createLabelWithTooltip(language.court.policyAdjustment || 'District Policy Adjustment', language.court.policyAdjustmentTooltip)
   )
   policyWrapper.appendChild(
     createReadOnlyInput(`${((courtCase.PolicyAdjustment || 0) * 100).toFixed(1)}%`)
@@ -540,8 +658,13 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
     inputWrapper.appendChild(juryWrapper)
   }
 
+  const pleaTooltipText = [
+    language.court.pleaTooltipNotGuilty,
+    language.court.pleaTooltipGuilty,
+    language.court.pleaTooltipNoContest
+  ].filter(Boolean).join(' ')
   const pleaWrapper = document.createElement('div')
-  pleaWrapper.appendChild(createLabel(language.court.plea || 'Plea'))
+  pleaWrapper.appendChild(createLabelWithTooltip(language.court.plea || 'Plea', pleaTooltipText || null))
   const pleaSelect = document.createElement('select')
   ;(language.court.pleaMap || ['Not Guilty', 'Guilty', 'No Contest']).forEach((pleaOption) => {
     const option = document.createElement('option')
@@ -669,7 +792,51 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
     forceResolveBtn.style.borderColor = 'var(--color-accent)'
     forceResolveBtn.addEventListener('click', async function () {
       if (forceResolveBtn.classList.contains('loading')) return
-      showLoadingOnButton(forceResolveBtn)
+      forceResolveBtn.classList.add('loading')
+      forceResolveBtn.disabled = true
+
+      const stages = language.court.forceResolveStages || [
+        'Submitting case to court...',
+        'Prosecution and defense present...',
+        'Judge deliberating...',
+        'Verdict being entered...',
+        'Finalizing case record...',
+      ]
+      const totalMs = 5000
+      const stageInterval = totalMs / stages.length
+      const circumference = 2 * Math.PI * 36
+
+      const overlay = document.createElement('div')
+      overlay.className = 'courtProcessingOverlay'
+      overlay.innerHTML = `
+        <div class="courtProcessingModal">
+          <div class="courtProcessingTitle">${escapeHtml(language.court.forceResolveProcessing || 'Processing case...')}</div>
+          <svg class="courtProcessingCircle" viewBox="0 0 80 80">
+            <circle class="courtProcessingCircleBg" cx="40" cy="40" r="36" />
+            <circle class="courtProcessingCircleProgress" cx="40" cy="40" r="36" />
+          </svg>
+          <div class="courtProcessingStage">${escapeHtml(stages[0])}</div>
+        </div>
+      `
+      document.body.appendChild(overlay)
+      const progressCircle = overlay.querySelector('.courtProcessingCircleProgress')
+      const stageEl = overlay.querySelector('.courtProcessingStage')
+
+      let elapsed = 0
+      const tick = 50
+      const progressInterval = setInterval(() => {
+        elapsed += tick
+        const pct = Math.min(1, elapsed / totalMs)
+        const dashOffset = circumference * (1 - pct)
+        progressCircle.style.strokeDashoffset = dashOffset
+        const stageIdx = Math.min(stages.length - 1, Math.floor(pct * stages.length))
+        stageEl.textContent = stages[stageIdx]
+      }, tick)
+
+      await new Promise((r) => setTimeout(r, totalMs))
+      clearInterval(progressInterval)
+      overlay.remove()
+
       let responseText
       try {
         const res = await fetch('/post/forceResolveCourtCase', {
@@ -685,13 +852,16 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
       } catch (_) {
         responseText = ''
       }
+
+      forceResolveBtn.classList.remove('loading')
+      forceResolveBtn.disabled = false
+
       if (responseText === 'OK' && typeof refreshCourtList === 'function') {
         topWindow.showNotification(language.court.forceResolveSuccess || 'Case resolved.', 'success')
         await refreshCourtList()
       } else {
         topWindow.showNotification(language.court.forceResolveError || 'Could not resolve case.', 'error')
       }
-      hideLoadingOnButton(forceResolveBtn)
     })
     statusButtonWrapper.appendChild(forceResolveBtn)
 
@@ -766,8 +936,25 @@ function toggleCourtCaseExpanded(listItem) {
 
 function createLabel(text) {
   const label = document.createElement('label')
-  label.innerHTML = text
+  label.textContent = text ?? ''
   return label
+}
+
+function createLabelWithTooltip(text, tooltip) {
+  const wrap = document.createElement('span')
+  wrap.classList.add('courtLabelWithTooltip')
+  const label = document.createElement('label')
+  label.textContent = text ?? ''
+  wrap.appendChild(label)
+  if (tooltip) {
+    const icon = document.createElement('span')
+    icon.classList.add('courtTooltipIcon')
+    icon.setAttribute('aria-label', tooltip)
+    icon.title = tooltip
+    icon.textContent = 'ⓘ'
+    wrap.appendChild(icon)
+  }
+  return wrap
 }
 
 function createSectionHeader(text) {
@@ -781,14 +968,16 @@ function createReadOnlyInput(value) {
   const input = document.createElement('input')
   input.type = 'text'
   input.disabled = true
-  input.value = value
+  const displayValue = (value === null || value === undefined) ? '' : String(value)
+  input.value = displayValue
+  if (displayValue.length > 60) input.title = displayValue
   return input
 }
 
 async function formatIsoDate(value) {
   if (!value) return '-'
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
+  if (Number.isNaN(date.getTime())) return '-'
   return date.toLocaleString()
 }
 

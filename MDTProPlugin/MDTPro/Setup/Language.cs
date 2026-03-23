@@ -25,6 +25,10 @@ namespace MDTPro.Setup {
             public string gpsSuccess = "GPS set to callout.";
             public string alprCleared = "ALPR cleared.";
             public string error = "Action failed.";
+            /// <summary>Title for the narcotics/drugs cheat sheet popup.</summary>
+            public string narcoticsCheatsheet = "Narcotics & Drugs Cheat Sheet";
+            /// <summary>Close button label for narcotics cheat sheet.</summary>
+            public string narcoticsCheatsheetClose = "Close";
         }
 
         public class Alpr {
@@ -664,6 +668,14 @@ namespace MDTPro.Setup {
             public string forceResolve = "Force Resolve";
             public string forceResolveSuccess = "Case resolved.";
             public string forceResolveError = "Could not resolve case.";
+            public string forceResolveProcessing = "Processing case...";
+            public string[] forceResolveStages = {
+                "Submitting case to court...",
+                "Prosecution and defense present...",
+                "Judge deliberating...",
+                "Verdict being entered...",
+                "Finalizing case record..."
+            };
             public string saveCase = "Save Plea & Notes";
             public string saveCaseSuccess = "Case updated.";
             public string saveCaseError = "Failed to save case.";
@@ -730,6 +742,48 @@ namespace MDTPro.Setup {
             public string chargeOutcomePending = "Pending";
             public string chargeOutcomeDismissed = "Dismissed";
             public string chargeOutcome = "Outcome";
+            public string courtDate = "Court";
+            public string trialDate = "Trial";
+            public string caseTimeline = "Case Timeline";
+            public string createdAt = "Created";
+            public string lastUpdated = "Last Updated";
+            public string resolveAt = "Court Date";
+            public string prosecutor = "Prosecutor";
+            public string defenseAttorney = "Defense Attorney";
+            public string defendant = "Defendant";
+            public string courtDistrictCol = "Court District";
+            public string dateCol = "Date";
+            public string pleaTooltipGuilty = "Guilty: Waives right to trial; conviction entered.";
+            public string pleaTooltipNoContest = "No Contest: Same effect as guilty; no admission of guilt.";
+            public string pleaTooltipNotGuilty = "Not Guilty: Proceeds to trial.";
+            public string docketPressureTooltip = "Court workload factor; high docket pressure may increase likelihood of plea deals.";
+            public string policyAdjustmentTooltip = "District policy modifier affecting sentencing or outcome.";
+            public string prosecutionStrengthTooltip = "Prosecution's estimated strength based on evidence and case factors.";
+            public string defenseStrengthTooltip = "Defense's estimated strength based on representation and case factors.";
+            public string evidenceBandLow = "Low";
+            public string evidenceBandMedium = "Medium";
+            public string evidenceBandStrong = "Strong";
+            public string evidenceBandLowNote = "Limited physical evidence – case may rely on officer testimony.";
+            public string exhibitFirearm = "Firearm recovered";
+            public string exhibitDrugs = "Drugs";
+            public string exhibitArrestReport = "Arrest report";
+            public string exhibitWarrant = "Active warrant documentation";
+            public string exhibitAssault = "Assault evidence";
+            public string exhibitVehicleDamage = "Vehicle/property damage evidence";
+            public string exhibitResistance = "Resistance evidence";
+            public string exhibitUseOfForce = "Use of force documentation";
+            public string exhibitIntoxication = "Intoxication evidence";
+            public string exhibitFleeing = "Fleeing evidence";
+            public string exhibitSupervision = "Supervision violation";
+            public string exhibitPatDown = "Pat-down/search evidence";
+            public string exhibitIllegalWeapon = "Illegal weapon evidence";
+            public string reportTypeIncident = "Incident";
+            public string reportTypeCitation = "Citation";
+            public string reportTypeArrest = "Arrest";
+            public string reportTypeImpound = "Impound";
+            public string reportTypeTrafficIncident = "Traffic Incident";
+            public string reportTypeInjury = "Injury";
+            public string reportTypePropertyEvidence = "Property & Evidence";
             public Static @static = new Static();
 
             public class Static {

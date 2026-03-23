@@ -186,6 +186,10 @@ const mockLanguage = {
     year: 'y', month: 'mo', day: 'd', hour: 'h', minute: 'm', second: 's',
     currencySymbol: '$', life: 'Life', meters: 'm', kilometers: 'km', feet: 'ft', miles: 'mi',
   },
+  quickActions: {
+    narcoticsCheatsheet: 'Narcotics & Drugs Cheat Sheet',
+    narcoticsCheatsheetClose: 'Close',
+  },
 };
 
 function send(res, status, body, contentType = 'text/plain') {

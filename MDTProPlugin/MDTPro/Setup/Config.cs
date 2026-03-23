@@ -131,7 +131,7 @@ namespace MDTPro.Setup {
         /// </summary>
         public string githubReleasesRepo = "stocky789/MDT-Pro";
 
-        /// <summary>Citation/arrest options schema version. When &lt; 2, citationOptions.json and arrestOptions.json are overwritten from defaults on load so upgraders get updated charges (no VC/PC/HS codes, Stolen Possession, Evading, etc.). Do not edit.</summary>
+        /// <summary>Citation/arrest options schema version. When &lt; current, citationOptions.json and arrestOptions.json are overwritten from defaults on load so upgraders get updated charges. Bump SetupController.currentCitationArrestOptionsVersion when adding charges. Do not edit.</summary>
         public int citationArrestOptionsVersion = 2;
 
         // ---- ALPR ----
