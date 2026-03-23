@@ -150,21 +150,22 @@ async function getChargeDetailsString(type, charge) {
     fineString += `${minFineStr} - ${maxFineStr}`
   }
 
+  if (type == 'citation') {
+    return fineString
+  }
+
   let incarcerationString = `${language.reports.sections.incarceration}: `
-  if (charge.minDays == charge.maxDays) {
+  if (charge.minDays != null && charge.maxDays != null && charge.minDays == charge.maxDays) {
     incarcerationString += await convertDaysToYMD(charge.minDays)
-  } else {
+  } else if (charge.minDays != null) {
     const minDaysStr = await convertDaysToYMD(charge.minDays)
     const maxDaysStr =
       charge.maxDays == null
         ? language.units.life
         : await convertDaysToYMD(charge.maxDays)
     incarcerationString += `${minDaysStr} - ${maxDaysStr}`
+  } else {
+    incarcerationString += '–'
   }
-
-  if (type == 'citation') {
-    return fineString
-  } else if (type == 'arrest') {
-    return `${fineString} | ${incarcerationString}`
-  }
+  return `${fineString} | ${incarcerationString}`
 }

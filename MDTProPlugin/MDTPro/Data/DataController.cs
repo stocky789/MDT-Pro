@@ -24,23 +24,37 @@ namespace MDTPro.Data {
         private const int DefaultJuryTrialSeverityThreshold = 15;
         private const int DefaultCourtRosterRotationDays = 14;
 
+        private class LawFirmRoster {
+            public string Name;
+            public string[] Lawyers;
+        }
+
         private class CourtDistrictProfile {
             public string District;
             public string CourtName;
             public string CourtType;
             public string[] Judges;
-            public string[] Prosecutors;
-            public string[] DefenseAttorneys;
+            public string ProsecutionOffice;
+            public string[] ProsecutionLawyers;
+            public LawFirmRoster[] DefenseFirms; // First is Public Defender, rest are private firms
             public float PolicyAdjustment;
         }
 
+        // Lore-friendly GTA law firms: Slaughter SS&S (GTA V), Hammerstein & Faust (GTA V), Delio and Furax (Vice City),
+        // Goldberg Ligner & Shyster (Liberty City), Rakin and Ponzer (GTA III)
         private static readonly CourtDistrictProfile LosSantosDistrict = new CourtDistrictProfile {
             District = "Los Santos Judicial District",
             CourtName = "Los Santos Superior Court",
             CourtType = "Superior Court",
-            Judges = new[] { "Hon. K. Martinez", "Hon. S. Alvarez", "Hon. D. Whitaker", "Hon. T. Ellison" },
-            Prosecutors = new[] { "A. Mercer", "L. O'Neil", "M. Reeves" },
-            DefenseAttorneys = new[] { "Public Defender Office", "C. Price", "R. Sinclair" },
+            Judges = new[] { "Hon. Hugh Harrison", "Hon. K. Martinez", "Hon. S. Alvarez", "Hon. D. Whitaker", "Hon. T. Ellison", "Hon. M. Chen", "Hon. L. Torres", "Hon. F. Okonkwo" },
+            ProsecutionOffice = "Los Santos County District Attorney's Office",
+            ProsecutionLawyers = new[] { "A. Mercer", "L. O'Neil", "M. Reeves", "T. Walsh", "J. Santos" },
+            DefenseFirms = new[] {
+                new LawFirmRoster { Name = "Public Defender Office", Lawyers = new[] { "M. Chen", "R. Foster", "D. Okonkwo", "K. Hayes" } },
+                new LawFirmRoster { Name = "Slaughter, Slaughter & Slaughter", Lawyers = new[] { "C. Price", "V. Slaughter", "R. Slaughter", "D. Mercer", "S. Torres" } },
+                new LawFirmRoster { Name = "Hammerstein & Faust", Lawyers = new[] { "N. Hammerstein", "F. Faust", "K. Lindell", "P. Reed" } },
+                new LawFirmRoster { Name = "Delio and Furax", Lawyers = new[] { "M. Delio", "J. Furax", "R. Vance", "L. Cruz" } },
+            },
             PolicyAdjustment = 0.02f,
         };
 
@@ -48,9 +62,15 @@ namespace MDTPro.Data {
             District = "Blaine County Circuit",
             CourtName = "Blaine County Courthouse",
             CourtType = "Circuit Court",
-            Judges = new[] { "Hon. R. Bennett", "Hon. J. Monroe", "Hon. P. Gaines" },
-            Prosecutors = new[] { "T. Caldwell", "J. Holloway", "D. Pritchard" },
-            DefenseAttorneys = new[] { "Public Defender Office", "N. Harper", "M. Lott" },
+            Judges = new[] { "Hon. R. Bennett", "Hon. J. Monroe", "Hon. P. Gaines", "Hon. V. Cross" },
+            ProsecutionOffice = "Blaine County District Attorney's Office",
+            ProsecutionLawyers = new[] { "T. Caldwell", "J. Holloway", "D. Pritchard", "B. Ellis", "M. Tate" },
+            DefenseFirms = new[] {
+                new LawFirmRoster { Name = "Public Defender Office", Lawyers = new[] { "N. Harper", "M. Lott", "C. Webb", "J. Riley" } },
+                new LawFirmRoster { Name = "Slaughter, Slaughter & Slaughter", Lawyers = new[] { "C. Price", "N. Harper", "M. Lott", "S. Torres" } },
+                new LawFirmRoster { Name = "Hammerstein & Faust", Lawyers = new[] { "P. Gaines", "L. Monroe", "K. Lindell" } },
+                new LawFirmRoster { Name = "Rakin and Ponzer", Lawyers = new[] { "A. Rakin", "J. Ponzer", "T. Mills" } },
+            },
             PolicyAdjustment = 0.05f,
         };
 
@@ -58,9 +78,15 @@ namespace MDTPro.Data {
             District = "Special Territory Docket",
             CourtName = "San Andreas Territorial Tribunal",
             CourtType = "Special Jurisdiction Court",
-            Judges = new[] { "Hon. I. Navarro", "Hon. V. Cross" },
-            Prosecutors = new[] { "S. DeLuca", "E. Rowan" },
-            DefenseAttorneys = new[] { "Public Defender Office", "B. Donovan", "F. Maddox" },
+            Judges = new[] { "Hon. I. Navarro", "Hon. V. Reese", "Hon. Grady", "Hon. Barry Griffin" },
+            ProsecutionOffice = "San Andreas Territorial Prosecutor's Office",
+            ProsecutionLawyers = new[] { "S. DeLuca", "E. Rowan", "B. Torres", "F. Maddox" },
+            DefenseFirms = new[] {
+                new LawFirmRoster { Name = "Public Defender Office", Lawyers = new[] { "B. Donovan", "F. Maddox", "G. Santos", "H. Velez" } },
+                new LawFirmRoster { Name = "Goldberg, Ligner & Shyster", Lawyers = new[] { "P. Ligner", "D. Shyster", "L. Ligner", "K. Jenkins" } },
+                new LawFirmRoster { Name = "Slaughter, Slaughter & Slaughter", Lawyers = new[] { "B. Donovan", "F. Maddox", "C. Price" } },
+                new LawFirmRoster { Name = "Rakin and Ponzer", Lawyers = new[] { "A. Rakin", "J. Ponzer", "D. Grossman" } },
+            },
             PolicyAdjustment = -0.03f,
         };
 
@@ -1171,22 +1197,36 @@ namespace MDTPro.Data {
                     }
 
                     foreach (ArrestReport.Charge charge in arrestReport.Charges) {
+                        int minDays = charge.minDays;
+                        int? maxDays = charge.maxDays;
                         int? time;
-                        if (charge.maxDays == null) {
+                        int rangeMin;
+                        int? rangeMax;
+                        if (maxDays == null) {
+                            // Life sentence charge: either life or a range (minDays to minDays*2)
                             if (Helper.GetRandomInt(0, 1) == 0) {
-                                time = Helper.GetRandomInt(charge.minDays, charge.minDays * 2);
+                                time = Helper.GetRandomInt(minDays, Math.Max(minDays, minDays * 2));
+                                rangeMin = minDays;
+                                rangeMax = Math.Max(minDays, minDays * 2);
                             } else {
                                 time = null;
+                                rangeMin = 0;
+                                rangeMax = null; // Life
                             }
                         } else {
-                            time = Helper.GetRandomInt(charge.minDays, (int)charge.maxDays);
+                            // Store base min for severity; roll at resolution
+                            time = minDays;
+                            rangeMin = minDays;
+                            rangeMax = maxDays;
                         }
                         courtData.AddCharge(
                             new CourtData.Charge(
                                 charge.name,
                                 Helper.GetRandomInt(charge.minFine, charge.maxFine),
                                 time,
-                                charge.isArrestable
+                                charge.isArrestable,
+                                rangeMin,
+                                rangeMax
                             )
                         );
                     }
@@ -1519,6 +1559,7 @@ namespace MDTPro.Data {
             bool hasLifeSentence = false;
 
             foreach (CourtData.Charge charge in courtData.Charges) {
+                if (charge == null) continue;
                 if (charge.Outcome != 1) continue; // Only convicted charges (1 = Convicted)
                 if (charge.Time == null) {
                     hasLifeSentence = true;
@@ -1581,6 +1622,7 @@ namespace MDTPro.Data {
             bool fishingRevoked = false;
 
             foreach (CourtData.Charge charge in courtData.Charges) {
+                if (charge == null) continue;
                 if (charge.Outcome != 1) continue; // Only convicted charges
                 if (string.IsNullOrEmpty(charge.Name)) continue;
                 string name = charge.Name.Trim();
@@ -1710,7 +1752,7 @@ namespace MDTPro.Data {
             string n = name.ToLowerInvariant();
             return n.Contains("controlled substance") || n.Contains("drug paraphernalia") || n.Contains("under influence of controlled")
                 || n.Contains("trafficking") || n.Contains("for sale") || n.Contains("sale or transport") || n.Contains("transport or sale") || n.Contains("transport of meth")
-                || n.Contains("manufacturing meth") || n.Contains("possession of cannabis") || n.Contains("possession of cocaine")
+                || n.Contains("manufacturing meth") || n.Contains("possession of cannabis") || n.Contains("possession of marijuana") || n.Contains("possession of cocaine")
                 || n.Contains("possession of methamphetamine") || n.Contains("possession of heroin") || n.Contains("possession of pcp")
                 || n.Contains("possession of lsd") || n.Contains("hallucinogen") || n.Contains("possession of ecstasy") || n.Contains("mdma")
                 || n.Contains("possession of fentanyl") || n.Contains("prescription") && n.Contains("narcotic");
@@ -1786,7 +1828,68 @@ namespace MDTPro.Data {
             return false;
         }
 
-        /// <summary>Per-charge conviction chance (0-100). Case chance + tier modifier + variance, then skewed so higher values are rarer. Roll is always 1-100; convicted if roll &lt;= chance.</summary>
+        /// <summary>Judge name -> leniency (-1 lenient to 1 strict). Loaded from judgeProfiles.json.</summary>
+        private static Dictionary<string, float> judgeLeniencyMap = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Load judge profiles from defaults/judgeProfiles.json. All roster judges must have profiles.</summary>
+        internal static void LoadJudgeProfiles() {
+            judgeLeniencyMap.Clear();
+            try {
+                string path = Setup.SetupController.JudgeProfilesDefaultsPath;
+                if (!System.IO.File.Exists(path)) {
+                    Utility.Helper.Log("judgeProfiles.json not found; all judges will use neutral leniency.", false, Utility.Helper.LogSeverity.Warning);
+                    return;
+                }
+                var data = Utility.Helper.ReadFromJsonFile<JudgeProfilesData>(path);
+                if (data?.judges == null) return;
+                foreach (var j in data.judges) {
+                    if (string.IsNullOrWhiteSpace(j?.name)) continue;
+                    float len = j.leniency;
+                    if (len < -1f) len = -1f;
+                    if (len > 1f) len = 1f;
+                    judgeLeniencyMap[j.name.Trim()] = len;
+                }
+                ValidateAllRosterJudgesHaveProfiles();
+            } catch (System.Exception ex) {
+                Utility.Helper.Log($"LoadJudgeProfiles: {ex.Message}", false, Utility.Helper.LogSeverity.Warning);
+            }
+        }
+
+        private static void ValidateAllRosterJudgesHaveProfiles() {
+            var rosterJudges = new[] { LosSantosDistrict, BlaineDistrict, IslandDistrict }
+                .SelectMany(p => p?.Judges ?? Enumerable.Empty<string>())
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Select(s => s.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var missing = rosterJudges.Where(name => !judgeLeniencyMap.ContainsKey(name)).ToList();
+            if (missing.Count > 0) {
+                Utility.Helper.Log($"Judges without profiles in judgeProfiles.json: {string.Join(", ", missing)}. Add profiles for these judges.", true, Utility.Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>Returns judge leniency (-1 to 1). All roster judges must have profiles in judgeProfiles.json; missing judges return 0 and log a warning.</summary>
+        private static float GetJudgeLeniencyFromName(string judgeName) {
+            if (string.IsNullOrWhiteSpace(judgeName)) return 0f;
+            string key = judgeName.Trim();
+            if (judgeLeniencyMap.TryGetValue(key, out float leniency)) return leniency;
+            Utility.Helper.Log($"Judge '{key}' has no profile in judgeProfiles.json; using neutral (0). Add a profile for this judge.", false, Utility.Helper.LogSeverity.Warning);
+            return 0f;
+        }
+
+        private static int GetProsecutorStrengthModifier(string prosecutorName) {
+            if (string.IsNullOrWhiteSpace(prosecutorName)) return 0;
+            int h = Math.Abs(GetStableHash(prosecutorName));
+            return (h % 17) - 8; // -8 to +8
+        }
+
+        private static int GetDefenseStrengthModifier(string defenseAttorneyName) {
+            if (string.IsNullOrWhiteSpace(defenseAttorneyName)) return 0;
+            int h = Math.Abs(GetStableHash(defenseAttorneyName));
+            return (h % 17) - 8; // -8 to +8 (positive = stronger defense = lower conviction)
+        }
+
+        /// <summary>Per-charge conviction chance (0-100). Case chance + tier modifier + variance + judge/prosecutor/defense modifiers, then skewed. Evidence cap applies.</summary>
         private static int GetPerChargeConvictionChance(CourtData courtCase, CourtData.Charge charge) {
             Config config = SetupController.GetConfig();
             int baseChance = courtCase.ConvictionChance;
@@ -1802,11 +1905,25 @@ namespace MDTPro.Data {
             } else if (IsFelonyChargeName(name)) tierMod -= 10;
             else if (IsViolentMisdemeanorChargeName(name)) tierMod = 0;
             else tierMod = 5;
+
+            // Judge/prosecutor/defense traits affect conviction (bench trials: judge; jury: prosecutor/defense affect underlying chance)
+            if (!courtCase.IsJuryTrial && !string.IsNullOrWhiteSpace(courtCase.JudgeName)) {
+                float leniency = GetJudgeLeniencyFromName(courtCase.JudgeName);
+                tierMod += (int)Math.Round(leniency * 8); // Lenient judge: -8; strict: +8
+            }
+            tierMod += GetProsecutorStrengthModifier(courtCase.ProsecutorName);
+            tierMod -= GetDefenseStrengthModifier(courtCase.DefenseAttorneyName); // Strong defense reduces chance
+
             int chance = Math.Max(15, Math.Min(85, baseChance + variance + tierMod));
 
             // Homicide without death report: cap conviction chance so documentation matters
             if (isHomicide && !hasDeathReport && config.courtConvictionHomicideNoDeathReportCap > 0)
                 chance = Math.Min(chance, config.courtConvictionHomicideNoDeathReportCap);
+
+            // Evidence cap: weak evidence cannot over-convict; strong evidence floors at 30%
+            int evidenceScore = courtCase.EvidenceScore;
+            if (evidenceScore < 20) chance = Math.Min(chance, 40);
+            if (evidenceScore > 70) chance = Math.Max(chance, 30);
 
             // Skew so higher conviction chances are rarer: more often reduce, rarely boost
             int skewRoll = Helper.GetRandomInt(1, 100);
@@ -1867,24 +1984,8 @@ namespace MDTPro.Data {
             if (outcomeReasoning != null) courtCase.OutcomeReasoning = outcomeReasoning;
             if (status == 3) {
                 if (string.IsNullOrWhiteSpace(courtCase.OutcomeReasoning)) {
-                    string[] dismissed = new[] {
-                        "Charges were dismissed. The case did not proceed to trial.",
-                        "The charges were dismissed. The prosecution declined to proceed.",
-                        "The case was dismissed. The matter was not tried on the merits.",
-                        "Charges were dismissed. Insufficient evidence to proceed.",
-                        "The case was dismissed on procedural grounds. The matter did not go to trial.",
-                        "The prosecution declined to proceed. The charges were dismissed.",
-                        "The case was dismissed without prejudice. The matter was not tried on the merits.",
-                        "Charges were dismissed with prejudice. The case will not be refiled.",
-                        "The court entered nolle prosequi. The prosecution elected not to proceed.",
-                        "The case was dismissed. The prosecution could not meet its burden at this stage.",
-                        "Charges were dismissed. The matter did not proceed to trial due to evidentiary issues.",
-                        "The case was dismissed. Key witnesses were unavailable or evidence was suppressed.",
-                        "The charges were dismissed. Procedural defects led to dismissal.",
-                        "The case was dismissed. The prosecution elected to decline prosecution.",
-                        "Charges were dismissed. The case did not reach trial.",
-                    };
-                    courtCase.OutcomeReasoning = dismissed[Helper.GetRandomInt(0, dismissed.Length - 1)];
+                    // Same charge-aware dismissal wording as auto-resolution would use (evidence band, burden of proof, charge-specific lines).
+                    courtCase.OutcomeReasoning = BuildOutcomeReasoning(courtCase, courtCase.ConvictionChance, 3);
                 }
                 courtCase.SentenceReasoning = null;
             } else if (status == 2) {
@@ -1931,7 +2032,7 @@ namespace MDTPro.Data {
             if (ped == null || !ped.IsValid()) return;
             try {
                 Persona persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped);
-                if (persona == null || string.IsNullOrEmpty(persona.FullName)) return;
+                if (persona == null || string.IsNullOrWhiteSpace(persona.FullName)) return;
 
                 // 0xA2719263 = WEAPON_UNARMED hash; GET_BEST_PED_WEAPON returns unarmed if ped has no weapon
                 bool hadWeapon = NativeFunction.Natives.GET_BEST_PED_WEAPON<uint>(ped, false) != 0xA2719263u;
@@ -1995,6 +2096,7 @@ namespace MDTPro.Data {
                 if (!ped.IsValid()) return;
 
                 string cacheKey = dbPed?.Name ?? persona.FullName;
+                if (string.IsNullOrWhiteSpace(cacheKey)) return;
                 lock (pedEvidenceLock) {
                     PruneStaleEvidenceEntries();
                     bool wasFleeingByHandle = false;
@@ -2032,6 +2134,20 @@ namespace MDTPro.Data {
                     ctx.ViolatedSupervision = violatedSupervision;
                     ctx.Resisted = resisted;
                     ctx.CapturedAt = DateTime.UtcNow;
+                    Database.UpsertPedEvidenceEntry(new PedEvidenceCacheEntry {
+                        PedName = cacheKey,
+                        CapturedAt = ctx.CapturedAt,
+                        HadWeapon = ctx.HadWeapon,
+                        WasWanted = ctx.WasWanted,
+                        WasPatDown = ctx.WasPatDown,
+                        WasDrunk = ctx.WasDrunk,
+                        WasFleeing = ctx.WasFleeing,
+                        AssaultedPed = ctx.AssaultedPed,
+                        DamagedVehicle = ctx.DamagedVehicle,
+                        HadIllegalWeapon = ctx.HadIllegalWeapon,
+                        ViolatedSupervision = ctx.ViolatedSupervision,
+                        Resisted = ctx.Resisted,
+                    });
                 }
             } catch (Exception e) {
                 // "address cannot be zero" / invalid entity - expected when ped despawned mid-capture; don't warn
@@ -2106,8 +2222,9 @@ namespace MDTPro.Data {
                     if (assaultedPlayer) assaultedPedHandles[ped.Handle] = now;
                     if (hadWeapon) hadWeaponHandles[ped.Handle] = now;
                     Persona persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped);
-                    if (persona != null && !string.IsNullOrEmpty(persona.FullName)) {
+                    if (persona != null && !string.IsNullOrWhiteSpace(persona.FullName)) {
                         string cacheKey = GetPedDataForPed(ped)?.Name ?? persona.FullName;
+                        if (string.IsNullOrWhiteSpace(cacheKey)) return;
                         if (!pedEvidenceCache.TryGetValue(cacheKey, out PedEvidenceContext ctx)) {
                             ctx = new PedEvidenceContext();
                             pedEvidenceCache[cacheKey] = ctx;
@@ -2117,6 +2234,20 @@ namespace MDTPro.Data {
                         if (assaultedPlayer) ctx.AssaultedPed = true;
                         if (hadWeapon) ctx.HadWeapon = true;
                         ctx.CapturedAt = now;
+                        Database.UpsertPedEvidenceEntry(new PedEvidenceCacheEntry {
+                            PedName = cacheKey,
+                            CapturedAt = ctx.CapturedAt,
+                            HadWeapon = ctx.HadWeapon,
+                            WasWanted = ctx.WasWanted,
+                            WasPatDown = ctx.WasPatDown,
+                            WasDrunk = ctx.WasDrunk,
+                            WasFleeing = ctx.WasFleeing,
+                            AssaultedPed = ctx.AssaultedPed,
+                            DamagedVehicle = ctx.DamagedVehicle,
+                            HadIllegalWeapon = ctx.HadIllegalWeapon,
+                            ViolatedSupervision = ctx.ViolatedSupervision,
+                            Resisted = ctx.Resisted,
+                        });
                     }
                 }
             } catch (Exception e) {
@@ -2128,14 +2259,30 @@ namespace MDTPro.Data {
             if (ped == null || !ped.IsValid()) return;
             try {
                 Persona persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped);
-                if (persona == null || string.IsNullOrEmpty(persona.FullName)) return;
+                if (persona == null || string.IsNullOrWhiteSpace(persona.FullName)) return;
                 string cacheKey = GetPedDataForPed(ped)?.Name ?? persona.FullName;
+                if (string.IsNullOrWhiteSpace(cacheKey)) return;
                 lock (pedEvidenceLock) {
                     if (!pedEvidenceCache.TryGetValue(cacheKey, out PedEvidenceContext ctx)) {
                         ctx = new PedEvidenceContext();
                         pedEvidenceCache[cacheKey] = ctx;
                     }
                     ctx.WasPatDown = true;
+                    if (ctx.CapturedAt == default(DateTime)) ctx.CapturedAt = DateTime.UtcNow;
+                    Database.UpsertPedEvidenceEntry(new PedEvidenceCacheEntry {
+                        PedName = cacheKey,
+                        CapturedAt = ctx.CapturedAt,
+                        HadWeapon = ctx.HadWeapon,
+                        WasWanted = ctx.WasWanted,
+                        WasPatDown = ctx.WasPatDown,
+                        WasDrunk = ctx.WasDrunk,
+                        WasFleeing = ctx.WasFleeing,
+                        AssaultedPed = ctx.AssaultedPed,
+                        DamagedVehicle = ctx.DamagedVehicle,
+                        HadIllegalWeapon = ctx.HadIllegalWeapon,
+                        ViolatedSupervision = ctx.ViolatedSupervision,
+                        Resisted = ctx.Resisted,
+                    });
                 }
                 CaptureFirearmsFromPed(ped, "Pat-down");
             } catch (Exception e) {
@@ -2771,8 +2918,34 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>Loads ped evidence cache from DB into memory. Prunes entries older than 24h. Case-insensitive merge.</summary>
+        internal static void LoadPedEvidenceFromDatabase() {
+            var entries = Database.LoadPedEvidenceCache(maxAgeHours: 24);
+            if (entries == null || entries.Count == 0) return;
+            lock (pedEvidenceLock) {
+                foreach (var e in entries) {
+                    if (string.IsNullOrWhiteSpace(e.PedName)) continue;
+                    var ctx = new PedEvidenceContext {
+                        HadWeapon = e.HadWeapon,
+                        WasWanted = e.WasWanted,
+                        WasPatDown = e.WasPatDown,
+                        WasDrunk = e.WasDrunk,
+                        WasFleeing = e.WasFleeing,
+                        AssaultedPed = e.AssaultedPed,
+                        DamagedVehicle = e.DamagedVehicle,
+                        HadIllegalWeapon = e.HadIllegalWeapon,
+                        ViolatedSupervision = e.ViolatedSupervision,
+                        Resisted = e.Resisted,
+                        CapturedAt = e.CapturedAt,
+                    };
+                    pedEvidenceCache[e.PedName] = ctx;
+                }
+            }
+        }
+
         private static void PruneStaleEvidenceEntries() {
             DateTime threshold = DateTime.UtcNow.AddHours(-24);
+            Database.PrunePedEvidenceCache(24);
             List<string> stale = pedEvidenceCache
                 .Where(kvp => kvp.Value.CapturedAt < threshold)
                 .Select(kvp => kvp.Key)
@@ -2813,9 +2986,11 @@ namespace MDTPro.Data {
             int repeatScore = GetRepeatOffenderScore(courtData, pedData, config);
             courtData.RepeatOffenderScore = repeatScore;
             courtData.EvidenceScore = GetEvidenceScore(courtData, config);
+            courtData.EvidenceBand = GetEvidenceBand(courtData);
             courtData.DocketPressure = GetDocketPressure(districtProfile.District, config);
+            courtData.OfficerTestimonySummary = BuildOfficerTestimonySummary(courtData);
 
-            bool hasLifeSentence = courtData.Charges.Any(c => c.Time == null);
+            bool hasLifeSentence = courtData.Charges?.Any(c => c.Time == null) == true;
             bool hasArrestableCharge = courtData.Charges?.Any(c => c.IsArrestable == true || (c.Time.HasValue && c.Time.Value > 0) || c.Time == null) == true;
 
             courtData.HasPublicDefender = pedData == null || courtData.RepeatOffenderScore < 7 || Helper.GetRandomInt(0, 100) < 70;
@@ -2857,6 +3032,10 @@ namespace MDTPro.Data {
             if (pedData?.IsWanted == true) convictionChance += 8;
             convictionChance = Math.Max(10, Math.Min(90, convictionChance));
 
+            // Evidence cap: weak evidence cannot over-convict; strong evidence floors at 30%
+            if (courtData.EvidenceScore < 20) convictionChance = Math.Min(convictionChance, 40);
+            if (courtData.EvidenceScore > 70) convictionChance = Math.Max(convictionChance, 30);
+
             if (courtData.IsJuryTrial && courtData.JurySize > 0) {
                 // Mean votes for conviction from conviction chance; add spread so we see more 9-3, 8-4 etc. instead of mostly 11-1
                 float meanVotes = (convictionChance / 100f) * courtData.JurySize;
@@ -2891,21 +3070,8 @@ namespace MDTPro.Data {
                 courtData.Number,
                 courtData.SeverityScore);
 
-            courtData.ProsecutorName = SelectRotatingRosterMember(
-                districtProfile.Prosecutors,
-                districtProfile.District,
-                "prosecutor",
-                courtData.Number,
-                courtData.RepeatOffenderScore);
-
-            courtData.DefenseAttorneyName = courtData.HasPublicDefender
-                ? "Public Defender Office"
-                : SelectRotatingRosterMember(
-                    districtProfile.DefenseAttorneys.Skip(1).ToArray(),
-                    districtProfile.District,
-                    "defense",
-                    courtData.Number,
-                    courtData.RepeatOffenderScore + courtData.SeverityScore);
+            courtData.ProsecutorName = SelectProsecutor(districtProfile, courtData.Number, courtData.RepeatOffenderScore);
+            courtData.DefenseAttorneyName = SelectDefenseAttorney(districtProfile, courtData.HasPublicDefender, courtData.Number, courtData.RepeatOffenderScore + courtData.SeverityScore);
 
             courtData.CreatedAtUtc = DateTime.UtcNow.ToString("o");
             courtData.LastUpdatedUtc = courtData.CreatedAtUtc;
@@ -2937,6 +3103,37 @@ namespace MDTPro.Data {
             if (ImpoundReports?.Any(r => r.Id == reportId) == true) return "impound";
             if (PropertyEvidenceReports?.Any(r => r.Id == reportId) == true) return "propertyEvidence";
             return null;
+        }
+
+        /// <summary>Recalculates EvidenceScore and Evidence* flags for a court case. Call after attach/detach of reports. Preserves EvidenceUseOfForce from primary arrest report.
+        /// Concurrency: No locking. If two requests recalc the same case concurrently, both may run; the last SaveCourtCase wins. Acceptable: recalc is idempotent and SQLite serializes DB writes.</summary>
+        internal static void RecalculateCourtCaseEvidence(CourtData courtData) {
+            if (courtData == null) return;
+            Config config = SetupController.GetConfig();
+
+            // Reset all evidence flags so GetEvidenceScore can set them fresh (it only sets true, never false)
+            courtData.EvidenceHadWeapon = false;
+            courtData.EvidenceWasWanted = false;
+            courtData.EvidenceWasPatDown = false;
+            courtData.EvidenceWasDrunk = false;
+            courtData.EvidenceWasFleeing = false;
+            courtData.EvidenceAssaultedPed = false;
+            courtData.EvidenceDamagedVehicle = false;
+            courtData.EvidenceIllegalWeapon = false;
+            courtData.EvidenceViolatedSupervision = false;
+            courtData.EvidenceResisted = false;
+            courtData.EvidenceHadDrugs = false;
+            courtData.EvidenceDrugTypesBreakdown = null;
+            courtData.EvidenceFirearmTypesBreakdown = null;
+            // EvidenceUseOfForce comes from arrest report; preserve before recalc
+            if (!string.IsNullOrEmpty(courtData.ReportId)) {
+                var primaryArrest = arrestReports?.FirstOrDefault(r => r.Id == courtData.ReportId);
+                courtData.EvidenceUseOfForce = primaryArrest?.UseOfForce != null && !string.IsNullOrEmpty(primaryArrest.UseOfForce.Type);
+            }
+
+            courtData.EvidenceScore = GetEvidenceScore(courtData, config);
+            courtData.EvidenceBand = GetEvidenceBand(courtData);
+            courtData.OfficerTestimonySummary = BuildOfficerTestimonySummary(courtData);
         }
 
         private static int GetEvidenceScore(CourtData courtData, Config config) {
@@ -3168,6 +3365,39 @@ namespace MDTPro.Data {
             return 2; // high
         }
 
+        /// <summary>Builds a short one-paragraph officer testimony summary from evidence flags and charges. For exhibit display.</summary>
+        private static string BuildOfficerTestimonySummary(CourtData courtData) {
+            if (courtData == null) return null;
+            var clauses = new List<string>();
+            if (courtData.EvidenceHadWeapon) {
+                string weapon = (courtData.EvidenceFirearmTypesBreakdown != null && courtData.EvidenceFirearmTypesBreakdown.Count > 0)
+                    ? $" ({string.Join(", ", courtData.EvidenceFirearmTypesBreakdown.Where(s => !string.IsNullOrEmpty(s)))})"
+                    : "";
+                clauses.Add($"Defendant was armed{weapon}");
+            }
+            if (courtData.EvidenceWasWanted) clauses.Add("defendant was wanted on warrant");
+            if (courtData.EvidenceResisted) clauses.Add("defendant resisted arrest");
+            if (courtData.EvidenceHadDrugs) {
+                string drugs = (courtData.EvidenceDrugTypesBreakdown != null && courtData.EvidenceDrugTypesBreakdown.Count > 0)
+                    ? string.Join(", ", courtData.EvidenceDrugTypesBreakdown.Where(s => !string.IsNullOrEmpty(s)))
+                    : "controlled substances";
+                clauses.Add($"defendant was found in possession of {drugs}");
+            }
+            if (courtData.EvidenceAssaultedPed) clauses.Add("defendant assaulted the officer");
+            if (courtData.EvidenceDamagedVehicle) clauses.Add("defendant caused vehicle damage during the incident");
+            if (courtData.EvidenceWasFleeing) clauses.Add("defendant fled from the officer");
+            if (courtData.EvidenceIllegalWeapon && !courtData.EvidenceHadWeapon) clauses.Add("defendant possessed an illegal weapon");
+            if (courtData.EvidenceViolatedSupervision) clauses.Add("defendant was in violation of supervision");
+            if (courtData.EvidenceUseOfForce) clauses.Add("use of force was required");
+            if (courtData.Charges != null && courtData.Charges.Count > 0) {
+                var chargeNames = courtData.Charges.Take(5).Select(c => c.Name).Where(s => !string.IsNullOrEmpty(s)).ToList();
+                if (chargeNames.Count > 0)
+                    clauses.Add($"Charges included: {string.Join(", ", chargeNames)}{(courtData.Charges.Count > 5 ? " and others" : "")}");
+            }
+            if (clauses.Count == 0) return null;
+            return "Officer responded to call. " + string.Join(", ", clauses) + ".";
+        }
+
         private static bool HasChargeKeyword(CourtData courtData, string keyword) {
             if (courtData?.Charges == null) return false;
             string k = keyword.ToLowerInvariant();
@@ -3188,7 +3418,7 @@ namespace MDTPro.Data {
         }
 
         private static bool HasKidnappingCharge(CourtData courtData) {
-            return HasChargeKeyword(courtData, "kidnapping");
+            return HasChargeKeyword(courtData, "kidnapping") || HasChargeKeyword(courtData, "false imprisonment");
         }
 
         private static bool HasArsonCharge(CourtData courtData) {
@@ -3202,11 +3432,68 @@ namespace MDTPro.Data {
                 string n = (c?.Name ?? "").ToLowerInvariant();
                 return n.Contains("paraphernalia") || n.Contains("controlled substance") || n.Contains("trafficking")
                     || n.Contains("manufacturing meth") || n.Contains("transport or sale of meth") || n.Contains("sale or transport of cannabis")
-                    || n.Contains("cannabis over") || n.Contains("under influence of controlled")
+                    || n.Contains("cannabis over") || n.Contains("cannabis") || n.Contains("marijuana") || n.Contains("under influence of controlled")
                     || n.Contains("cocaine") || n.Contains("heroin") || n.Contains("fentanyl") || n.Contains("methamphetamine")
                     || (n.Contains("amphetamine") && !n.Contains("methamphetamine"))
-                    || n.Contains("benzodiazepine") || n.Contains("hallucinogen") || n.Contains("ecstasy") || n.Contains("mdma") || n.Contains("pcp");
+                    || n.Contains("benzodiazepine") || n.Contains("hallucinogen") || n.Contains("ecstasy") || n.Contains("mdma") || n.Contains("pcp")
+                    || n.Contains("dmt") || n.Contains("ghb") || n.Contains("ketamine") || n.Contains("steroids") || n.Contains("bath salt")
+                    || n.Contains("synthetic cannabinoid") || n.Contains("k2") || n.Contains("spice") || n.Contains("peyote") || n.Contains("psilocybin")
+                    || n.Contains("lysergic") || n.Contains("oxycontin") || n.Contains("percocet") || n.Contains("vicodin") || n.Contains("codeine")
+                    || n.Contains("promethazine") || n.Contains("demerol") || n.Contains("morphine") || n.Contains("methadone") || n.Contains("opium")
+                    || n.Contains("hydromorph") || n.Contains("roxicodone") || n.Contains("roofies") || n.Contains("ativan") || n.Contains("valium")
+                    || n.Contains("xanax") || n.Contains("soma") || n.Contains("tramadol") || n.Contains("darvocet") || n.Contains("darvon")
+                    || n.Contains("cultivation") || n.Contains("intent to manufacture") || n.Contains("intent to distribute")
+                    || n.Contains("schedule i") || n.Contains("schedule ii") || n.Contains("schedule iii") || n.Contains("schedule iv");
             });
+        }
+
+        private static bool HasGangCharge(CourtData courtData) {
+            return HasChargeKeyword(courtData, "gang");
+        }
+
+        private static bool HasFederalCharge(CourtData courtData) {
+            if (courtData?.Charges == null) return false;
+            return courtData.Charges.Any(c => {
+                string n = (c?.Name ?? "").ToLowerInvariant();
+                return n.Contains("federal") || n.Contains("assassination") || n.Contains("espionage") || n.Contains("cyberterrorism")
+                    || n.Contains("bank fraud") || n.Contains("wire fraud") || n.Contains("securities fraud") || n.Contains("human trafficking")
+                    || n.Contains("alien smuggl") || n.Contains("drug trafficking across");
+            });
+        }
+
+        private static bool HasICECharge(CourtData courtData) {
+            if (courtData?.Charges == null) return false;
+            return courtData.Charges.Any(c => {
+                string n = (c?.Name ?? "").ToLowerInvariant();
+                return n.Contains("immigration") || n.Contains("illegal entry") || n.Contains("illegal re-entry")
+                    || n.Contains("harboring illegal") || n.Contains("deportation") || n.Contains("work visa");
+            });
+        }
+
+        private static bool HasRICOCharge(CourtData courtData) {
+            return HasChargeKeyword(courtData, "rico") || HasChargeKeyword(courtData, "racketeering");
+        }
+
+        private static bool HasFraudCharge(CourtData courtData) {
+            if (courtData?.Charges == null) return false;
+            return courtData.Charges.Any(c => {
+                string n = (c?.Name ?? "").ToLowerInvariant();
+                return n.Contains("fraud") || n.Contains("embezzlement") || n.Contains("forgery") || n.Contains("money laundering")
+                    || n.Contains("ponzi") || n.Contains("mortgage fraud") || n.Contains("insurance fraud") || n.Contains("corporate fraud")
+                    || n.Contains("tax fraud") || n.Contains("identity theft");
+            });
+        }
+
+        private static bool HasWildlifeCharge(CourtData courtData) {
+            if (courtData?.Charges == null) return false;
+            return courtData.Charges.Any(c => {
+                string n = (c?.Name ?? "").ToLowerInvariant();
+                return n.Contains("poaching") || n.Contains("cruelty to animal") || n.Contains("dog fighting");
+            });
+        }
+
+        private static bool HasUnlicensedCharge(CourtData courtData) {
+            return HasChargeKeyword(courtData, "unlicensed") || HasChargeKeyword(courtData, "unauthorized practice");
         }
 
         private static int CountMatchingEvidenceTags(CourtData courtData, string[] tags) {
@@ -3255,6 +3542,74 @@ namespace MDTPro.Data {
                 if (tag == "UseOfForce" && !courtData.EvidenceUseOfForce) return false;
             }
             return true;
+        }
+
+        /// <summary>True if courtData has any charge whose name contains any of the keywords (case-insensitive).</summary>
+        /// <remarks>Sentinel values avoid false positives from substring matches (e.g. "possession" on firearm charges, "reckless" on arson).</remarks>
+        private static bool CaseMatchesChargeKeywords(CourtData courtData, string[] keywords) {
+            if (keywords == null || keywords.Length == 0) return true;
+            foreach (var k in keywords) {
+                if (k == "__drug_crime__") { if (HasDrugCrimeCharge(courtData)) return true; continue; }
+                if (k == "__dui_charge__") { if (HasDUIVerdictCharge(courtData)) return true; continue; }
+                if (k == "__traffic_no_arson__") { if (HasTrafficVerdictChargeExcludingArson(courtData)) return true; continue; }
+                if (k == "__trafficking_drug__") { if (HasDrugTraffickingOrSaleCharge(courtData)) return true; continue; }
+                if (HasChargeKeyword(courtData, k)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>DUI/DWI and closely related charges (matches "Driving Under The Influence" etc., not generic drug influence).</summary>
+        private static bool HasDUIVerdictCharge(CourtData courtData) {
+            if (courtData?.Charges == null) return false;
+            return courtData.Charges.Any(c => {
+                string n = (c?.Name ?? "").ToLowerInvariant();
+                return n.Contains("dui") || n.Contains("dwi") || n.Contains("driving under")
+                    || n.Contains("field sobriety") || n.Contains("chemical test") || n.Contains("sobriety testing")
+                    || n.Contains("dui causing");
+            });
+        }
+
+        /// <summary>Traffic/driving charges for verdict wording; excludes arson "reckless burning" and firearm "reckless discharge of firearm" from reckless catch-all.</summary>
+        private static bool HasTrafficVerdictChargeExcludingArson(CourtData courtData) {
+            if (courtData?.Charges == null) return false;
+            if (HasArsonCharge(courtData)) return false;
+            return HasChargeKeyword(courtData, "traffic") || HasChargeKeyword(courtData, "speeding") || HasChargeKeyword(courtData, "unlawful speed")
+                || HasChargeKeyword(courtData, "evading") || HasChargeKeyword(courtData, "elude") || HasChargeKeyword(courtData, "street racing") || HasChargeKeyword(courtData, "hit and run")
+                || HasChargeKeyword(courtData, "wrong side") || HasChargeKeyword(courtData, "driving on suspended") || HasChargeKeyword(courtData, "driving without license")
+                || HasChargeKeyword(courtData, "license expired") || HasChargeKeyword(courtData, "refusal to sign traffic") || HasChargeKeyword(courtData, "impeding traffic")
+                || HasChargeKeyword(courtData, "reckless driving") || HasChargeKeyword(courtData, "careless driving")
+                || (HasChargeKeyword(courtData, "reckless") && !HasChargeKeyword(courtData, "burning") && !HasChargeKeyword(courtData, "firearm"));
+        }
+
+        /// <summary>Drug trafficking / intent to distribute / sale-for-drug charges only (avoids "Unlawful Sale of Firearms").</summary>
+        private static bool HasDrugTraffickingOrSaleCharge(CourtData courtData) {
+            if (courtData?.Charges == null) return false;
+            return courtData.Charges.Any(c => {
+                string n = (c?.Name ?? "").ToLowerInvariant();
+                var one = new CourtData { Charges = new List<CourtData.Charge> { c } };
+                if (!HasDrugCrimeCharge(one)) return false;
+                return n.Contains("trafficking") || n.Contains("intent to distribute") || n.Contains("for sale") || n.Contains("manufacturing meth")
+                    || n.Contains("transport or sale") || n.Contains("sale or transport") || n.Contains("cultivation");
+            });
+        }
+
+        /// <summary>Selects a verdict phrase, preferring charge-specific wording when the case matches. Generic (null/empty chargeKeywords) always eligible.</summary>
+        private static string SelectChargeAwarePhrase(CourtData courtData, (string text, string[] chargeKeywords)[] pool) {
+            if (pool == null || pool.Length == 0) return "";
+            var eligible = new List<(string text, int weight)>();
+            foreach (var entry in pool) {
+                if (!CaseMatchesChargeKeywords(courtData, entry.chargeKeywords)) continue;
+                int w = (entry.chargeKeywords == null || entry.chargeKeywords.Length == 0) ? 1 : 8;
+                eligible.Add((entry.text, w));
+            }
+            if (eligible.Count == 0) return "";
+            int total = eligible.Sum(e => e.weight);
+            int r = Helper.GetRandomInt(0, Math.Max(0, total - 1));
+            foreach (var e in eligible) {
+                r -= e.weight;
+                if (r < 0) return e.text;
+            }
+            return eligible[eligible.Count - 1].text;
         }
 
         private static string SelectWeightedOutcome(CourtData courtData, (string text, string[] evidenceTags)[] pool) {
@@ -3320,6 +3675,20 @@ namespace MDTPro.Data {
                         "The defendant pleaded guilty and waived the right to a jury trial. The court accepted the plea and sentenced the defendant.",
                         "The defendant entered a guilty plea. The court, satisfied that the plea was knowing and voluntary, accepted it and imposed sentence.",
                         "The defendant entered a guilty plea. The court noted the defendant's allocution and acceptance of responsibility before imposing sentence.",
+                        "The defendant entered a guilty plea. The court accepted the plea and proceeded to sentencing without further proceedings.",
+                        "The defendant pleaded guilty at arraignment. The court accepted the plea and scheduled sentencing.",
+                        "The defendant entered a guilty plea. The court accepted the plea and ordered a presentence investigation before imposing sentence.",
+                        "The defendant entered a guilty plea. The court accepted the plea, found a factual basis sufficient to support it, and proceeded to sentencing.",
+                        "The defendant pleaded guilty. The court accepted the plea after advising the defendant of the rights being waived and imposed sentence.",
+                        "The defendant entered a guilty plea. The court accepted the plea and continued the matter for sentencing.",
+                        "The defendant pleaded guilty to the charges as filed. The court accepted the plea and pronounced sentence.",
+                        "The defendant entered a guilty plea. The court accepted the plea, entered a finding of guilty, and set a sentencing date.",
+                        "The defendant pleaded guilty. The court accepted the plea and proceeded to imposition of sentence without delay.",
+                        "The defendant entered a guilty plea. The court accepted the plea after confirming the defendant understood the consequences and proceeded accordingly.",
+                        "The defendant pleaded guilty to all counts. The court accepted the plea and sentenced the defendant in accordance with the agreement.",
+                        "The defendant entered a guilty plea. The court accepted the plea and ordered the defendant committed pending sentencing.",
+                        "The defendant pleaded guilty. The court accepted the plea, noted the defendant's waiver of trial, and imposed sentence.",
+                        "The defendant entered a guilty plea. The court accepted the plea and remanded the defendant for sentencing.",
                     };
                     b.Append(guiltyPlea[Helper.GetRandomInt(0, guiltyPlea.Length - 1)]);
                 } else if (string.Equals(pleaNorm, "No Contest", StringComparison.OrdinalIgnoreCase)) {
@@ -3339,28 +3708,59 @@ namespace MDTPro.Data {
                         "The defendant entered a no contest plea. The court, having accepted the plea, treated it as a guilty plea for sentencing and imposed sentence.",
                         "The defendant entered a no contest plea without admitting or denying the allegations. The court accepted the plea and entered a guilty verdict.",
                         "The defendant entered a plea of no contest. The court accepted the plea and, treating it as equivalent to a guilty plea for sentencing, imposed sentence.",
+                        "The defendant entered a no contest plea. The court accepted the plea, entered a conviction, and scheduled sentencing.",
+                        "The defendant pleaded nolo contendere. The court accepted the plea and proceeded to sentencing as if a guilty verdict had been returned.",
+                        "The defendant entered a no contest plea. The court found the plea knowing and voluntary, accepted it, and imposed sentence.",
+                        "The defendant entered a nolo contendere plea. The court accepted the plea, entered a finding of guilty, and continued for sentencing.",
+                        "The defendant entered a no contest plea. The court treated the plea as an admission of the factual basis and proceeded to sentencing.",
+                        "The defendant pleaded no contest to the charges. The court accepted the plea and entered a judgment of conviction for sentencing purposes.",
+                        "The defendant entered a no contest plea. The court accepted the plea, finding it made voluntarily and with full knowledge of the consequences.",
                     };
                     b.Append(noContestPlea[Helper.GetRandomInt(0, noContestPlea.Length - 1)]);
                 } else if (mismatchGuilty) {
-                    string[] lowEvidenceGuilty = new[] {
-                        "Despite limited physical evidence, the {0} found the defendant guilty, relying heavily on witness testimony and the defendant's conduct at the scene.",
-                        "In a case that hinged on credibility, the {0} found the defendant guilty based on the weight of officer testimony and circumstantial evidence.",
-                        "The {0} returned a guilty verdict. Although the evidence was circumstantial, witness credibility and the defendant's statements supported the conviction.",
-                        "The {0} found the defendant guilty. The prosecution's case, while not overwhelming, was sufficient to establish guilt beyond a reasonable doubt.",
-                        "The {0} returned a guilty verdict. Circumstantial evidence and officer testimony, while limited, were deemed sufficient to establish guilt beyond a reasonable doubt.",
-                        "Despite the lack of physical evidence, the {0} found the defendant guilty. Credibility determinations favoured the prosecution's witnesses.",
-                        "The {0} found the defendant guilty based on circumstantial evidence and witness testimony. The evidence, though not abundant, was sufficient to meet the burden of proof.",
-                        "In a case relying primarily on officer testimony, the {0} returned a guilty verdict. Credibility was resolved in favour of the prosecution.",
-                        "The {0} returned a guilty verdict. Limited physical evidence was supplemented by credible witness testimony sufficient to establish guilt beyond a reasonable doubt.",
-                        "The {0} found the defendant guilty. Circumstantial evidence and the defendant's own statements, together with officer testimony, supported the conviction.",
-                        "Despite limited corroborating evidence, the {0} found the defendant guilty. Witness credibility and circumstantial indicators established guilt beyond a reasonable doubt.",
-                        "The {0} returned a guilty verdict. Officer testimony and circumstantial evidence, though not overwhelming, were deemed sufficient to prove guilt beyond a reasonable doubt.",
-                        "The {0} found the defendant guilty. The prosecution's case, resting largely on credibility determinations, met the burden of proof despite limited physical evidence.",
-                        "In a case that turned on credibility, the {0} returned a guilty verdict. Circumstantial evidence and witness testimony were sufficient to establish guilt beyond a reasonable doubt.",
-                        "The {0} returned a guilty verdict. Although physical evidence was sparse, the weight of officer testimony and circumstantial evidence supported the conviction.",
-                        "The {0} found the defendant guilty. Credibility determinations favoured the prosecution's witnesses, and the circumstantial evidence was sufficient to establish guilt beyond a reasonable doubt.",
+                    var lowEvidenceGuilty = new (string text, string[] chargeKeywords)[] {
+                        ("Despite limited physical evidence, the {0} found the defendant guilty, relying heavily on witness testimony and the defendant's conduct at the scene.", null),
+                        ("In a case that hinged on credibility, the {0} found the defendant guilty based on the weight of officer testimony and circumstantial evidence.", null),
+                        ("The {0} returned a guilty verdict. Although the evidence was circumstantial, witness credibility and the defendant's statements supported the conviction.", null),
+                        ("The {0} found the defendant guilty. The prosecution's case, while not overwhelming, was sufficient to establish guilt beyond a reasonable doubt.", null),
+                        ("The {0} returned a guilty verdict. Circumstantial evidence and officer testimony, while limited, were deemed sufficient to establish guilt beyond a reasonable doubt.", null),
+                        ("Despite the lack of physical evidence, the {0} found the defendant guilty. Credibility determinations favoured the prosecution's witnesses.", null),
+                        ("The {0} found the defendant guilty based on circumstantial evidence and witness testimony. The evidence, though not abundant, was sufficient to meet the burden of proof.", null),
+                        ("In a case relying primarily on officer testimony, the {0} returned a guilty verdict. Credibility was resolved in favour of the prosecution.", null),
+                        ("The {0} returned a guilty verdict. Limited physical evidence was supplemented by credible witness testimony sufficient to establish guilt beyond a reasonable doubt.", null),
+                        ("The {0} found the defendant guilty. Circumstantial evidence and the defendant's own statements, together with officer testimony, supported the conviction.", null),
+                        ("Despite limited corroborating evidence, the {0} found the defendant guilty. Witness credibility and circumstantial indicators established guilt beyond a reasonable doubt.", null),
+                        ("The {0} returned a guilty verdict. Officer testimony and circumstantial evidence, though not overwhelming, were deemed sufficient to prove guilt beyond a reasonable doubt.", null),
+                        ("The {0} found the defendant guilty. The prosecution's case, resting largely on credibility determinations, met the burden of proof despite limited physical evidence.", null),
+                        ("In a case that turned on credibility, the {0} returned a guilty verdict. Circumstantial evidence and witness testimony were sufficient to establish guilt beyond a reasonable doubt.", null),
+                        ("The {0} returned a guilty verdict. Although physical evidence was sparse, the weight of officer testimony and circumstantial evidence supported the conviction.", null),
+                        ("The {0} found the defendant guilty. Credibility determinations favoured the prosecution's witnesses, and the circumstantial evidence was sufficient to establish guilt beyond a reasonable doubt.", null),
+                        ("Despite limited physical evidence, the {0} returned a guilty verdict. The defendant's own admissions and circumstantial evidence were sufficient to meet the burden of proof.", null),
+                        ("The {0} found the defendant guilty. Although the evidence was not overwhelming, the totality of circumstances and witness credibility supported conviction.", null),
+                        ("Despite the absence of forensic evidence, the {0} returned a guilty verdict based on officer testimony and the defendant's conduct at the scene.", null),
+                        ("The {0} found the defendant guilty. Limited documentary evidence was supplemented by credible testimony sufficient to establish guilt beyond a reasonable doubt.", null),
+                        ("In a case with sparse physical evidence, the {0} returned a guilty verdict. Circumstantial evidence and the defendant's behaviour were deemed probative of guilt.", null),
+                        ("The {0} found the defendant guilty despite limited corroboration. Witness credibility and circumstantial indicators met the prosecution's burden of proof.", null),
+                        ("Despite limited tangible evidence, the {0} returned a guilty verdict. Officer testimony and the defendant's inconsistent statements supported the conviction.", null),
+                        ("The {0} found the defendant guilty. Though physical evidence was minimal, witness identification and circumstantial evidence established guilt beyond a reasonable doubt.", null),
+                        ("Despite limited BAC evidence, the {0} found the defendant guilty on DUI charges based on officer observations and field sobriety testimony.", new[] { "__dui_charge__" }),
+                        ("The {0} returned a guilty verdict on impaired driving charges. Limited chemical test evidence was supplemented by officer testimony about impairment.", new[] { "__dui_charge__" }),
+                        ("DUI conviction despite sparse evidence. The {0} relied on the defendant's conduct and officer credibility to meet the burden of proof.", new[] { "__dui_charge__" }),
+                        ("Despite limited drug evidence, the {0} found the defendant guilty. Officer testimony and circumstantial indicators established possession.", new[] { "__drug_crime__" }),
+                        ("The {0} returned a guilty verdict on drug charges. Chain of custody was imperfect but the tribunal found the evidence sufficient.", new[] { "__drug_crime__" }),
+                        ("Drug possession conviction with limited physical evidence. The {0} relied on officer testimony and the defendant's conduct.", new[] { "__drug_crime__" }),
+                        ("Despite limited assault evidence, the {0} found the defendant guilty. Witness credibility and the defendant's conduct supported the verdict.", new[] { "assault", "battery" }),
+                        ("The {0} returned a guilty verdict on battery charges. Circumstantial evidence and victim testimony, though limited, were deemed sufficient.", new[] { "battery" }),
+                        ("Theft conviction despite sparse evidence. The {0} relied on witness identification and circumstantial indicators of intent.", new[] { "theft", "larceny" }),
+                        ("The {0} found the defendant guilty on burglary charges. Limited forensic evidence was supplemented by witness testimony.", new[] { "burglary" }),
+                        ("Despite limited weapon evidence, the {0} returned a guilty verdict. Officer testimony established possession and intent.", new[] { "firearm", "weapon", "gun" }),
+                        ("The {0} found the defendant guilty on evading charges. Driver identification was contested but the tribunal credited officer testimony.", new[] { "evad", "fleeing", "elude" }),
+                        ("Evading conviction despite limited pursuit evidence. The {0} relied on vehicle identification and officer credibility.", new[] { "evad", "evading", "elude" }),
+                        ("The {0} returned a guilty verdict on traffic charges. Limited speed measurement evidence was supplemented by officer observations.", new[] { "__traffic_no_arson__" }),
+                        ("Despite limited resisting evidence, the {0} found the defendant guilty. Officer testimony established the lawfulness of the arrest.", new[] { "resisting", "obstruction" }),
                     };
-                    b.AppendFormat(lowEvidenceGuilty[Helper.GetRandomInt(0, lowEvidenceGuilty.Length - 1)], tribunal);
+                    var chosen = SelectChargeAwarePhrase(courtData, lowEvidenceGuilty);
+                    b.AppendFormat(string.IsNullOrEmpty(chosen) ? "Despite limited physical evidence, the {0} found the defendant guilty based on witness testimony and circumstantial evidence." : chosen, tribunal);
                 } else {
                     var guiltyTrialPool = new (string text, string[] evidenceTags)[] {
                         ("The {0} returned a guilty verdict. The prosecution built an overwhelming case against the defendant.", null),
@@ -3394,6 +3794,63 @@ namespace MDTPro.Data {
                         ("The {0} returned a guilty verdict. The defendant's presence at the scene and incriminating conduct supported conviction.", null),
                         ("The {0} found the defendant guilty. The prosecution presented a coherent and convincing case.", null),
                         ("The {0} returned a guilty verdict. The defendant was found guilty based on the strength of the prosecution's evidence.", null),
+                        ("The {0} returned a guilty verdict. Overwhelming evidence presented at trial left no reasonable doubt as to the defendant's guilt.", null),
+                        ("The {0} found the defendant guilty. The prosecution's case was built on compelling witness testimony that the {0} found credible.", null),
+                        ("The {0} returned a guilty verdict. Physical evidence recovered at the scene conclusively linked the defendant to the offence.", null),
+                        ("The {0} found the defendant guilty. Circumstantial evidence, when viewed in its totality, established guilt beyond a reasonable doubt.", null),
+                        ("The {0} returned a guilty verdict. The defendant's conduct before, during, and after the incident supported the prosecution's theory.", null),
+                        ("The {0} found the defendant guilty. Documentary evidence, including records and reports, corroborated the charges and supported conviction.", null),
+                        ("The {0} returned a guilty verdict. Expert testimony provided by the prosecution established key elements of the offence.", null),
+                        ("The {0} found the defendant guilty. The defendant's confession, admitted into evidence, was central to the verdict.", null),
+                        ("The {0} returned a guilty verdict. The defendant was caught in the act; eyewitness and officer testimony confirmed the defendant's involvement.", null),
+                        ("The {0} found the defendant guilty. The chain of custody for physical evidence was properly established and the evidence was admitted.", null),
+                        ("The {0} returned a guilty verdict. Corroboration between witnesses, physical evidence, and the defendant's own statements established guilt.", null),
+                        ("The {0} found the defendant guilty. The prosecution met its burden of proof beyond a reasonable doubt on each element of the offence.", null),
+                        ("The {0} returned a guilty verdict. Testimony from multiple witnesses converged on the defendant's guilt.", null),
+                        ("The {0} found the defendant guilty. Forensic evidence presented at trial supported the prosecution's case and excluded alternative explanations.", null),
+                        ("The {0} returned a guilty verdict. The defendant's presence at the scene and incriminating conduct were established by both testimony and physical evidence.", null),
+                        ("The {0} found the defendant guilty. Video or photographic evidence presented at trial was consistent with the charges and supported conviction.", null),
+                        ("The {0} returned a guilty verdict. The prosecution presented a coherent narrative supported by witness testimony, documents, and physical evidence.", null),
+                        ("The {0} found the defendant guilty. Eyewitness identification, though challenged, was found reliable and sufficient to support conviction.", null),
+                        ("The {0} returned a guilty verdict. The defendant's admissions, whether formal or informal, were weighed with other evidence and supported guilt.", null),
+                        ("The {0} found the defendant guilty. The defence failed to raise a reasonable doubt; the prosecution's evidence was sufficient and convincing.", null),
+                        ("The {0} returned a guilty verdict. Overwhelming testimony from officers and civilians established the defendant's participation in the offence.", null),
+                        ("The {0} found the defendant guilty. Physical evidence, including items recovered from the defendant, linked the defendant to the crime.", null),
+                        ("The {0} returned a guilty verdict. Circumstantial evidence, though indirect, was sufficient to infer guilt beyond a reasonable doubt.", null),
+                        ("The {0} found the defendant guilty. The defendant's statements to officers, admitted into evidence, were inconsistent with innocence.", null),
+                        ("The {0} returned a guilty verdict. Documentary evidence, such as records and logs, supported the prosecution's timeline and theory.", null),
+                        ("The {0} found the defendant guilty. Expert witnesses testified to matters within their expertise; the {0} found their testimony persuasive.", null),
+                        ("The {0} returned a guilty verdict. The defendant was observed committing the offence; identification and conduct were not in serious dispute.", null),
+                        ("The {0} found the defendant guilty. The prosecution established a strong chain of evidence linking the defendant to the offence.", null),
+                        ("The {0} returned a guilty verdict. Multiple strands of evidence—testimony, physical evidence, and documentary proof—converged on guilt.", null),
+                        ("The {0} found the defendant guilty. The burden of proof was met; the prosecution presented sufficient evidence to eliminate reasonable doubt.", null),
+                        ("The {0} returned a guilty verdict. Witness testimony was credible, consistent, and sufficient to establish the defendant's guilt.", null),
+                        ("The {0} found the defendant guilty. Physical evidence recovered from the defendant or the scene supported the charges.", null),
+                        ("The {0} returned a guilty verdict. Circumstantial evidence, when combined with the defendant's conduct, established guilt beyond a reasonable doubt.", null),
+                        ("The {0} found the defendant guilty. The defendant's behaviour at the scene and subsequent statements supported the prosecution's case.", null),
+                        ("The {0} returned a guilty verdict. Documentary and physical evidence corroborated witness accounts and established the defendant's involvement.", null),
+                        ("The {0} found the defendant guilty. Expert testimony addressed technical or scientific issues and supported the prosecution's theory.", null),
+                        ("The {0} returned a guilty verdict. The defendant's confession, corroborated by other evidence, was deemed voluntary and reliable.", null),
+                        ("The {0} found the defendant guilty. The defendant was apprehended at or near the scene; circumstances and evidence pointed to guilt.", null),
+                        ("The {0} returned a guilty verdict. The chain of custody for key evidence was established; the evidence was properly admitted and weighed.", null),
+                        ("The {0} found the defendant guilty. Cross-correspondence between witnesses, documents, and physical evidence supported conviction.", null),
+                        ("The {0} returned a guilty verdict. The prosecution proved each essential element of the offence; no reasonable doubt remained.", null),
+                        ("The {0} found the defendant guilty. Testimony from the victim and other witnesses was consistent and sufficient to establish guilt.", null),
+                        ("The {0} returned a guilty verdict. Forensic analysis of evidence presented at trial supported the prosecution and implicated the defendant.", null),
+                        ("The {0} found the defendant guilty. The defendant's location, conduct, and admissions at the time of arrest supported the verdict.", null),
+                        ("The {0} returned a guilty verdict. Audio or visual recordings admitted into evidence supported the charges and the prosecution's narrative.", null),
+                        ("The {0} found the defendant guilty. The prosecution presented a logically coherent case supported by admissible evidence.", null),
+                        ("The {0} returned a guilty verdict. Identification evidence, supported by corroboration, was sufficient to establish the defendant's guilt.", null),
+                        ("The {0} found the defendant guilty. The defendant's words and actions, as testified to and documented, were indicative of guilt.", null),
+                        ("The {0} returned a guilty verdict. The defence presented no credible alternative; the prosecution's evidence was sufficient and persuasive.", null),
+                        ("The {0} found the defendant guilty. Physical evidence and testimony combined to establish a compelling case against the defendant.", null),
+                        ("The {0} returned a guilty verdict. Circumstantial evidence, though not direct, was sufficient to satisfy the burden of proof.", null),
+                        ("The {0} found the defendant guilty. Documentary records supported the chronology and facts underlying the charges.", null),
+                        ("The {0} returned a guilty verdict. Expert evidence addressed disputed issues and supported the prosecution's theory of the case.", null),
+                        ("The {0} found the defendant guilty. The defendant was taken into custody at the scene; evidence gathered supported the charges.", null),
+                        ("The {0} returned a guilty verdict. Properly authenticated evidence was admitted and established the defendant's guilt beyond a reasonable doubt.", null),
+                        ("The {0} found the defendant guilty. Multiple sources of evidence—witnesses, documents, and physical items—supported the verdict.", null),
+                        ("The {0} returned a guilty verdict. The prosecution proved the defendant's guilt; the evidence was overwhelming and left no reasonable doubt.", null),
                         ("The {0} found the defendant guilty. Evidence that the defendant was armed at the time of arrest strongly supported the prosecution's case.", new[] { "Weapon" }),
                         ("The {0} returned a guilty verdict. The defendant was armed when taken into custody, a fact the {0} found significant.", new[] { "Weapon" }),
                         ("The {0} found the defendant guilty. Possession of a weapon at the time of arrest was cited as evidence of intent and capability.", new[] { "Weapon" }),
@@ -3445,14 +3902,41 @@ namespace MDTPro.Data {
                         ("The {0} returned a guilty verdict. Documentation of force used during arrest was consistent with the charges and admissible.", new[] { "UseOfForce" }),
                         ("The {0} found the defendant guilty. Multiple factors—including the defendant's conduct at arrest and the evidence gathered—supported the verdict.", new[] { "Resisted", "Weapon" }),
                         ("The {0} returned a guilty verdict. The combination of an outstanding warrant and the defendant's conduct at arrest left no reasonable doubt.", new[] { "Wanted", "Fleeing" }),
+                        ("The {0} found the defendant guilty. The defendant was in possession of controlled substances and resisted arrest; both factors supported the verdict.", new[] { "Drugs", "Resisted" }),
+                        ("The {0} returned a guilty verdict. Flight from officers and recovery of a weapon at arrest demonstrated consciousness of guilt and dangerous conduct.", new[] { "Fleeing", "Weapon" }),
+                        ("The {0} found the defendant guilty. The defendant fled and was armed; the {0} considered both as evidence of intent and guilt.", new[] { "Fleeing", "Weapon" }),
+                        ("The {0} returned a guilty verdict. An outstanding warrant and the defendant's resistance during arrest left no reasonable doubt.", new[] { "Wanted", "Resisted" }),
+                        ("The {0} found the defendant guilty. Drugs were recovered and the defendant was armed; the combination strengthened the prosecution's case.", new[] { "Drugs", "Weapon" }),
+                        ("The {0} returned a guilty verdict. The defendant was intoxicated and resisted arrest; both were cited as supporting the charges.", new[] { "Drunk", "Resisted" }),
+                        ("The {0} found the defendant guilty. Assault during the incident and resistance at arrest were presented as evidence of culpability.", new[] { "Assault", "Resisted" }),
+                        ("The {0} returned a guilty verdict. The defendant was wanted, armed, and fled; the {0} weighed these factors in reaching its verdict.", new[] { "Wanted", "Weapon", "Fleeing" }),
+                        ("The {0} found the defendant guilty. Drugs and an illegal weapon were recovered; the prosecution's case was compelling.", new[] { "Drugs", "IllegalWeapon" }),
+                        ("The {0} returned a guilty verdict. The defendant was on supervision and possessed drugs; violation and possession supported conviction.", new[] { "Supervision", "Drugs" }),
+                        ("The {0} found the defendant guilty. Evidence discovered during a lawful pat-down and the defendant's resistance supported the charges.", new[] { "PatDown", "Resisted" }),
+                        ("The {0} returned a guilty verdict. Vehicle damage and assault during the incident established the defendant's involvement.", new[] { "VehicleDamage", "Assault" }),
+                        ("The {0} found the defendant guilty. The defendant fled and assaulted an officer; flight and assault were cited as evidence of guilt.", new[] { "Fleeing", "Assault" }),
+                        ("The {0} returned a guilty verdict. Use of force documentation and resistance during arrest corroborated the prosecution's account.", new[] { "UseOfForce", "Resisted" }),
+                        ("The {0} found the defendant guilty. The defendant was intoxicated and fled; impairment and flight supported the verdict.", new[] { "Drunk", "Fleeing" }),
+                        ("The {0} returned a guilty verdict. An outstanding warrant and weapon possession demonstrated the defendant's fugitive status and dangerousness.", new[] { "Wanted", "Weapon" }),
                         ("The {0} found the defendant guilty. The murder charges were the defining element of the case.", new[] { "Homicide" }),
                         ("The {0} returned a guilty verdict. The gravity of the homicide charges dominated the proceeding.", new[] { "Homicide" }),
                         ("The {0} found the defendant guilty. The murder and manslaughter charges were central to the prosecution's case.", new[] { "Homicide" }),
                         ("The {0} returned a guilty verdict. The homicide-related charges were paramount in the {0}'s decision.", new[] { "Homicide" }),
                         ("The {0} found the defendant guilty. The murder charges warranted the most serious consideration by the court.", new[] { "Homicide" }),
                         ("The {0} returned a guilty verdict. The defendant's conviction on murder charges was the focal point of the case.", new[] { "Homicide" }),
+                        ("The {0} found the defendant guilty. The homicide charges were proven beyond a reasonable doubt; the evidence was compelling.", new[] { "Homicide" }),
+                        ("The {0} returned a guilty verdict. Murder or manslaughter was established through testimony, forensic evidence, and the defendant's conduct.", new[] { "Homicide" }),
+                        ("The {0} found the defendant guilty. The seriousness of the homicide charges demanded, and received, thorough consideration by the {0}.", new[] { "Homicide" }),
+                        ("The {0} returned a guilty verdict. The defendant was convicted of homicide-related offences; the gravity of the charges was reflected in the verdict.", new[] { "Homicide" }),
+                        ("The {0} found the defendant guilty. Evidence presented at trial established the defendant's guilt on the murder or manslaughter charges.", new[] { "Homicide" }),
                         ("The {0} found the defendant guilty. The sexual offence charges were central to the prosecution's case.", new[] { "SexOffense" }),
                         ("The {0} returned a guilty verdict. The gravity of the rape and sexual violence charges dominated the proceeding.", new[] { "SexOffense" }),
+                        ("The {0} found the defendant guilty. The sexual offence charges were proven beyond a reasonable doubt through victim testimony and corroborating evidence.", new[] { "SexOffense" }),
+                        ("The {0} returned a guilty verdict. Evidence of sexual assault or related offences was compelling; the {0} found the defendant guilty.", new[] { "SexOffense" }),
+                        ("The {0} found the defendant guilty. The sexual offence charges warranted the most serious consideration; the prosecution met its burden.", new[] { "SexOffense" }),
+                        ("The {0} returned a guilty verdict. Testimony, forensic evidence, and corroboration established the defendant's guilt on the sexual offence charges.", new[] { "SexOffense" }),
+                        ("The {0} found the defendant guilty. The defendant was convicted of sexual offences; the charges were central to the case and supported by the evidence.", new[] { "SexOffense" }),
+                        ("The {0} returned a guilty verdict. Sexual offence charges dominated the trial; the {0} found the evidence sufficient and the defendant guilty.", new[] { "SexOffense" }),
                         ("The {0} found the defendant guilty. Kidnapping and related charges were paramount in the {0}'s decision.", new[] { "Kidnapping" }),
                         ("The {0} returned a guilty verdict. The kidnapping charges warranted the most serious consideration.", new[] { "Kidnapping" }),
                         ("The {0} found the defendant guilty. The arson charges were a defining element of the case.", new[] { "Arson" }),
@@ -3478,6 +3962,13 @@ namespace MDTPro.Data {
                     factors.Add("escape or attempted escape from custody was established");
                 if (HasChargeKeyword(courtData, "violation of probation") || HasChargeKeyword(courtData, "violation of parole") || HasChargeKeyword(courtData, "protective order"))
                     factors.Add("breach of court orders or supervision was established");
+                if (HasGangCharge(courtData)) factors.Add("gang-related charges formed part of the case");
+                if (HasFederalCharge(courtData)) factors.Add("federal charges were proven");
+                if (HasICECharge(courtData)) factors.Add("immigration-related charges were established");
+                if (HasRICOCharge(courtData)) factors.Add("RICO or racketeering charges were proven");
+                if (HasFraudCharge(courtData)) factors.Add("fraud or financial crime charges were established");
+                if (HasWildlifeCharge(courtData)) factors.Add("wildlife or animal cruelty charges were proven");
+                if (HasUnlicensedCharge(courtData)) factors.Add("unlicensed or unauthorised practice was established");
                 if (courtData.EvidenceHadWeapon) factors.Add("the defendant was armed at the time of arrest");
                 if (courtData.EvidenceWasWanted) factors.Add("an active warrant was outstanding");
                 if (courtData.EvidenceViolatedSupervision) factors.Add("the defendant was on probation or parole");
@@ -3517,6 +4008,10 @@ namespace MDTPro.Data {
                         "Prior convictions influenced the verdict.",
                         "The defendant's repeat offender status factored in the decision.",
                         "The court noted the defendant's prior criminal record in reaching its verdict.",
+                        "The defendant's pattern of recidivism was considered by the court.",
+                        "Prior offences were cited as aggravating circumstances.",
+                        "The court weighed the defendant's history of similar conduct.",
+                        "Repeat offender status was reflected in the sentencing considerations.",
                     };
                     b.Append(" " + repeatOffender[Helper.GetRandomInt(0, repeatOffender.Length - 1)]);
                 }
@@ -3527,6 +4022,9 @@ namespace MDTPro.Data {
                         $"The jury split {courtData.JuryVotesForConviction}-{courtData.JuryVotesForAcquittal} in favour of guilt.",
                         $"The vote was {courtData.JuryVotesForConviction} to {courtData.JuryVotesForAcquittal}.",
                         $"The jury voted {courtData.JuryVotesForConviction} to {courtData.JuryVotesForAcquittal} for conviction.",
+                        $"A {courtData.JuryVotesForConviction}-{courtData.JuryVotesForAcquittal} jury verdict found the defendant guilty.",
+                        $"The jury returned a guilty verdict by a margin of {courtData.JuryVotesForConviction} to {courtData.JuryVotesForAcquittal}.",
+                        $"Jurors voted {courtData.JuryVotesForConviction}-{courtData.JuryVotesForAcquittal} to convict.",
                     };
                     b.Append(" " + juryConviction[Helper.GetRandomInt(0, juryConviction.Length - 1)]);
                 }
@@ -3537,19 +4035,64 @@ namespace MDTPro.Data {
                         "Docket pressure led to an expedited hearing.",
                         "The case was resolved quickly due to court backlog.",
                         "Amid heavy docket volume, the case was heard on an expedited schedule.",
+                        "Court congestion contributed to a compressed trial schedule.",
+                        "The case was prioritized due to docket pressure and resolved accordingly.",
                     };
                     b.Append(" " + docketConviction[Helper.GetRandomInt(0, docketConviction.Length - 1)]);
                 }
                 AppendChargeDomainPhrase(b, courtData, resolvedStatus);
             } else if (resolvedStatus == 2) {
                 if (mismatchAcquittal) {
-                    string[] highEvidenceAcquittal = new[] {
-                        "Despite strong prosecution evidence, the {0} returned a not guilty verdict. The defence successfully challenged key aspects of the case and raised sufficient reasonable doubt.",
-                        "In an unexpected outcome, the {0} acquitted the defendant. Procedural issues and defence challenges to the evidence ultimately prevailed.",
-                        "The {0} returned a not guilty verdict despite a robust prosecution case. The defence's challenge to witness identification and chain of custody created reasonable doubt.",
-                        "Although the prosecution presented substantial evidence, the {0} found the defendant not guilty. Credibility issues and defence arguments raised sufficient doubt.",
+                    var highEvidenceAcquittal = new (string text, string[] chargeKeywords)[] {
+                        ("Despite strong prosecution evidence, the {0} returned a not guilty verdict. The defence successfully challenged key aspects of the case and raised sufficient reasonable doubt.", null),
+                        ("In an unexpected outcome, the {0} acquitted the defendant. Procedural issues and defence challenges to the evidence ultimately prevailed.", null),
+                        ("The {0} returned a not guilty verdict despite a robust prosecution case. The defence's challenge to witness identification and chain of custody created reasonable doubt.", null),
+                        ("Although the prosecution presented substantial evidence, the {0} found the defendant not guilty. Credibility issues and defence arguments raised sufficient doubt.", null),
+                        ("Despite compelling prosecution evidence, the {0} acquitted the defendant. Defence counsel successfully attacked the legality of the search and seizure.", null),
+                        ("The {0} returned a not guilty verdict despite strong evidence. Miranda violations and inadmissible statements undermined the prosecution's case.", null),
+                        ("In a surprising outcome, the {0} found the defendant not guilty. The defence's alibi evidence and conflicting testimony created reasonable doubt.", null),
+                        ("Although the prosecution presented a strong case, the {0} acquitted the defendant. Problems with identification procedures and mistaken identity concerns prevailed.", null),
+                        ("Despite substantial physical evidence, the {0} returned a not guilty verdict. Chain of custody breaches and forensic reliability challenges favoured the defence.", null),
+                        ("The {0} acquitted the defendant despite a robust prosecution. Defence arguments on lack of intent and self-defence raised sufficient reasonable doubt.", null),
+                        ("In an unexpected verdict, the {0} found the defendant not guilty. Procedural defects and exclusion of key evidence tipped the balance toward acquittal.", null),
+                        ("Despite significant evidence against the defendant, the {0} returned a not guilty verdict. Witness credibility issues and conflicting testimony doomed the prosecution's case.", null),
+                        ("The {0} acquitted the defendant despite strong circumstantial evidence. The defence successfully argued mistaken identity and lack of corroboration.", null),
+                        ("Although the prosecution marshalled substantial proof, the {0} found the defendant not guilty. Search illegality and Fourth Amendment violations led to acquittal.", null),
+                        ("The {0} acquitted the defendant despite compelling evidence. The defence successfully challenged the traffic stop and field sobriety procedures.", new[] { "__dui_charge__" }),
+                        ("Despite strong DUI evidence, the {0} returned a not guilty verdict. Breath test calibration and chain of custody were successfully challenged.", new[] { "__dui_charge__" }),
+                        ("The {0} acquitted the defendant on DUI charges despite substantial evidence. The defence attacked the legality of the stop and testing protocol.", new[] { "__dui_charge__" }),
+                        ("The {0} acquitted the defendant on DUI charges. The defence successfully challenged the prosecution's impairment evidence and raised reasonable doubt.", new[] { "__dui_charge__" }),
+                        ("Despite drug evidence, the {0} acquitted the defendant. The defence successfully challenged the search and chain of custody.", new[] { "__drug_crime__" }),
+                        ("The {0} returned a not guilty verdict on drug charges. Search warrant defects and evidence handling were successfully challenged.", new[] { "__drug_crime__" }),
+                        ("The {0} acquitted the defendant on drug possession charges. The defence raised sufficient doubt about lawful possession and intent.", new[] { "__drug_crime__" }),
+                        ("Despite assault evidence, the {0} acquitted the defendant. Self-defence and lack of intent were successfully argued.", new[] { "assault", "battery" }),
+                        ("The {0} acquitted the defendant on assault charges. The defence successfully challenged identification and raised reasonable doubt.", new[] { "assault" }),
+                        ("Battery charges resulted in acquittal. The defence argued self-defence and provocation; the {0} had reasonable doubt.", new[] { "battery" }),
+                        ("Despite theft evidence, the {0} returned a not guilty verdict. The defence challenged ownership and intent successfully.", new[] { "theft", "larceny", "burglary" }),
+                        ("The {0} acquitted the defendant on burglary charges. The defence successfully challenged proof of unlawful entry.", new[] { "burglary" }),
+                        ("The {0} acquitted the defendant on robbery charges. The defence challenged identification and the force-or-fear element; reasonable doubt remained.", new[] { "robbery" }),
+                        ("Despite firearm evidence, the {0} acquitted the defendant. Search legality and constructive possession were successfully challenged.", new[] { "firearm", "weapon", "gun" }),
+                        ("The {0} returned a not guilty verdict on weapon charges. The defence raised sufficient doubt about possession and unlawful intent.", new[] { "weapon", "firearm" }),
+                        ("Despite evading evidence, the {0} acquitted the defendant. Driver identification and pursuit justification were successfully challenged.", new[] { "evad", "fleeing", "elude" }),
+                        ("The {0} acquitted the defendant on evading charges. The defence challenged whether the defendant was the driver and whether pursuit was lawful.", new[] { "evad", "evading", "elude" }),
+                        ("The {0} acquitted the defendant on traffic charges despite strong evidence. The defence successfully challenged speed measurement and vehicle identification.", new[] { "__traffic_no_arson__" }),
+                        ("Despite resisting arrest evidence, the {0} acquitted the defendant. The defence successfully challenged the lawfulness of the underlying detention.", new[] { "resisting", "obstruction" }),
+                        ("The {0} acquitted the defendant on murder charges. The defence challenged causation, intent, and identification; reasonable doubt prevailed.", new[] { "murder" }),
+                        ("The {0} acquitted the defendant on manslaughter charges. The defence successfully argued lack of recklessness and causation.", new[] { "manslaughter" }),
+                        ("Despite homicide evidence, the {0} returned a not guilty verdict. The defence challenged forensic evidence and raised reasonable doubt.", new[] { "murder", "manslaughter" }),
+                        ("The {0} acquitted the defendant on sexual assault charges. Consent and identification were successfully challenged.", new[] { "rape", "sexual assault", "sexual" }),
+                        ("The {0} acquitted the defendant on sex offence charges. The defence raised sufficient doubt about the prosecution's narrative.", new[] { "rape", "sexual" }),
+                        ("Despite kidnapping evidence, the {0} acquitted the defendant. Consent and unlawful restraint were successfully challenged.", new[] { "kidnapping" }),
+                        ("The {0} returned a not guilty verdict on arson charges. Origin and cause were successfully challenged by the defence.", new[] { "arson" }),
+                        ("Despite strong prosecution evidence, the {0} acquitted the defendant. The defence successfully excluded key evidence on procedural grounds.", null),
+                        ("The {0} acquitted the defendant. Expert testimony was successfully impeached; reasonable doubt remained.", null),
+                        ("In a surprising verdict, the {0} found the defendant not guilty. The defence's challenge to eyewitness identification prevailed.", null),
+                        ("The {0} acquitted the defendant despite a strong case. Discovery violations and withheld evidence favoured the defence.", null),
+                        ("Despite overwhelming evidence, the {0} returned a not guilty verdict. Juror nullification or credibility determinations may have factored.", null),
+                        ("The {0} acquitted the defendant. The defence successfully argued that the prosecution's theory did not fit the evidence.", null),
                     };
-                    b.AppendFormat(highEvidenceAcquittal[Helper.GetRandomInt(0, highEvidenceAcquittal.Length - 1)], tribunal);
+                    var chosen = SelectChargeAwarePhrase(courtData, highEvidenceAcquittal);
+                    b.AppendFormat(string.IsNullOrEmpty(chosen) ? "Despite strong prosecution evidence, the {0} returned a not guilty verdict. The defence successfully challenged key aspects of the case." : chosen, tribunal);
                 } else {
                 var acquittalPool = new (string text, string[] evidenceTags)[] {
                     ("The {0} found the defendant not guilty. The prosecution failed to establish guilt beyond a reasonable doubt.", null),
@@ -3607,6 +4150,115 @@ namespace MDTPro.Data {
                     ("The {0} found the defendant not guilty. The defence's arguments raised sufficient doubt to warrant acquittal.", null),
                     ("The {0} returned a not guilty verdict. The prosecution failed to establish a sufficient connection between the defendant and the offence.", null),
                     ("The {0} acquitted the defendant. The evidence presented fell short of the standard required for conviction.", null),
+                    ("The {0} found the defendant not guilty. Chain of custody issues and handling errors undermined the physical evidence.", null),
+                    ("The {0} acquitted the defendant. The prosecution could not prove the defendant's identity beyond reasonable doubt.", null),
+                    ("The {0} returned a not guilty verdict. Identification procedures were flawed; the defendant was acquitted.", null),
+                    ("The {0} found the defendant not guilty. Procedural defects and evidentiary rulings favoured the defence.", null),
+                    ("The {0} acquitted the defendant. The search that yielded evidence was ruled unlawful.", null),
+                    ("The {0} returned a not guilty verdict. Search legality was successfully challenged; key evidence was excluded.", null),
+                    ("The {0} found the defendant not guilty. Miranda violations led to exclusion of incriminating statements.", null),
+                    ("The {0} acquitted the defendant. Statements were suppressed due to procedural violations.", null),
+                    ("The {0} returned a not guilty verdict. The defendant's alibi was not disproven beyond reasonable doubt.", null),
+                    ("The {0} found the defendant not guilty. Alibi evidence raised sufficient doubt as to the defendant's presence.", null),
+                    ("The {0} acquitted the defendant. Mistaken identity was a reasonable possibility given the evidence.", null),
+                    ("The {0} returned a not guilty verdict. The defence established a credible mistaken identity theory.", null),
+                    ("The {0} found the defendant not guilty. Conflicting testimony among witnesses created insurmountable doubt.", null),
+                    ("The {0} acquitted the defendant. Inconsistent and contradictory testimony favoured acquittal.", null),
+                    ("The {0} returned a not guilty verdict. The prosecution failed to prove intent beyond reasonable doubt.", null),
+                    ("The {0} found the defendant not guilty. Lack of intent was established; the requisite mental element was not proven.", null),
+                    ("The {0} acquitted the defendant. The defendant's claim of self-defence raised reasonable doubt.", null),
+                    ("The {0} returned a not guilty verdict. Self-defence could not be ruled out; the defendant was acquitted.", null),
+                    ("The {0} found the defendant not guilty. Witness credibility was fatally undermined on cross-examination.", null),
+                    ("The {0} acquitted the defendant. The prosecution's witnesses were deemed unreliable by the {0}.", null),
+                    ("The {0} returned a not guilty verdict. Insufficient evidence linked the defendant to the offence.", null),
+                    ("The {0} found the defendant not guilty. The circumstantial evidence did not establish guilt to the required degree.", null),
+                    ("The {0} acquitted the defendant. The prosecution's circumstantial case left room for reasonable alternative inferences.", null),
+                    ("The {0} returned a not guilty verdict. Procedural irregularities tainted the evidence and favoured acquittal.", null),
+                    ("The {0} found the defendant not guilty. Evidentiary gaps and unanswered questions supported acquittal.", null),
+                    ("The {0} acquitted the defendant. The prosecution could not corroborate its key allegations.", null),
+                    ("The {0} returned a not guilty verdict. Corroborating evidence was lacking; reasonable doubt prevailed.", null),
+                    ("The {0} found the defendant not guilty. The defence's challenge to the arrest procedure was sustained.", null),
+                    ("The {0} acquitted the defendant. Arrest legality and Fourth Amendment concerns favoured the defence.", null),
+                    ("The {0} returned a not guilty verdict. Forensic evidence was inconclusive or unreliable.", null),
+                    ("The {0} found the defendant not guilty. Expert testimony failed to establish guilt beyond reasonable doubt.", null),
+                    ("The {0} acquitted the defendant. The {0} was not satisfied that the prosecution had met its burden.", null),
+                    ("The {0} returned a not guilty verdict. The evidence, viewed as a whole, left reasonable doubt.", null),
+                    ("The {0} found the defendant not guilty. Timeline inconsistencies and conflicting accounts favoured acquittal.", null),
+                    ("The {0} acquitted the defendant. The prosecution's narrative did not comport with the evidence.", null),
+                    ("The {0} returned a not guilty verdict. Prior inconsistent statements by witnesses undermined the case.", null),
+                    ("The {0} found the defendant not guilty. Bias or motive to fabricate affected prosecution witnesses.", null),
+                    ("The {0} acquitted the defendant. The defendant's version of events was plausible and not disproven.", null),
+                    ("The {0} returned a not guilty verdict. Lack of physical evidence tying the defendant to the crime favoured acquittal.", null),
+                    ("The {0} found the defendant not guilty. The prosecution relied on uncorroborated testimony; the {0} had reasonable doubt.", null),
+                    ("The {0} acquitted the defendant. Suppression of evidence due to constitutional violations weakened the prosecution.", null),
+                    ("The {0} returned a not guilty verdict. The defendant was acquitted on the strength of defence evidence and reasonable doubt.", null),
+                    ("The {0} found the defendant not guilty. The prosecution failed to rebut the defence's theory of the case.", null),
+                    ("The {0} acquitted the defendant. Witness identification was unreliable; mistaken identity remained a real possibility.", null),
+                    ("The {0} returned a not guilty verdict. The elements of the offence were not proven beyond reasonable doubt.", null),
+                    ("The {0} found the defendant not guilty. The burden of proof was not met; the presumption of innocence prevailed.", null),
+                    ("The {0} acquitted the defendant. The {0} concluded the evidence was insufficient to sustain a conviction.", null),
+                    ("The {0} returned a not guilty verdict. Conflicting expert opinions left reasonable doubt as to guilt.", null),
+                    ("The {0} found the defendant not guilty. The prosecution's reliance on a single uncorroborated witness was insufficient.", null),
+                    ("The {0} acquitted the defendant. The evidence was more consistent with innocence than guilt.", null),
+                    ("The {0} returned a not guilty verdict. Police conduct and investigation flaws raised doubt about the case.", null),
+                    ("The {0} found the defendant not guilty. The defence successfully challenged the reliability of the evidence.", null),
+                    ("The {0} acquitted the defendant. Exculpatory evidence and reasonable doubt led to acquittal.", null),
+                    ("The {0} returned a not guilty verdict. The prosecution could not establish the defendant's involvement to the required standard.", null),
+                    ("The {0} found the defendant not guilty. Motive, opportunity, and means were not sufficiently proven.", null),
+                    ("The {0} acquitted the defendant. The prosecution's case rested on speculation rather than proof.", null),
+                    ("The {0} returned a not guilty verdict. Discovery violations and withheld evidence contributed to acquittal.", null),
+                    ("The {0} found the defendant not guilty. The defendant was acquitted; the evidence did not eliminate reasonable doubt.", null),
+                    ("The {0} acquitted the defendant. Insufficient evidence; the prosecution could not meet its burden.", null),
+                    ("The {0} returned a not guilty verdict. The prosecution could not establish a prima facie case.", null),
+                    ("The {0} found the defendant not guilty. Corroboration was lacking; the prosecution's case was thin.", null),
+                    ("The {0} acquitted the defendant. The evidence was inconclusive as to the defendant's role.", null),
+                    ("The {0} returned a not guilty verdict. The defence's motion for acquittal was granted.", null),
+                    ("The {0} found the defendant not guilty. Hearsay and inadmissible evidence weakened the prosecution.", null),
+                    ("The {0} acquitted the defendant. The prosecution's timeline did not hold up under scrutiny.", null),
+                    ("The {0} returned a not guilty verdict. Physical evidence was inconclusive or absent.", null),
+                    ("The {0} found the defendant not guilty. The prosecution could not explain away exculpatory evidence.", null),
+                    ("The {0} acquitted the defendant. The evidence did not support the prosecution's theory of the case.", null),
+                    ("The {0} returned a not guilty verdict. Lack of motive evidence favoured the defence.", null),
+                    ("The {0} found the defendant not guilty. The prosecution's case was built on inference rather than proof.", null),
+                    ("The {0} acquitted the defendant. Eyewitness testimony was impeached; identification failed.", null),
+                    ("The {0} returned a not guilty verdict. The prosecution could not establish the defendant's presence at the scene.", null),
+                    ("The {0} found the defendant not guilty. Documentary evidence was ambiguous or exculpatory.", null),
+                    ("The {0} acquitted the defendant. The prosecution failed to prove the corpus delicti.", null),
+                    ("The {0} returned a not guilty verdict. Reasonable alternative explanations were not ruled out.", null),
+                    ("The {0} found the defendant not guilty. The prosecution's circumstantial case had too many gaps.", null),
+                    ("The {0} acquitted the defendant. The burden of proof was not sustained on any count.", null),
+                    ("The {0} returned a not guilty verdict. The evidence did not establish guilt to a moral certainty.", null),
+                    ("The {0} found the defendant not guilty. The prosecution could not overcome the defendant's presumption of innocence.", null),
+                    ("The {0} acquitted the defendant. The prosecution's evidence was speculative and insufficient.", null),
+                    ("The {0} returned a not guilty verdict. The defence raised doubt on every essential element.", null),
+                    ("The {0} found the defendant not guilty. The prosecution could not prove the defendant's knowledge or intent.", null),
+                    ("The {0} acquitted the defendant. The evidence was as consistent with innocence as with guilt.", null),
+                    ("The {0} returned a not guilty verdict. The prosecution failed to establish a complete chain of evidence.", null),
+                    ("The {0} found the defendant not guilty. The prosecution could not exclude the possibility of third-party culpability.", null),
+                    ("The {0} acquitted the defendant. The prosecution's witnesses had credibility issues.", null),
+                    ("The {0} returned a not guilty verdict. The prosecution could not prove the defendant acted unlawfully.", null),
+                    ("The {0} found the defendant not guilty. The prosecution's case depended on testimony that was not credible.", null),
+                    ("The {0} acquitted the defendant. The prosecution could not establish the requisite mens rea.", null),
+                    ("The {0} returned a not guilty verdict. The prosecution's evidence was circumstantial and insufficient.", null),
+                    ("The {0} found the defendant not guilty. The prosecution could not prove the actus reus.", null),
+                    ("The {0} acquitted the defendant. The prosecution's theory was not supported by the weight of the evidence.", null),
+                    ("The {0} returned a not guilty verdict. The prosecution failed to present sufficient evidence on any element.", null),
+                    ("The {0} found the defendant not guilty. The prosecution could not establish causation.", null),
+                    ("The {0} acquitted the defendant. The prosecution's case was undermined by its own witnesses.", null),
+                    ("The {0} returned a not guilty verdict. The prosecution could not prove the defendant committed the act.", null),
+                    ("The {0} found the defendant not guilty. The prosecution's evidence was insufficient as a matter of law.", null),
+                    ("The {0} acquitted the defendant. The prosecution could not establish a connection between the defendant and the crime.", null),
+                    ("The {0} returned a not guilty verdict. The prosecution's case was based on conjecture.", null),
+                    ("The {0} found the defendant not guilty. The prosecution could not prove the defendant had the requisite intent.", null),
+                    ("The {0} acquitted the defendant. The prosecution's evidence was contradicted by physical evidence.", null),
+                    ("The {0} returned a not guilty verdict. The prosecution failed to meet its burden on identification.", null),
+                    ("The {0} found the defendant not guilty. The prosecution could not establish the defendant's guilt.", null),
+                    ("The {0} acquitted the defendant. The prosecution's case lacked the necessary evidentiary foundation.", null),
+                    ("The {0} returned a not guilty verdict. The prosecution could not prove the defendant's involvement.", null),
+                    ("The {0} found the defendant not guilty. The prosecution's witnesses were not believed.", null),
+                    ("The {0} acquitted the defendant. The prosecution could not sustain its burden of proof.", null),
+                    ("The {0} returned a not guilty verdict. The prosecution failed to prove guilt beyond a reasonable doubt on any charge.", null),
+                    ("The {0} found the defendant not guilty. The prosecution's evidence was insufficient to support a conviction.", null),
                 };
                 string chosen = SelectWeightedOutcome(courtData, acquittalPool);
                 b.AppendFormat(chosen, tribunal);
@@ -3618,6 +4270,9 @@ namespace MDTPro.Data {
                         $"{courtData.DefenseAttorneyName} provided effective representation for the defence.",
                         $"Private counsel {courtData.DefenseAttorneyName} argued persuasively on the defendant's behalf.",
                         $"{courtData.DefenseAttorneyName} successfully advocated for the defendant.",
+                        $"Defence counsel {courtData.DefenseAttorneyName} secured an acquittal through skilled representation.",
+                        $"{courtData.DefenseAttorneyName} effectively challenged the prosecution's case and secured acquittal.",
+                        $"Private counsel {courtData.DefenseAttorneyName} raised sufficient reasonable doubt to secure a not guilty verdict.",
                     };
                     b.Append(" " + privateCounsel[Helper.GetRandomInt(0, privateCounsel.Length - 1)]);
                 }
@@ -3628,6 +4283,9 @@ namespace MDTPro.Data {
                         $"The jury split {courtData.JuryVotesForAcquittal}-{courtData.JuryVotesForConviction} in favour of not guilty.",
                         $"A {courtData.JuryVotesForAcquittal}-{courtData.JuryVotesForConviction} jury vote returned a not guilty verdict.",
                         $"The jury voted {courtData.JuryVotesForAcquittal} to {courtData.JuryVotesForConviction} for acquittal.",
+                        $"The jury returned a not guilty verdict by a margin of {courtData.JuryVotesForAcquittal} to {courtData.JuryVotesForConviction}.",
+                        $"A {courtData.JuryVotesForAcquittal}-{courtData.JuryVotesForConviction} vote in favour of acquittal was recorded.",
+                        $"Jurors voted {courtData.JuryVotesForAcquittal}-{courtData.JuryVotesForConviction} for acquittal.",
                     };
                     b.Append(" " + juryAcquittal[Helper.GetRandomInt(0, juryAcquittal.Length - 1)]);
                 }
@@ -3638,39 +4296,139 @@ namespace MDTPro.Data {
                         "Docket pressure contributed to a quick resolution.",
                         "The case was fast-tracked; resolution came amid a busy court schedule.",
                         "Amid court backlog, the case was resolved on an accelerated timeline.",
+                        "Court congestion led to an expedited disposition of the matter.",
+                        "The case was resolved on a compressed schedule due to docket pressure.",
                     };
                     b.Append(" " + docketAcquittal[Helper.GetRandomInt(0, docketAcquittal.Length - 1)]);
                 }
                 AppendChargeDomainPhrase(b, courtData, resolvedStatus);
             } else if (resolvedStatus == 3) {
-                string[] dismissedPool = new[] {
-                    "Charges were dismissed. The case did not proceed to trial.",
-                    "The charges were dismissed. The prosecution declined to proceed.",
-                    "The case was dismissed. Insufficient evidence to proceed to trial.",
-                    "Charges were dismissed on procedural grounds. The case did not go to trial.",
-                    "The court dismissed the case. The matter was not tried on the merits.",
-                    "The case was dismissed. The prosecution could not meet its burden at this stage.",
-                    "Charges were dismissed without prejudice. The matter was not tried on the merits.",
-                    "The charges were dismissed with prejudice. The case will not be refiled.",
-                    "The court entered nolle prosequi. The prosecution elected not to proceed.",
-                    "Charges were dismissed. The matter did not proceed to trial due to evidentiary issues.",
-                    "The case was dismissed. Key witnesses were unavailable or evidence was suppressed.",
-                    "The prosecution declined to proceed. Charges were dismissed.",
-                    "Charges were dismissed on procedural grounds. The matter did not reach trial.",
-                    "The case was dismissed. Procedural defects led to dismissal.",
-                    "The charges were dismissed. The case did not reach trial.",
-                    "The court dismissed the case. Insufficient evidence was cited.",
-                    "Charges were dismissed. The prosecution elected to decline prosecution.",
-                    "The case was dismissed. The matter was not tried on the merits.",
-                    "The charges were dismissed. Did not proceed to trial.",
-                    "The court dismissed the case. The prosecution declined to proceed.",
-                    "Charges were dismissed. The prosecution withdrew the charges.",
-                    "The case was dismissed. Evidentiary problems prevented the case from going forward.",
-                    "The charges were dismissed. The case was resolved without a trial.",
-                    "The court entered a dismissal. The matter was not tried on the merits.",
-                    "Charges were dismissed. The prosecution determined it could not prevail.",
+                // Evidence-band-aware: when EvidenceBand is Low, prefer insufficient-evidence / burden wording. Charge-specific phrasing favoured.
+                var lowEvidenceDismissals = new (string text, string[] chargeKeywords)[] {
+                    ("The case was dismissed. Insufficient evidence to proceed to trial.", null),
+                    ("Charges were dismissed. The prosecution could not meet its burden of proof.", null),
+                    ("The court dismissed the case. Insufficient evidence was cited.", null),
+                    ("The case was dismissed. The prosecution could not meet its burden at this stage.", null),
+                    ("Charges were dismissed. The evidence was insufficient to support prosecution.", null),
+                    ("The court entered a dismissal. The prosecution could not establish a prima facie case.", null),
+                    ("The case was dismissed. Evidence did not rise to the level required for trial.", null),
+                    ("Charges were dismissed. The prosecution could not sustain its burden of proof.", null),
+                    ("The court dismissed the case. Insufficient evidence to support the charges.", null),
+                    ("Charges were dismissed. Lack of corroborating evidence prevented prosecution.", null),
+                    ("The case was dismissed. The prosecution could not demonstrate probable cause.", null),
+                    ("Charges were dismissed. The evidence was insufficient to establish the elements of the offence.", null),
+                    ("The court entered a dismissal. The prosecution failed to meet its evidentiary burden.", null),
+                    ("Charges were dismissed. Insufficient evidence; the prosecution could not proceed.", null),
+                    ("The case was dismissed. The evidence fell short of what was required to go to trial.", null),
+                    ("Charges were dismissed. Burden of proof could not be met at this stage.", null),
+                    ("The court dismissed the case. The prosecution could not adduce sufficient evidence.", null),
+                    ("Charges were dismissed. Evidence was inadequate to support a conviction.", null),
+                    ("The case was dismissed. The prosecution's evidence was deemed insufficient.", null),
+                    ("Charges were dismissed. Could not establish a prima facie case.", null),
+                    ("DUI charges dismissed. Insufficient evidence to support prosecution—lack of reliable BAC documentation or calibration records.", new[] { "__dui_charge__" }),
+                    ("Impaired driving charges were dismissed. The prosecution could not meet its burden of proof; breath test validity was contested.", new[] { "__dui_charge__" }),
+                    ("DUI charges dismissed. Evidence of impairment was insufficient; field sobriety procedures were not properly documented.", new[] { "__dui_charge__" }),
+                    ("The court dismissed the DUI charges. The prosecution could not establish impairment beyond a reasonable doubt.", new[] { "__dui_charge__" }),
+                    ("DWI charges were dismissed. Chain of custody for breath samples and calibration records could not be established.", new[] { "__dui_charge__" }),
+                    ("DUI charges dismissed. Insufficient evidence—traffic stop justification and testing protocol were challenged.", new[] { "__dui_charge__" }),
+                    ("Chemical test refusal charges dismissed. The prosecution could not meet its burden; procedural defects cited.", new[] { "__dui_charge__" }),
+                    ("Drug possession charges dismissed. Insufficient evidence—chain of custody and search legality could not be established.", new[] { "__drug_crime__" }),
+                    ("Narcotics charges were dismissed. The prosecution could not meet its burden of proof; the search was deemed unlawful.", new[] { "__drug_crime__" }),
+                    ("Drug charges dismissed. Insufficient evidence to establish possession; evidence handling was challenged.", new[] { "__drug_crime__" }),
+                    ("Controlled substance charges were dismissed. The prosecution could not establish chain of custody.", new[] { "__drug_crime__" }),
+                    ("Trafficking charges dismissed. Insufficient evidence; the prosecution could not meet its burden for intent to distribute.", new[] { "__trafficking_drug__" }),
+                    ("Assault charges dismissed. Insufficient evidence—identification and intent could not be established.", new[] { "assault" }),
+                    ("Battery charges were dismissed. The prosecution could not meet its burden of proof; witness credibility was lacking.", new[] { "battery" }),
+                    ("Assault and battery charges dismissed. Insufficient evidence; the victim declined to cooperate.", new[] { "assault", "battery" }),
+                    ("Domestic violence charges were dismissed. The prosecution could not establish the elements; insufficient corroboration.", new[] { "domestic", "battery", "assault" }),
+                    ("Theft charges dismissed. Insufficient evidence to establish ownership and intent.", new[] { "theft", "larceny" }),
+                    ("Burglary charges were dismissed. The prosecution could not meet its burden; no evidence of unlawful entry.", new[] { "burglary" }),
+                    ("Robbery charges dismissed. Insufficient evidence—identification and force or fear could not be proven.", new[] { "robbery" }),
+                    ("Grand theft charges were dismissed. The prosecution could not establish value or intent.", new[] { "grand theft", "theft" }),
+                    ("Stolen property charges dismissed. Insufficient evidence of knowing possession.", new[] { "stolen" }),
+                    ("Firearm charges were dismissed. The prosecution could not establish possession or unlawful intent.", new[] { "firearm", "weapon", "gun" }),
+                    ("Weapon possession charges dismissed. Insufficient evidence; search legality was successfully challenged.", new[] { "weapon", "firearm", "gun" }),
+                    ("Carrying concealed weapon charges were dismissed. The prosecution could not meet its burden of proof.", new[] { "concealed", "weapon" }),
+                    ("Evading charges dismissed. Insufficient evidence to establish identity of the driver or necessity of pursuit.", new[] { "evad", "fleeing", "elude" }),
+                    ("Evading peace officer charges were dismissed. The prosecution could not establish the elements.", new[] { "evad", "evading", "elude" }),
+                    ("Reckless evading charges dismissed. Insufficient evidence—pursuit protocol and identification were contested.", new[] { "reckless evad", "evading", "elude" }),
+                    ("Traffic charges dismissed. Insufficient evidence; the prosecution could not establish the elements.", new[] { "__traffic_no_arson__" }),
+                    ("Reckless driving charges were dismissed. The prosecution could not meet its burden of proof.", new[] { "reckless driving" }),
+                    ("Hit and run charges dismissed. Insufficient evidence to establish the defendant was the driver.", new[] { "hit and run", "leaving the scene" }),
+                    ("Driving on suspended license charges were dismissed. Documentation of suspension could not be established.", new[] { "suspended", "license" }),
+                    ("Resisting arrest charges dismissed. The prosecution could not establish the lawfulness of the underlying detention.", new[] { "resisting", "obstruction" }),
+                    ("Obstruction charges were dismissed. Insufficient evidence; the underlying arrest was challenged.", new[] { "obstruction", "resisting" }),
+                    ("Murder charges dismissed. Insufficient evidence—the prosecution could not establish causation or intent.", new[] { "murder" }),
+                    ("Manslaughter charges were dismissed. The prosecution could not meet its burden of proof.", new[] { "manslaughter" }),
+                    ("Homicide charges were dismissed. Evidence was insufficient to proceed; key forensic evidence was unavailable.", new[] { "murder", "manslaughter" }),
+                    ("Sexual assault charges dismissed. The prosecution could not establish the elements; insufficient corroboration.", new[] { "rape", "sexual assault", "sexual battery" }),
+                    ("Sex offence charges were dismissed. The prosecution could not meet its burden; consent and identification were at issue.", new[] { "rape", "sexual" }),
+                    ("Kidnapping charges dismissed. Insufficient evidence to establish unlawful restraint or movement.", new[] { "kidnapping" }),
+                    ("Arson charges were dismissed. Origin and cause could not be established; insufficient evidence.", new[] { "arson" }),
+                    ("Arson charges were dismissed. The prosecution could not meet its burden of proof.", new[] { "arson", "burning" }),
+                    ("Vandalism charges dismissed. Insufficient evidence of damage valuation and intent.", new[] { "vandalism" }),
+                    ("Criminal trespass charges were dismissed. The prosecution could not establish unlawful entry.", new[] { "trespass" }),
+                    ("Escape charges were dismissed. Insufficient evidence that the defendant was in lawful custody.", new[] { "escape" }),
+                    ("Probation violation charges dismissed. The prosecution could not establish the breach.", new[] { "probation", "parole" }),
+                    ("Disorderly conduct charges were dismissed. The prosecution could not meet its burden of proof.", new[] { "disorderly", "disturbing" }),
+                    ("Fraud charges were dismissed. Insufficient evidence to establish intent to defraud.", new[] { "fraud", "embezzlement" }),
                 };
-                b.Append(dismissedPool[Helper.GetRandomInt(0, dismissedPool.Length - 1)]);
+                var dismissedPool = new (string text, string[] chargeKeywords)[] {
+                    ("Charges were dismissed. The case did not proceed to trial.", null),
+                    ("The charges were dismissed. The prosecution declined to proceed.", null),
+                    ("The case was dismissed. Insufficient evidence to proceed to trial.", null),
+                    ("Charges were dismissed on procedural grounds. The case did not go to trial.", null),
+                    ("The court dismissed the case. The matter was not tried on the merits.", null),
+                    ("The case was dismissed. The prosecution could not meet its burden at this stage.", null),
+                    ("Charges were dismissed without prejudice. The matter was not tried on the merits.", null),
+                    ("The charges were dismissed with prejudice. The case will not be refiled.", null),
+                    ("The court entered nolle prosequi. The prosecution elected not to proceed.", null),
+                    ("Charges were dismissed. The matter did not proceed to trial due to evidentiary issues.", null),
+                    ("The case was dismissed. Key witnesses were unavailable or evidence was suppressed.", null),
+                    ("The prosecution declined to proceed. Charges were dismissed.", null),
+                    ("Charges were dismissed on procedural grounds. The matter did not reach trial.", null),
+                    ("The case was dismissed. Procedural defects led to dismissal.", null),
+                    ("The charges were dismissed. The case did not reach trial.", null),
+                    ("The court dismissed the case. Insufficient evidence was cited.", null),
+                    ("Charges were dismissed. The prosecution elected to decline prosecution.", null),
+                    ("The case was dismissed. The matter was not tried on the merits.", null),
+                    ("The charges were dismissed. Did not proceed to trial.", null),
+                    ("The court dismissed the case. The prosecution declined to proceed.", null),
+                    ("Charges were dismissed. The prosecution withdrew the charges.", null),
+                    ("The case was dismissed. Evidentiary problems prevented the case from going forward.", null),
+                    ("The charges were dismissed. The case was resolved without a trial.", null),
+                    ("The court entered a dismissal. The matter was not tried on the merits.", null),
+                    ("Charges were dismissed. The prosecution determined it could not prevail.", null),
+                    ("Charges were dismissed. Witnesses failed to appear or were unwilling to testify.", null),
+                    ("The case was dismissed. A key witness recanted or became unavailable.", null),
+                    ("Charges were dismissed. Chain of custody problems made the evidence inadmissible.", null),
+                    ("The case was dismissed. Evidence was suppressed following a motion to suppress.", null),
+                    ("Charges were dismissed. Procedural deadlines were missed by the prosecution.", null),
+                    ("The case was dismissed. The defendant's speedy trial rights would have been violated.", null),
+                    ("Charges were dismissed. Identification evidence was deemed unreliable.", null),
+                    ("Charges were dismissed. The prosecution elected to focus resources elsewhere.", null),
+                    ("Charges were dismissed. Plea negotiations with co-defendants led to dismissal.", null),
+                    ("Charges were dismissed. New exculpatory evidence emerged before trial.", null),
+                    ("The case was dismissed. The victim declined to cooperate with prosecution.", null),
+                    ("Charges were dismissed. Jurisdictional or venue issues prevented trial.", null),
+                    ("The case was dismissed. The statute of limitations had expired.", null),
+                    ("Charges were dismissed. Double jeopardy or collateral estoppel applied.", null),
+                    ("The case was dismissed. The charges were duplicative of another pending case.", null),
+                    ("DUI charges were dismissed. The victim of the alleged impairment incident declined to testify.", new[] { "__dui_charge__" }),
+                    ("Drug charges were dismissed. A key witness was unavailable; the prosecution could not proceed.", new[] { "__drug_crime__" }),
+                    ("Assault charges were dismissed. The alleged victim recanted before trial.", new[] { "assault", "battery" }),
+                    ("Theft charges were dismissed. The complaining witness failed to appear.", new[] { "theft", "larceny", "burglary" }),
+                    ("Firearm charges were dismissed. Evidence was suppressed; the search was ruled unconstitutional.", new[] { "firearm", "weapon" }),
+                    ("Evading charges were dismissed. The pursuing officer was unavailable to testify.", new[] { "evad", "fleeing", "elude" }),
+                    ("Traffic charges were dismissed. Calibration records for the speed measurement device were lost.", new[] { "speeding", "traffic" }),
+                };
+                if (evidenceBand == 0 && Helper.GetRandomInt(0, 99) < 65) {
+                    var lowResult = SelectChargeAwarePhrase(courtData, lowEvidenceDismissals);
+                    b.Append(string.IsNullOrEmpty(lowResult) ? "The case was dismissed. Insufficient evidence to proceed to trial." : lowResult);
+                } else {
+                    var dismResult = SelectChargeAwarePhrase(courtData, dismissedPool);
+                    b.Append(string.IsNullOrEmpty(dismResult) ? "Charges were dismissed. The case did not proceed to trial." : dismResult);
+                }
             }
 
             return b.ToString().Trim();
@@ -3894,12 +4652,12 @@ namespace MDTPro.Data {
                 };
                 phrases.Add(resolvedStatus == 1 ? firearmConv[Helper.GetRandomInt(0, firearmConv.Length - 1)] : firearmAcq[Helper.GetRandomInt(0, firearmAcq.Length - 1)]);
             }
-            // Traffic/evading: exclude arson charges that contain "reckless" (e.g. reckless burning)
+            // Traffic/evading: exclude arson (reckless burning) and firearm (reckless discharge of firearm) from "reckless" catch-all
             if (!HasArsonCharge(courtData) && (HasChargeKeyword(courtData, "traffic") || HasChargeKeyword(courtData, "speeding") || HasChargeKeyword(courtData, "evading")
                 || HasChargeKeyword(courtData, "street racing") || HasChargeKeyword(courtData, "hit and run") || HasChargeKeyword(courtData, "wrong side")
                 || HasChargeKeyword(courtData, "driving on suspended") || HasChargeKeyword(courtData, "driving without license") || HasChargeKeyword(courtData, "license expired")
                 || HasChargeKeyword(courtData, "refusal to sign traffic") || HasChargeKeyword(courtData, "impeding traffic")
-                || (HasChargeKeyword(courtData, "reckless") && !HasChargeKeyword(courtData, "burning")))) {
+                || (HasChargeKeyword(courtData, "reckless") && !HasChargeKeyword(courtData, "burning") && !HasChargeKeyword(courtData, "firearm")))) {
                 string[] trafficConv = new[] {
                     "The traffic and driving charges were central to the verdict.",
                     "Reckless driving and related conduct factored in the outcome.",
@@ -3928,8 +4686,21 @@ namespace MDTPro.Data {
             var b = new StringBuilder();
             string judge = courtData.JudgeName ?? "the court";
             bool hasLife = courtData.Charges?.Any(c => c.Time == null) == true;
+            bool pleaGuiltyOrNoContest = string.Equals(courtData.Plea, "Guilty", StringComparison.OrdinalIgnoreCase) || string.Equals(courtData.Plea, "No Contest", StringComparison.OrdinalIgnoreCase);
+
+            if (pleaGuiltyOrNoContest) {
+                string[] pleaPhrases = new[] {
+                    "The defendant's guilty plea was taken into account as a mitigating factor in sentencing.",
+                    "Having regard to the defendant's acceptance of responsibility, the court imposed a reduced sentence.",
+                    "The court applied a sentencing discount in light of the defendant's guilty plea.",
+                    $"{judge} noted the defendant's guilty plea when determining the appropriate sentence.",
+                    "The defendant's early acceptance of guilt was considered as a mitigating factor.",
+                };
+                b.Append(pleaPhrases[Helper.GetRandomInt(0, pleaPhrases.Length - 1)]);
+            }
 
             if (courtData.RepeatOffenderScore >= 6) {
+                if (b.Length > 0) b.Append(" ");
                 string[] recidivism = new[] {
                     $"The court cited the defendant's extensive prior record and pattern of criminal conduct as significant aggravating factors.",
                     $"{judge} noted the defendant's repeated failures to comply with prior sanctions and the need for deterrence.",
@@ -3951,6 +4722,13 @@ namespace MDTPro.Data {
                     "The court emphasised the gravity of prior convictions and the defendant's escalating conduct.",
                     $"{judge} considered the defendant's prior sanctions and the evident need for a stronger deterrent.",
                     "The defendant's extensive prior record, failure to rehabilitate, and pattern of criminal conduct warranted an elevated sentence.",
+                    $"{judge} cited the defendant's entrenched recidivism and disregard for the law as grounds for a substantial sentence.",
+                    "The court found that the defendant's repeat offending pattern left no alternative but a lengthy custodial term.",
+                    $"{judge} emphasised that the defendant's persistent criminality warranted a sentence that would protect the public.",
+                    "The defendant's history of recidivism demonstrated that lesser sanctions had been exhausted; the court imposed accordingly.",
+                    $"{judge} noted that the defendant's repeated return to criminal conduct justified a sentence at the upper end of the range.",
+                    "The court considered the defendant's longstanding pattern of reoffending and the need for incapacitation.",
+                    $"{judge} found that the defendant's recidivist behaviour and failure to reform warranted an elevated sentence.",
                 };
                 b.Append(recidivism[Helper.GetRandomInt(0, recidivism.Length - 1)]);
             } else if (courtData.RepeatOffenderScore >= 3) {
@@ -3970,6 +4748,11 @@ namespace MDTPro.Data {
                     "The defendant's prior record was taken into account as part of the sentencing calculus.",
                     $"Aggravating factors considered by {judge} included the defendant's prior convictions.",
                     "The court balanced the defendant's prior convictions against the nature of the current offence.",
+                    $"{judge} applied the sentencing guidelines in light of the defendant's prior convictions and the current offence.",
+                    "The defendant's prior record was given due weight in determining the appropriate custodial term.",
+                    $"The court, having regard to the prior convictions, fashioned a sentence that reflected both the offence and the defendant's history.",
+                    $"{judge} took the defendant's prior convictions into consideration when selecting the sentence within the range.",
+                    "The defendant's criminal history was applied as an aggravating factor under the sentencing framework.",
                 };
                 b.Append(prior[Helper.GetRandomInt(0, prior.Length - 1)]);
             }
@@ -3982,6 +4765,11 @@ namespace MDTPro.Data {
                     "The homicide-related convictions warranted the most serious sentencing response.",
                     "The murder charges were the defining factor in the court's sentencing approach.",
                     "The gravity of the murder convictions dominated the sentencing considerations.",
+                    $"{judge} cited the taking of human life as the paramount factor in determining the appropriate sentence.",
+                    "The court found that the homicide convictions demanded the most severe sentencing response available.",
+                    $"The loss of life and circumstances of the offence were emphasised by {judge} in imposing sentence.",
+                    "The murder and manslaughter convictions warranted a sentence reflecting the utmost gravity of the conduct.",
+                    $"{judge} considered the irreparable harm caused by the homicide and imposed sentence accordingly.",
                 };
                 b.Append(homicideSent[Helper.GetRandomInt(0, homicideSent.Length - 1)]);
             }
@@ -3991,6 +4779,10 @@ namespace MDTPro.Data {
                     "The sexual offence convictions warranted a severe sentencing response.",
                     "The court emphasised the gravity of the sex crimes in fashioning sentence.",
                     "Protection of vulnerable persons and denunciation of sexual violence informed the sentence.",
+                    $"{judge} cited the sexual offences as among the most serious in the criminal calendar.",
+                    "The court found that the sexual offence convictions warranted a substantial custodial sentence.",
+                    $"The need to protect the public and denounce sexual violence was central to {judge}'s sentencing approach.",
+                    "The sexual offence convictions were weighed heavily in determining the appropriate sentence.",
                 };
                 b.Append(sexSent[Helper.GetRandomInt(0, sexSent.Length - 1)]);
             }
@@ -3999,6 +4791,9 @@ namespace MDTPro.Data {
                 string[] kidnapSent = new[] {
                     "The kidnapping convictions were central to the sentencing decision.",
                     "The court treated abduction-related offences as highly aggravating.",
+                    $"{judge} emphasised the serious nature of the kidnapping charges in imposing sentence.",
+                    "The deprivation of liberty and risk to the victim weighed heavily in the sentencing decision.",
+                    $"The kidnapping convictions warranted a substantial sentence, as noted by {judge}.",
                 };
                 b.Append(kidnapSent[Helper.GetRandomInt(0, kidnapSent.Length - 1)]);
             }
@@ -4007,8 +4802,91 @@ namespace MDTPro.Data {
                 string[] arsonSent = new[] {
                     "The arson convictions factored heavily into the sentence imposed.",
                     "Fire-related offences and risk to life and property were emphasised in sentencing.",
+                    $"{judge} cited the danger posed by the arson and the risk to life and property as aggravating factors.",
+                    "The court found that arson offences warranted a substantial sentence given the potential for harm.",
+                    $"The arson convictions were treated as highly serious by {judge} in fashioning the sentence.",
                 };
                 b.Append(arsonSent[Helper.GetRandomInt(0, arsonSent.Length - 1)]);
+            }
+            if (HasChargeKeyword(courtData, "robbery") || HasChargeKeyword(courtData, "burglary") || HasChargeKeyword(courtData, "carjacking") || HasChargeKeyword(courtData, "home invasion")) {
+                if (b.Length > 0) b.Append(" ");
+                string[] robberySent = new[] {
+                    "The robbery and burglary convictions were central to the sentencing decision.",
+                    $"{judge} emphasised the seriousness of the property crime and the threat to victims in imposing sentence.",
+                    "The court found that the robbery or burglary charges warranted a substantial custodial sentence.",
+                    "The invasion of property and threat of violence were weighed heavily in the sentencing decision.",
+                    $"{judge} cited the robbery or burglary convictions as warranting a sentence reflecting the gravity of the conduct.",
+                };
+                b.Append(robberySent[Helper.GetRandomInt(0, robberySent.Length - 1)]);
+            }
+            if (HasDrugCrimeCharge(courtData)) {
+                if (b.Length > 0) b.Append(" ");
+                string[] drugSent = new[] {
+                    "The drug offence convictions were central to the sentencing decision.",
+                    $"{judge} considered the nature and quantity of the controlled substances in fashioning the sentence.",
+                    "The court weighed the drug-related charges and the need for deterrence in imposing sentence.",
+                    "The drug convictions warranted a sentence reflecting the seriousness of narcotics offences.",
+                    $"{judge} cited the drug offences as aggravating the need for both punishment and rehabilitation.",
+                };
+                b.Append(drugSent[Helper.GetRandomInt(0, drugSent.Length - 1)]);
+            }
+            if (!HasArsonCharge(courtData) && (HasChargeKeyword(courtData, "traffic") || HasChargeKeyword(courtData, "speeding") || HasChargeKeyword(courtData, "evading")
+                || HasChargeKeyword(courtData, "street racing") || HasChargeKeyword(courtData, "hit and run") || HasChargeKeyword(courtData, "DUI") || HasChargeKeyword(courtData, "DWI")
+                || HasChargeKeyword(courtData, "driving under") || HasChargeKeyword(courtData, "chemical test") || HasChargeKeyword(courtData, "field sobriety") || HasChargeKeyword(courtData, "driving on suspended")
+                || HasChargeKeyword(courtData, "driving without license") || HasChargeKeyword(courtData, "license expired") || (HasChargeKeyword(courtData, "reckless") && !HasChargeKeyword(courtData, "burning") && !HasChargeKeyword(courtData, "firearm")))) {
+                if (b.Length > 0) b.Append(" ");
+                string[] trafficSent = new[] {
+                    "The traffic and driving-related convictions were considered in imposing sentence.",
+                    $"{judge} weighed the traffic offence or DUI convictions in fashioning the sentence.",
+                    "The court found that the driving charges warranted a sentence reflecting the risk to public safety.",
+                    "The traffic or DUI convictions were central to the sentencing decision.",
+                    $"{judge} cited the driving-related conduct and risk to others as factors in determining the sentence.",
+                };
+                b.Append(trafficSent[Helper.GetRandomInt(0, trafficSent.Length - 1)]);
+            }
+            if (HasFraudCharge(courtData)) {
+                if (b.Length > 0) b.Append(" ");
+                string[] fraudSent = new[] {
+                    "The fraud and financial crime convictions were central to the sentencing decision.",
+                    $"{judge} considered the extent of the financial harm and breach of trust in imposing sentence.",
+                    "The court found that the fraud convictions warranted a sentence reflecting the seriousness of the conduct.",
+                    $"{judge} cited the calculated nature of the fraud and the harm to victims as aggravating factors.",
+                    "The court weighed the breach of trust and financial loss to victims in imposing sentence.",
+                };
+                b.Append(fraudSent[Helper.GetRandomInt(0, fraudSent.Length - 1)]);
+            }
+            if (HasChargeKeyword(courtData, "firearm") || HasChargeKeyword(courtData, "weapon") || HasChargeKeyword(courtData, "gun") || HasChargeKeyword(courtData, "armed")) {
+                if (b.Length > 0) b.Append(" ");
+                string[] firearmSent = new[] {
+                    "The firearms charges were central to the sentencing decision.",
+                    $"{judge} emphasised the danger posed by unlawful weapon possession in fashioning the sentence.",
+                    "The court found that the firearms convictions warranted a substantial custodial sentence.",
+                    $"{judge} cited the weapon charges as an aggravating factor in determining the appropriate sentence.",
+                    "The court weighed the unlawful possession of firearms and the risk to public safety in sentencing.",
+                };
+                b.Append(firearmSent[Helper.GetRandomInt(0, firearmSent.Length - 1)]);
+            }
+            if (HasChargeKeyword(courtData, "resisting") || HasChargeKeyword(courtData, "obstruction") || HasChargeKeyword(courtData, "refusing") || HasChargeKeyword(courtData, "failure to present")) {
+                if (b.Length > 0) b.Append(" ");
+                string[] resistingSent = new[] {
+                    "The resisting or obstruction convictions were considered as aggravating factors in sentencing.",
+                    $"{judge} noted the defendant's refusal to comply with lawful authority in fashioning the sentence.",
+                    "The court weighed the resisting arrest or obstruction charges in imposing sentence.",
+                    $"The defendant's resistance to lawful arrest was cited by {judge} as an aggravating factor.",
+                    "The court considered the obstruction of justice and refusal to comply as factors in the sentence.",
+                };
+                b.Append(resistingSent[Helper.GetRandomInt(0, resistingSent.Length - 1)]);
+            }
+            if (HasChargeKeyword(courtData, "violation of probation") || HasChargeKeyword(courtData, "violation of parole") || HasChargeKeyword(courtData, "protective order") || HasChargeKeyword(courtData, "failure to register as sex offender") || HasChargeKeyword(courtData, "warrant")) {
+                if (b.Length > 0) b.Append(" ");
+                string[] warrantSent = new[] {
+                    "The probation, parole, or warrant-related convictions were central to the sentencing decision.",
+                    $"{judge} considered the defendant's failure to comply with prior court orders in imposing sentence.",
+                    "The court found that the supervision violation warranted a consecutive or enhanced sentence.",
+                    $"{judge} cited the defendant's disregard for court orders and outstanding warrants as aggravating factors.",
+                    "The court weighed the defendant's breach of supervision and outstanding warrant status in imposing sentence.",
+                };
+                b.Append(warrantSent[Helper.GetRandomInt(0, warrantSent.Length - 1)]);
             }
             if (courtData.SeverityScore >= 15 || hasLife) {
                 if (b.Length > 0) b.Append(" ");
@@ -4034,6 +4912,15 @@ namespace MDTPro.Data {
                     $"The nature of the offences, their gravity, and the threat to public safety were cited by {judge}.",
                     "The court imposed a substantial sentence having regard to the seriousness of the offence and protection of the public.",
                     "The gravity of the charges and the substantial threat to public safety warranted an elevated sentence.",
+                    $"The court found the offences to be of such seriousness that {judge} imposed a sentence at the upper end of the range.",
+                    "The threat to public safety and the gravity of the conduct justified a substantial custodial term.",
+                    $"{judge} emphasised the need to protect the community given the serious nature of the offences.",
+                    "The offences were of sufficient gravity to warrant a sentence reflecting the highest level of culpability.",
+                    $"The court considered the serious threat posed to the public and imposed sentence accordingly.",
+                    "The nature and circumstances of the offences demanded a substantial sentence for the protection of the public.",
+                    $"{judge} found that the seriousness of the conduct and the risk to public safety warranted an elevated sentence.",
+                    "The court imposed a substantial sentence having regard to the grave nature of the offences and threat to public safety.",
+                    $"The offences demonstrated such a threat to public safety that {judge} imposed a sentence toward the top of the range.",
                 };
                 b.Append(severity[Helper.GetRandomInt(0, severity.Length - 1)]);
             }
@@ -4053,6 +4940,11 @@ namespace MDTPro.Data {
                         $"The unanimous verdict was accorded significant weight by {judge} in sentencing.",
                         "The court noted the jury's unanimous verdict and imposed sentence accordingly.",
                         "The unanimous jury finding of guilt warranted a strong sentencing response.",
+                        $"The jury's unanimous verdict left no doubt as to guilt; {judge} imposed sentence accordingly.",
+                        "The court accorded significant weight to the unanimous jury verdict in determining the sentence.",
+                        $"The unanimous jury verdict was cited by {judge} as supporting a substantial sentencing response.",
+                        "The jury's unanimous finding of guilt reinforced the court's assessment of the seriousness of the conduct.",
+                        $"The unanimous verdict of the jury informed {judge}'s determination of the appropriate sentence.",
                     };
                     b.Append(unanimous[Helper.GetRandomInt(0, unanimous.Length - 1)]);
                 } else if (margin <= 2) {
@@ -4067,6 +4959,9 @@ namespace MDTPro.Data {
                         $"The narrow jury margin was taken into account by {judge} in fashioning the sentence.",
                         "The court balanced the jury's split decision in determining the appropriate sentence.",
                         $"The narrow verdict was noted by {judge}; the sentence reflected the divided jury finding.",
+                        "The court took the jury's split decision into account when fashioning the sentence.",
+                        $"Given the close jury vote, {judge} balanced the verdict with appropriate sentencing considerations.",
+                        "The narrow margin of the jury's decision was reflected in the court's sentencing approach.",
                     };
                     b.Append(narrow[Helper.GetRandomInt(0, narrow.Length - 1)]);
                 }
@@ -4083,6 +4978,10 @@ namespace MDTPro.Data {
                     $" The sentence was consistent with {judge}'s application of local sentencing standards.",
                     $" {judge} imposed a sentence reflective of this district's approach to comparable cases.",
                     $" The court applied the district's established approach to offences of this kind.",
+                    $" {judge} imposed a sentence reflective of this jurisdiction's practice for similar offences.",
+                    " The sentence was fashioned in accordance with local sentencing norms for comparable cases.",
+                    $" The court applied {judge}'s assessment of how similar matters are typically disposed in this district.",
+                    $" The sentence reflected the district's sentencing practice for offences of this nature.",
                 };
                 b.Append(policyHigh[Helper.GetRandomInt(0, policyHigh.Length - 1)]);
             } else if (policy < -0.02f && b.Length > 0) {
@@ -4095,6 +4994,10 @@ namespace MDTPro.Data {
                     $" {judge} applied a sentence that took mitigating circumstances into account.",
                     " The court considered mitigating factors in assessing the appropriate sentence.",
                     $" Mitigating circumstances informed {judge}'s sentencing approach.",
+                    " The court reduced the sentence having regard to mitigating factors presented.",
+                    $" {judge} gave weight to mitigating circumstances in selecting a sentence below the guideline midpoint.",
+                    " The sentence was moderated in light of the mitigating factors in the case.",
+                    $" Mitigating circumstances led {judge} to impose a sentence that reflected leniency where appropriate.",
                 };
                 b.Append(policyLow[Helper.GetRandomInt(0, policyLow.Length - 1)]);
             }
@@ -4114,6 +5017,12 @@ namespace MDTPro.Data {
                     "The court considered the violent or threatening nature of the conduct as an aggravating factor.",
                     $"The assaultive behaviour was taken into account by {judge} as an aggravating factor.",
                     "The violent conduct and threat to others were cited as significant aggravating factors.",
+                    $"The defendant's use of force and threat of violence were emphasised by {judge} in imposing sentence.",
+                    "The court found that the assaultive conduct and weapon use significantly aggravated the offence.",
+                    $"The weapon or violent conduct at the time of the offence was cited by {judge} as warranting an elevated sentence.",
+                    "The defendant's violent behaviour and disregard for the safety of others weighed heavily in sentencing.",
+                    $"The court considered the defendant's assaultive conduct and armed status as significant aggravating factors.",
+                    "The violent or armed nature of the offence justified a sentence toward the upper end of the range.",
                 };
                 b.Append(violent[Helper.GetRandomInt(0, violent.Length - 1)]);
             }
@@ -4182,23 +5091,37 @@ namespace MDTPro.Data {
 
                 bool pleaGuiltyOrNoContest = string.Equals(plea, "Guilty", StringComparison.OrdinalIgnoreCase) || string.Equals(plea, "No Contest", StringComparison.OrdinalIgnoreCase);
 
+                // Plea bargain: 10-25% sentence discount when Guilty/No Contest
+                float pleaDiscount = pleaGuiltyOrNoContest ? (1f - (Helper.GetRandomInt(10, 25) / 100f)) : 1f;
+
                 if (courtCase.Charges != null) {
+                    bool juryConvicted = false;
+                    if (courtCase.IsJuryTrial && courtCase.JurySize > 0) {
+                        juryConvicted = courtCase.JuryVotesForConviction > (courtCase.JurySize / 2);
+                    }
+
                     foreach (CourtData.Charge charge in courtCase.Charges) {
+                        if (charge == null) continue;
                         if (pleaGuiltyOrNoContest) {
                             charge.Outcome = 1; // Convicted
                             charge.ConvictionChance = null;
-                            charge.SentenceDaysServed = charge.Time;
+                        } else if (courtCase.IsJuryTrial && courtCase.JurySize > 0) {
+                            charge.Outcome = juryConvicted ? 1 : 2;
+                            charge.ConvictionChance = null;
                         } else {
                             int chance = GetPerChargeConvictionChance(courtCase, charge);
                             charge.ConvictionChance = chance;
                             int roll = Helper.GetRandomInt(1, 100);
                             charge.Outcome = roll <= chance ? 1 : 2; // 1 Convicted, 2 Acquitted
-                            if (charge.Outcome == 1) charge.SentenceDaysServed = charge.Time;
+                        }
+
+                        if (charge.Outcome == 1) {
+                            charge.SentenceDaysServed = RollSentenceForCharge(courtCase, charge, pleaDiscount);
                         }
                     }
                 }
 
-                int newStatus = (courtCase.Charges != null && courtCase.Charges.Any(c => c.Outcome == 1)) ? 1 : 2;
+                int newStatus = (courtCase.Charges != null && courtCase.Charges.Any(c => c != null && c.Outcome == 1)) ? 1 : 2;
                 courtCase.Status = newStatus;
                 courtCase.OutcomeReasoning = BuildOutcomeReasoning(courtCase, courtCase.ConvictionChance, newStatus);
                 if (newStatus == 1) {
@@ -4239,7 +5162,7 @@ namespace MDTPro.Data {
                 }
 
                 Database.SaveCourtCase(courtCase);
-                int convictedCount = courtCase.Charges?.Count(c => c.Outcome == 1) ?? 0;
+                int convictedCount = courtCase.Charges?.Count(c => c != null && c.Outcome == 1) ?? 0;
                 Helper.Log($"Court case {courtCase.Number} auto-resolved: {(newStatus == 1 ? "Convicted" : "Acquitted")} ({convictedCount}/{courtCase.Charges?.Count ?? 0} charges) (plea: {courtCase.Plea})", false, Helper.LogSeverity.Info);
 
                 string defendantName = !string.IsNullOrWhiteSpace(courtCase.PedName) ? courtCase.PedName.Trim() : "Unknown";
@@ -4250,11 +5173,36 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>Rolls sentence days for a convicted charge. Life sentence returns null. Applies range roll, SentenceMultiplier, plea discount, and judge leniency.</summary>
+        private static int? RollSentenceForCharge(CourtData courtCase, CourtData.Charge charge, float pleaDiscount) {
+            if (charge.Time == null && (!charge.MaxDays.HasValue || charge.MaxDays.Value <= 0)) return null; // Life
+            int minD = charge.MinDays;
+            int maxD = charge.MaxDays ?? minD;
+            if (maxD < minD) maxD = minD;
+            // Legacy charges (no MinDays/MaxDays): use Time as fixed base
+            if (minD <= 0 && maxD <= 0 && charge.Time.HasValue && charge.Time.Value > 0) {
+                minD = charge.Time.Value;
+                maxD = charge.Time.Value;
+            }
+            if (minD <= 0 && maxD <= 0) return 0;
+
+            float t = Helper.GetRandomInt(0, 100) / 100f;
+            float leniency = GetJudgeLeniencyFromName(courtCase.JudgeName);
+            if (leniency != 0) t = Math.Max(0, Math.Min(1, t + leniency * 0.35f));
+            int rolled = minD + (int)Math.Round(t * (maxD - minD));
+            rolled = Math.Max(minD, Math.Min(maxD, rolled));
+
+            float mult = courtCase.SentenceMultiplier > 0 ? courtCase.SentenceMultiplier : 1f;
+            int sentence = Math.Max(0, (int)Math.Round(rolled * mult * pleaDiscount));
+            return sentence;
+        }
+
         private static int GetSeverityScore(CourtData courtData) {
             if (courtData?.Charges == null) return 0;
 
             int score = 0;
             foreach (CourtData.Charge charge in courtData.Charges) {
+                if (charge == null) continue;
                 score += 1;
                 if (charge.IsArrestable == true) score += 3;
 
@@ -4279,6 +5227,30 @@ namespace MDTPro.Data {
             if (county.Contains("blaine")) return BlaineDistrict;
             if (area.Contains("cayo") || area.Contains("north yankton")) return IslandDistrict;
             return LosSantosDistrict;
+        }
+
+        /// <summary>Selects prosecutor from district's prosecution office. Returns "Office — Lawyer".</summary>
+        private static string SelectProsecutor(CourtDistrictProfile district, string caseNumber, int caseWeight) {
+            if (district == null || string.IsNullOrEmpty(district.ProsecutionOffice) || district.ProsecutionLawyers == null || district.ProsecutionLawyers.Length == 0)
+                return null;
+            string lawyer = SelectRotatingRosterMember(district.ProsecutionLawyers, district.District, "prosecutor", caseNumber, caseWeight);
+            return string.IsNullOrEmpty(lawyer) ? district.ProsecutionOffice : $"{district.ProsecutionOffice} — {lawyer}";
+        }
+
+        /// <summary>Selects defense attorney. If public defender: from first firm. Else: from private firms. Returns "Firm — Lawyer".</summary>
+        private static string SelectDefenseAttorney(CourtDistrictProfile district, bool hasPublicDefender, string caseNumber, int caseWeight) {
+            if (district?.DefenseFirms == null || district.DefenseFirms.Length == 0) return "Public Defender Office";
+            LawFirmRoster firm;
+            if (hasPublicDefender || district.DefenseFirms.Length <= 1) {
+                firm = district.DefenseFirms[0];
+            } else {
+                int idx = 1 + (Math.Abs(GetStableHash($"{district.District}|defense|{caseNumber}|{caseWeight}")) % (district.DefenseFirms.Length - 1));
+                firm = district.DefenseFirms[idx];
+            }
+            if (firm == null || string.IsNullOrEmpty(firm.Name)) return "Public Defender Office";
+            if (firm.Lawyers == null || firm.Lawyers.Length == 0) return firm.Name;
+            string lawyer = SelectRotatingRosterMember(firm.Lawyers, district.District, $"defense|{firm.Name}", caseNumber, caseWeight);
+            return string.IsNullOrEmpty(lawyer) ? firm.Name : $"{firm.Name} — {lawyer}";
         }
 
         private static string SelectRotatingRosterMember(
@@ -4332,12 +5304,9 @@ namespace MDTPro.Data {
             if (courtData.SentenceMultiplier <= 1f) return;
 
             foreach (CourtData.Charge charge in courtData.Charges) {
+                if (charge == null) continue;
                 charge.Fine = Math.Max(0, (int)Math.Round(charge.Fine * courtData.SentenceMultiplier));
-
-                if (charge.Time.HasValue && charge.Time.Value > 0) {
-                    int adjustedDays = (int)Math.Round(charge.Time.Value * courtData.SentenceMultiplier);
-                    charge.Time = Math.Max(charge.Time.Value, adjustedDays);
-                }
+                // Do NOT apply SentenceMultiplier to charge.Time; sentencing range roll happens at resolution
             }
         }
 

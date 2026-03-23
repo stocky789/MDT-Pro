@@ -30,7 +30,8 @@ namespace MDTPro.Data {
             if ((n.Contains("lsd") || n.Contains("hallucinogen") || n.Contains("mescaline") || n.Contains("psilocybin")) && !n.Contains("ecstasy"))
                 return new List<string> { "LSD/Hallucinogen", "LSD_Hallucinogen", "Mescaline", "Psilocybin", "LSD" };
             if (n.Contains("ecstasy") || n.Contains("mdma")) return new List<string> { "Ecstasy/MDMA", "Ecstasy_MDMA" };
-            if (n.Contains("possession of cannabis") || n.Contains("cannabis over legal limit") || n.Contains("sale or transport of cannabis"))
+            if (n.Contains("possession of cannabis") || n.Contains("cannabis over legal limit") || n.Contains("sale or transport of cannabis")
+                || n.Contains("possession of marijuana") || n.Contains("cultivation of marijuana"))
                 return new List<string> { "Cannabis" };
 
             // Prescription/Narcotic -> that type OR any (per task: "Prescription/Narcotic" OR any)
