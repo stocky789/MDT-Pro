@@ -210,7 +210,23 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
     const chargeLabel = document.createElement('label')
     chargeLabel.textContent = charge.Name || '–'
     chargeWrapper.appendChild(chargeLabel)
-    let detailValue = await getChargeDetailsString(charge.Fine || 0, charge.Time)
+    let detailValue
+    if (!isResolved) {
+      const md = typeof charge.MinDays === 'number' ? charge.MinDays : 0
+      const mxd = charge.MaxDays != null && typeof charge.MaxDays === 'number' ? charge.MaxDays : null
+      const useStatutoryRange = md > 0 || (mxd != null && mxd > 0)
+      detailValue = useStatutoryRange
+        ? await getChargeDetailsString(charge.Fine || 0, charge.Time, { minDays: md, maxDays: mxd })
+        : await getChargeDetailsString(charge.Fine || 0, charge.Time)
+    } else if (convicted) {
+      let imposedDays = charge.SentenceDaysServed
+      if (imposedDays == null) {
+        imposedDays = charge.Time != null ? charge.Time : null
+      }
+      detailValue = await getChargeDetailsString(charge.Fine || 0, imposedDays)
+    } else {
+      detailValue = await getChargeDetailsString(charge.Fine || 0, charge.Time, { hideIncarceration: true })
+    }
     if (isResolved) {
       const outcomeMap = {
         1: language.court.chargeOutcomeConvicted || 'Convicted',
@@ -981,18 +997,38 @@ async function formatIsoDate(value) {
   return date.toLocaleString()
 }
 
-async function getChargeDetailsString(fine, time) {
+/**
+ * @param {number} fine
+ * @param {number|null|undefined} time — statutory (pending) or imposed days; null = life
+ * @param {{ hideIncarceration?: boolean, minDays?: number, maxDays?: number|null }} [options]
+ */
+async function getChargeDetailsString(fine, time, options = {}) {
+  const hideIncarceration = options.hideIncarceration === true
+  const minDays = options.minDays
+  const maxDays = options.maxDays
+
   const language = await getLanguage()
 
   const fineFormatted = await getCurrencyString(fine)
-  let fineString = `${language.court.fine}: ${fineFormatted}`
-  const timeFormatted =
-    time === null ? language.units.life : await convertDaysToYMD(time)
-  let timeString = `${language.court.incarceration}: ${timeFormatted}`
+  const fineString = `${language.court.fine}: ${fineFormatted}`
+  if (hideIncarceration) return fineString
 
-  return time > 0 || time === null
-    ? `${fineString} | ${timeString}`
-    : fineString
+  let incarcerationPart = null
+  if (typeof minDays === 'number' && (minDays > 0 || (maxDays != null && maxDays > 0))) {
+    const maxV = maxDays != null ? maxDays : minDays
+    if (minDays === maxV) {
+      incarcerationPart = `${language.court.incarceration}: ${await convertDaysToYMD(minDays)}`
+    } else {
+      const minStr = await convertDaysToYMD(minDays)
+      const maxStr = maxDays == null ? language.units.life : await convertDaysToYMD(maxV)
+      incarcerationPart = `${language.court.incarceration}: ${minStr} - ${maxStr}`
+    }
+  } else if (time > 0 || time === null) {
+    const timeFormatted = time === null ? language.units.life : await convertDaysToYMD(time)
+    incarcerationPart = `${language.court.incarceration}: ${timeFormatted}`
+  }
+
+  return incarcerationPart ? `${fineString} | ${incarcerationPart}` : fineString
 }
 
 async function getTotalTimeString(time, lifeSentences) {

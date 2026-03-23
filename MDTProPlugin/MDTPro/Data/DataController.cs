@@ -1308,9 +1308,10 @@ namespace MDTPro.Data {
             MDTProPedData persistentMatch = GetReEncounterCandidate(currentPedData);
             if (persistentMatch == null) return;
 
-            string originalName = currentPedData.Name;
-            currentPedData.ApplyPersistentIdentity(persistentMatch);
+            string liveName = currentPedData.Name;
+            currentPedData.ApplyPersistentRecordPreservingLiveIdentity(persistentMatch);
             currentPedData.TimesStopped = Math.Max(currentPedData.TimesStopped, persistentMatch.TimesStopped + 1);
+            currentPedData.TryParseNameIntoFirstLast();
 
             if (currentPedData.CDFPedData != null) {
                 currentPedData.CDFPedData.Wanted = currentPedData.IsWanted;
@@ -1323,7 +1324,7 @@ namespace MDTPro.Data {
             }
 
             KeepPedInDatabase(currentPedData);
-            Helper.Log($"Re-encounter matched by model: {originalName} => {currentPedData.Name}", false, Helper.LogSeverity.Info);
+            Helper.Log($"Re-encounter merged prior record (model + name match); live identity kept: {liveName}", false, Helper.LogSeverity.Info);
         }
 
         internal static void ResolvePedForReEncounter(Ped ped) {
@@ -1504,6 +1505,23 @@ namespace MDTPro.Data {
                 recentlyIdentifiedPedHandles.Remove(k);
         }
 
+        /// <summary>GTA peds share models; only merge persistent history when names clearly match so we do not graft one person's record onto another (e.g. Stan Pierce vs Stan Bank).</summary>
+        private static bool PedNamesConsistentForModelReEncounter(MDTProPedData persisted, MDTProPedData live) {
+            if (persisted == null || live == null) return false;
+            string pn = (persisted.Name ?? "").Trim();
+            string ln = (live.Name ?? "").Trim();
+            if (pn.Length > 0 && ln.Length > 0 && string.Equals(pn, ln, StringComparison.OrdinalIgnoreCase))
+                return true;
+            string pLast = (persisted.LastName ?? "").Trim();
+            string lLast = (live.LastName ?? "").Trim();
+            if (pLast.Length == 0 || lLast.Length == 0) return false;
+            if (!string.Equals(pLast, lLast, StringComparison.OrdinalIgnoreCase)) return false;
+            string pFirst = (persisted.FirstName ?? "").Trim();
+            string lFirst = (live.FirstName ?? "").Trim();
+            if (pFirst.Length == 0 || lFirst.Length == 0) return true;
+            return string.Equals(pFirst, lFirst, StringComparison.OrdinalIgnoreCase);
+        }
+
         private static MDTProPedData GetReEncounterCandidate(MDTProPedData currentPedData) {
             if (currentPedData == null) return null;
             bool hasModel = (currentPedData.ModelHash != 0) || !string.IsNullOrEmpty(currentPedData.ModelName);
@@ -1520,6 +1538,7 @@ namespace MDTPro.Data {
                     .Where(ped => ped != null && !string.IsNullOrEmpty(ped.Name))
                     .Where(IsPedAvailableForEncounter)
                     .Where(ped => !pedDatabase.Any(activePed => activePed.Name == ped.Name))
+                    .Where(ped => PedNamesConsistentForModelReEncounter(ped, currentPedData))
                     .Where(ped => {
                         if (currentPedData.ModelHash != 0 && ped.ModelHash != 0) {
                             return ped.ModelHash == currentPedData.ModelHash;
@@ -5133,7 +5152,15 @@ namespace MDTPro.Data {
                 } else {
                     courtCase.SentenceReasoning = null;
                 }
-                courtCase.LastUpdatedUtc = DateTime.UtcNow.ToString("o");
+                DateTime nowUtc = DateTime.UtcNow;
+                courtCase.LastUpdatedUtc = nowUtc.ToString("o");
+                // If resolved before the scheduled trial/court time (e.g. Force Resolve), store actual
+                // resolution time so the case timeline and docket date are not still in the future.
+                if (!string.IsNullOrEmpty(courtCase.ResolveAtUtc)
+                    && DateTime.TryParse(courtCase.ResolveAtUtc, null, DateTimeStyles.RoundtripKind, out DateTime scheduledResolve)
+                    && nowUtc < scheduledResolve) {
+                    courtCase.ResolveAtUtc = nowUtc.ToString("o");
+                }
 
                 if (!string.IsNullOrEmpty(courtCase.PedName)) {
                     string normalized = courtCase.PedName.ToLower();
