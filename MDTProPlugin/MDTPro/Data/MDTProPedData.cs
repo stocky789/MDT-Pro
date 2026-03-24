@@ -255,6 +255,54 @@ namespace MDTPro.Data {
                 .ToList() ?? new List<ArrestGroup.Charge>();
         }
 
+        /// <summary>Merge citations, warrants, permits, and incarceration from a saved ped while keeping the live ped's name/DOB/address from CDF. Used for model-based re-encounter so we never label one NPC with another's identity (many peds share the same model).</summary>
+        internal void ApplyPersistentRecordPreservingLiveIdentity(MDTProPedData source) {
+            if (source == null) return;
+
+            if (!string.IsNullOrEmpty(source.AdvisoryText)) AdvisoryText = source.AdvisoryText;
+            TimesStopped = source.TimesStopped;
+            IsWanted = source.IsWanted;
+            WarrantText = source.WarrantText;
+            IsOnProbation = source.IsOnProbation;
+            IsOnParole = source.IsOnParole;
+            if (!string.IsNullOrEmpty(source.LicenseStatus)) LicenseStatus = source.LicenseStatus;
+            if (!string.IsNullOrEmpty(source.LicenseExpiration)) LicenseExpiration = source.LicenseExpiration;
+            if (!string.IsNullOrEmpty(source.WeaponPermitStatus)) WeaponPermitStatus = source.WeaponPermitStatus;
+            if (!string.IsNullOrEmpty(source.WeaponPermitExpiration)) WeaponPermitExpiration = source.WeaponPermitExpiration;
+            if (!string.IsNullOrEmpty(source.WeaponPermitType)) WeaponPermitType = source.WeaponPermitType;
+            if (!string.IsNullOrEmpty(source.FishingPermitStatus)) FishingPermitStatus = source.FishingPermitStatus;
+            if (!string.IsNullOrEmpty(source.FishingPermitExpiration)) FishingPermitExpiration = source.FishingPermitExpiration;
+            if (!string.IsNullOrEmpty(source.HuntingPermitStatus)) HuntingPermitStatus = source.HuntingPermitStatus;
+            if (!string.IsNullOrEmpty(source.HuntingPermitExpiration)) HuntingPermitExpiration = source.HuntingPermitExpiration;
+            if (!string.IsNullOrEmpty(source.IncarceratedUntil)) IncarceratedUntil = source.IncarceratedUntil;
+            IsDeceased = source.IsDeceased;
+            DeceasedAt = source.DeceasedAt;
+
+            Citations = source.Citations?
+                .Select(charge => new CitationGroup.Charge {
+                    name = charge.name,
+                    minFine = charge.minFine,
+                    maxFine = charge.maxFine,
+                    canRevokeLicense = charge.canRevokeLicense,
+                    isArrestable = charge.isArrestable
+                })
+                .ToList() ?? new List<CitationGroup.Charge>();
+
+            Arrests = source.Arrests?
+                .Select(charge => new ArrestGroup.Charge {
+                    name = charge.name,
+                    minFine = charge.minFine,
+                    maxFine = charge.maxFine,
+                    canRevokeLicense = charge.canRevokeLicense,
+                    isArrestable = charge.isArrestable,
+                    minDays = charge.minDays,
+                    maxDays = charge.maxDays,
+                    probation = charge.probation,
+                    canBeWarrant = charge.canBeWarrant
+                })
+                .ToList() ?? new List<ArrestGroup.Charge>();
+        }
+
         /// <summary>Try to sync CDF PedData name to match persistent identity after re-encounter. Uses CDF API property names (Firstname/Lastname). Wrapped in try-catch.</summary>
         internal void TrySyncCDFPersonaToPersistentIdentity() {
             if (CDFPedData == null || string.IsNullOrEmpty(Name)) return;

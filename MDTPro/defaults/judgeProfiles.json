@@ -1,0 +1,84 @@
+{
+  "judges": [
+    {
+      "name": "Hon. Hugh Harrison",
+      "leniency": -0.4,
+      "notes": "GTA V canon — judge on Fame or Shame. Theatrical but tends to go easy on defendants."
+    },
+    {
+      "name": "Hon. Barry Griffin",
+      "leniency": -0.7,
+      "notes": "GTA IV canon — Liberty City. Sentenced Billy Grey to country club rehab; known for lenient dispositions."
+    },
+    {
+      "name": "Hon. Grady",
+      "leniency": 0.8,
+      "notes": "GTA IV canon — host of Just or Unjust on WKTT. Harsh, unpredictable rulings."
+    },
+    {
+      "name": "Hon. K. Martinez",
+      "leniency": 0.2,
+      "notes": "Los Santos Superior Court. By-the-book, slight lean toward prosecution."
+    },
+    {
+      "name": "Hon. S. Alvarez",
+      "leniency": -0.5,
+      "notes": "Los Santos Superior Court. Rehabilitation-focused, gives second chances."
+    },
+    {
+      "name": "Hon. D. Whitaker",
+      "leniency": 0.6,
+      "notes": "Los Santos Superior Court. Tough on repeat offenders and drug cases."
+    },
+    {
+      "name": "Hon. T. Ellison",
+      "leniency": -0.2,
+      "notes": "Los Santos Superior Court. Fair, weighs mitigating factors heavily."
+    },
+    {
+      "name": "Hon. M. Chen",
+      "leniency": 0.0,
+      "notes": "Los Santos Superior Court. Neutral; lets evidence speak."
+    },
+    {
+      "name": "Hon. R. Bennett",
+      "leniency": 0.4,
+      "notes": "Blaine County Circuit. Rural court veteran; tough on property crime."
+    },
+    {
+      "name": "Hon. J. Monroe",
+      "leniency": -0.6,
+      "notes": "Blaine County Circuit. Community-minded; prefers probation over jail when possible."
+    },
+    {
+      "name": "Hon. P. Gaines",
+      "leniency": 0.3,
+      "notes": "Blaine County Circuit. Straight shooter; moderate sentencing."
+    },
+    {
+      "name": "Hon. V. Cross",
+      "leniency": -0.3,
+      "notes": "Blaine County Circuit. Former PD; sympathetic to defendants with clean records."
+    },
+    {
+      "name": "Hon. I. Navarro",
+      "leniency": 0.5,
+      "notes": "San Andreas Territorial Tribunal. Federal docket; strict on organized crime and trafficking."
+    },
+    {
+      "name": "Hon. V. Reese",
+      "leniency": -0.4,
+      "notes": "San Andreas Territorial Tribunal. Transferred from Liberty City; known for plea leniency."
+    },
+    {
+      "name": "Hon. L. Torres",
+      "leniency": 0.1,
+      "notes": "Los Santos Superior Court. Newer to the bench; cautious and procedural."
+    },
+    {
+      "name": "Hon. F. Okonkwo",
+      "leniency": -0.8,
+      "notes": "Los Santos Superior Court. Reform advocate; lowest sentences in the district."
+    }
+  ]
+}

@@ -39,6 +39,37 @@ body {
   gap: 8px;
 }
 
+.courtCaseListHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-primary-half);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.courtCaseListHeaderExpand { flex-shrink: 0; width: 24px; }
+.courtCaseListHeaderDefendant { flex: 1 1 auto; min-width: 0; }
+.courtCaseListHeaderCaseNumber { flex-shrink: 0; min-width: 6em; }
+.courtCaseListHeaderDistrict { flex-shrink: 0; min-width: 5em; }
+.courtCaseListHeaderDate { flex-shrink: 0; min-width: 7em; }
+.courtCaseListHeaderStatus { flex-shrink: 0; min-width: 5em; }
+
+.courtCaseRowDistrict,
+.courtCaseRowDate {
+  font-size: 13px;
+  color: var(--color-text-primary-half);
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.courtCaseRowDistrict { min-width: 5em; }
+.courtCaseRowDate { min-width: 7em; }
+
 /* Collapsed row: person name + case # with status on the right */
 .courtCaseList .courtCaseListItem {
   border: 1px solid var(--color-border);
@@ -116,6 +147,7 @@ body {
   color: var(--color-text-primary-half);
   font-family: var(--font-family-mono);
   flex-shrink: 0;
+  min-width: 6em;
 }
 
 .courtCaseRowStatus {
@@ -165,6 +197,13 @@ body {
 }
 
 .courtCaseDetails .chargesWrapper {
+  min-width: 0;
+}
+
+/* Long Prosecutor/Defense Attorney "Firm — Lawyer" strings: truncate with ellipsis, full text on hover via title */
+.courtCaseDetails input[type="text"]:disabled {
+  overflow: hidden;
+  text-overflow: ellipsis;
   min-width: 0;
 }
 
@@ -394,6 +433,10 @@ body {
     grid-template-columns: 1fr;
   }
 
+  .courtCaseListHeader {
+    display: none;
+  }
+
   .courtCaseRow {
     flex-wrap: wrap;
   }
@@ -402,6 +445,11 @@ body {
     width: 100%;
     order: 1;
     margin-left: 32px;
+    font-size: 12px;
+  }
+
+  .courtCaseRowDistrict,
+  .courtCaseRowDate {
     font-size: 12px;
   }
 
@@ -423,6 +471,60 @@ body {
   }
 }
 
+/* Case Timeline */
+.courtTimelineSection {
+  grid-column: 1 / -1;
+}
+
+.courtTimelineRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Evidence band note */
+.courtEvidenceBandNote {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--color-text-primary-half);
+  padding: 4px 0;
+  border-left: 2px solid var(--color-border);
+  padding-left: 10px;
+  margin-left: 2px;
+}
+
+/* Tooltip icon */
+.courtLabelWithTooltip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.courtTooltipIcon {
+  font-size: 12px;
+  color: var(--color-text-primary-half);
+  cursor: help;
+  font-style: italic;
+}
+
+/* Exhibit rows */
+.evidenceExhibitRow .evidenceBreakdownValue {
+  font-size: 12px;
+}
+
+/* Attached reports for resolved cases */
+.courtAttachedReportLink {
+  color: var(--color-accent-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  text-decoration: underline;
+}
+
+.courtAttachedReportLink:hover {
+  color: var(--color-accent);
+}
+
 /* Court case: attached reports evidence help */
 .courtAttachedReportsSection .courtAttachedReportsHelp {
   font-size: 12px;
@@ -430,4 +532,67 @@ body {
   color: var(--color-text-primary-half, #666);
   margin: 0 0 10px 0;
   max-width: 52em;
+}
+
+/* Force Resolve processing overlay */
+.courtProcessingOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--color-background) 85%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.courtProcessingModal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 32px 40px;
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-medium, 8px);
+  background: var(--color-surface);
+  box-shadow: 0 0 32px var(--color-accent-glow, rgba(201, 162, 39, 0.15));
+  min-width: 280px;
+}
+
+.courtProcessingTitle {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-accent-secondary);
+}
+
+.courtProcessingCircle {
+  width: 80px;
+  height: 80px;
+  transform: rotate(-90deg); /* Start from top */
+}
+
+.courtProcessingCircleBg {
+  fill: none;
+  stroke: var(--color-border);
+  stroke-width: 6;
+}
+
+.courtProcessingCircleProgress {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 226; /* 2 * pi * 36 */
+  stroke-dashoffset: 226;
+  transition: stroke-dashoffset 0.15s linear;
+}
+
+.courtProcessingStage {
+  font-size: 13px;
+  color: var(--color-text-primary);
+  text-align: center;
+  min-height: 1.4em;
+  transition: opacity 0.2s ease;
 }

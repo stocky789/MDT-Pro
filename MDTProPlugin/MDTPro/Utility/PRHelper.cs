@@ -8,6 +8,7 @@ using PolicingRedefined.Interaction.Assets.PedAttributes;
 using Rage;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 
 namespace MDTPro.Utility {
@@ -69,17 +70,46 @@ namespace MDTPro.Utility {
                 return;
             }
 
+            // Vehicle traffic stops keep the ped in a different PR interaction mode. SetPedAsStopped on an occupant
+            // can flatten that to a generic "stopped ped" state and the Ped Stop menu loses Dismiss and other stop options.
+            bool inVehicle = false;
             try {
-                // PR requires ped to be marked as stopped for the hand-citation menu option to be enabled. See PR Ped Detainment API.
-                var pedApiType = System.Type.GetType("PolicingRedefined.API.PedAPI, PolicingRedefined");
-                if (pedApiType != null) {
-                    var setStopped = pedApiType.GetMethod("SetPedAsStopped", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                    setStopped?.Invoke(null, new object[] { ped });
+                inVehicle = ped.IsInAnyVehicle(false);
+            } catch {
+                /* ignore */
+            }
+
+            try {
+                if (!inVehicle) {
+                    // On-foot: ensure PR knows the ped is stopped so hand-citation is available; avoid duplicate SetPedAsStopped when already stopped.
+                    var pedApiType = System.Type.GetType("PolicingRedefined.API.PedAPI, PolicingRedefined");
+                    if (pedApiType != null) {
+                        const BindingFlags pedApiFlags = BindingFlags.Public | BindingFlags.Static;
+                        MethodInfo setStopped = pedApiType.GetMethod("SetPedAsStopped", pedApiFlags);
+                        MethodInfo isStopped = pedApiType.GetMethod("IsPedStopped", pedApiFlags);
+                        bool shouldSetStopped = true;
+                        if (isStopped != null) {
+                            try {
+                                object result = isStopped.Invoke(null, new object[] { ped });
+                                if (result is bool alreadyStopped && alreadyStopped)
+                                    shouldSetStopped = false;
+                            } catch {
+                                // Unknown — keep shouldSetStopped true (legacy behavior).
+                            }
+                        }
+                        if (shouldSetStopped && setStopped != null) {
+                            try {
+                                setStopped.Invoke(null, new object[] { ped });
+                            } catch {
+                                /* ignore */
+                            }
+                        }
+                    }
                 }
-                // Give PR a frame to process SetPedAsStopped before we add citations.
+                // One frame before queueing citations (after SetPedAsStopped when used).
                 GameFiber.Yield();
             } catch {
-                // Ignore if SetPedAsStopped not available or fails
+                // Ignore PedAPI reflection failures
             }
 
             foreach (CitationHandoutCharge charge in charges) {
