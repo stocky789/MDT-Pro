@@ -70,33 +70,43 @@ namespace MDTPro.Utility {
                 return;
             }
 
+            // Vehicle traffic stops keep the ped in a different PR interaction mode. SetPedAsStopped on an occupant
+            // can flatten that to a generic "stopped ped" state and the Ped Stop menu loses Dismiss and other stop options.
+            bool inVehicle = false;
             try {
-                // PR requires the ped to be stopped for hand-citation. Calling SetPedAsStopped again on an already-stopped ped can desync PR's menu (e.g. missing dismiss).
-                // If IsPedStopped is unavailable or fails, we still set stopped so Give Citation keeps working on older PR builds.
-                var pedApiType = System.Type.GetType("PolicingRedefined.API.PedAPI, PolicingRedefined");
-                if (pedApiType != null) {
-                    const BindingFlags pedApiFlags = BindingFlags.Public | BindingFlags.Static;
-                    MethodInfo setStopped = pedApiType.GetMethod("SetPedAsStopped", pedApiFlags);
-                    MethodInfo isStopped = pedApiType.GetMethod("IsPedStopped", pedApiFlags);
-                    bool shouldSetStopped = true;
-                    if (isStopped != null) {
-                        try {
-                            object result = isStopped.Invoke(null, new object[] { ped });
-                            if (result is bool alreadyStopped && alreadyStopped)
-                                shouldSetStopped = false;
-                        } catch {
-                            // Unknown state — keep shouldSetStopped true so we match legacy behavior.
+                inVehicle = ped.IsInAnyVehicle(false);
+            } catch {
+                /* ignore */
+            }
+
+            try {
+                if (!inVehicle) {
+                    // On-foot: ensure PR knows the ped is stopped so hand-citation is available; avoid duplicate SetPedAsStopped when already stopped.
+                    var pedApiType = System.Type.GetType("PolicingRedefined.API.PedAPI, PolicingRedefined");
+                    if (pedApiType != null) {
+                        const BindingFlags pedApiFlags = BindingFlags.Public | BindingFlags.Static;
+                        MethodInfo setStopped = pedApiType.GetMethod("SetPedAsStopped", pedApiFlags);
+                        MethodInfo isStopped = pedApiType.GetMethod("IsPedStopped", pedApiFlags);
+                        bool shouldSetStopped = true;
+                        if (isStopped != null) {
+                            try {
+                                object result = isStopped.Invoke(null, new object[] { ped });
+                                if (result is bool alreadyStopped && alreadyStopped)
+                                    shouldSetStopped = false;
+                            } catch {
+                                // Unknown — keep shouldSetStopped true (legacy behavior).
+                            }
                         }
-                    }
-                    if (shouldSetStopped && setStopped != null) {
-                        try {
-                            setStopped.Invoke(null, new object[] { ped });
-                        } catch {
-                            // Ignore if SetPedAsStopped fails
+                        if (shouldSetStopped && setStopped != null) {
+                            try {
+                                setStopped.Invoke(null, new object[] { ped });
+                            } catch {
+                                /* ignore */
+                            }
                         }
                     }
                 }
-                // One frame for PR to apply stop state before queueing citations.
+                // One frame before queueing citations (after SetPedAsStopped when used).
                 GameFiber.Yield();
             } catch {
                 // Ignore PedAPI reflection failures
@@ -107,8 +117,6 @@ namespace MDTPro.Utility {
 
                 Citation citation = new Citation(ped, charge.Name, charge.Fine, SetupController.GetLanguage().units.currencySymbol, SetupController.GetConfig().displayCurrencySymbolBeforeNumber, charge.IsArrestable);
                 PolicingRedefined.API.PedAPI.GiveCitationToPed(ped, citation);
-                // Let PR process each queued handoff; back-to-back calls in one frame can break the ped menu.
-                GameFiber.Yield();
             }
 
             string message = string.Format(SetupController.GetLanguage().inGame.handCitationTo ?? "Hand citation to {0}", pedName);
