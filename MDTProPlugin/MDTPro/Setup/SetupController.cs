@@ -183,7 +183,7 @@ namespace MDTPro.Setup {
 
         /// <summary>One-time migration: overwrite citation and arrest options from defaults so upgraders get updated charges. Bump version when adding charges (RICO, Federal, Wildlife, etc.) or expanding citations.</summary>
         private static void EnsureCitationArrestOptionsFromDefaults(Config cfg, Config def) {
-            const int currentCitationArrestOptionsVersion = 3;
+            const int currentCitationArrestOptionsVersion = 6;
             if (cfg.citationArrestOptionsVersion >= currentCitationArrestOptionsVersion) return;
             try {
                 if (File.Exists(CitationOptionsDefaultsPath)) {
@@ -195,7 +195,7 @@ namespace MDTPro.Setup {
                     cachedArrestOptions = null;
                 }
                 cfg.citationArrestOptionsVersion = currentCitationArrestOptionsVersion;
-                Helper.Log("Citation and arrest options updated from defaults (version 3: RICO, Federal, Wildlife, Larceny/Fraud, expanded DUI/DWI, firearms, and more).", true, Helper.LogSeverity.Info);
+                Helper.Log("Citation and arrest options updated from defaults (version 6: deduplicated arrest charges, merged overlapping traffic/property/firearms entries).", true, Helper.LogSeverity.Info);
             } catch (Exception ex) {
                 Helper.Log($"Could not update citation/arrest options from defaults: {ex.Message}", true, Helper.LogSeverity.Warning);
             }

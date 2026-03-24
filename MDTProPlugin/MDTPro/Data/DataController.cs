@@ -1651,7 +1651,7 @@ namespace MDTPro.Data {
                     driversLicenseRevoked = true;
                 }
 
-                // Firearms: California PC 29805, 26202 — felonies = lifetime; domestic violence / protective order = lifetime; violent misdemeanors = 10 years
+                // Firearms: under California rules — felonies = lifetime; domestic violence / protective order = lifetime; violent misdemeanors = 10 years
                 if (!firearmsRevoked) {
                     bool isFelony = IsFelonyChargeName(name);
                     bool isDomesticViolence = name.IndexOf("Domestic Violence", StringComparison.OrdinalIgnoreCase) >= 0
@@ -1735,7 +1735,8 @@ namespace MDTPro.Data {
                 || n.Contains("chemical test") || n.Contains("field sobriety") || n.Contains("refusal to submit")
                 || n.Contains("vehicular") || n.Contains("evading") || n.Contains("vin ") || n.Contains("vin tampering") || n.Contains("defaced vin")
                 || n.Contains("hit and run") || n.Contains("hit-and-run") || n.Contains("reckless driving") || n.Contains("street racing")
-                || n.Contains("carjacking") || n.Contains("driving on suspended") || n.Contains("driving without license") || n.Contains("driving without valid license") || n.Contains("driving with license expired")
+                || n.Contains("carjacking") || n.Contains("driving on suspended") || n.Contains("driving on revoked") || n.Contains("revoked license")
+                || n.Contains("driving without license") || n.Contains("driving without valid license") || n.Contains("driving with license expired")
                 || n.Contains("failure to present") || n.Contains("refusing to provide identification")
                 || n.Contains("refusal to sign traffic") || n.Contains("wrong side of road") || n.Contains("driving on wrong side")
                 || (n.Contains("vehicle") && (n.Contains("theft") || n.Contains("stolen") || n.Contains("evidence")));

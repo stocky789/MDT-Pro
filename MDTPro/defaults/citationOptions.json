@@ -3,66 +3,52 @@
     "name": "Speeding",
     "charges": [
       {
-        "name": "Unlawful Speed 1-15 MPH Over Speed Limit",
+        "name": "Unlawful Speed 1-15 MPH Over Posted Limit",
         "minFine": 234,
         "maxFine": 238,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Unlawful Speed 16-25 MPH Over Speed Limit",
+        "name": "Unlawful Speed 16-25 MPH Over Posted Limit",
         "minFine": 363,
         "maxFine": 500,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Unlawful Speed 26 MPH Or More Over Speed Limit",
+        "name": "Unlawful Speed 26 MPH or More Over Posted Limit",
         "minFine": 490,
         "maxFine": 1000,
         "canRevokeLicense": true,
         "isArrestable": true
       },
       {
-        "name": "Unlawful Speed 100 MPH Or More",
+        "name": "Unlawful Speed 100 MPH or More",
         "minFine": 500,
         "maxFine": 1000,
         "canRevokeLicense": true,
         "isArrestable": true
       },
       {
-        "name": "Impeding Traffic",
+        "name": "Impeding Traffic / Driving Below Posted Minimum Speed",
         "minFine": 234,
         "maxFine": 238,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Excessive Acceleration / Exhibition of Speed",
+        "name": "Exhibition of Speed / Excessive Acceleration",
         "minFine": 234,
         "maxFine": 1000,
         "canRevokeLicense": true,
         "isArrestable": false
       },
       {
-        "name": "Too Fast For Conditions",
+        "name": "Unsafe Speed for Prevailing Conditions — Basic Speed Law",
         "minFine": 234,
         "maxFine": 490,
         "canRevokeLicense": true,
-        "isArrestable": false
-      },
-      {
-        "name": "Unlawful Speed Over Posted Limit",
-        "minFine": 234,
-        "maxFine": 490,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Unlawful Speed Under Posted Limit",
-        "minFine": 234,
-        "maxFine": 238,
-        "canRevokeLicense": false,
         "isArrestable": false
       }
     ]
@@ -71,35 +57,35 @@
     "name": "Signals / Signs",
     "charges": [
       {
-        "name": "Failure To Stop At Stop Sign",
+        "name": "Failure to Stop at Stop Sign",
         "minFine": 234,
         "maxFine": 238,
         "canRevokeLicense": true,
         "isArrestable": false
       },
       {
-        "name": "Failure To Stop For Traffic Signal",
+        "name": "Failure to Stop for Steady Circular Red Signal",
         "minFine": 490,
         "maxFine": 500,
         "canRevokeLicense": true,
         "isArrestable": false
       },
       {
-        "name": "Failure To Stop At R/R Signal / Barrier",
+        "name": "Failure to Stop at Railroad Crossing — Gates or Signals",
         "minFine": 490,
         "maxFine": 1000,
         "canRevokeLicense": true,
         "isArrestable": false
       },
       {
-        "name": "Failure To Comply With Lane Direction Sign / Device",
+        "name": "Failure to Comply With Lane Direction Sign or Pavement Marking",
         "minFine": 234,
         "maxFine": 238,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Wrong Direction On Posted One Way",
+        "name": "Wrong Way on Posted One-Way Highway",
         "minFine": 234,
         "maxFine": 490,
         "canRevokeLicense": false,
@@ -111,7 +97,7 @@
     "name": "Operation",
     "charges": [
       {
-        "name": "Improper Lane Change",
+        "name": "Unsafe Lane Change",
         "minFine": 234,
         "maxFine": 238,
         "canRevokeLicense": false,
@@ -132,21 +118,21 @@
         "isArrestable": false
       },
       {
-        "name": "Failure To Signal",
+        "name": "Failure to Signal Turn or Lane Change",
         "minFine": 234,
         "maxFine": 238,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Driving On Shoulder",
+        "name": "Driving on Highway Shoulder",
         "minFine": 234,
         "maxFine": 238,
         "canRevokeLicense": true,
         "isArrestable": false
       },
       {
-        "name": "Passing In No Passing Zone",
+        "name": "Passing in No-Passing Zone",
         "minFine": 234,
         "maxFine": 490,
         "canRevokeLicense": false,
@@ -160,70 +146,28 @@
         "isArrestable": false
       },
       {
-        "name": "Failure To Maintain Lane",
+        "name": "Failure to Maintain Lane / Straddling / Left of Center",
         "minFine": 234,
         "maxFine": 238,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Left of Center",
-        "minFine": 234,
-        "maxFine": 238,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Left of Center (Improper)",
-        "minFine": 234,
-        "maxFine": 238,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Left Turn on Red",
+        "name": "Illegal Left Turn on Red",
         "minFine": 162,
         "maxFine": 490,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Left Turn on Red (Illegal)",
-        "minFine": 162,
-        "maxFine": 490,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Crossing Over a Divider / Median",
-        "minFine": 234,
-        "maxFine": 238,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Crossing Over Center Divider / Median",
-        "minFine": 234,
-        "maxFine": 238,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Crossing Over Center Divider, Median Or Gore",
+        "name": "Illegal Crossing of Divider, Median, or Gore Area",
         "minFine": 234,
         "maxFine": 238,
         "canRevokeLicense": true,
         "isArrestable": false
       },
       {
-        "name": "Failure to Make Turn as Directed",
-        "minFine": 234,
-        "maxFine": 238,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Failure to Make Turn as Directed by Sign/Device",
+        "name": "Failure to Make Turn as Directed by Sign or Marking",
         "minFine": 234,
         "maxFine": 238,
         "canRevokeLicense": false,
@@ -237,35 +181,28 @@
         "isArrestable": false
       },
       {
-        "name": "Driving On Sidewalk / Bicycle Path",
+        "name": "Driving on Sidewalk or Bicycle Path",
         "minFine": 234,
         "maxFine": 490,
         "canRevokeLicense": true,
         "isArrestable": false
       },
       {
-        "name": "Riding On Exterior Of Vehicle",
+        "name": "Riding on Exterior of Vehicle",
         "minFine": 234,
         "maxFine": 490,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Operating Wireless Device While Driving (Texting)",
+        "name": "Electronic Wireless Device — Handheld Use While Driving",
         "minFine": 162,
         "maxFine": 250,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Cell Phone Use While Driving (Hands-On)",
-        "minFine": 162,
-        "maxFine": 250,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Stopping On Rail Crossing",
+        "name": "Stopping or Parking on Railroad Crossing",
         "minFine": 490,
         "maxFine": 1000,
         "canRevokeLicense": false,
@@ -277,63 +214,49 @@
     "name": "Yielding",
     "charges": [
       {
-        "name": "Failure To Yield To Stopped Emergency Vehicle",
+        "name": "Failure to Yield to Emergency Vehicle — Stationary or Approaching",
         "minFine": 490,
         "maxFine": 1000,
         "canRevokeLicense": true,
         "isArrestable": false
       },
       {
-        "name": "Failure To Yield To Emergency Vehicle",
-        "minFine": 490,
-        "maxFine": 1000,
-        "canRevokeLicense": true,
-        "isArrestable": false
-      },
-      {
-        "name": "Failure To Yield To Pedestrian In Crosswalk",
+        "name": "Failure to Yield to Pedestrian in Crosswalk",
         "minFine": 234,
         "maxFine": 490,
         "canRevokeLicense": true,
         "isArrestable": false
       },
       {
-        "name": "Failure To Yield To Highway Workers",
+        "name": "Failure to Yield to Highway Workers or Work Zone",
         "minFine": 234,
         "maxFine": 490,
         "canRevokeLicense": true,
         "isArrestable": false
       },
       {
-        "name": "Failure To Yield To Public Transit Vehicles",
+        "name": "Failure to Yield to Transit Bus Re-entering Traffic",
         "minFine": 234,
         "maxFine": 238,
         "canRevokeLicense": true,
         "isArrestable": false
       },
       {
-        "name": "Failure To Yield Leaving Obstructed Lane",
+        "name": "Failure to Yield Leaving Obstructed Lane",
         "minFine": 234,
         "maxFine": 238,
         "canRevokeLicense": true,
         "isArrestable": false
       },
       {
-        "name": "Failure To Yield Entering Highway",
+        "name": "Failure to Yield Entering Highway",
         "minFine": 234,
         "maxFine": 238,
         "canRevokeLicense": true,
         "isArrestable": false
       },
       {
-        "name": "Failure To Yield At Intersection",
-        "minFine": 234,
-        "maxFine": 238,
-        "canRevokeLicense": true,
-        "isArrestable": false
-      },
-      {
-        "name": "Violation Of Right Of Way",
+        "name": "Failure to Yield / Right-of-Way Violation at Intersection",
         "minFine": 234,
         "maxFine": 238,
         "canRevokeLicense": true,
@@ -345,91 +268,42 @@
     "name": "Bikes / ATV",
     "charges": [
       {
-        "name": "ATV DOT Approved Helmet Required (Operator)",
+        "name": "DOT Helmet Required — Motorcycle or Motorized Bicycle Operator",
         "minFine": 197,
         "maxFine": 250,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "ATV DOT Approved Helmet Required (Passenger)",
+        "name": "DOT Helmet Required — Motorcycle or Motorized Bicycle Passenger",
         "minFine": 197,
         "maxFine": 250,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "DOT Approved Helmet Required (Operator of Motorcycle / ATV)",
-        "minFine": 197,
-        "maxFine": 250,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "DOT Approved Helmet Required (Operator)",
-        "minFine": 197,
-        "maxFine": 250,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "DOT Approved Helmet Required (Passenger on Motorcycle / ATV)",
-        "minFine": 197,
-        "maxFine": 250,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "DOT Approved Helmet Required (Passenger)",
-        "minFine": 197,
-        "maxFine": 250,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "DOT Approved Safety Glasses / Shield Required for Motorcycle Operators",
+        "name": "Eye Protection Required — Motorcycle Operator",
         "minFine": 99,
         "maxFine": 121,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Failure To Wear DOT Approved Motorcycle Helmet",
-        "minFine": 197,
-        "maxFine": 250,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Helmet Required on Paved Roads (Bicycles)",
+        "name": "Bicycle Helmet Required — Rider Under 18",
         "minFine": 25,
         "maxFine": 100,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Unlawful Operation of Bicycle on Highway (Without Bicycle Path)",
+        "name": "Bicycle — Operation on Highway Where Bike Lane or Path Required",
         "minFine": 100,
         "maxFine": 250,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Unlawful to Operate a Bicycle on a Highway",
-        "minFine": 54,
-        "maxFine": 66,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Riding Bicycle Not On Right",
-        "minFine": 197,
-        "maxFine": 250,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Operating Bicycle On Highway Violation",
+        "name": "Bicycle — Direction of Travel / Far Right / Wrong Side",
         "minFine": 197,
         "maxFine": 250,
         "canRevokeLicense": false,
@@ -441,121 +315,72 @@
     "name": "Equipment",
     "charges": [
       {
-        "name": "Damaged Windshield Obstructing Drivers View",
-        "minFine": 197,
+        "name": "Windshield Missing, Obstructed, or in Unsafe Condition",
+        "minFine": 99,
         "maxFine": 250,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Defective Equipment",
-        "minFine": 197,
-        "maxFine": 250,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Defective Vehicle Equipment (Headlights, Brakes, etc.)",
-        "minFine": 197,
-        "maxFine": 250,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Failure to Dim Headlights to Oncoming Traffic",
-        "minFine": 234,
-        "maxFine": 238,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Failure to Illuminate Lights as Required in Inclement Weather",
-        "minFine": 81,
-        "maxFine": 99,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Failure to Wear Safety Belt (Driver/Passenger)",
-        "minFine": 162,
-        "maxFine": 162,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Lights Must Be Illuminated in Rain or Fog",
-        "minFine": 81,
-        "maxFine": 99,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Neon / Underglow Lighting Prohibited While in Motion",
-        "minFine": 197,
-        "maxFine": 250,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Prohibited Lighting (Neon, Underglow, etc.)",
-        "minFine": 197,
-        "maxFine": 250,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Unroadworthy Vehicle (Unsafe Condition)",
+        "name": "Defective, Unsafe, or Unroadworthy Vehicle / Equipment",
         "minFine": 144,
         "maxFine": 250,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Vehicle Must Have Minimum of Two Headlights (One on Each Side)",
-        "minFine": 54,
-        "maxFine": 66,
+        "name": "Failure to Dim Headlights for Approaching Traffic",
+        "minFine": 234,
+        "maxFine": 238,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Vehicle Must Have Minimum of Two Red Taillights (One on Each Side)",
-        "minFine": 54,
-        "maxFine": 66,
+        "name": "Lights Required — Darkness, Fog, or Inclement Weather",
+        "minFine": 81,
+        "maxFine": 238,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Windshield Required (Without Tint / Cracks / Obstruction)",
-        "minFine": 99,
-        "maxFine": 121,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Safety Belt Violation",
+        "name": "Safety Belt — Driver or Passenger",
         "minFine": 162,
         "maxFine": 162,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Child Restraint / Child Seat Violation",
+        "name": "Prohibited Lighting — Underglow, Neon, or Noncompliant Lamps",
+        "minFine": 197,
+        "maxFine": 250,
+        "canRevokeLicense": false,
+        "isArrestable": false
+      },
+      {
+        "name": "Noncompliant or Modified Exhaust",
+        "minFine": 197,
+        "maxFine": 1000,
+        "canRevokeLicense": false,
+        "isArrestable": false
+      },
+      {
+        "name": "Minimum Headlamps — Two Front White Lights",
+        "minFine": 54,
+        "maxFine": 66,
+        "canRevokeLicense": false,
+        "isArrestable": false
+      },
+      {
+        "name": "Minimum Taillamps — Two Rear Red Lights",
+        "minFine": 54,
+        "maxFine": 66,
+        "canRevokeLicense": false,
+        "isArrestable": false
+      },
+      {
+        "name": "Child Passenger Restraint / Car Seat Violation",
         "minFine": 197,
         "maxFine": 490,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Vehicle Not Roadworthy",
-        "minFine": 197,
-        "maxFine": 250,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Windshield Obstructed In Driver's View",
-        "minFine": 197,
-        "maxFine": 250,
         "canRevokeLicense": false,
         "isArrestable": false
       },
@@ -567,28 +392,7 @@
         "isArrestable": false
       },
       {
-        "name": "Lights Not Illuminated As Required",
-        "minFine": 234,
-        "maxFine": 238,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Prohibited Lighting",
-        "minFine": 197,
-        "maxFine": 250,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Prohibited/Modified Exhaust",
-        "minFine": 197,
-        "maxFine": 1000,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Failure To Secure Load",
+        "name": "Failure to Secure Vehicle Load",
         "minFine": 234,
         "maxFine": 1000,
         "canRevokeLicense": false,
@@ -600,21 +404,21 @@
     "name": "Documents",
     "charges": [
       {
-        "name": "Failure To Provide Proof Of Financial Responsibility",
+        "name": "Failure to Provide Proof of Financial Responsibility",
         "minFine": 100,
         "maxFine": 500,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Expired Insurance",
+        "name": "Expired or Lapsed Insurance",
         "minFine": 200,
         "maxFine": 500,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Failure To Register Vehicle",
+        "name": "Failure to Register Vehicle / Current Registration Required",
         "minFine": 256,
         "maxFine": 500,
         "canRevokeLicense": false,
@@ -628,70 +432,56 @@
         "isArrestable": false
       },
       {
-        "name": "Failure To Display License Plate",
+        "name": "Failure to Display Valid License Plates — Front and Rear",
         "minFine": 197,
         "maxFine": 250,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "License Not Carried",
+        "name": "Failure to Carry Valid Driver License When Driving",
         "minFine": 197,
         "maxFine": 250,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Failure To Present Drivers License Upon Demand",
+        "name": "Failure to Present or Display License to Peace Officer on Demand",
         "minFine": 250,
         "maxFine": 1000,
         "canRevokeLicense": false,
         "isArrestable": true
       },
       {
-        "name": "Expired Drivers License",
+        "name": "Expired Driver License",
         "minFine": 197,
         "maxFine": 250,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Expired Drivers License (Less Than 30 Days)",
+        "name": "Expired Driver License — Less Than 30 Days",
         "minFine": 100,
         "maxFine": 281,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Expired Insurance (Less Than 30 Days)",
+        "name": "Expired Insurance — Less Than 30 Days",
         "minFine": 100,
         "maxFine": 281,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Expired Vehicle Registration (Less Than 30 Days)",
+        "name": "Expired Vehicle Registration — Less Than 30 Days",
         "minFine": 100,
         "maxFine": 281,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Failure to Carry Valid License",
-        "minFine": 197,
-        "maxFine": 250,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Failure to Display License Plate (Front / Rear Plate)",
-        "minFine": 197,
-        "maxFine": 250,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Learners Permit Violation (Non-compliance w/ Restrictions)",
+        "name": "Instruction Permit Violation — Failure to Comply With Restrictions",
         "minFine": 90,
         "maxFine": 110,
         "canRevokeLicense": false,
@@ -705,7 +495,7 @@
         "isArrestable": true
       },
       {
-        "name": "Driving On Suspended License",
+        "name": "Driving on Suspended or Revoked License",
         "minFine": 300,
         "maxFine": 1000,
         "canRevokeLicense": true,
@@ -811,7 +601,7 @@
         "isArrestable": false
       },
       {
-        "name": "Public Nuisance / Urination",
+        "name": "Public Urination",
         "minFine": 250,
         "maxFine": 1000,
         "canRevokeLicense": false,
@@ -833,13 +623,6 @@
       },
       {
         "name": "Littering",
-        "minFine": 100,
-        "maxFine": 1000,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Littering in Public",
         "minFine": 100,
         "maxFine": 1000,
         "canRevokeLicense": false,
@@ -888,13 +671,6 @@
         "isArrestable": true
       },
       {
-        "name": "Urinating in Public",
-        "minFine": 250,
-        "maxFine": 500,
-        "canRevokeLicense": false,
-        "isArrestable": true
-      },
-      {
         "name": "Camping Without Permit (Public Areas)",
         "minFine": 45,
         "maxFine": 55,
@@ -902,21 +678,14 @@
         "isArrestable": false
       },
       {
-        "name": "Dog Must Be Leashed in Public Spaces",
+        "name": "Dog Off-Leash or Uncontrolled in Public (Local Ordinance)",
         "minFine": 50,
         "maxFine": 500,
         "canRevokeLicense": false,
         "isArrestable": false
       },
       {
-        "name": "Jaywalking (Crossing Outside Designated Areas)",
-        "minFine": 25,
-        "maxFine": 250,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Jaywalking (Pedestrian Crossing Violation)",
+        "name": "Jaywalking / Unlawful Pedestrian Crossing",
         "minFine": 25,
         "maxFine": 250,
         "canRevokeLicense": false,
@@ -933,13 +702,6 @@
         "name": "Pedestrian On Freeway / Highway",
         "minFine": 197,
         "maxFine": 250,
-        "canRevokeLicense": false,
-        "isArrestable": false
-      },
-      {
-        "name": "Unleashed Dog",
-        "minFine": 50,
-        "maxFine": 500,
         "canRevokeLicense": false,
         "isArrestable": false
       },
