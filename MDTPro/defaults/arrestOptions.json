@@ -3,7 +3,7 @@
     "name": "Misdemeanor Traffic",
     "charges": [
       {
-        "name": "Driving On Suspended License",
+        "name": "Driving on Suspended License",
         "minFine": 300,
         "maxFine": 1000,
         "minDays": 0,
@@ -23,8 +23,8 @@
         "canRevokeLicense": true
       },
       {
-        "name": "Driving With License Expired 1yr+",
-        "minFine": 300,
+        "name": "Driving With License Expired One Year or More",
+        "minFine": 250,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -43,9 +43,9 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Hit and Run (Property Damage)",
-        "minFine": 1000,
-        "maxFine": 10000,
+        "name": "Hit and Run / Leaving the Scene — Property Damage Only",
+        "minFine": 0,
+        "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
         "probation": 0.4,
@@ -54,10 +54,10 @@
       },
       {
         "name": "Driving On Wrong Side Of Road",
-        "minFine": 250,
-        "maxFine": 1000,
+        "minFine": 0,
+        "maxFine": 238,
         "minDays": 0,
-        "maxDays": 90,
+        "maxDays": 180,
         "probation": 0.4,
         "canBeWarrant": false,
         "canRevokeLicense": true
@@ -74,9 +74,9 @@
       },
       {
         "name": "Street Racing / Speed Contest",
-        "minFine": 500,
+        "minFine": 355,
         "maxFine": 1000,
-        "minDays": 0,
+        "minDays": 1,
         "maxDays": 90,
         "probation": 0.4,
         "canBeWarrant": true,
@@ -84,20 +84,10 @@
       },
       {
         "name": "Evading Peace Officer",
-        "minFine": 1000,
-        "maxFine": 10000,
+        "minFine": 0,
+        "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
-        "probation": 0.4,
-        "canBeWarrant": true,
-        "canRevokeLicense": true
-      },
-      {
-        "name": "Driving Under The Influence",
-        "minFine": 390,
-        "maxFine": 1000,
-        "minDays": 4,
-        "maxDays": 180,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": true
@@ -121,6 +111,146 @@
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": true
+      },
+      {
+        "name": "Aggressive / Careless Driving",
+        "minFine": 145,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.6,
+        "canBeWarrant": true,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "Driving on Suspended License (Second Offense)",
+        "minFine": 500,
+        "maxFine": 2000,
+        "minDays": 5,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "Permitting Unlicensed Driver",
+        "minFine": 250,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.7,
+        "canBeWarrant": false,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "Reckless Endangerment",
+        "minFine": 145,
+        "maxFine": 1000,
+        "minDays": 5,
+        "maxDays": 90,
+        "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "Reckless Speeding (MPH 30+ Over)",
+        "minFine": 145,
+        "maxFine": 1000,
+        "minDays": 5,
+        "maxDays": 90,
+        "probation": 0.5,
+        "canBeWarrant": true,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "DUI Narcotics 1st Offense",
+        "minFine": 390,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.8,
+        "canBeWarrant": false,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "DUI Narcotics 2nd Offense",
+        "minFine": 390,
+        "maxFine": 1000,
+        "minDays": 4,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "Driving Under the Influence / DWI — First Offense (0.08% BAC)",
+        "minFine": 390,
+        "maxFine": 1000,
+        "minDays": 2,
+        "maxDays": 180,
+        "probation": 0.8,
+        "canBeWarrant": false,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "DWI 2nd Offense",
+        "minFine": 390,
+        "maxFine": 1000,
+        "minDays": 4,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "DWI Commercial CDL Driver (0.08% BAC)",
+        "minFine": 390,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.5,
+        "canBeWarrant": false,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "DWI Motorcycle Driver (0.08% BAC)",
+        "minFine": 390,
+        "maxFine": 1000,
+        "minDays": 2,
+        "maxDays": 180,
+        "probation": 0.7,
+        "canBeWarrant": false,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "DWI (Under 21, 0.02% BAC)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.8,
+        "canBeWarrant": false,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "DUI Narcotics w/ Property Damage",
+        "minFine": 390,
+        "maxFine": 5000,
+        "minDays": 5,
+        "maxDays": 365,
+        "probation": 0.3,
+        "canBeWarrant": false,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "DWI w/ Property Damage",
+        "minFine": 390,
+        "maxFine": 5000,
+        "minDays": 5,
+        "maxDays": 365,
+        "probation": 0.3,
+        "canBeWarrant": false,
+        "canRevokeLicense": true
       }
     ]
   },
@@ -131,49 +261,159 @@
         "name": "Reckless Evading Peace Officer",
         "minFine": 1000,
         "maxFine": 10000,
-        "minDays": 180,
-        "maxDays": 1080,
-        "probation": 0.4,
-        "canBeWarrant": true,
-        "canRevokeLicense": true
-      },
-      {
-        "name": "Felony Reckless Evading Causing Injury or Death",
-        "minFine": 1000,
-        "maxFine": 10000,
         "minDays": 480,
-        "maxDays": 1080,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": true
       },
       {
-        "name": "Hit and Run Causing Injury Or Death",
+        "name": "Felony Reckless Evading or Fleeing Causing Bodily Injury or Death",
+        "minFine": 2000,
+        "maxFine": 10000,
+        "minDays": 1095,
+        "maxDays": 3650,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "Hit and Run Causing Bodily Injury or Death / Leaving the Scene",
         "minFine": 1000,
         "maxFine": 10000,
         "minDays": 90,
-        "maxDays": 1440,
-        "probation": 0.4,
+        "maxDays": 1460,
+        "probation": 0.05,
         "canBeWarrant": true,
         "canRevokeLicense": true
       },
       {
-        "name": "Street Racing Causing Injury or Death",
-        "minFine": 1000,
+        "name": "Street Racing Causing Great Bodily Injury or Death / Speed Contest",
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 360,
-        "maxDays": 1080,
-        "probation": 0.4,
+        "minDays": 30,
+        "maxDays": 1095,
+        "probation": 0.15,
         "canBeWarrant": true,
         "canRevokeLicense": true
       },
       {
         "name": "DUI Causing Injury Or Death",
-        "minFine": 1000,
+        "minFine": 390,
         "maxFine": 5000,
-        "minDays": 360,
-        "maxDays": 1440,
+        "minDays": 5,
+        "maxDays": 1460,
         "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "Driving on Revoked License",
+        "minFine": 300,
+        "maxFine": 2000,
+        "minDays": 10,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "Driving on Suspended License (Third Offense)",
+        "minFine": 500,
+        "maxFine": 2000,
+        "minDays": 10,
+        "maxDays": 365,
+        "probation": 0.2,
+        "canBeWarrant": false,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "Fleeing or Attempting to Elude LEO",
+        "minFine": 1000,
+        "maxFine": 10000,
+        "minDays": 480,
+        "maxDays": 1095,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "Vehicular Assault",
+        "minFine": 390,
+        "maxFine": 5000,
+        "minDays": 5,
+        "maxDays": 1460,
+        "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "DUI Narcotics 3rd Offense",
+        "minFine": 390,
+        "maxFine": 1000,
+        "minDays": 120,
+        "maxDays": 365,
+        "probation": 0.3,
+        "canBeWarrant": false,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "DUI Narcotics Causing Death",
+        "minFine": 1015,
+        "maxFine": 5000,
+        "minDays": 1460,
+        "maxDays": 3650,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "DWI 3rd Offense",
+        "minFine": 390,
+        "maxFine": 1000,
+        "minDays": 120,
+        "maxDays": 365,
+        "probation": 0.3,
+        "canBeWarrant": false,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "DWI Causing Death",
+        "minFine": 1015,
+        "maxFine": 5000,
+        "minDays": 1460,
+        "maxDays": 3650,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "DUI Narcotics w/ Bodily Injury",
+        "minFine": 390,
+        "maxFine": 5000,
+        "minDays": 5,
+        "maxDays": 1460,
+        "probation": 0.3,
+        "canBeWarrant": false,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "DWI w/ Bodily Injury",
+        "minFine": 390,
+        "maxFine": 5000,
+        "minDays": 5,
+        "maxDays": 1460,
+        "probation": 0.3,
+        "canBeWarrant": false,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "Fleeing w/ DUI / DWI - Narcotics",
+        "minFine": 390,
+        "maxFine": 10000,
+        "minDays": 480,
+        "maxDays": 2555,
+        "probation": 0.25,
         "canBeWarrant": true,
         "canRevokeLicense": true
       }
@@ -183,28 +423,18 @@
     "name": "Misdemeanor Firearms / Weapons",
     "charges": [
       {
-        "name": "Brandishing Firearm Or Deadly Weapon",
+        "name": "Brandishing Firearm or Deadly Weapon",
         "minFine": 100,
         "maxFine": 1000,
         "minDays": 30,
-        "maxDays": 90,
+        "maxDays": 365,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Negligent Discharge Of Firearm",
-        "minFine": 100,
-        "maxFine": 1000,
-        "minDays": 0,
-        "maxDays": 180,
-        "probation": 0.4,
-        "canBeWarrant": true,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Carrying Concealed Firearm Without Permit",
-        "minFine": 100,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
@@ -213,48 +443,58 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Unlawful Transport Of Loaded Firearm",
-        "minFine": 100,
+        "name": "Carrying Concealed Firearm or Weapon Without Permit",
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
-        "maxDays": 180,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Unlawful Transport of Firearm (Loaded or Unloaded)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Shooting From Vehicle",
-        "minFine": 100,
-        "maxFine": 1000,
+        "minFine": 0,
+        "maxFine": 10000,
         "minDays": 0,
-        "maxDays": 365,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Possession Of Assault Weapon / Illegal Accessory",
-        "minFine": 500,
-        "maxFine": 5000,
+        "minFine": 0,
+        "maxFine": 10000,
         "minDays": 0,
-        "maxDays": 365,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Possession Of Firearm By Prohibited Person",
-        "minFine": 500,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
-        "maxDays": 365,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Possession Of Stolen Firearm",
-        "minFine": 500,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
@@ -264,7 +504,7 @@
       },
       {
         "name": "Possession Of Firearm With Altered/Removed Serial Number",
-        "minFine": 100,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
@@ -274,11 +514,51 @@
       },
       {
         "name": "Possession Of Ammunition By Prohibited Person",
-        "minFine": 100,
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 0,
+        "maxDays": 1095,
+        "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Discharge of Firearm Within 500 Feet of Dwelling",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 180,
+        "maxDays": 2555,
+        "probation": 0.85,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Firearm by Person Under (21)",
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
-        "probation": 0.4,
+        "probation": 0.5,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Reckless Discharge of Firearm",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.85,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Unlawful Possession of Firearm Misdemeanor",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.5,
         "canBeWarrant": true,
         "canRevokeLicense": false
       }
@@ -288,92 +568,122 @@
     "name": "Felony Firearms / Weapons",
     "charges": [
       {
-        "name": "Assault With Deadly Weapon (Firearm)",
-        "minFine": 1000,
+        "name": "Assault With Deadly Weapon (Firearm or Other Deadly Weapon)",
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 720,
-        "maxDays": 1440,
+        "minDays": 180,
+        "maxDays": 1460,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Discharging Firearm At Inhabited Dwelling",
-        "minFine": 1000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 1080,
-        "maxDays": 2520,
+        "minDays": 1095,
+        "maxDays": 2555,
         "probation": 0.3,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Possession Of Short-Barreled Rifle Or Shotgun",
-        "minFine": 1000,
+        "minFine": 0,
         "maxFine": 10000,
         "minDays": 0,
-        "maxDays": 1080,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Possession Of Explosive Device",
-        "minFine": 5000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 720,
-        "maxDays": 2160,
-        "probation": 0.3,
+        "minDays": 0,
+        "maxDays": 1095,
+        "probation": 0.05,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Altering Or Removing Firearm Serial Number",
-        "minFine": 1000,
-        "maxFine": 3000,
+        "minFine": 0,
+        "maxFine": 10000,
         "minDays": 480,
-        "maxDays": 1080,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Possession Of Firearm By Felon",
-        "minFine": 1000,
+        "minFine": 0,
         "maxFine": 10000,
         "minDays": 480,
-        "maxDays": 1080,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Possession Of Firearm In Commission Of Felony",
-        "minFine": 1000,
+        "minFine": 0,
         "maxFine": 10000,
         "minDays": 365,
-        "maxDays": 1080,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Possession Of Assault Weapon / Machine Gun",
-        "minFine": 5000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 1440,
-        "maxDays": 2880,
+        "minDays": 480,
+        "maxDays": 1095,
         "probation": 0.2,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Attempt To Detonate Explosive Device",
-        "minFine": 5000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 720,
-        "maxDays": 2160,
+        "minDays": 0,
+        "maxDays": 1095,
         "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Detonating Explosive Device",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 1825,
+        "maxDays": 7300,
+        "probation": 0.02,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Illegal Possession of Automatic Weapon",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 480,
+        "maxDays": 1095,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Unlawful Possession of Firearm Felony",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 365,
+        "maxDays": 1095,
+        "probation": 0.1,
         "canBeWarrant": true,
         "canRevokeLicense": false
       }
@@ -384,7 +694,7 @@
     "charges": [
       {
         "name": "Simple Battery",
-        "minFine": 500,
+        "minFine": 0,
         "maxFine": 2000,
         "minDays": 0,
         "maxDays": 180,
@@ -394,29 +704,29 @@
       },
       {
         "name": "Battery Causing Serious Bodily Injury",
-        "minFine": 1000,
-        "maxFine": 10000,
-        "minDays": 365,
-        "maxDays": 1440,
+        "minFine": 0,
+        "maxFine": 2000,
+        "minDays": 0,
+        "maxDays": 1460,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Battery With Deadly Weapon",
-        "minFine": 2000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 720,
-        "maxDays": 1440,
+        "minDays": 180,
+        "maxDays": 1460,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Battery On Peace Officer",
-        "minFine": 2000,
-        "maxFine": 10000,
-        "minDays": 180,
+        "minFine": 0,
+        "maxFine": 2000,
+        "minDays": 0,
         "maxDays": 365,
         "probation": 0.4,
         "canBeWarrant": true,
@@ -424,9 +734,9 @@
       },
       {
         "name": "Battery On Firefighter / EMS",
-        "minFine": 2000,
-        "maxFine": 10000,
-        "minDays": 180,
+        "minFine": 0,
+        "maxFine": 2000,
+        "minDays": 0,
         "maxDays": 365,
         "probation": 0.4,
         "canBeWarrant": true,
@@ -434,31 +744,71 @@
       },
       {
         "name": "Malicious Wounding",
-        "minFine": 1000,
-        "maxFine": 10000,
-        "minDays": 365,
-        "maxDays": 1440,
-        "probation": 0.4,
-        "canBeWarrant": true,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Sexual Battery",
-        "minFine": 2000,
-        "maxFine": 10000,
-        "minDays": 180,
-        "maxDays": 720,
+        "minFine": 0,
+        "maxFine": 2000,
+        "minDays": 0,
+        "maxDays": 1460,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Mayhem",
-        "minFine": 2000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 720,
-        "maxDays": 2880,
+        "minDays": 730,
+        "maxDays": 2920,
         "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Aggravated Battery",
+        "minFine": 0,
+        "maxFine": 2000,
+        "minDays": 730,
+        "maxDays": 1460,
+        "probation": 0.25,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Domestic Battery - Misdemeanor",
+        "minFine": 0,
+        "maxFine": 2000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.65,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Domestic Battery - Felony",
+        "minFine": 0,
+        "maxFine": 6000,
+        "minDays": 365,
+        "maxDays": 2920,
+        "probation": 0.35,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Battery on Law Enforcement Officer",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 180,
+        "maxDays": 1095,
+        "probation": 0.2,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Aggravated Battery On Law Enforcement Officer",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 730,
+        "maxDays": 2555,
+        "probation": 0.05,
         "canBeWarrant": true,
         "canRevokeLicense": false
       }
@@ -469,7 +819,7 @@
     "charges": [
       {
         "name": "Simple Assault",
-        "minFine": 500,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -479,29 +829,19 @@
       },
       {
         "name": "Aggravated Assault",
-        "minFine": 1000,
+        "minFine": 0,
         "maxFine": 10000,
         "minDays": 180,
-        "maxDays": 720,
-        "probation": 0.4,
-        "canBeWarrant": true,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Assault With Deadly Weapon",
-        "minFine": 1000,
-        "maxFine": 10000,
-        "minDays": 365,
-        "maxDays": 1440,
+        "maxDays": 1460,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Domestic Violence / Corporal Injury",
-        "minFine": 1000,
+        "minFine": 0,
         "maxFine": 6000,
-        "minDays": 180,
+        "minDays": 0,
         "maxDays": 365,
         "probation": 0.4,
         "canBeWarrant": true,
@@ -509,7 +849,7 @@
       },
       {
         "name": "Assault On Peace Officer",
-        "minFine": 1000,
+        "minFine": 0,
         "maxFine": 2000,
         "minDays": 0,
         "maxDays": 365,
@@ -519,7 +859,7 @@
       },
       {
         "name": "Assault On Firefighter / EMS",
-        "minFine": 1000,
+        "minFine": 0,
         "maxFine": 2000,
         "minDays": 0,
         "maxDays": 365,
@@ -528,22 +868,42 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Vehicular Assault",
-        "minFine": 1000,
-        "maxFine": 10000,
-        "minDays": 180,
-        "maxDays": 720,
+        "name": "Felony Domestic Assault",
+        "minFine": 0,
+        "maxFine": 6000,
+        "minDays": 365,
+        "maxDays": 1460,
         "probation": 0.4,
         "canBeWarrant": true,
-        "canRevokeLicense": true
+        "canRevokeLicense": false
       },
       {
-        "name": "Sexual Assault",
-        "minFine": 2000,
+        "name": "Misdemeanor Domestic Assault",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.75,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Assault on Law Enforcement Officer",
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 180,
-        "maxDays": 720,
-        "probation": 0.4,
+        "minDays": 730,
+        "maxDays": 2555,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Aggravated Stalking",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 1825,
+        "probation": 0.25,
         "canBeWarrant": true,
         "canRevokeLicense": false
       }
@@ -554,7 +914,7 @@
     "charges": [
       {
         "name": "Resisting / Obstructing Peace Officer",
-        "minFine": 500,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
@@ -564,17 +924,17 @@
       },
       {
         "name": "Failure To Comply With Lawful Order",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
-        "maxDays": 180,
+        "maxDays": 365,
         "probation": 0.4,
         "canBeWarrant": false,
         "canRevokeLicense": false
       },
       {
         "name": "Refusing To Provide Identification",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -584,7 +944,7 @@
       },
       {
         "name": "Providing False Information To Peace Officer",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -594,12 +954,82 @@
       },
       {
         "name": "Obstructing Or Hindering Investigation",
-        "minFine": 500,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
         "probation": 0.4,
         "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Attempt to Flee or Elude on Foot",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.6,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Destroying or Concealing Evidence",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.5,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Mask or Disguise in Attempt to Elude Arrest",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.5,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Planting or Tampering Evidence",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Resisting Arrest With Violence",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 0,
+        "maxDays": 1095,
+        "probation": 0.2,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Resisting Arrest (Non-Violent)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.6,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Unlawful Contact",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.5,
+        "canBeWarrant": false,
         "canRevokeLicense": false
       }
     ]
@@ -609,7 +1039,7 @@
     "charges": [
       {
         "name": "Vandalism (Under $400)",
-        "minFine": 400,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
@@ -619,20 +1049,10 @@
       },
       {
         "name": "Vandalism ($400 Or More)",
-        "minFine": 1000,
+        "minFine": 0,
         "maxFine": 50000,
-        "minDays": 180,
-        "maxDays": 1080,
-        "probation": 0.4,
-        "canBeWarrant": true,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Destruction Of Property",
-        "minFine": 500,
-        "maxFine": 10000,
         "minDays": 0,
-        "maxDays": 365,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
@@ -640,7 +1060,7 @@
       {
         "name": "Criminal Trespassing",
         "minFine": 75,
-        "maxFine": 400,
+        "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
         "probation": 0.4,
@@ -649,7 +1069,7 @@
       },
       {
         "name": "Prowling",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -659,12 +1079,62 @@
       },
       {
         "name": "Possession Of Burglary Tools",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
         "probation": 0.4,
         "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Graffiti",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.8,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Criminal Trespassing (Residential)",
+        "minFine": 75,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.8,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Criminal Trespassing (Commercial)",
+        "minFine": 75,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.8,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Criminal Trespassing (Government)",
+        "minFine": 75,
+        "maxFine": 2000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.7,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Criminal Trespassing (Restricted)",
+        "minFine": 75,
+        "maxFine": 10000,
+        "minDays": 0,
+        "maxDays": 1095,
+        "probation": 0.6,
+        "canBeWarrant": true,
         "canRevokeLicense": false
       }
     ]
@@ -674,7 +1144,7 @@
     "charges": [
       {
         "name": "Possession Of Drug Paraphernalia",
-        "minFine": 100,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -684,9 +1154,9 @@
       },
       {
         "name": "Under Influence Of Controlled Substance",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
-        "minDays": 0,
+        "minDays": 90,
         "maxDays": 365,
         "probation": 0.4,
         "canBeWarrant": false,
@@ -694,58 +1164,58 @@
       },
       {
         "name": "Trafficking / Sale Of Controlled Substance",
-        "minFine": 10000,
-        "maxFine": 50000,
-        "minDays": 1080,
-        "maxDays": 2880,
+        "minFine": 0,
+        "maxFine": 20000,
+        "minDays": 1095,
+        "maxDays": 1825,
         "probation": 0.3,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Possession Of Controlled Substance For Sale",
-        "minFine": 1000,
+        "minFine": 0,
         "maxFine": 20000,
-        "minDays": 365,
-        "maxDays": 3240,
+        "minDays": 730,
+        "maxDays": 1825,
         "probation": 0.3,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Transport Or Sale Of Methamphetamine",
-        "minFine": 1000,
-        "maxFine": 20000,
-        "minDays": 720,
-        "maxDays": 1440,
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 730,
+        "maxDays": 1460,
         "probation": 0.3,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Manufacturing Methamphetamine",
-        "minFine": 1000,
-        "maxFine": 20000,
-        "minDays": 1080,
-        "maxDays": 2520,
+        "minFine": 0,
+        "maxFine": 50000,
+        "minDays": 1095,
+        "maxDays": 2555,
         "probation": 0.3,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Sale Or Transport Of Cannabis",
-        "minFine": 500,
-        "maxFine": 5000,
+        "minFine": 0,
+        "maxFine": 500,
         "minDays": 0,
-        "maxDays": 1440,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Possession Of Amphetamine",
-        "minFine": 500,
-        "maxFine": 2000,
+        "minFine": 0,
+        "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
         "probation": 0.4,
@@ -754,28 +1224,18 @@
       },
       {
         "name": "Possession Of Benzodiazepine",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
-        "maxDays": 180,
-        "probation": 0.4,
-        "canBeWarrant": false,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Possession Of Cannabis Over Legal Limit",
-        "minFine": 100,
-        "maxFine": 500,
-        "minDays": 0,
-        "maxDays": 180,
+        "maxDays": 365,
         "probation": 0.4,
         "canBeWarrant": false,
         "canRevokeLicense": false
       },
       {
         "name": "Possession Of Cocaine",
-        "minFine": 500,
-        "maxFine": 2000,
+        "minFine": 0,
+        "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
         "probation": 0.4,
@@ -784,8 +1244,8 @@
       },
       {
         "name": "Possession Of Methamphetamine",
-        "minFine": 500,
-        "maxFine": 2000,
+        "minFine": 0,
+        "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
         "probation": 0.4,
@@ -794,18 +1254,8 @@
       },
       {
         "name": "Possession Of Heroin",
-        "minFine": 500,
-        "maxFine": 2000,
-        "minDays": 0,
-        "maxDays": 365,
-        "probation": 0.4,
-        "canBeWarrant": false,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Possession Of PCP",
-        "minFine": 500,
-        "maxFine": 2000,
+        "minFine": 0,
+        "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
         "probation": 0.4,
@@ -814,8 +1264,8 @@
       },
       {
         "name": "Possession Of LSD / Hallucinogen",
-        "minFine": 500,
-        "maxFine": 2000,
+        "minFine": 0,
+        "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
         "probation": 0.4,
@@ -824,8 +1274,8 @@
       },
       {
         "name": "Possession Of Ecstasy / MDMA",
-        "minFine": 500,
-        "maxFine": 2000,
+        "minFine": 0,
+        "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
         "probation": 0.4,
@@ -835,17 +1285,17 @@
       {
         "name": "Possession Of Fentanyl",
         "minFine": 1000,
-        "maxFine": 5000,
-        "minDays": 180,
-        "maxDays": 720,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Possession Of Controlled Substance (Prescription/Narcotic)",
-        "minFine": 500,
-        "maxFine": 2000,
+        "minFine": 0,
+        "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
         "probation": 0.4,
@@ -854,11 +1304,431 @@
       },
       {
         "name": "Possession Of Controlled Substance",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
         "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of DMT",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.1,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Synthetic Cannabinoids (K2 / Spice)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.1,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Gamma Hydroxybutyrate (GHB)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.1,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Synthetic Cathinones (Bath Salts)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.1,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Peyote",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.1,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Psilocybin Mushrooms",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.1,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession w/ Intent To Distribute Schedule I Narcotic",
+        "minFine": 0,
+        "maxFine": 20000,
+        "minDays": 1095,
+        "maxDays": 2920,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Trafficking Schedule I Narcotic",
+        "minFine": 0,
+        "maxFine": 20000,
+        "minDays": 1095,
+        "maxDays": 1825,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Adderall",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.2,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Cocaine Base (Crack)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.1,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Codeine (Promethazine)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.25,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Demerol",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.2,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Hydromorphones",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.15,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Marijuana (More Than 28 Grams+)",
+        "minFine": 0,
+        "maxFine": 500,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Morphine",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.2,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Methadone",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.15,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Opium",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.2,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Oxycontin",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.05,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of PCP / Angel Dust",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.15,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Percocet",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.2,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Vicodin",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.25,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession w/ Intent To Distribute Schedule II Narcotic",
+        "minFine": 0,
+        "maxFine": 20000,
+        "minDays": 1095,
+        "maxDays": 2920,
+        "probation": 0.05,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Simple Possession of Marijuana",
+        "minFine": 0,
+        "maxFine": 100,
+        "minDays": 0,
+        "maxDays": 30,
+        "probation": 0.75,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Trafficking Schedule II Narcotic",
+        "minFine": 0,
+        "maxFine": 20000,
+        "minDays": 1095,
+        "maxDays": 1825,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Anabolic Steroids",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.3,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Ketamine",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.3,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Tylenol w/ Codeine (Promethazine)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.3,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession w/ Intent To Distribute Schedule III Narcotic",
+        "minFine": 0,
+        "maxFine": 20000,
+        "minDays": 730,
+        "maxDays": 1825,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Trafficking Schedule III Narcotic",
+        "minFine": 0,
+        "maxFine": 20000,
+        "minDays": 730,
+        "maxDays": 1825,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Ativan",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Darvocet",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Darvon",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Rohypnol (Roofies)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Soma",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Tramadol",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Valium",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Xanax",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession w/ Intent To Distribute Schedule IV Narcotic",
+        "minFine": 0,
+        "maxFine": 20000,
+        "minDays": 365,
+        "maxDays": 1825,
+        "probation": 0.2,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Trafficking Schedule IV Narcotic",
+        "minFine": 0,
+        "maxFine": 20000,
+        "minDays": 365,
+        "maxDays": 1825,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Cultivation of Cocaine",
+        "minFine": 0,
+        "maxFine": 50000,
+        "minDays": 1095,
+        "maxDays": 2555,
+        "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Cultivation of Marijuana",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 0,
+        "maxDays": 1095,
+        "probation": 0.5,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Prescription Pills",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.2,
         "canBeWarrant": false,
         "canRevokeLicense": false
       }
@@ -869,87 +1739,87 @@
     "charges": [
       {
         "name": "First Degree Burglary (Residential)",
-        "minFine": 10000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 1800,
-        "maxDays": 3600,
+        "minDays": 730,
+        "maxDays": 2190,
         "probation": 0.2,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Home Invasion",
-        "minFine": 10000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 1800,
-        "maxDays": 3600,
+        "minDays": 730,
+        "maxDays": 2190,
         "probation": 0.2,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Robbery",
-        "minFine": 10000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 1800,
-        "maxDays": 3240,
+        "minDays": 730,
+        "maxDays": 2190,
         "probation": 0.2,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Attempted Robbery",
-        "minFine": 5000,
+        "minFine": 0,
         "maxFine": 10000,
         "minDays": 365,
-        "maxDays": 1080,
+        "maxDays": 1825,
         "probation": 0.3,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Robbery In First Degree (Armed)",
-        "minFine": 10000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 3600,
-        "maxDays": 7200,
+        "minDays": 1095,
+        "maxDays": 3285,
         "probation": 0.2,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Attempted Armed Robbery",
-        "minFine": 5000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 1800,
-        "maxDays": 3240,
+        "minDays": 730,
+        "maxDays": 2190,
         "probation": 0.3,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Carjacking",
-        "minFine": 10000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 1800,
-        "maxDays": 3240,
+        "minDays": 1095,
+        "maxDays": 3285,
         "probation": 0.2,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Grand Theft Auto",
-        "minFine": 1000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 365,
-        "maxDays": 1080,
+        "minDays": 480,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": true
       },
       {
         "name": "Petty Theft (Under $950)",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -959,7 +1829,7 @@
       },
       {
         "name": "Shoplifting (Under $950)",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -969,11 +1839,171 @@
       },
       {
         "name": "Burglary (Second Degree)",
-        "minFine": 1000,
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 480,
+        "maxDays": 1095,
+        "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Accessory to Robbery",
+        "minFine": 0,
         "maxFine": 10000,
         "minDays": 365,
-        "maxDays": 1080,
+        "maxDays": 1095,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Armed Robbery",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 1095,
+        "maxDays": 3285,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Attempted Grand Theft Auto",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 365,
+        "maxDays": 1095,
+        "probation": 0.2,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Breaking and Entering",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 480,
+        "maxDays": 1095,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Breaking and Entering - Vehicle",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
         "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Burglary",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 480,
+        "maxDays": 1095,
+        "probation": 0.2,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Grand Theft Auto (Value Total: Less than $50,000)",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 480,
+        "maxDays": 1095,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Grand Theft Auto (Value Total: $50,000+)",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 730,
+        "maxDays": 1460,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Home Invasion Robbery",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 1095,
+        "maxDays": 3285,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Nighttime Burglary",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 730,
+        "maxDays": 2190,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Removal of Identification Markings",
+        "minFine": 0,
+        "maxFine": 25000,
+        "minDays": 480,
+        "maxDays": 1095,
+        "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Strong Arm Robbery",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 730,
+        "maxDays": 1825,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Theft by Deception",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 730,
+        "maxDays": 1095,
+        "probation": 0.25,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Theft by Taking",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 730,
+        "maxDays": 1095,
+        "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Theft of Emergency Vehicle",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 1095,
+        "maxDays": 2190,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Receiving Stolen Property",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 480,
+        "maxDays": 1095,
+        "probation": 0.2,
         "canBeWarrant": true,
         "canRevokeLicense": false
       }
@@ -984,17 +2014,17 @@
     "charges": [
       {
         "name": "Possession Of Stolen Vehicle",
-        "minFine": 1000,
-        "maxFine": 5000,
-        "minDays": 365,
-        "maxDays": 1080,
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 480,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": true
       },
       {
         "name": "Possession Of Stolen Drivers License",
-        "minFine": 500,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
@@ -1004,7 +2034,7 @@
       },
       {
         "name": "Possession Of Stolen License Plate",
-        "minFine": 500,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
@@ -1014,37 +2044,37 @@
       },
       {
         "name": "VIN Tampering / Altered Or Defaced VIN",
-        "minFine": 500,
-        "maxFine": 1000,
-        "minDays": 0,
-        "maxDays": 365,
+        "minFine": 0,
+        "maxFine": 25000,
+        "minDays": 480,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": true
       },
       {
         "name": "Possession Of Stolen Debit / Credit Card",
-        "minFine": 500,
-        "maxFine": 2000,
+        "minFine": 0,
+        "maxFine": 10000,
         "minDays": 0,
-        "maxDays": 365,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": false,
         "canRevokeLicense": false
       },
       {
         "name": "Possession Of Credit Card Scanning Device",
-        "minFine": 500,
-        "maxFine": 1000,
+        "minFine": 0,
+        "maxFine": 10000,
         "minDays": 0,
-        "maxDays": 365,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Possession Of Counterfeit Items",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
@@ -1054,12 +2084,32 @@
       },
       {
         "name": "Possession Of Stolen Property",
-        "minFine": 250,
-        "maxFine": 1000,
+        "minFine": 0,
+        "maxFine": 10000,
         "minDays": 0,
-        "maxDays": 365,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Fraudulent Driver's License or ID(s)",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 730,
+        "maxDays": 1095,
+        "probation": 0.7,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Fraudulent Government ID / Passport",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 730,
+        "maxDays": 1460,
+        "probation": 0.6,
+        "canBeWarrant": true,
         "canRevokeLicense": false
       }
     ]
@@ -1072,7 +2122,7 @@
         "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
-        "maxDays": 7200,
+        "maxDays": 7300,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
@@ -1082,28 +2132,168 @@
         "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
-        "maxDays": 7200,
+        "maxDays": 7300,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Failure To Register As Sex Offender",
-        "minFine": 1000,
-        "maxFine": 5000,
+        "minFine": 0,
+        "maxFine": 10000,
         "minDays": 180,
-        "maxDays": 365,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Violation Of Protective Order",
-        "minFine": 250,
-        "maxFine": 1000,
+        "minFine": 0,
+        "maxFine": 5000,
         "minDays": 0,
         "maxDays": 365,
         "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Bail Jumping",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 180,
+        "maxDays": 1095,
+        "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Certificate of Bench Warrant",
+        "minFine": 0,
+        "maxFine": 0,
+        "minDays": 0,
+        "maxDays": 720,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Contempt of Court",
+        "minFine": 0,
+        "maxFine": 5000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.25,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Failure to Appear",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.2,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Failure to Obey Court Order",
+        "minFine": 0,
+        "maxFine": 5000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.25,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Failure to Pay Child Support",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.75,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Failure to Pay Fine",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 90,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Failure to Report to Probation Officer",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Fleeing to Elude Law Enforcement",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 365,
+        "maxDays": 1095,
+        "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Failure to Pay Restitution",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Terroristic Threats or Acts",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 365,
+        "maxDays": 1095,
+        "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Violation of Court-Ordered Community Service",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Violation of Felony Probation",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 2190,
+        "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Violation of No-Contact Order",
+        "minFine": 0,
+        "maxFine": 5000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.05,
         "canBeWarrant": true,
         "canRevokeLicense": false
       }
@@ -1114,27 +2304,27 @@
     "charges": [
       {
         "name": "Escape From Custody",
-        "minFine": 1000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 180,
-        "maxDays": 1080,
+        "minDays": 365,
+        "maxDays": 2190,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Aid In Escape",
-        "minFine": 500,
-        "maxFine": 5000,
+        "minFine": 0,
+        "maxFine": 10000,
         "minDays": 0,
-        "maxDays": 365,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Attempt To Escape Custody",
-        "minFine": 500,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
@@ -1144,27 +2334,27 @@
       },
       {
         "name": "Escape From Jail",
-        "minFine": 1000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 180,
-        "maxDays": 1080,
+        "minDays": 365,
+        "maxDays": 2190,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Aid In Escape Of Jail",
-        "minFine": 500,
-        "maxFine": 5000,
+        "minFine": 0,
+        "maxFine": 10000,
         "minDays": 0,
-        "maxDays": 365,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Attempt To Escape Jail",
-        "minFine": 500,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
@@ -1179,63 +2369,133 @@
     "charges": [
       {
         "name": "First Degree Murder",
-        "minFine": 10000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 9000,
-        "maxDays": null,
+        "minDays": 9125,
+        "maxDays": 9999,
         "probation": 0,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Second Degree Murder",
-        "minFine": 10000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 3600,
-        "maxDays": null,
+        "minDays": 5475,
+        "maxDays": 9999,
         "probation": 0,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Attempted Murder",
-        "minFine": 5000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 1800,
-        "maxDays": 3600,
+        "minDays": 1825,
+        "maxDays": 2920,
         "probation": 0.2,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Voluntary Manslaughter",
-        "minFine": 10000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 1080,
-        "maxDays": 3960,
+        "minDays": 1095,
+        "maxDays": 4015,
         "probation": 0.2,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Involuntary Manslaughter",
-        "minFine": 5000,
+        "minFine": 0,
         "maxFine": 10000,
         "minDays": 365,
-        "maxDays": 1440,
+        "maxDays": 1460,
         "probation": 0.3,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Vehicular Manslaughter",
-        "minFine": 1000,
+        "minFine": 0,
         "maxFine": 10000,
         "minDays": 365,
-        "maxDays": 3600,
+        "maxDays": 1460,
         "probation": 0.3,
         "canBeWarrant": true,
         "canRevokeLicense": true
+      },
+      {
+        "name": "Aggravated Murder",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 9125,
+        "maxDays": 9999,
+        "probation": 0,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Murder of Police Officer",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 9125,
+        "maxDays": 9999,
+        "probation": 0,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Vehicular Homicide",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 1825,
+        "maxDays": 3650,
+        "probation": 0,
+        "canBeWarrant": true,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "Manslaughter While Under Influence of Drugs / Alcohol",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 1460,
+        "maxDays": 3650,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Negligent Homicide",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 365,
+        "maxDays": 1460,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": true
+      },
+      {
+        "name": "Attempted Murder of a Police Officer",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 3650,
+        "maxDays": 9999,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Conspiracy to Commit Murder",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 1825,
+        "maxDays": 9125,
+        "probation": 0.2,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
       }
     ]
   },
@@ -1244,51 +2504,91 @@
     "charges": [
       {
         "name": "Rape",
-        "minFine": 10000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 1080,
-        "maxDays": 4680,
+        "minDays": 1095,
+        "maxDays": 2920,
         "probation": 0.2,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Attempted Rape",
-        "minFine": 5000,
+        "minFine": 0,
         "maxFine": 10000,
         "minDays": 365,
-        "maxDays": 1080,
+        "maxDays": 1095,
         "probation": 0.3,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Kidnapping",
-        "minFine": 5000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 720,
-        "maxDays": 2880,
+        "minDays": 730,
+        "maxDays": 2920,
         "probation": 0.2,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Attempted Kidnapping",
-        "minFine": 2500,
-        "maxFine": 5000,
+        "minFine": 0,
+        "maxFine": 10000,
         "minDays": 365,
-        "maxDays": 1080,
+        "maxDays": 1095,
         "probation": 0.3,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Aggravated Kidnapping",
-        "minFine": 10000,
+        "minFine": 0,
         "maxFine": 10000,
-        "minDays": 1800,
-        "maxDays": null,
+        "minDays": 4015,
+        "maxDays": 9999,
         "probation": 0.2,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "False Imprisonment",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 0,
+        "maxDays": 1095,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Aggravated Sexual Assault",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 5475,
+        "maxDays": 9999,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Sexual Assault",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 1095,
+        "maxDays": 2920,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Sexual Battery",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 180,
+        "maxDays": 1460,
+        "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       }
@@ -1299,41 +2599,101 @@
     "charges": [
       {
         "name": "Arson Causing Great Bodily Injury",
-        "minFine": 10000,
-        "maxFine": 10000,
-        "minDays": 1800,
-        "maxDays": 3600,
+        "minFine": 0,
+        "maxFine": 50000,
+        "minDays": 1825,
+        "maxDays": 3285,
         "probation": 0.2,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Arson Of Structure",
-        "minFine": 5000,
-        "maxFine": 10000,
-        "minDays": 1080,
-        "maxDays": 2880,
+        "minFine": 0,
+        "maxFine": 50000,
+        "minDays": 730,
+        "maxDays": 2920,
         "probation": 0.2,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Reckless Burning / Unlawful Burning",
-        "minFine": 1000,
-        "maxFine": 10000,
+        "minFine": 0,
+        "maxFine": 50000,
         "minDays": 180,
-        "maxDays": 1080,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Attempted Arson",
-        "minFine": 1000,
-        "maxFine": 5000,
+        "minFine": 0,
+        "maxFine": 50000,
         "minDays": 180,
-        "maxDays": 720,
+        "maxDays": 730,
         "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Arson First Degree",
+        "minFine": 0,
+        "maxFine": 50000,
+        "minDays": 1095,
+        "maxDays": 2920,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Arson Second Degree",
+        "minFine": 0,
+        "maxFine": 50000,
+        "minDays": 730,
+        "maxDays": 1460,
+        "probation": 0.2,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Arson Third Degree",
+        "minFine": 0,
+        "maxFine": 50000,
+        "minDays": 180,
+        "maxDays": 1095,
+        "probation": 0.5,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Attempted Arson First Degree",
+        "minFine": 0,
+        "maxFine": 50000,
+        "minDays": 730,
+        "maxDays": 1825,
+        "probation": 0.25,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Attempted Arson Second Degree",
+        "minFine": 0,
+        "maxFine": 50000,
+        "minDays": 365,
+        "maxDays": 1095,
+        "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Attempted Arson Third Degree",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.6,
         "canBeWarrant": true,
         "canRevokeLicense": false
       }
@@ -1344,7 +2704,7 @@
     "charges": [
       {
         "name": "Soliciting Prostitution",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -1354,7 +2714,7 @@
       },
       {
         "name": "Engaging In Prostitution",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -1364,7 +2724,7 @@
       },
       {
         "name": "Loitering With Purpose Of Prostitution",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
@@ -1374,7 +2734,7 @@
       },
       {
         "name": "Lewd Conduct In Public",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -1384,12 +2744,417 @@
       },
       {
         "name": "Indecent Exposure",
-        "minFine": 250,
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 1095,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Sexual Acts (Public)",
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
-        "probation": 0.4,
+        "probation": 0.85,
         "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Public Act Lewdness (Felony)",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 365,
+        "maxDays": 1095,
+        "probation": 0.6,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      }
+    ]
+  },
+  {
+    "name": "Accessory",
+    "charges": [
+      {
+        "name": "Accessory After the Fact - Felony",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 365,
+        "maxDays": 1095,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Accessory After the Fact - Misdemeanor",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.6,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      }
+    ]
+  },
+  {
+    "name": "Criminal Street Gang Activity",
+    "charges": [
+      {
+        "name": "Commission of Felony to Further Gang Activity",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 1095,
+        "maxDays": 10950,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Display of Gang Symbols in Public Areas",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.8,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Loitering in Furtherance of Gang Activity",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.75,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Participation in Criminal Street Gang Activity",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 480,
+        "maxDays": 1095,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Recruitment for Criminal Street Gang Activity",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 730,
+        "maxDays": 1825,
+        "probation": 0.2,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Threats or Violence for Gang Initiation",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 1095,
+        "maxDays": 9125,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      }
+    ]
+  },
+  {
+    "name": "Federal Enforcement Division",
+    "charges": [
+      {
+        "name": "Attempted Assassination of a Government Official",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.08,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Assassination of a Government Official",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 9125,
+        "maxDays": 9999,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Bank Fraud",
+        "minFine": 0,
+        "maxFine": 1000000,
+        "minDays": 1825,
+        "maxDays": 10950,
+        "probation": 0.2,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Bribery of Public Officials",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 1825,
+        "maxDays": 7300,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Counterfeiting Currency",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Cyber Fraud",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 1825,
+        "maxDays": 10950,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Cyberterrorism",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Drug Trafficking Across State Lines",
+        "minFine": 0,
+        "maxFine": 10000000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Espionage - Unauthorized Disclosure of National Secrets",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 7300,
+        "maxDays": 9999,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Flying Aircraft in Restricted Airspace",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 1825,
+        "maxDays": 10950,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Hijacking of Aircraft",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 7300,
+        "maxDays": 9999,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Human Trafficking for Forced Labor",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Identity Theft (Including Online Means)",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 365,
+        "maxDays": 1095,
+        "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Insider Trading",
+        "minFine": 0,
+        "maxFine": 5000000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Obstruction of Justice - Federal Case",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 1825,
+        "maxDays": 5475,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Operating a Clandestine Drug Lab",
+        "minFine": 0,
+        "maxFine": 50000,
+        "minDays": 1095,
+        "maxDays": 2555,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Piracy on Open Seas",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Automatic Firearm Switch",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 1825,
+        "maxDays": 5475,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Explosive Device Without Permit",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 1825,
+        "maxDays": 7300,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Providing Material Support to Terrorist Organizations",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Securities Fraud",
+        "minFine": 0,
+        "maxFine": 5000000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Smuggling Contraband by Air",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Smuggling Narcotics",
+        "minFine": 0,
+        "maxFine": 10000000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Tax Evasion",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 1825,
+        "maxDays": 7300,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Transporting a Kidnapped Person Across State Lines",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Unauthorized Boarding of Vessel in Waters",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 1825,
+        "maxDays": 5475,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Unlawful Possession of Machine Gun",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 1825,
+        "maxDays": 5475,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Unlawful Sale of Firearms",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 1825,
+        "maxDays": 7300,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Wire Fraud",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 1825,
+        "maxDays": 7300,
+        "probation": 0.1,
+        "canBeWarrant": true,
         "canRevokeLicense": false
       }
     ]
@@ -1399,27 +3164,27 @@
     "charges": [
       {
         "name": "Stalking",
-        "minFine": 1000,
-        "maxFine": 5000,
-        "minDays": 180,
-        "maxDays": 720,
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 0,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Impersonating Peace Officer",
-        "minFine": 1000,
+        "minFine": 0,
         "maxFine": 2000,
         "minDays": 0,
-        "maxDays": 365,
+        "maxDays": 180,
         "probation": 0.4,
         "canBeWarrant": false,
         "canRevokeLicense": false
       },
       {
         "name": "False Report Of Emergency (911 Abuse)",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -1429,18 +3194,18 @@
       },
       {
         "name": "Unlawful Assembly",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
-        "maxDays": 180,
+        "maxDays": 365,
         "probation": 0.4,
         "canBeWarrant": false,
         "canRevokeLicense": false
       },
       {
         "name": "Riot",
-        "minFine": 1000,
-        "maxFine": 2000,
+        "minFine": 0,
+        "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
         "probation": 0.4,
@@ -1449,7 +3214,7 @@
       },
       {
         "name": "Present During A Riot",
-        "minFine": 500,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -1459,7 +3224,7 @@
       },
       {
         "name": "Disturbing The Peace",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 400,
         "minDays": 0,
         "maxDays": 90,
@@ -1469,7 +3234,7 @@
       },
       {
         "name": "Disorderly Conduct",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 90,
@@ -1479,8 +3244,8 @@
       },
       {
         "name": "Harassment By Electronic Means",
-        "minFine": 500,
-        "maxFine": 2000,
+        "minFine": 0,
+        "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
         "probation": 0.4,
@@ -1489,7 +3254,7 @@
       },
       {
         "name": "Failure To Disperse",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -1499,7 +3264,7 @@
       },
       {
         "name": "Loitering",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -1509,7 +3274,7 @@
       },
       {
         "name": "Public Intoxication",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -1519,7 +3284,7 @@
       },
       {
         "name": "Reckless Endangerment (Assault)",
-        "minFine": 500,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -1529,7 +3294,7 @@
       },
       {
         "name": "Wanton Endangerment",
-        "minFine": 250,
+        "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 180,
@@ -1539,7 +3304,7 @@
       },
       {
         "name": "Battery (Mutual Combat / Fighting)",
-        "minFine": 500,
+        "minFine": 0,
         "maxFine": 2000,
         "minDays": 0,
         "maxDays": 180,
@@ -1548,22 +3313,667 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Accessory After The Fact",
-        "minFine": 1000,
-        "maxFine": 5000,
-        "minDays": 180,
-        "maxDays": 1080,
+        "name": "Accessory Before The Fact",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 0,
+        "maxDays": 1095,
         "probation": 0.4,
         "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
-        "name": "Accessory Before The Fact",
-        "minFine": 1000,
-        "maxFine": 5000,
-        "minDays": 180,
-        "maxDays": 1080,
+        "name": "Contributing Alcohol to Person(s) Under 21",
+        "minFine": 250,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.7,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Criminal Solicitation",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 0,
+        "maxDays": 1095,
+        "probation": 0.8,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Fighting in Public",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.85,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Harassment",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.8,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Illegal Broadcasting",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.9,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Urinating in Public",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.95,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Terroristic Threats (Misdemeanor)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.75,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Terroristic Threats (Felony)",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 480,
+        "maxDays": 1095,
+        "probation": 0.5,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      }
+    ]
+  },
+  {
+    "name": "Unlicensed / Unauthorized",
+    "charges": [
+      {
+        "name": "Unlicensed Sale of Alcohol",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.3,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Unlicensed Firearms Dealing",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 365,
+        "maxDays": 1825,
+        "probation": 0.2,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Unlicensed Food Sales",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
         "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Unauthorized Practice of a Profession",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 365,
+        "maxDays": 1825,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Unlawful Sale of Prescription Drugs",
+        "minFine": 0,
+        "maxFine": 20000,
+        "minDays": 1095,
+        "maxDays": 1825,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Unlicensed Street Vending",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.5,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Operating a Business Without a License",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Unlicensed Auto Dealership Operations",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 365,
+        "maxDays": 1095,
+        "probation": 0.2,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Unlicensed Transport of Hazardous Materials",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 0,
+        "maxDays": 3650,
+        "probation": 0.3,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Unlicensed Tattoo or Body Art Services",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      }
+    ]
+  },
+  {
+    "name": "Immigration/ICE",
+    "charges": [
+      {
+        "name": "Alien Smuggling for Financial Gain",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "False Statement on Immigration Application",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 730,
+        "maxDays": 5475,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Harboring Illegal Aliens",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 1825,
+        "maxDays": 7300,
+        "probation": 0,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Illegal Entry",
+        "minFine": 0,
+        "maxFine": 250,
+        "minDays": 0,
+        "maxDays": 730,
+        "probation": 0,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Illegal Re-Entry After Deportation",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 730,
+        "maxDays": 7300,
+        "probation": 0,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Immigration Document Forgery",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 730,
+        "maxDays": 3650,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Immigration Document Fraud",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 365,
+        "maxDays": 3650,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Providing False Documents to Authorities",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 730,
+        "maxDays": 3650,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Re-Entry of Deported Alien",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 730,
+        "maxDays": 7300,
+        "probation": 0,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Smuggling of Aliens",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Violating Work Visa Regulations",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 0,
+        "maxDays": 1825,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      }
+    ]
+  },
+  {
+    "name": "Larceny / Fraud",
+    "charges": [
+      {
+        "name": "Check Fraud 1st Offense",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 0,
+        "maxDays": 1095,
+        "probation": 0.75,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Corporate Fraud",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 1825,
+        "maxDays": 9125,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Credit Card Fraud (Over $500)",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 365,
+        "maxDays": 3650,
+        "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Credit Card Fraud (Under $500)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.6,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Embezzlement",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 480,
+        "maxDays": 1095,
+        "probation": 0.2,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Forgery",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 480,
+        "maxDays": 1095,
+        "probation": 0.6,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Fraud",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 730,
+        "maxDays": 1095,
+        "probation": 0.5,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Fraudulent Passport",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 730,
+        "maxDays": 1460,
+        "probation": 0.6,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Fraudulent Use of Access Device",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 730,
+        "maxDays": 1460,
+        "probation": 0.6,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Fraudulent Use of Electronic Device",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 730,
+        "maxDays": 1825,
+        "probation": 0.5,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Grand Larceny",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 730,
+        "maxDays": 1095,
+        "probation": 0.5,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Insurance Fraud",
+        "minFine": 0,
+        "maxFine": 50000,
+        "minDays": 1825,
+        "maxDays": 5475,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Manipulation of a VIN",
+        "minFine": 0,
+        "maxFine": 25000,
+        "minDays": 480,
+        "maxDays": 1095,
+        "probation": 0.75,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Money Laundering (Over $100,000)",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Mortgage Fraud",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 1825,
+        "maxDays": 7300,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Obtaining Under False Pretenses",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.75,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Petit Larceny (Under $300)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.9,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Petit Larceny (Over $300)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.9,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Petit Larceny 2nd Offense",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.7,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Petit Larceny 3rd Offense",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 180,
+        "maxDays": 1095,
+        "probation": 0.55,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Theft of Services (Goods)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 180,
+        "probation": 0.85,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Ponzi Scheme Operations",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Tax Fraud",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 1825,
+        "maxDays": 7300,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      }
+    ]
+  },
+  {
+    "name": "Racketeering (RICO)",
+    "charges": [
+      {
+        "name": "Drug Trafficking (RICO)",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Drug Cartel Operations (RICO)",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Extortion (RICO)",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.2,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Illegal Gambling (RICO)",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 1825,
+        "maxDays": 5475,
+        "probation": 0.25,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Money Laundering (RICO)",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.15,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Racketeering (RICO)",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 10950,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "RICO Conspiracy",
+        "minFine": 0,
+        "maxFine": 250000,
+        "minDays": 3650,
+        "maxDays": 7300,
+        "probation": 0.1,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      }
+    ]
+  },
+  {
+    "name": "Wildlife",
+    "charges": [
+      {
+        "name": "Cruelty to Animals",
+        "minFine": 0,
+        "maxFine": 20000,
+        "minDays": 0,
+        "maxDays": 1095,
+        "probation": 0.5,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Dog Fighting",
+        "minFine": 0,
+        "maxFine": 50000,
+        "minDays": 480,
+        "maxDays": 1095,
+        "probation": 0.05,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Poaching",
+        "minFine": 5000,
+        "maxFine": 50000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Dog Fighting Paraphernalia",
+        "minFine": 0,
+        "maxFine": 50000,
+        "minDays": 365,
+        "maxDays": 730,
+        "probation": 0.15,
         "canBeWarrant": true,
         "canRevokeLicense": false
       }

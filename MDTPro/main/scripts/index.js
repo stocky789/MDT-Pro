@@ -85,8 +85,35 @@
       })
     }
 
-    // Panic, ALPR and other qabBtn (excluding backup and notepad which have their own handlers)
-    quickActionsBar.querySelectorAll('.qabBtn:not(.qabBackupMain):not([data-action="notepad"])').forEach((btn) => {
+    // Narcotics Cheat Sheet: open popup (excluded from loading/API flow below)
+    const narcoticsBtn = quickActionsBar.querySelector('.qabBtn[data-action="narcoticsCheatsheet"]')
+    const narcoticsPopup = document.getElementById('narcoticsCheatsheetPopup')
+    const narcoticsContent = document.getElementById('narcoticsCheatsheetContent')
+    if (narcoticsBtn && narcoticsPopup && narcoticsContent && typeof buildNarcoticsCheatsheetContent === 'function') {
+      let contentBuilt = false
+      const openNarcoticsCheatsheet = () => {
+        if (!contentBuilt) {
+          narcoticsContent.appendChild(buildNarcoticsCheatsheetContent())
+          contentBuilt = true
+        }
+        narcoticsPopup.classList.add('open')
+        narcoticsPopup.setAttribute('aria-hidden', 'false')
+      }
+      const closeNarcoticsCheatsheet = () => {
+        narcoticsPopup.classList.remove('open')
+        narcoticsPopup.setAttribute('aria-hidden', 'true')
+      }
+      narcoticsBtn.addEventListener('click', openNarcoticsCheatsheet)
+      narcoticsPopup.querySelectorAll('[data-narcotics-cheatsheet-close]').forEach((el) => {
+        el.addEventListener('click', closeNarcoticsCheatsheet)
+      })
+      narcoticsPopup.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeNarcoticsCheatsheet()
+      })
+    }
+
+    // Panic, ALPR and other qabBtn (excluding backup, notepad, narcoticsCheatsheet which have their own handlers)
+    quickActionsBar.querySelectorAll('.qabBtn:not(.qabBackupMain):not([data-action="notepad"]):not([data-action="narcoticsCheatsheet"])').forEach((btn) => {
       btn.addEventListener('click', async function () {
         const action = this.dataset.action
         if (!action) return

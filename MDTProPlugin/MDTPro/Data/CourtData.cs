@@ -27,6 +27,8 @@ namespace MDTPro.Data {
         public int PriorConvictionCount = 0;
         public int SeverityScore = 0;
         public int EvidenceScore = 0;
+        /// <summary>0=Low (&lt;35), 1=Medium (35-59), 2=High (≥60). Computed from EvidenceScore for API.</summary>
+        public int EvidenceBand = 0;
         public bool EvidenceHadWeapon = false;
         public bool EvidenceWasWanted = false;
         public bool EvidenceWasPatDown = false;
@@ -70,6 +72,8 @@ namespace MDTPro.Data {
         public List<string> LicenseRevocations = new List<string>();
         /// <summary>Report IDs attached to this case (evidence). Editable until court date; then frozen.</summary>
         public List<string> AttachedReportIds = new List<string>();
+        /// <summary>Optional one-paragraph summary of officer testimony from evidence flags and charges. For exhibit display.</summary>
+        public string OfficerTestimonySummary;
         public List<Charge> Charges = new List<Charge>();
 
         public class Charge {
@@ -86,11 +90,24 @@ namespace MDTPro.Data {
                 IsArrestable = isArrestable;
             }
 
+            internal Charge(string name, int fine, int? time, bool isArrestable, int minDays, int? maxDays) {
+                Name = name;
+                Fine = fine;
+                Time = time;
+                IsArrestable = isArrestable;
+                MinDays = minDays;
+                MaxDays = maxDays;
+            }
+
             public Charge() { }
 
             public string Name;
             public int Fine;
             public int? Time;
+            /// <summary>Statutory minimum jail days for sentencing range. Used with MaxDays at resolution.</summary>
+            public int MinDays;
+            /// <summary>Statutory maximum jail days. Null = life sentence.</summary>
+            public int? MaxDays;
             public bool? IsArrestable;
             /// <summary>0 Pending, 1 Convicted, 2 Acquitted, 3 Dismissed. Set at resolution.</summary>
             public int Outcome;

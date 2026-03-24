@@ -986,6 +986,23 @@
   stroke: none;
 }
 
+/* Drugs icon: original SVG Repo colors (QAB svg rule uses fill:none — set fills on paths) */
+.quickActionsBar .qabBtn.qabNarcoticsCheatsheet svg.qabDrugsIcon {
+  stroke: none;
+}
+
+.quickActionsBar .qabBtn.qabNarcoticsCheatsheet svg.qabDrugsIcon path {
+  stroke: none;
+}
+
+.quickActionsBar .qabBtn.qabNarcoticsCheatsheet svg.qabDrugsIcon path.qabDrugsFillLight {
+  fill: #ecf0f1;
+}
+
+.quickActionsBar .qabBtn.qabNarcoticsCheatsheet svg.qabDrugsIcon path.qabDrugsFillCoral {
+  fill: #e64c3c;
+}
+
 .quickActionsBar .qabBtn.qabPanic {
   color: var(--color-error);
   border-color: var(--color-error-half);
@@ -1241,6 +1258,255 @@
 .notepadPopupSave:hover {
   background-color: var(--color-accent) !important;
   color: var(--color-surface) !important;
+}
+
+/* ---------- Narcotics Cheat Sheet popup ---------- */
+.narcoticsCheatsheetPopup {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition-time-short) ease, visibility var(--transition-time-short) ease;
+}
+
+.narcoticsCheatsheetPopup.open {
+  pointer-events: all;
+  opacity: 1;
+  visibility: visible;
+}
+
+.narcoticsCheatsheetBackdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.narcoticsCheatsheetPanel {
+  position: relative;
+  width: 100%;
+  max-width: 680px;
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-medium);
+}
+
+.narcoticsCheatsheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.narcoticsCheatsheetTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.narcoticsCheatsheetClose {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary-half);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color var(--transition-time-short) ease, background-color var(--transition-time-short) ease;
+}
+
+.narcoticsCheatsheetClose:hover {
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-elevated);
+}
+
+.narcoticsCheatsheetContent {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.narcoticsCheatsheetInner {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.narcoticsCheatsheetSection {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.narcoticsCheatsheetSection:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.narcoticsCheatsheetSectionTitle {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.narcoticsCheatsheetTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.narcoticsCheatsheetTable th,
+.narcoticsCheatsheetTable td {
+  padding: 8px 10px;
+  text-align: left;
+  border: 1px solid var(--color-border);
+}
+
+.narcoticsCheatsheetTable th {
+  background-color: var(--color-surface-elevated);
+  color: var(--color-accent-secondary);
+  font-weight: 600;
+}
+
+.narcoticsCheatsheetTable tr:nth-child(even) td {
+  background-color: var(--color-surface-dimmed);
+}
+
+.narcoticsCheatsheetNote,
+.narcoticsCheatsheetHint {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--color-text-primary-half);
+  font-style: italic;
+}
+
+.narcoticsCheatsheetGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.narcoticsCheatsheetGridItem {
+  font-size: 12px;
+  padding: 8px 10px;
+  background-color: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+
+.narcoticsCheatsheetSlangGrid {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 16px;
+}
+
+.narcoticsCheatsheetSlangGrid > div {
+  font-size: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.narcoticsCheatsheetSlangGrid > div:last-child {
+  border-bottom: none;
+}
+
+.narcoticsCheatsheetCharges > div {
+  font-size: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.narcoticsCheatsheetCharges > div:last-child {
+  border-bottom: none;
+}
+
+.narcoticsCheatsheetSection ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-primary);
+}
+
+.narcoticsCheatsheetSection li {
+  margin-bottom: 4px;
+}
+
+.narcoticsCheatsheetAlert {
+  padding: 12px 14px;
+  border-radius: 4px;
+  background-color: var(--color-warning-half);
+  border: 1px solid var(--color-warning);
+}
+
+.narcoticsCheatsheetFentanyl {
+  background-color: var(--color-error-half);
+  border-color: var(--color-error);
+}
+
+.narcoticsCheatsheetFentanyl ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.narcoticsCheatsheetFentanyl li {
+  margin-bottom: 6px;
+  color: var(--color-text-primary);
+}
+
+.narcoticsCheatsheetActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.narcoticsCheatsheetCloseBtn {
+  padding: 8px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background-color: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: background-color var(--transition-time-short) ease, border-color var(--transition-time-short) ease;
+}
+
+.narcoticsCheatsheetCloseBtn:hover {
+  background-color: var(--color-accent-half);
+  border-color: var(--color-accent);
+}
+
+/* Quick Actions Bar: narcotics button styling (matches other qabBtn) */
+.quickActionsBar .qabBtn.qabNarcoticsCheatsheet {
+  color: var(--color-text-primary);
+}
+
+.quickActionsBar .qabBtn.qabNarcoticsCheatsheet:hover {
+  color: var(--color-accent);
 }
 
 @media (max-width: 700px) {

@@ -238,6 +238,16 @@ namespace MDTPro.ServerAPI {
                 if (arrest.AttachedReportIds == null) arrest.AttachedReportIds = new System.Collections.Generic.List<string>();
                 if (!arrest.AttachedReportIds.Contains(data.reportId)) arrest.AttachedReportIds.Add(data.reportId);
                 Database.SaveArrestReport(arrest);
+                // If arrest has linked court case, sync attachment and recalc evidence
+                if (!string.IsNullOrEmpty(arrest.CourtCaseNumber)) {
+                    var courtCase = DataController.CourtDatabase?.FirstOrDefault(x => x.Number == arrest.CourtCaseNumber);
+                    if (courtCase != null && courtCase.Status == 0) {
+                        if (courtCase.AttachedReportIds == null) courtCase.AttachedReportIds = new System.Collections.Generic.List<string>();
+                        if (!courtCase.AttachedReportIds.Contains(data.reportId)) courtCase.AttachedReportIds.Add(data.reportId);
+                        DataController.RecalculateCourtCaseEvidence(courtCase);
+                        Database.SaveCourtCase(courtCase);
+                    }
+                }
                 buffer = Encoding.UTF8.GetBytes("OK");
                 contentType = "text/plain";
                 status = 200;
@@ -259,6 +269,15 @@ namespace MDTPro.ServerAPI {
                 }
                 if (arrest.AttachedReportIds != null) arrest.AttachedReportIds.Remove(data.reportId);
                 Database.SaveArrestReport(arrest);
+                // If arrest has linked court case, sync detachment and recalc evidence
+                if (!string.IsNullOrEmpty(arrest.CourtCaseNumber)) {
+                    var courtCase = DataController.CourtDatabase?.FirstOrDefault(x => x.Number == arrest.CourtCaseNumber);
+                    if (courtCase != null && courtCase.Status == 0) {
+                        if (courtCase.AttachedReportIds != null) courtCase.AttachedReportIds.Remove(data.reportId);
+                        DataController.RecalculateCourtCaseEvidence(courtCase);
+                        Database.SaveCourtCase(courtCase);
+                    }
+                }
                 buffer = Encoding.UTF8.GetBytes("OK");
                 contentType = "text/plain";
                 status = 200;
@@ -288,7 +307,20 @@ namespace MDTPro.ServerAPI {
                         added++;
                     }
                 }
-                if (added > 0) Database.SaveArrestReport(arrest);
+                if (added > 0) {
+                    Database.SaveArrestReport(arrest);
+                    // If arrest has linked court case, sync attachments and recalc evidence
+                    if (!string.IsNullOrEmpty(arrest.CourtCaseNumber)) {
+                        var courtCase = DataController.CourtDatabase?.FirstOrDefault(x => x.Number == arrest.CourtCaseNumber);
+                        if (courtCase != null && courtCase.Status == 0) {
+                            courtCase.AttachedReportIds = arrest.AttachedReportIds != null
+                                ? new System.Collections.Generic.List<string>(arrest.AttachedReportIds)
+                                : new System.Collections.Generic.List<string>();
+                            DataController.RecalculateCourtCaseEvidence(courtCase);
+                            Database.SaveCourtCase(courtCase);
+                        }
+                    }
+                }
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = true, added }));
                 contentType = "application/json";
                 status = 200;
@@ -321,6 +353,7 @@ namespace MDTPro.ServerAPI {
                 }
                 if (courtCase.AttachedReportIds == null) courtCase.AttachedReportIds = new System.Collections.Generic.List<string>();
                 if (!courtCase.AttachedReportIds.Contains(data.reportId)) courtCase.AttachedReportIds.Add(data.reportId);
+                DataController.RecalculateCourtCaseEvidence(courtCase);
                 Database.SaveCourtCase(courtCase);
                 buffer = Encoding.UTF8.GetBytes("OK");
                 contentType = "text/plain";
@@ -347,6 +380,7 @@ namespace MDTPro.ServerAPI {
                     return;
                 }
                 if (courtCase.AttachedReportIds != null) courtCase.AttachedReportIds.Remove(data.reportId);
+                DataController.RecalculateCourtCaseEvidence(courtCase);
                 Database.SaveCourtCase(courtCase);
                 buffer = Encoding.UTF8.GetBytes("OK");
                 contentType = "text/plain";
