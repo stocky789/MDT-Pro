@@ -25,6 +25,7 @@ All notable changes to MDT Pro are documented here.
 - **Court display** — Fixed display glitches when attached reports couldn't be loaded.
 - **Court frontend hardening** — createReadOnlyInput handles null/undefined; formatIsoDate returns '-' for invalid dates; EvidenceScore coerced to number; courtCases guarded against non-array API response; null entries filtered from case list; long Prosecutor/Defense "Firm — Lawyer" strings truncate with ellipsis and show full text on hover; createLabel/createLabelWithTooltip handle missing language keys safely.
 - **Charge data robustness** — Court display and case saving now handle missing or invalid charge entries without errors.
+- **Policing Redefined — citation handoff** — Closing a citation in the MDT no longer calls `SetPedAsStopped` on occupants still inside a vehicle, which was putting PR into the wrong interaction state and hiding **Dismiss** (and other options) on the Traffic Stop / Ped Stop menus.
 
 ---
 
