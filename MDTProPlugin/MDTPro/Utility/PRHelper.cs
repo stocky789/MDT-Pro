@@ -8,6 +8,7 @@ using PolicingRedefined.Interaction.Assets.PedAttributes;
 using Rage;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 
 namespace MDTPro.Utility {
@@ -70,16 +71,35 @@ namespace MDTPro.Utility {
             }
 
             try {
-                // PR requires ped to be marked as stopped for the hand-citation menu option to be enabled. See PR Ped Detainment API.
+                // PR requires the ped to be stopped for hand-citation. Calling SetPedAsStopped again on an already-stopped ped can desync PR's menu (e.g. missing dismiss).
+                // If IsPedStopped is unavailable or fails, we still set stopped so Give Citation keeps working on older PR builds.
                 var pedApiType = System.Type.GetType("PolicingRedefined.API.PedAPI, PolicingRedefined");
                 if (pedApiType != null) {
-                    var setStopped = pedApiType.GetMethod("SetPedAsStopped", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                    setStopped?.Invoke(null, new object[] { ped });
+                    const BindingFlags pedApiFlags = BindingFlags.Public | BindingFlags.Static;
+                    MethodInfo setStopped = pedApiType.GetMethod("SetPedAsStopped", pedApiFlags);
+                    MethodInfo isStopped = pedApiType.GetMethod("IsPedStopped", pedApiFlags);
+                    bool shouldSetStopped = true;
+                    if (isStopped != null) {
+                        try {
+                            object result = isStopped.Invoke(null, new object[] { ped });
+                            if (result is bool alreadyStopped && alreadyStopped)
+                                shouldSetStopped = false;
+                        } catch {
+                            // Unknown state — keep shouldSetStopped true so we match legacy behavior.
+                        }
+                    }
+                    if (shouldSetStopped && setStopped != null) {
+                        try {
+                            setStopped.Invoke(null, new object[] { ped });
+                        } catch {
+                            // Ignore if SetPedAsStopped fails
+                        }
+                    }
                 }
-                // Give PR a frame to process SetPedAsStopped before we add citations.
+                // One frame for PR to apply stop state before queueing citations.
                 GameFiber.Yield();
             } catch {
-                // Ignore if SetPedAsStopped not available or fails
+                // Ignore PedAPI reflection failures
             }
 
             foreach (CitationHandoutCharge charge in charges) {
@@ -87,6 +107,8 @@ namespace MDTPro.Utility {
 
                 Citation citation = new Citation(ped, charge.Name, charge.Fine, SetupController.GetLanguage().units.currencySymbol, SetupController.GetConfig().displayCurrencySymbolBeforeNumber, charge.IsArrestable);
                 PolicingRedefined.API.PedAPI.GiveCitationToPed(ped, citation);
+                // Let PR process each queued handoff; back-to-back calls in one frame can break the ped menu.
+                GameFiber.Yield();
             }
 
             string message = string.Format(SetupController.GetLanguage().inGame.handCitationTo ?? "Hand citation to {0}", pedName);
