@@ -8,7 +8,7 @@ All notable changes to MDT Pro are documented here.
 
 ### Minor Features
 
-- **Cleaner logs** — Startup writes a short config summary to **MDTPro.log** instead of the full settings dump and folder listing (turn on **verboseFileLogging** in config if you need the old detail). Optional **log file size cap** with automatic trim so the file doesn’t grow forever. **WebSocket** and **ALPR** messages go to the log file instead of filling the RPH console.
+- **Cleaner logs** — Startup writes a short config summary to **MDTPro.log** instead of the full settings dump and folder listing (turn on **verboseFileLogging** in config if you need the old detail). Optional **log file size cap** with automatic trim so the file doesn’t grow forever. **WebSocket** and **ALPR** lines are still written to **MDTPro.log** as before; they are **no longer duplicated** into the **RPH in-game console** (so routine connects/disconnects and ALPR start/stop don’t spam the plugin console).
 
 - **Easier to share logs** — If an error gets written to **MDTPro.log**, those lines no longer include long **C:\…** folder paths, so snippets are shorter and more comfortable to post on the forum.
 
