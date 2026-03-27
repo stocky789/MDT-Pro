@@ -135,7 +135,7 @@ namespace MDTPro.Setup {
         public int citationArrestOptionsVersion = 2;
 
         // ---- ALPR ----
-        /// <summary>Enable ALPR scanning and HUD in-game. Only active when in a police cruiser and on duty. Tuning (range, cone, interval) is hardcoded with realistic values.</summary>
+        /// <summary>Enable ALPR scanning and HUD in-game. Only active when in a police cruiser and on duty. Registration/insurance use live CDF documents only (aligned with Callout Interface).</summary>
         public bool alprEnabled = false;
         /// <summary>ALPR popup auto-close in MDT (seconds). 0 = no auto-close. Used by ALPR web plugin.</summary>
         public int alprPopupDuration = 0;
@@ -153,5 +153,10 @@ namespace MDTPro.Setup {
 
         /// <summary>When true, log detailed firearm capture flow (PR API results, fallback, event triggers) to MDT Pro log. Use for debugging Firearms Check.</summary>
         public bool firearmDebugLogging = false;
+
+        /// <summary>When true, startup writes the full config JSON and MDT folder file list to MDTPro.log. Default off keeps the log short.</summary>
+        public bool verboseFileLogging = false;
+        /// <summary>When the log file exceeds this size (KB), it is shortened automatically (newest half kept). 0 = no limit.</summary>
+        public int logFileMaxSizeKb = 5120;
     }
 }

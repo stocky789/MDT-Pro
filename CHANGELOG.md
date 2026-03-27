@@ -4,6 +4,22 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
+## [0.9.7.1] — 2026-03-27
+
+### What’s new
+
+- **Drug charges & seizures** — When adding **arrest** charges, use the **schedule** dropdown (Schedules I–V or other wording) to narrow narcotics so the list is easier to use. On **Property and Evidence** reports, choose a **schedule**, then the drug type (new **Ritalin** and **Hydrocodone** options there too).
+- **Charge list cleanup** — Removed a couple of arrest charges that were effectively duplicates (**shoplifting under $950** vs **petty theft**, and a second **controlled substance / prescription** line that matched the generic possession charge). The arrest list file refreshes from the update when you load the mod.
+
+### Fixes & improvements
+
+- **Probation / parole** — If someone is on probation or parole, their **arrest history** will usually show at least one prior charge so it doesn’t look empty by mistake.
+- **Person Search** — Looks up **saved and recent people** more reliably (not only who’s “live” in the current session), so the right record—and **photo**—shows up more often. Searching another name before the last search finishes no longer mixes up the results.
+- **ALPR (plate reader)** — Registration and insurance hits use **what the game actually has on that vehicle** (aligned with Callout Interface), not guesses from empty fields or old saved vehicle data when there’s no live owner. Scan timing and how often it checks plates are **the same as before** (no extra slowdown/speed-up settings).
+- **Court & seizure evidence** — Drug evidence from **Property and Evidence** reports still lines up with possession and controlled-substance charges after the charge list change. **Theft**-style verdict wording now also picks up charges that say **shoplifting** (helps older arrests that still use that name).
+
+---
+
 ## [0.9.7.0] — 2026-03-23
 
 ### Major Features
@@ -18,12 +34,9 @@ All notable changes to MDT Pro are documented here.
 
 ### Bug Fixes
 
-- **California law alignment** — All 143 citation charges and 414 arrest charges verified against California Vehicle Code, Penal Code, Health & Safety Code, and related statutes. Fines, jail ranges, and penalties updated to match 2024–2025 CA bail schedules and statutory amounts (base fine + penalty assessments). Traffic, drugs, firearms, assault, theft, homicide, federal/ICE, and wildlife charges now reflect real-world CA penalties.
 - **Citation/arrest options now update on upgrade** — Bumped `citationArrestOptionsVersion` to 3 so existing installations receive the new charge and citation defaults. Previously the version stayed at 2, so users who already had the 0.9.6.0 files never got the 0.9.7.0 additions.
 - **Correct sentence totals** — Resolved cases now show the actual total jail time imposed, not the statutory maximum.
-- **Fewer crashes** — Fixed issues when viewing cases with missing or corrupted data.
 - **Court display** — Fixed display glitches when attached reports couldn't be loaded.
-- **Court frontend hardening** — createReadOnlyInput handles null/undefined; formatIsoDate returns '-' for invalid dates; EvidenceScore coerced to number; courtCases guarded against non-array API response; null entries filtered from case list; long Prosecutor/Defense "Firm — Lawyer" strings truncate with ellipsis and show full text on hover; createLabel/createLabelWithTooltip handle missing language keys safely.
 - **Charge data robustness** — Court display and case saving now handle missing or invalid charge entries without errors.
 - **Policing Redefined — citation handoff** — Closing a citation in the MDT no longer calls `SetPedAsStopped` on occupants still inside a vehicle, which was putting PR into the wrong interaction state and hiding **Dismiss** (and other options) on the Traffic Stop / Ped Stop menus.
 

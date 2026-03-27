@@ -56,6 +56,9 @@ namespace MDTPro.ServerAPI {
                     }
                 }
                 if (pedData == null) {
+                    pedData = DataController.GetPedDataByName(name) ?? DataController.GetPedDataByName(reversedName);
+                }
+                if (pedData == null) {
                     pedData = DataController.PedDatabase.FirstOrDefault(o => o.Name?.ToLower() == name.ToLower() || o.Name?.ToLower() == reversedName.ToLower());
                 }
                 if (pedData == null && (name == "context" || name == "%context" || name.Equals("current", StringComparison.OrdinalIgnoreCase))) {

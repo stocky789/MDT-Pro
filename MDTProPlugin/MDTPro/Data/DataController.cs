@@ -1775,7 +1775,8 @@ namespace MDTPro.Data {
                 || n.Contains("manufacturing meth") || n.Contains("possession of cannabis") || n.Contains("possession of marijuana") || n.Contains("possession of cocaine")
                 || n.Contains("possession of methamphetamine") || n.Contains("possession of heroin") || n.Contains("possession of pcp")
                 || n.Contains("possession of lsd") || n.Contains("hallucinogen") || n.Contains("possession of ecstasy") || n.Contains("mdma")
-                || n.Contains("possession of fentanyl") || n.Contains("prescription") && n.Contains("narcotic");
+                || n.Contains("possession of fentanyl") || n.Contains("ritalin") || n.Contains("hydrocodone")
+                || n.Contains("prescription") && n.Contains("narcotic");
         }
 
         /// <summary>True if the case has at least one drug-related charge. Used for evidence relevance (e.g. DocumentedDrugs / drug records directly relevant).</summary>
@@ -2440,7 +2441,8 @@ namespace MDTPro.Data {
                     if (!ped.Exists()) return 0;
                     if (records.Count > 0) {
                         Database.SaveFirearmRecords(records);
-                        Helper.Log($"[Firearm] Saved {records.Count} firearm record(s) from {source} (owner: {ownerName})", false, Helper.LogSeverity.Info);
+                        if (SetupController.GetConfig().firearmDebugLogging)
+                            Helper.Log($"[Firearm] Saved {records.Count} firearm record(s) from {source} (owner: {ownerName})", false, Helper.LogSeverity.Info);
                     }
                     if (drugRecords.Count > 0) Database.SaveDrugRecords(drugRecords);
                 }
@@ -2479,7 +2481,8 @@ namespace MDTPro.Data {
                     LastSeenAt = DateTime.UtcNow.ToString("o")
                 };
                 Database.SaveFirearmRecords(new List<FirearmRecord> { record });
-                Helper.Log($"[Firearm] Saved 1 firearm record from fallback (player-held: {displayName})", false, Helper.LogSeverity.Info);
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"[Firearm] Saved 1 firearm record from fallback (player-held: {displayName})", false, Helper.LogSeverity.Info);
             } catch (Exception e) {
                 Helper.Log($"Firearm fallback failed: {e.Message}", false, Helper.LogSeverity.Warning);
             }
@@ -2585,7 +2588,8 @@ namespace MDTPro.Data {
                                 var records = ExtractFirearmRecordsFromItemList(list, "Evidence (ground)", "Evidence (ground)");
                                 if (records.Count > 0) {
                                     Database.SaveFirearmRecords(records);
-                                    Helper.Log($"[Firearm] Saved {records.Count} firearm record(s) from pickup (Evidence ground)", false, Helper.LogSeverity.Info);
+                                    if (SetupController.GetConfig().firearmDebugLogging)
+                                        Helper.Log($"[Firearm] Saved {records.Count} firearm record(s) from pickup (Evidence ground)", false, Helper.LogSeverity.Info);
                                     lock (capturedPickupHandlesLock) {
                                         capturedPickupHandles.Add(ent.Handle);
                                         if (capturedPickupHandles.Count > 200) {
@@ -2608,7 +2612,8 @@ namespace MDTPro.Data {
         /// <summary>Accepts firearm check result from Dispatch or external system. Call when Dispatch returns serial/owner so it shows in MDT Firearms Check. Source will be "Dispatch".</summary>
         internal static bool SaveFirearmCheckResultFromDispatch(string serialNumber, string ownerName, string weaponType, string status = null, string weaponModelId = null) {
             if (string.IsNullOrWhiteSpace(ownerName)) return false;
-            Helper.Log($"[Firearm] SaveFirearmCheckResultFromDispatch: serial={serialNumber ?? "(none)"}, owner={ownerName}, weapon={weaponType ?? weaponModelId ?? "Firearm"}, status={status ?? "—"}", false, Helper.LogSeverity.Info);
+            if (SetupController.GetConfig().firearmDebugLogging)
+                Helper.Log($"[Firearm] SaveFirearmCheckResultFromDispatch: serial={serialNumber ?? "(none)"}, owner={ownerName}, weapon={weaponType ?? weaponModelId ?? "Firearm"}, status={status ?? "—"}", false, Helper.LogSeverity.Info);
             string serial = string.IsNullOrWhiteSpace(serialNumber) ? null : serialNumber.Trim();
             string weapon = (weaponType ?? weaponModelId ?? "Firearm").Trim();
             if (string.IsNullOrEmpty(weapon)) weapon = "Firearm";
@@ -2880,11 +2885,13 @@ namespace MDTPro.Data {
                             foreach (var p in toRemove) capturedVehicleSearchPlates.Remove(p);
                         }
                     }
-                    Helper.Log($"Vehicle search captured {records.Count} item(s) for plate {plate}", false, Helper.LogSeverity.Info);
+                    if (SetupController.GetConfig().firearmDebugLogging)
+                        Helper.Log($"Vehicle search captured {records.Count} item(s) for plate {plate}", false, Helper.LogSeverity.Info);
                 }
                 if (firearmRecords.Count > 0) {
                     Database.SaveFirearmRecords(firearmRecords);
-                    Helper.Log($"[Firearm] Saved {firearmRecords.Count} firearm record(s) from vehicle search (plate {plate})", false, Helper.LogSeverity.Info);
+                    if (SetupController.GetConfig().firearmDebugLogging)
+                        Helper.Log($"[Firearm] Saved {firearmRecords.Count} firearm record(s) from vehicle search (plate {plate})", false, Helper.LogSeverity.Info);
                 }
             } catch (Exception e) {
                 Helper.Log($"CaptureVehicleSearchItems failed: {e.Message}", false, Helper.LogSeverity.Warning);
@@ -3421,6 +3428,13 @@ namespace MDTPro.Data {
         private static bool HasChargeKeyword(CourtData courtData, string keyword) {
             if (courtData?.Charges == null) return false;
             string k = keyword.ToLowerInvariant();
+            // "Shoplifting …" does not contain the substring "theft"; treat shoplifting as theft for verdict/rationale keyword matching (legacy cases + citations).
+            if (k == "theft") {
+                return courtData.Charges.Any(c => {
+                    string n = (c.Name ?? "").ToLowerInvariant();
+                    return n.Contains("theft") || n.Contains("shoplift");
+                });
+            }
             return courtData.Charges.Any(c => (c.Name ?? "").ToLowerInvariant().Contains(k));
         }
 
@@ -3458,7 +3472,7 @@ namespace MDTPro.Data {
                     || n.Contains("benzodiazepine") || n.Contains("hallucinogen") || n.Contains("ecstasy") || n.Contains("mdma") || n.Contains("pcp")
                     || n.Contains("dmt") || n.Contains("ghb") || n.Contains("ketamine") || n.Contains("steroids") || n.Contains("bath salt")
                     || n.Contains("synthetic cannabinoid") || n.Contains("k2") || n.Contains("spice") || n.Contains("peyote") || n.Contains("psilocybin")
-                    || n.Contains("lysergic") || n.Contains("oxycontin") || n.Contains("percocet") || n.Contains("vicodin") || n.Contains("codeine")
+                    || n.Contains("lysergic") || n.Contains("oxycontin") || n.Contains("percocet") || n.Contains("vicodin") || n.Contains("hydrocodone") || n.Contains("ritalin") || n.Contains("codeine")
                     || n.Contains("promethazine") || n.Contains("demerol") || n.Contains("morphine") || n.Contains("methadone") || n.Contains("opium")
                     || n.Contains("hydromorph") || n.Contains("roxicodone") || n.Contains("roofies") || n.Contains("ativan") || n.Contains("valium")
                     || n.Contains("xanax") || n.Contains("soma") || n.Contains("tramadol") || n.Contains("darvocet") || n.Contains("darvon")
