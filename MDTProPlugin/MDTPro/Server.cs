@@ -33,7 +33,8 @@ namespace MDTPro {
             Log($"Listening on: {fullIp}");
             Log($"Listening on: {fullName}");
             File.WriteAllText(Setup.SetupController.IpAddressesPath, $"{fullIp}\n{fullName}");
-            Utility.RageNotification.ShowAddressNotification(localIp, Environment.MachineName, port);
+            if (Setup.SetupController.GetConfig().showListeningAddressNotification)
+                Utility.RageNotification.ShowAddressNotification(localIp, Environment.MachineName, port);
 
             while (RunServer) {
                 try {

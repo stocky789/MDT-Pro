@@ -1,6 +1,6 @@
 {
   "drugTypes": [
-    { "id": "Cannabis", "name": "Cannabis", "schedule": "Other" },
+    { "id": "Cannabis", "name": "Cannabis", "schedule": "I" },
     { "id": "Cocaine", "name": "Cocaine", "schedule": "II" },
     { "id": "Methamphetamine", "name": "Methamphetamine", "schedule": "II" },
     { "id": "Amphetamine", "name": "Amphetamine", "schedule": "II" },

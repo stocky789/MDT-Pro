@@ -1356,6 +1356,9 @@ namespace MDTPro.Data {
                     // Always refresh wanted status from CDF so PR dispatch results (warrants) show in MDT search
                     existingPed.IsWanted = mdtProPedData.IsWanted;
                     existingPed.WarrantText = mdtProPedData.WarrantText;
+                    // Always refresh portrait model from the live ped (was incorrectly gated on CDFPedData == null, leaving stale ModelName for most peds)
+                    if (mdtProPedData.ModelHash != 0) existingPed.ModelHash = mdtProPedData.ModelHash;
+                    if (!string.IsNullOrEmpty(mdtProPedData.ModelName)) existingPed.ModelName = mdtProPedData.ModelName;
                     if (existingPed.CDFPedData == null) {
                         existingPed.LicenseStatus = mdtProPedData.LicenseStatus;
                         existingPed.LicenseExpiration = mdtProPedData.LicenseExpiration;
@@ -1372,9 +1375,6 @@ namespace MDTPro.Data {
                         if (!string.IsNullOrEmpty(mdtProPedData.Birthday)) existingPed.Birthday = existingPed.Birthday ?? mdtProPedData.Birthday;
                         if (!string.IsNullOrEmpty(mdtProPedData.Gender)) existingPed.Gender = existingPed.Gender ?? mdtProPedData.Gender;
                         if (!string.IsNullOrEmpty(mdtProPedData.Address)) existingPed.Address = existingPed.Address ?? mdtProPedData.Address;
-                        // Always update model from current encounter so ID photo matches the person in front of you
-                        if (mdtProPedData.ModelHash != 0) existingPed.ModelHash = mdtProPedData.ModelHash;
-                        if (!string.IsNullOrEmpty(mdtProPedData.ModelName)) existingPed.ModelName = mdtProPedData.ModelName;
                         existingPed.TryParseNameIntoFirstLast();
                     }
                 }
@@ -1509,6 +1509,54 @@ namespace MDTPro.Data {
             var cutoff = DateTime.UtcNow - RecentlyIdentifiedTtl;
             foreach (var k in recentlyIdentifiedPedHandles.Where(x => x.Value.At < cutoff).Select(x => x.Key).ToList())
                 recentlyIdentifiedPedHandles.Remove(k);
+        }
+
+        /// <summary>True if the world ped's identity (CDF or LSPDFR persona) matches the MDT record name.</summary>
+        internal static bool LivePedIdentityMatchesRecord(Ped p, MDTProPedData pedData) {
+            if (p == null || !p.IsValid() || pedData == null || string.IsNullOrWhiteSpace(pedData.Name)) return false;
+            string live = null;
+            try { live = p.GetPedData()?.FullName; } catch { }
+            if (string.IsNullOrWhiteSpace(live)) {
+                try {
+                    var persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(p);
+                    if (persona != null && !string.IsNullOrEmpty(persona.FullName)) live = persona.FullName;
+                } catch { }
+            }
+            if (string.IsNullOrWhiteSpace(live)) return false;
+            return string.Equals(live.Trim(), pedData.Name.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>Refresh ModelHash/ModelName from a live ped (Holder or recently ID'd handle) so Person Search ID photos match the entity in the world. CDF does not supply portrait data; we use GTA model name against public ped image CDNs.</summary>
+        internal static bool TryRefreshPedModelFromLiveWorld(MDTProPedData pedData, string searchName, string reversedSearchName) {
+            if (pedData == null) return false;
+            try {
+                if (pedData.Holder != null && pedData.Holder.IsValid()) {
+                    uint h = (uint)pedData.Holder.Model.Hash;
+                    string n = pedData.Holder.Model.Name;
+                    if (h != 0 && !string.IsNullOrEmpty(n)) {
+                        pedData.ModelHash = h;
+                        pedData.ModelName = n;
+                        return true;
+                    }
+                }
+                foreach (string key in new[] { searchName, reversedSearchName, pedData.Name }) {
+                    if (string.IsNullOrWhiteSpace(key)) continue;
+                    var handleOpt = GetRecentlyIdentifiedPedHandle(key.Trim());
+                    if (!handleOpt.HasValue) continue;
+                    try {
+                        Ped live = World.GetEntityByHandle<Ped>(handleOpt.Value);
+                        if (live == null || !live.IsValid()) continue;
+                        if (!LivePedIdentityMatchesRecord(live, pedData)) continue;
+                        uint mh = (uint)live.Model.Hash;
+                        string mn = live.Model.Name;
+                        if (mh == 0 || string.IsNullOrEmpty(mn)) continue;
+                        pedData.ModelHash = mh;
+                        pedData.ModelName = mn;
+                        return true;
+                    } catch { }
+                }
+            } catch { }
+            return false;
         }
 
         /// <summary>GTA peds share models; only merge persistent history when names clearly match so we do not graft one person's record onto another (e.g. Stan Pierce vs Stan Bank).</summary>

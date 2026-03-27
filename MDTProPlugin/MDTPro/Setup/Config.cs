@@ -3,6 +3,8 @@
 namespace MDTPro.Setup {
     internal class Config {
         public int port = 9000;
+        /// <summary>When true, show the in-game notification with MDT URLs (local IP and PC name) when the HTTP server starts. Disable for streaming to avoid exposing host/network info on screen; URLs remain in MDTPro/ipAddresses.txt and the log.</summary>
+        public bool showListeningAddressNotification = true;
         public int maxNumberOfNearbyPedsOrVehicles = 15;
         public int databaseLimitMultiplier = 10;
         /// <summary>Milliseconds between WebSocket pushes for time, location, and map coords. Higher = less CPU; 1000 is smooth for taskbar/map.</summary>
