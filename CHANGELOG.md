@@ -22,7 +22,6 @@ All notable changes to MDT Pro are documented here.
 - **Person Search** — Saved and recent people resolve more reliably; **photos** mix up less often, including when you search a new name before the last search has finished.
 - **ALPR** — Registration and insurance flags use **live game data** for that vehicle (same idea as Callout Interface), not empty fields or old saved-only records when there’s no live owner. Plate scan timing is unchanged from before.
 - **Court** — Drug evidence from **Property and Evidence** still matches **possession / controlled substance** charges after the charge list change. Verdict wording that looks for **theft** also matches older charges that still say **shoplifting**.
-- **Arrest reports** — Fixed a rare case where saving a closed arrest showed a generic error (object reference) for suspects who only had a light or ID-style person record, or when charge data was missing from the save request.
 
 ---
 
