@@ -12,7 +12,7 @@ using static MDTPro.Utility.Helper;
 namespace MDTPro.ALPR {
     /// <summary>
     /// Coordinates ALPR scanning, flag detection, and broadcasting to HUD/WebSocket.
-    /// Scan/read range, cone, interval, and cooldown are hardcoded to realistic values; only enable and HUD position are in config.
+    /// Registration/insurance flags follow live CDF vehicle documents only (same source as Callout Interface), not null/empty string heuristics or SQLite snapshots.
     /// </summary>
     internal static class ALPRController {
         private static GameFiber _scanFiber;
@@ -53,7 +53,7 @@ namespace MDTPro.ALPR {
 
             _scanFiber = GameFiber.StartNew(ScanLoop);
             ALPRHUD.Start();
-            Log("ALPR started", true, LogSeverity.Info);
+            Log("ALPR started", false, LogSeverity.Info);
         }
 
         internal static void Stop() {
@@ -68,7 +68,7 @@ namespace MDTPro.ALPR {
                 AlertedPlates.Clear();
                 PlateCooldown.Clear();
             }
-            Log("ALPR stopped", true, LogSeverity.Info);
+            Log("ALPR stopped", false, LogSeverity.Info);
         }
 
         internal static void Clear() {
@@ -94,6 +94,7 @@ namespace MDTPro.ALPR {
                     }
                     intervalMs = ScanIntervalMs;
                     int cooldownSec = CooldownSeconds;
+                    const int maxReadPerCycle = 3;
                     int maxVehicles = Math.Min(16, Math.Max(5, cfg.maxNumberOfNearbyPedsOrVehicles + 2));
                     float scanRangeMeters = ScanRangeMeters;
                     float readRangeMeters = ReadRangeMeters;
@@ -148,7 +149,6 @@ namespace MDTPro.ALPR {
 
                     // Sort by distance and take up to 3 vehicles within read range
                     SortBufferByDistance(InConeAndRangeBuffer);
-                    const int maxReadPerCycle = 3;
                     int processed = 0;
 
                     for (int i = 0; i < InConeAndRangeBuffer.Count && processed < maxReadPerCycle; i++) {
@@ -167,7 +167,7 @@ namespace MDTPro.ALPR {
                             string modelDisplayName;
 
                             if (vd.CDFVehicleData?.Owner != null) {
-                                flags = BuildFlags(vd, dbVehicle);
+                                flags = BuildFlagsFromLiveCdfVehicle(vd, dbVehicle);
                                 modelDisplayName = vd.ModelDisplayName ?? vd.ModelName ?? "";
                                 // Prefer MDT DB owner over CDF for re-encounters: CDF assigns a fresh persona per spawn,
                                 // but our DB has the persistent identity (correct owner) from prior stops.
@@ -177,7 +177,7 @@ namespace MDTPro.ALPR {
                             } else {
                                 // No CDF data: use MDT database (stolen/expired from prior stops or saved data)
                                 if (dbVehicle != null) {
-                                    flags = BuildFlags(dbVehicle, null);
+                                    flags = BuildFlagsPersistedVehicleOnly(dbVehicle);
                                     owner = dbVehicle.Owner ?? "—";
                                     modelDisplayName = dbVehicle.ModelDisplayName ?? dbVehicle.ModelName ?? "";
                                 } else {
@@ -230,7 +230,7 @@ namespace MDTPro.ALPR {
                         }
                     }
                 } catch (Exception ex) {
-                    Log($"ALPR scan error: {ex.Message}", true, LogSeverity.Error);
+                    Log($"ALPR scan error: {ex.Message}", false, LogSeverity.Error);
                 }
 
                 loopCount++;
@@ -279,36 +279,88 @@ namespace MDTPro.ALPR {
             return null;
         }
 
-        private static List<string> BuildFlags(MDTProVehicleData vd, MDTProVehicleData dbVehicle) {
+        /// <summary>ALPR when CDF has an owner: stolen/BOLO/wanted plus registration/insurance from CDF document objects only.</summary>
+        private static List<string> BuildFlagsFromLiveCdfVehicle(MDTProVehicleData vd, MDTProVehicleData dbVehicle) {
             var flags = new List<string>();
-
             if (vd != null && vd.IsStolen)
                 flags.Add("Stolen");
             if (DataController.HasActiveBOLOs(vd) || (dbVehicle != null && DataController.HasActiveBOLOs(dbVehicle)))
                 flags.Add("BOLO");
 
-            string reg = vd.RegistrationStatus ?? "";
-            if (reg.Equals("Expired", StringComparison.OrdinalIgnoreCase))
-                flags.Add("Registration expired");
-            else if (reg.Equals("Suspended", StringComparison.OrdinalIgnoreCase) ||
-                     reg.Equals("Revoked", StringComparison.OrdinalIgnoreCase) ||
-                     reg.Equals("None", StringComparison.OrdinalIgnoreCase) ||
-                     string.IsNullOrWhiteSpace(reg))
-                flags.Add("No registration");
-
-            string ins = vd.InsuranceStatus ?? "";
-            if (ins.Equals("Expired", StringComparison.OrdinalIgnoreCase))
-                flags.Add("Insurance expired");
-            else if (ins.Equals("Suspended", StringComparison.OrdinalIgnoreCase) ||
-                     ins.Equals("Revoked", StringComparison.OrdinalIgnoreCase) ||
-                     ins.Equals("None", StringComparison.OrdinalIgnoreCase) ||
-                     string.IsNullOrWhiteSpace(ins))
-                flags.Add("No insurance");
-
-            if (vd.CDFVehicleData?.Owner?.Wanted == true)
-                flags.Add("Owner wanted");
+            VehicleData cdf = vd?.CDFVehicleData;
+            if (cdf != null) {
+                AppendCdfRegistrationInsuranceFlags(flags, cdf);
+                if (cdf.Owner?.Wanted == true)
+                    flags.Add("Owner wanted");
+            }
 
             return flags;
+        }
+
+        /// <summary>No live CDF owner: stolen/BOLO from MDT persistence only — do not show reg/insurance (would not match Callout Interface).</summary>
+        private static List<string> BuildFlagsPersistedVehicleOnly(MDTProVehicleData dbVehicle) {
+            var flags = new List<string>();
+            if (dbVehicle == null) return flags;
+            if (dbVehicle.IsStolen)
+                flags.Add("Stolen");
+            if (DataController.HasActiveBOLOs(dbVehicle))
+                flags.Add("BOLO");
+            return flags;
+        }
+
+        /// <summary>Uses CDF Registration/Insurance entities when present; never infers violations from missing or blank strings on MDTProVehicleData.</summary>
+        private static void AppendCdfRegistrationInsuranceFlags(List<string> flags, VehicleData cdf) {
+            if (cdf == null) return;
+            try {
+                if (cdf.Registration != null)
+                    AppendOneCdfDocumentFlags(flags, cdf.Registration, "Registration expired", "No registration");
+            } catch { /* CDF version differences */ }
+            try {
+                if (cdf.Insurance != null)
+                    AppendOneCdfDocumentFlags(flags, cdf.Insurance, "Insurance expired", "No insurance");
+            } catch { }
+        }
+
+        private static void AppendOneCdfDocumentFlags(List<string> flags, object document, string expiredLabel, string invalidLabel) {
+            if (document == null || flags == null) return;
+            string statusStr = null;
+            DateTime? expiration = null;
+            try {
+                var stProp = document.GetType().GetProperty("Status");
+                if (stProp != null)
+                    statusStr = stProp.GetValue(document)?.ToString();
+                var expProp = document.GetType().GetProperty("ExpirationDate");
+                if (expProp != null) {
+                    object ev = expProp.GetValue(document);
+                    if (ev is DateTime dt) expiration = dt;
+                }
+            } catch {
+                return;
+            }
+
+            if (DocumentStatusImpliesExpired(statusStr, expiration)) {
+                flags.Add(expiredLabel);
+                return;
+            }
+            if (IsSuspendedRevokedOrNoneStatus(statusStr))
+                flags.Add(invalidLabel);
+        }
+
+        private static bool DocumentStatusImpliesExpired(string status, DateTime? expirationDate) {
+            if (!string.IsNullOrEmpty(status) && string.Equals(status, "Expired", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (expirationDate.HasValue && expirationDate.Value.Date < DateTime.UtcNow.Date) {
+                if (string.IsNullOrEmpty(status) || string.Equals(status, "Valid", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool IsSuspendedRevokedOrNoneStatus(string status) {
+            if (string.IsNullOrEmpty(status)) return false;
+            return string.Equals(status, "Suspended", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(status, "Revoked", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(status, "None", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>Sorts the buffer in place by distance (closest first).</summary>

@@ -6,10 +6,9 @@ using MDTPro.Data.Reports;
 namespace MDTPro.Data {
     /// <summary>Charge-to-evidence mapping for Property and Evidence Receipt (seizure) reports. Determines which drug/firearm types satisfy which arrest charges for court evidence scoring.</summary>
     public static class SeizureEvidenceHelper {
-        /// <summary>Drug type ids from seizureOptions.json. Used for mapping consistency.</summary>
-        /// <summary>Drug type ids from seizureOptions.json. Aligned with Policing Redefined EDrugType.</summary>
+        /// <summary>Drug type ids from seizureOptions.json. Aligned with Policing Redefined EDrugType where applicable.</summary>
         public static readonly IReadOnlyList<string> KnownDrugTypeIds = new[] {
-            "Cannabis", "Cocaine", "Methamphetamine", "Amphetamine", "Heroin", "Fentanyl", "PCP",
+            "Cannabis", "Cocaine", "Methamphetamine", "Amphetamine", "Ritalin", "Heroin", "Fentanyl", "Hydrocodone", "PCP",
             "LSD/Hallucinogen", "Mescaline", "Psilocybin", "Ecstasy/MDMA", "Prescription/Narcotic", "Benzodiazepine",
             "Paraphernalia Only", "Other Controlled Substance"
         };
@@ -24,7 +23,10 @@ namespace MDTPro.Data {
             if (n.Contains("fentanyl")) return new List<string> { "Fentanyl" };
             if (n.Contains("cocaine")) return new List<string> { "Cocaine" };
             if (n.Contains("methamphetamine")) return new List<string> { "Methamphetamine" };
-            if (n.Contains("amphetamine") && !n.Contains("methamphetamine")) return new List<string> { "Amphetamine", "Adderall", "Concerta", "Ritalin", "Vyvanse" };
+            if (n.Contains("amphetamine") && !n.Contains("methamphetamine")) return new List<string> { "Amphetamine", "Ritalin", "Adderall", "Concerta", "Vyvanse" };
+            if (n.Contains("ritalin")) return new List<string> { "Ritalin" };
+            if (n.Contains("hydrocodone") || n.Contains("hydrocodone-acetaminophen") || n.Contains("vicodin"))
+                return new List<string> { "Hydrocodone", "Vicodin", "Prescription/Narcotic" };
             if (n.Contains("benzodiazepine") || n.Contains("xanax") || n.Contains("valium")) return new List<string> { "Benzodiazepine" };
             if (n.Contains("pcp")) return new List<string> { "PCP" };
             if ((n.Contains("lsd") || n.Contains("hallucinogen") || n.Contains("mescaline") || n.Contains("psilocybin")) && !n.Contains("ecstasy"))
@@ -41,7 +43,8 @@ namespace MDTPro.Data {
             // Paraphernalia -> Paraphernalia Only OR any (per task)
             if (n.Contains("paraphernalia")) return new List<string> { "Paraphernalia Only" };
 
-            // Generic: controlled substance, trafficking, for sale, transport, manufacturing -> any drug type
+            // "Possession Of Controlled Substance" (generic) and same-style charges: any documented drug on the PER satisfies court drug-evidence scoring (same practical effect as the removed duplicate "(Prescription/Narcotic)" charge).
+            // Legacy saved charge names that still include "prescription" + "narcotic" hit the branch above.
             if (n.Contains("controlled substance") || n.Contains("trafficking") || n.Contains("for sale")
                 || n.Contains("sale or transport") || n.Contains("transport or sale") || n.Contains("transport of meth")
                 || n.Contains("manufacturing meth") || n.Contains("under influence of controlled"))

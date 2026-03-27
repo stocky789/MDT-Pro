@@ -55,6 +55,44 @@ searchInput.addEventListener('input', function () {
   filterPersonLists(this.value.trim())
 })
 
+/**
+ * ID photo in Person Search is a catalogue still for the ped *model* (shared by many NPCs). CDF/PR do not expose mugshot textures.
+ * Tries multiple URLs: FiveM docs host vanilla peds as webp; png fallback covers older mirrors.
+ */
+function setPedIdPhoto (photoImg, photoPlaceholder, response) {
+  if (!photoImg || !photoPlaceholder) return
+  const modelName = (response.ModelName || '').trim().toLowerCase()
+  const candidates = []
+  if (modelName) {
+    candidates.push(`https://docs.fivem.net/peds/${modelName}.webp`)
+    candidates.push(`https://docs.fivem.net/peds/${modelName}.png`)
+  }
+  if (candidates.length === 0) {
+    photoImg.classList.add('hidden')
+    photoImg.removeAttribute('src')
+    photoPlaceholder.classList.remove('hidden')
+    return
+  }
+  let i = 0
+  const tryNext = () => {
+    if (i >= candidates.length) {
+      photoImg.classList.add('hidden')
+      photoImg.removeAttribute('src')
+      photoPlaceholder.classList.remove('hidden')
+      return
+    }
+    const url = candidates[i++]
+    photoImg.onerror = () => tryNext()
+    photoImg.onload = () => {
+      photoImg.classList.remove('hidden')
+      photoPlaceholder.classList.add('hidden')
+      photoImg.alt = response.Name || ''
+    }
+    photoImg.src = url
+  }
+  tryNext()
+}
+
 function filterPersonLists(searchText) {
   const q = (searchText || '').toLowerCase()
   const lists = [
@@ -171,8 +209,19 @@ async function loadSearchHistory() {
   }
 }
 
+let _pedSearchSeq = 0
+let _pedSearchAbort = null
+
 async function performSearch(query) {
+  _pedSearchSeq++
+  const thisSearch = _pedSearchSeq
+  _pedSearchAbort?.abort()
+  _pedSearchAbort = new AbortController()
+  const signal = _pedSearchAbort.signal
+  const stale = () => thisSearch !== _pedSearchSeq
+
   const language = await getLanguage()
+  if (stale()) return
   const notifs = language?.pedSearch?.notifications || {}
   if (!query) {
     topWindow.showNotification(
@@ -181,14 +230,24 @@ async function performSearch(query) {
     )
     return
   }
-  const res = await fetch('/data/specificPed', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: query,
-  })
-  const response = res.ok ? await res.json().catch(() => null) : null
+
+  let response
+  try {
+    const res = await fetch('/data/specificPed', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: query,
+      signal,
+    })
+    if (stale()) return
+    response = res.ok ? await res.json().catch(() => null) : null
+  } catch (e) {
+    if (e?.name === 'AbortError') return
+    throw e
+  }
+  if (stale()) return
 
   if (!response) {
     topWindow.showNotification(
@@ -198,6 +257,7 @@ async function performSearch(query) {
     return
   }
 
+  try {
   // Alert notifications for wanted/probation/parole/advisory
   if (response.IsWanted) {
     topWindow.showNotification(
@@ -235,24 +295,7 @@ async function performSearch(query) {
   // ID photo: use FiveM ped model image when ModelName is available (vanilla GTA peds)
   const photoImg = document.getElementById('pedIdPhotoImg')
   const photoPlaceholder = document.querySelector('.pedIdPhotoPlaceholder')
-  if (photoImg && photoPlaceholder) {
-    const modelName = (response.ModelName || '').trim().toLowerCase()
-    if (modelName) {
-      photoImg.src = `https://docs.fivem.net/peds/${modelName}.webp`
-      photoImg.classList.remove('hidden')
-      photoImg.alt = response.Name || ''
-      photoPlaceholder.classList.add('hidden')
-      photoImg.onerror = () => {
-        photoImg.classList.add('hidden')
-        photoImg.removeAttribute('src')
-        photoPlaceholder.classList.remove('hidden')
-      }
-    } else {
-      photoImg.classList.add('hidden')
-      photoImg.removeAttribute('src')
-      photoPlaceholder.classList.remove('hidden')
-    }
-  }
+  setPedIdPhoto(photoImg, photoPlaceholder, response)
 
   for (const key of Object.keys(response)) {
     const el = document.querySelector(
@@ -359,14 +402,24 @@ async function performSearch(query) {
       openReportWithPrefill('injury', { pedName: response.Name, source: 'pedSearch' })
   }
 
+  if (stale()) return
+
   // Drug records for this ped
-  const drugsResponse = await (
-    await fetch('/data/drugsByOwner', {
+  let drugsResponse
+  try {
+    const dr = await fetch('/data/drugsByOwner', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(response.Name ?? ''),
+      signal,
     })
-  ).json()
+    if (stale()) return
+    drugsResponse = await dr.json()
+  } catch (e) {
+    if (e?.name === 'AbortError') return
+    throw e
+  }
+  if (stale()) return
 
   document
     .querySelectorAll(
@@ -399,13 +452,21 @@ async function performSearch(query) {
   }
 
   // Vehicles owned by this ped
-  const vehiclesResponse = await (
-    await fetch('/data/pedVehicles', {
+  let vehiclesResponse
+  try {
+    const vr = await fetch('/data/pedVehicles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: response.Name,
+      signal,
     })
-  ).json()
+    if (stale()) return
+    vehiclesResponse = await vr.json()
+  } catch (e) {
+    if (e?.name === 'AbortError') return
+    throw e
+  }
+  if (stale()) return
 
   document
     .querySelectorAll(
@@ -444,13 +505,21 @@ async function performSearch(query) {
   }
 
   // Registered Firearms (from pat-down / dead body search)
-  const firearmsResponse = await (
-    await fetch('/data/firearmsForPed', {
+  let firearmsResponse
+  try {
+    const fr = await fetch('/data/firearmsForPed', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(response.Name ?? ''),
+      signal,
     })
-  ).json()
+    if (stale()) return
+    firearmsResponse = await fr.json()
+  } catch (e) {
+    if (e?.name === 'AbortError') return
+    throw e
+  }
+  if (stale()) return
 
   document
     .querySelectorAll(
@@ -491,13 +560,21 @@ async function performSearch(query) {
   }
 
   // Reports involving this ped
-  const reportsResponse = await (
-    await fetch('/data/pedReports', {
+  let reportsResponse
+  try {
+    const rr = await fetch('/data/pedReports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: response.Name,
+      signal,
     })
-  ).json()
+    if (stale()) return
+    reportsResponse = await rr.json()
+  } catch (e) {
+    if (e?.name === 'AbortError') return
+    throw e
+  }
+  if (stale()) return
 
   document
     .querySelectorAll(
@@ -554,7 +631,11 @@ async function performSearch(query) {
   }
 
   // Reload search history after successful search
-  await loadSearchHistory()
+  if (!stale()) await loadSearchHistory()
+  } catch (e) {
+    if (e?.name === 'AbortError') return
+    throw e
+  }
 }
 
 function getColorForValue(value) {

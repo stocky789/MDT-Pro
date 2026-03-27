@@ -6,6 +6,7 @@ const CONFIG_SECTIONS = [
     title: 'General',
     keys: [
       'port',
+      'showListeningAddressNotification',
       'webSocketUpdateInterval',
       'databaseUpdateInterval',
       'initialWindowWidth',
@@ -171,6 +172,11 @@ const CONFIG_FIELD_META = {
       { label: '3010', value: 3010 },
       PRESET_CUSTOM,
     ],
+  },
+  showListeningAddressNotification: {
+    label: 'Show MDT address in-game',
+    tooltip:
+      'When you go on duty, an in-game pop-up lists the URLs to open the MDT (local IP and computer name). Turn this off when streaming or recording so that information is not visible on screen. URLs are still written to MDTPro/ipAddresses.txt and startup still logs where the server is listening.',
   },
   webSocketUpdateInterval: {
     label: 'Taskbar & map update interval (ms)',
