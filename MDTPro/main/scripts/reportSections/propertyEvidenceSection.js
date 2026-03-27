@@ -128,18 +128,44 @@ async function getPropertyEvidenceSection (data = {}, isList = false) {
     drugsAddLabel.className = 'addChargesLabel'
     drugsAddLabel.style.marginBottom = '8px'
     drugsAddLabel.style.fontSize = '13px'
-    drugsAddLabel.textContent = labels.addDrugsHelp || 'Select drug type and quantity, then click Add'
+    drugsAddLabel.textContent = labels.addDrugsHelp || 'Select schedule, drug type, and quantity, then click Add'
     section.appendChild(drugsAddLabel)
     const drugsAddRow = document.createElement('div')
     drugsAddRow.classList.add('propertyEvidenceDrugsAddRow')
+    const scheduleOrder = ['I', 'II', 'III', 'IV', 'V', 'Other', 'Paraphernalia']
+    const scheduleLabels = { I: 'Schedule I', II: 'Schedule II', III: 'Schedule III', IV: 'Schedule IV', V: 'Schedule V', Other: 'Other / unspecified', Paraphernalia: 'Paraphernalia' }
+    const scheduleSelect = document.createElement('select')
+    scheduleSelect.className = 'propertyEvidenceDrugScheduleSelect'
+    scheduleSelect.setAttribute('aria-label', labels.drugSchedule || 'Drug schedule')
+    const optAll = document.createElement('option')
+    optAll.value = ''
+    optAll.textContent = labels.allSchedules || 'All schedules'
+    scheduleSelect.appendChild(optAll)
+    for (const s of scheduleOrder) {
+      if (!drugTypes.some((d) => (d.schedule || 'Other') === s)) continue
+      const o = document.createElement('option')
+      o.value = s
+      o.textContent = scheduleLabels[s] || s
+      scheduleSelect.appendChild(o)
+    }
     const drugTypeSelect = document.createElement('select')
     drugTypeSelect.className = 'propertyEvidenceDrugTypeSelect'
-    drugTypes.forEach(opt => {
-      const o = document.createElement('option')
-      o.value = opt.id || opt.name || opt
-      o.textContent = opt.name || opt.id || opt
-      drugTypeSelect.appendChild(o)
-    })
+    function repopulateDrugTypeOptions () {
+      const sched = scheduleSelect.value
+      drugTypeSelect.innerHTML = ''
+      const filtered = !sched
+        ? drugTypes
+        : drugTypes.filter((d) => (d.schedule || 'Other') === sched)
+      const list = filtered.length > 0 ? filtered : drugTypes
+      for (const opt of list) {
+        const o = document.createElement('option')
+        o.value = opt.id || opt.name || opt
+        o.textContent = opt.name || opt.id || opt
+        drugTypeSelect.appendChild(o)
+      }
+    }
+    scheduleSelect.addEventListener('change', repopulateDrugTypeOptions)
+    repopulateDrugTypeOptions()
     const quantitySelect = document.createElement('select')
     quantitySelect.className = 'propertyEvidenceQuantitySelect'
     drugQuantities.forEach(q => {
@@ -157,6 +183,7 @@ async function getPropertyEvidenceSection (data = {}, isList = false) {
       const quantity = quantitySelect.value || ''
       addDrugToList(section, type, quantity)
     })
+    drugsAddRow.appendChild(scheduleSelect)
     drugsAddRow.appendChild(drugTypeSelect)
     drugsAddRow.appendChild(quantitySelect)
     drugsAddRow.appendChild(addDrugBtn)

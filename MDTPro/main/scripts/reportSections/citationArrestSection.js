@@ -3,6 +3,25 @@ async function getCitationArrestSection(type, isList = false, list = []) {
   const options =
     type == 'citation' ? await getCitationOptions() : await getArrestOptions()
 
+  let arrestNarcoticScheduleFilter = 'all'
+
+  function getNarcoticScheduleRoman (chargeName) {
+    const n = (chargeName || '').toLowerCase()
+    if (/\bschedule\s+iv\b/.test(n)) return 'IV'
+    if (/\bschedule\s+v\b/.test(n)) return 'V'
+    if (/\bschedule\s+iii\b/.test(n)) return 'III'
+    if (/\bschedule\s+ii\b/.test(n)) return 'II'
+    if (/\bschedule\s+i\b/.test(n)) return 'I'
+    return null
+  }
+
+  function chargeMatchesArrestScheduleFilter (chargeName, filter) {
+    if (type !== 'arrest' || !filter || filter === 'all') return true
+    const roman = getNarcoticScheduleRoman(chargeName)
+    if (filter === 'other') return roman == null
+    return roman === filter
+  }
+
   const title = document.createElement('div')
   if (isList) {
     title.classList.add('searchResponseSectionTitle')
@@ -38,6 +57,42 @@ async function getCitationArrestSection(type, isList = false, list = []) {
   })
   optionsWrapper.appendChild(optionsSearchInput)
 
+  if (type === 'arrest' && canEdit) {
+    const schedRow = document.createElement('div')
+    schedRow.className = 'arrestChargeScheduleFilterRow'
+    schedRow.style.marginBottom = '8px'
+    const schedLabel = document.createElement('label')
+    schedLabel.style.display = 'block'
+    schedLabel.style.fontSize = '13px'
+    schedLabel.style.marginBottom = '4px'
+    schedLabel.textContent = language.reports?.sections?.arrest?.narcoticScheduleFilterLabel || 'Narcotic charges by schedule'
+    const scheduleFilterSelect = document.createElement('select')
+    scheduleFilterSelect.className = 'arrestNarcoticScheduleFilter'
+    scheduleFilterSelect.setAttribute('aria-label', schedLabel.textContent)
+    const schedOpts = [
+      { value: 'all', text: language.reports?.sections?.arrest?.allSchedulesOption || 'All charges' },
+      { value: 'I', text: 'Schedule I' },
+      { value: 'II', text: 'Schedule II' },
+      { value: 'III', text: 'Schedule III' },
+      { value: 'IV', text: 'Schedule IV' },
+      { value: 'V', text: 'Schedule V' },
+      { value: 'other', text: language.reports?.sections?.arrest?.nonScheduledNarcoticsOption || 'Other / non-schedule wording' }
+    ]
+    for (const so of schedOpts) {
+      const o = document.createElement('option')
+      o.value = so.value
+      o.textContent = so.text
+      scheduleFilterSelect.appendChild(o)
+    }
+    scheduleFilterSelect.addEventListener('change', async function () {
+      arrestNarcoticScheduleFilter = scheduleFilterSelect.value
+      await performSearch(optionsSearchInput.value.trim())
+    })
+    schedRow.appendChild(schedLabel)
+    schedRow.appendChild(scheduleFilterSelect)
+    optionsWrapper.appendChild(schedRow)
+  }
+
   async function performSearch(search) {
     optionsWrapper.querySelectorAll('details').forEach((el) => el.remove())
     for (const group of options) {
@@ -54,6 +109,9 @@ async function getCitationArrestSection(type, isList = false, list = []) {
       })
 
       for (const charge of group.charges) {
+        if (!chargeMatchesArrestScheduleFilter(charge.name, arrestNarcoticScheduleFilter)) {
+          continue
+        }
         if (
           search &&
           !charge.name.toLowerCase().includes(search.toLowerCase())

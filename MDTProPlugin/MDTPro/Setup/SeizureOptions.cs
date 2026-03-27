@@ -10,6 +10,8 @@ namespace MDTPro.Setup {
         public class DrugTypeOption {
             public string id;
             public string name;
+            /// <summary>Optional DEA-style schedule bucket for PER UI (I–V, Paraphernalia, Other). Omitted = Other.</summary>
+            public string schedule;
         }
 
         public class QuantityOption {

@@ -13,6 +13,7 @@ using System.Xml;
 
 namespace MDTPro.Utility {
     internal class Helper {
+        private static int _logWritesForTrimCheck;
         internal static T ReadFromJsonFile<T>(string filePath) where T : new() {
             return File.Exists(filePath) ? JsonConvert.DeserializeObject<T>(File.ReadAllText(filePath)) : default;
         }
@@ -54,8 +55,50 @@ namespace MDTPro.Utility {
                     Directory.CreateDirectory(logDir);
                 string line = $"[{DateTime.Now:O}] [{severity}] {message}\n";
                 File.AppendAllText(logPath, line);
+                MaybeTrimLogFile(logPath);
             } catch (Exception ex) {
                 try { Game.LogTrivial($"MDT Pro: Log write failed: {ex.Message}"); } catch { }
+            }
+        }
+
+        /// <summary>If logFileMaxSizeKb is set, shorten the file when it grows past the limit (keeps the newest half).</summary>
+        private static void MaybeTrimLogFile(string logPath) {
+            if (++_logWritesForTrimCheck % 32 != 0) return;
+            int maxKb = 0;
+            try {
+                maxKb = Setup.SetupController.GetConfig().logFileMaxSizeKb;
+            } catch {
+                maxKb = 5120;
+            }
+            if (maxKb <= 0) return;
+            long maxBytes = (long)maxKb * 1024L;
+            try {
+                var fi = new FileInfo(logPath);
+                if (!fi.Exists || fi.Length <= maxBytes) return;
+                int keep = (int)Math.Min(int.MaxValue / 4, Math.Max(4096, maxBytes / 2));
+                string tail = ReadUtf8TailFromFile(logPath, keep);
+                string header = $"[{DateTime.Now:O}] [{LogSeverity.Warning}] MDT Pro log shortened (file exceeded {maxKb} KB). Older lines removed.\n";
+                File.WriteAllText(logPath, header + tail);
+            } catch {
+                // never break gameplay for log maintenance
+            }
+        }
+
+        private static string ReadUtf8TailFromFile(string path, int maxBytesToRead) {
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)) {
+                long len = fs.Length;
+                if (len <= maxBytesToRead) {
+                    using (var sr = new StreamReader(fs))
+                        return sr.ReadToEnd();
+                }
+                long start = Math.Max(0, len - maxBytesToRead);
+                fs.Position = start;
+                if (start > 0) {
+                    int b;
+                    while ((b = fs.ReadByte()) >= 0 && b != '\n' && fs.Position < len) { }
+                }
+                using (var sr = new StreamReader(fs))
+                    return sr.ReadToEnd();
             }
         }
 

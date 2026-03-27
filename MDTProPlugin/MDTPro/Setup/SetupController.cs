@@ -147,14 +147,17 @@ namespace MDTPro.Setup {
             Helper.Log($"Log path: {Path.GetFullPath(LogFilePath)}");
 
             Config config = GetConfig();
-            Helper.Log($"Config:\n{JsonConvert.SerializeObject(config, Formatting.Indented)}");
+            if (config.verboseFileLogging) {
+                Helper.Log($"Config:\n{JsonConvert.SerializeObject(config, Formatting.Indented)}");
+                string[] MDTProDirectoryFiles = Directory.GetFiles(MDTProPath).Select(item => $"[File] {Path.GetFileName(item)}").ToArray();
+                string[] MDTProDirectoryDirs = Directory.GetDirectories(MDTProPath).Select(item => $"[Directory] {Path.GetFileName(item)}").ToArray();
+                string[] MDTProDirectoryFilesAndDirs = MDTProDirectoryFiles.Concat(MDTProDirectoryDirs).ToArray();
+                Helper.Log($"MDTPro Directory:\n  {string.Join("\n  ", MDTProDirectoryFilesAndDirs)}");
+            } else {
+                Helper.Log($"Config: port {config.port}, ALPR {(config.alprEnabled ? "on" : "off")}, DB x{config.databaseLimitMultiplier}, log cap {(config.logFileMaxSizeKb > 0 ? config.logFileMaxSizeKb + " KB" : "off")}. Enable verboseFileLogging in config.json for full settings dump.");
+            }
             if (config.firearmDebugLogging)
                 Helper.Log("[Firearm] Debug logging ENABLED – firearm capture flow will be logged to this file.", false, Helper.LogSeverity.Info);
-
-            string[] MDTProDirectoryFiles = Directory.GetFiles(MDTProPath).Select(item => $"[File] {Path.GetFileName(item)}").ToArray();
-            string[] MDTProDirectoryDirs = Directory.GetDirectories(MDTProPath).Select(item => $"[Directory] {Path.GetFileName(item)}").ToArray();
-            string[] MDTProDirectoryFilesAndDirs = MDTProDirectoryFiles.Concat(MDTProDirectoryDirs).ToArray();
-            Helper.Log($"MDTPro Directory:\n  {string.Join("\n  ", MDTProDirectoryFilesAndDirs)}");
         }
 
         internal static void ClearCache() {
@@ -170,20 +173,27 @@ namespace MDTPro.Setup {
                 var def = new Config();
                 cachedConfig = Helper.ReadFromJsonFile<Config>(ConfigPath) ?? def;
                 EnsureALPRDefaults(cachedConfig, def);
+                EnsureLogFileDefaults(cachedConfig, def);
                 EnsureCitationArrestOptionsFromDefaults(cachedConfig, def);
                 Helper.WriteToJsonFile(ConfigPath, cachedConfig);
             }
             return cachedConfig;
         }
 
-        /// <summary>Ensures ALPR config values are sensible. Only enable, popup duration, and HUD position are in config; tuning is hardcoded.</summary>
+        /// <summary>Ensures ALPR config values are sensible. Only enable, popup duration, and HUD position are in config.</summary>
         private static void EnsureALPRDefaults(Config cfg, Config def) {
             if (string.IsNullOrEmpty(cfg.alprHudAnchor)) cfg.alprHudAnchor = def.alprHudAnchor ?? "TopRight";
         }
 
+        /// <summary>Clamp log file size limit (0 = unlimited, max 100 MB).</summary>
+        private static void EnsureLogFileDefaults(Config cfg, Config def) {
+            if (cfg.logFileMaxSizeKb < 0) cfg.logFileMaxSizeKb = 0;
+            if (cfg.logFileMaxSizeKb > 102400) cfg.logFileMaxSizeKb = 102400;
+        }
+
         /// <summary>One-time migration: overwrite citation and arrest options from defaults so upgraders get updated charges. Bump version when adding charges (RICO, Federal, Wildlife, etc.) or expanding citations.</summary>
         private static void EnsureCitationArrestOptionsFromDefaults(Config cfg, Config def) {
-            const int currentCitationArrestOptionsVersion = 6;
+            const int currentCitationArrestOptionsVersion = 8;
             if (cfg.citationArrestOptionsVersion >= currentCitationArrestOptionsVersion) return;
             try {
                 if (File.Exists(CitationOptionsDefaultsPath)) {
@@ -195,7 +205,7 @@ namespace MDTPro.Setup {
                     cachedArrestOptions = null;
                 }
                 cfg.citationArrestOptionsVersion = currentCitationArrestOptionsVersion;
-                Helper.Log("Citation and arrest options updated from defaults (version 6: deduplicated arrest charges, merged overlapping traffic/property/firearms entries).", true, Helper.LogSeverity.Info);
+                Helper.Log("Citation and arrest options updated from defaults (version 8: removed duplicate shoplifting + prescription possession charge).", true, Helper.LogSeverity.Info);
             } catch (Exception ex) {
                 Helper.Log($"Could not update citation/arrest options from defaults: {ex.Message}", true, Helper.LogSeverity.Warning);
             }

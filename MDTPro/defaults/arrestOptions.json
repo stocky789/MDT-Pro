@@ -1293,16 +1293,6 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Possession Of Controlled Substance (Prescription/Narcotic)",
-        "minFine": 0,
-        "maxFine": 1000,
-        "minDays": 0,
-        "maxDays": 365,
-        "probation": 0.4,
-        "canBeWarrant": false,
-        "canRevokeLicense": false
-      },
-      {
         "name": "Possession Of Controlled Substance",
         "minFine": 0,
         "maxFine": 1000,
@@ -1514,6 +1504,26 @@
       },
       {
         "name": "Possession of Vicodin",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.25,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Ritalin",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.2,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Hydrocodone",
         "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
@@ -1819,16 +1829,6 @@
       },
       {
         "name": "Petty Theft (Under $950)",
-        "minFine": 0,
-        "maxFine": 1000,
-        "minDays": 0,
-        "maxDays": 180,
-        "probation": 0.4,
-        "canBeWarrant": false,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Shoplifting (Under $950)",
         "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,

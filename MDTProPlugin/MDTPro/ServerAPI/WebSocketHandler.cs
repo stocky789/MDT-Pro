@@ -46,7 +46,8 @@ namespace MDTPro.ServerAPI {
                     WebSockets.Add(webSocket);
                 }
 
-                Log($"New WebSocket #{WebSockets.IndexOf(webSocket)}", true, LogSeverity.Info);
+                if (SetupController.GetConfig().verboseFileLogging)
+                    Log($"New WebSocket #{WebSockets.IndexOf(webSocket)}", false, LogSeverity.Info);
 
                 while (webSocket.State == WebSocketState.Open && Server.RunServer) {
                     var result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
@@ -96,7 +97,7 @@ namespace MDTPro.ServerAPI {
                     }
                 }
             } catch (Exception e) {
-                if (Server.RunServer) Log($"WebSocket Error: {e.Message}", true, LogSeverity.Error);
+                if (Server.RunServer) Log($"WebSocket Error: {e.Message}", false, LogSeverity.Error);
             } finally {
                 UnsubscribeIfNeeded();
                 if (webSocket != null) {
@@ -157,10 +158,10 @@ namespace MDTPro.ServerAPI {
                     }
                 } catch (OperationCanceledException) {
                 } catch (WebSocketException wse) when (wse.InnerException?.Message.Contains("nonexistent network connection") ?? false) {
-                    Log("WebSocket lost", true, LogSeverity.Warning);
+                    Log("WebSocket lost", false, LogSeverity.Warning);
                 } catch (Exception e) {
                     string innerMessage = e.InnerException != null ? $"Inner: {e.InnerException.Message}" : "";
-                    Log($"WebSocket Error on interval: {e.Message}{innerMessage}", true, LogSeverity.Error);
+                    Log($"WebSocket Error on interval: {e.Message}{innerMessage}", false, LogSeverity.Error);
                 }
             });
         }
@@ -214,11 +215,12 @@ namespace MDTPro.ServerAPI {
             foreach (WebSocket webSocket in webSocketsArr) {
                 try {
                     if (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.CloseReceived) {
-                        Log($"Closing WebSocket #{Array.IndexOf(webSocketsArr, webSocket)}", true, LogSeverity.Info);
+                        if (SetupController.GetConfig().verboseFileLogging)
+                            Log($"Closing WebSocket #{Array.IndexOf(webSocketsArr, webSocket)}", false, LogSeverity.Info);
                         await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
                     }
                 } catch (Exception e) {
-                    Log($"WebSocket close error: {e.Message}", true, LogSeverity.Warning);
+                    Log($"WebSocket close error: {e.Message}", false, LogSeverity.Warning);
                 }
             }
         }
