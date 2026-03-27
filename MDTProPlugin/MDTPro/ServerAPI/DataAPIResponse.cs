@@ -56,6 +56,9 @@ namespace MDTPro.ServerAPI {
                     }
                 }
                 if (pedData == null) {
+                    pedData = DataController.GetPedDataByName(name) ?? DataController.GetPedDataByName(reversedName);
+                }
+                if (pedData == null) {
                     pedData = DataController.PedDatabase.FirstOrDefault(o => o.Name?.ToLower() == name.ToLower() || o.Name?.ToLower() == reversedName.ToLower());
                 }
                 if (pedData == null && (name == "context" || name == "%context" || name.Equals("current", StringComparison.OrdinalIgnoreCase))) {
@@ -64,6 +67,7 @@ namespace MDTPro.ServerAPI {
 
                 Database.SaveSearchHistoryEntry("ped", name, pedData?.Name);
                 if (pedData != null) {
+                    DataController.TryRefreshPedModelFromLiveWorld(pedData, name, reversedName);
                     DataController.KeepPedInDatabase(pedData);
                     if (MDTProPedData.IsMinimalIdentity(pedData)) {
                         Utility.Helper.Log($"[MDTPro] Person Search returning minimal-identity ped (will show N/A): {pedData.Name}", false, Utility.Helper.LogSeverity.Info);

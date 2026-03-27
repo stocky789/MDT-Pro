@@ -996,3 +996,9 @@ body {
   box-sizing: border-box;
   resize: vertical;
 }
+
+/* Narcotic schedule filter was removed (charges live in schedule <details> groups). Hide if a cached older script still injects the row. */
+.arrestSection .arrestChargeScheduleFilterRow,
+.arrestSection .arrestNarcoticScheduleFilter {
+  display: none !important;
+}

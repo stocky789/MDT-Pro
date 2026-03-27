@@ -936,6 +936,8 @@ namespace MDTPro.Data {
                     ?? keepInPedDatabase.FirstOrDefault(x => x.Name?.Equals(pedName, StringComparison.OrdinalIgnoreCase) == true);
                 if (pedData == null) {
                     pedData = new MDTProPedData { Name = pedName };
+                    pedData.Citations = new List<CitationGroup.Charge>();
+                    pedData.Arrests = new List<ArrestGroup.Charge>();
                     pedData.ModelHash = (uint)ped.Model.Hash;
                     pedData.ModelName = ped.Model.Name;
                     pedData.TryParseNameIntoFirstLast();
@@ -1109,7 +1111,8 @@ namespace MDTPro.Data {
                     if (pedIndex != -1) {
                         MDTProPedData pedDataToAdd = pedDatabase[pedIndex];
 
-                        pedDataToAdd.Citations.AddRange(citationReport.Charges.Where(x => !x.addedByReportInEdit));
+                        pedDataToAdd.Citations ??= new List<CitationGroup.Charge>();
+                        pedDataToAdd.Citations.AddRange((citationReport.Charges ?? Enumerable.Empty<CitationReport.Charge>()).Where(x => x != null && !x.addedByReportInEdit));
 
                         KeepPedInDatabase(pedDataToAdd);
                         pedDatabase[pedIndex] = pedDataToAdd;
@@ -1134,7 +1137,8 @@ namespace MDTPro.Data {
 
                 if (newlyClosed) {
                     // Set FinalAmount once when the citation becomes closed; do not recalculate on later saves.
-                    var chargesToHand = citationReport.Charges
+                    var chargesToHand = (citationReport.Charges ?? Enumerable.Empty<CitationReport.Charge>())
+                        .Where(charge => charge != null)
                         .Select(charge => new PRHelper.CitationHandoutCharge {
                             Name = charge.name,
                             Fine = Helper.GetRandomInt(charge.minFine, charge.maxFine),
@@ -1161,7 +1165,8 @@ namespace MDTPro.Data {
                 if (!string.IsNullOrEmpty(arrestReport.OffenderPedName)) {
                     MDTProPedData pedDataToAdd = GetPedDataByName(arrestReport.OffenderPedName);
                     if (pedDataToAdd != null) {
-                        pedDataToAdd.Arrests.AddRange(arrestReport.Charges.Where(x => !x.addedByReportInEdit));
+                        pedDataToAdd.Arrests ??= new List<ArrestGroup.Charge>();
+                        pedDataToAdd.Arrests.AddRange((arrestReport.Charges ?? Enumerable.Empty<ArrestReport.Charge>()).Where(x => x != null && !x.addedByReportInEdit));
 
                         // Arrest satisfies warrant: clear wanted status and sync to CDF so MDT and PR stay consistent
                         pedDataToAdd.IsWanted = false;
@@ -1196,7 +1201,8 @@ namespace MDTPro.Data {
                         courtData.AttachedReportIds.AddRange(arrestReport.AttachedReportIds);
                     }
 
-                    foreach (ArrestReport.Charge charge in arrestReport.Charges) {
+                    foreach (ArrestReport.Charge charge in arrestReport.Charges ?? Enumerable.Empty<ArrestReport.Charge>()) {
+                        if (charge == null) continue;
                         int minDays = charge.minDays;
                         int? maxDays = charge.maxDays;
                         int? time;
@@ -1350,6 +1356,9 @@ namespace MDTPro.Data {
                     // Always refresh wanted status from CDF so PR dispatch results (warrants) show in MDT search
                     existingPed.IsWanted = mdtProPedData.IsWanted;
                     existingPed.WarrantText = mdtProPedData.WarrantText;
+                    // Always refresh portrait model from the live ped (was incorrectly gated on CDFPedData == null, leaving stale ModelName for most peds)
+                    if (mdtProPedData.ModelHash != 0) existingPed.ModelHash = mdtProPedData.ModelHash;
+                    if (!string.IsNullOrEmpty(mdtProPedData.ModelName)) existingPed.ModelName = mdtProPedData.ModelName;
                     if (existingPed.CDFPedData == null) {
                         existingPed.LicenseStatus = mdtProPedData.LicenseStatus;
                         existingPed.LicenseExpiration = mdtProPedData.LicenseExpiration;
@@ -1366,9 +1375,6 @@ namespace MDTPro.Data {
                         if (!string.IsNullOrEmpty(mdtProPedData.Birthday)) existingPed.Birthday = existingPed.Birthday ?? mdtProPedData.Birthday;
                         if (!string.IsNullOrEmpty(mdtProPedData.Gender)) existingPed.Gender = existingPed.Gender ?? mdtProPedData.Gender;
                         if (!string.IsNullOrEmpty(mdtProPedData.Address)) existingPed.Address = existingPed.Address ?? mdtProPedData.Address;
-                        // Always update model from current encounter so ID photo matches the person in front of you
-                        if (mdtProPedData.ModelHash != 0) existingPed.ModelHash = mdtProPedData.ModelHash;
-                        if (!string.IsNullOrEmpty(mdtProPedData.ModelName)) existingPed.ModelName = mdtProPedData.ModelName;
                         existingPed.TryParseNameIntoFirstLast();
                     }
                 }
@@ -1503,6 +1509,54 @@ namespace MDTPro.Data {
             var cutoff = DateTime.UtcNow - RecentlyIdentifiedTtl;
             foreach (var k in recentlyIdentifiedPedHandles.Where(x => x.Value.At < cutoff).Select(x => x.Key).ToList())
                 recentlyIdentifiedPedHandles.Remove(k);
+        }
+
+        /// <summary>True if the world ped's identity (CDF or LSPDFR persona) matches the MDT record name.</summary>
+        internal static bool LivePedIdentityMatchesRecord(Ped p, MDTProPedData pedData) {
+            if (p == null || !p.IsValid() || pedData == null || string.IsNullOrWhiteSpace(pedData.Name)) return false;
+            string live = null;
+            try { live = p.GetPedData()?.FullName; } catch { }
+            if (string.IsNullOrWhiteSpace(live)) {
+                try {
+                    var persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(p);
+                    if (persona != null && !string.IsNullOrEmpty(persona.FullName)) live = persona.FullName;
+                } catch { }
+            }
+            if (string.IsNullOrWhiteSpace(live)) return false;
+            return string.Equals(live.Trim(), pedData.Name.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>Refresh ModelHash/ModelName from a live ped (Holder or recently ID'd handle) so Person Search ID photos match the entity in the world. CDF does not supply portrait data; we use GTA model name against public ped image CDNs.</summary>
+        internal static bool TryRefreshPedModelFromLiveWorld(MDTProPedData pedData, string searchName, string reversedSearchName) {
+            if (pedData == null) return false;
+            try {
+                if (pedData.Holder != null && pedData.Holder.IsValid()) {
+                    uint h = (uint)pedData.Holder.Model.Hash;
+                    string n = pedData.Holder.Model.Name;
+                    if (h != 0 && !string.IsNullOrEmpty(n)) {
+                        pedData.ModelHash = h;
+                        pedData.ModelName = n;
+                        return true;
+                    }
+                }
+                foreach (string key in new[] { searchName, reversedSearchName, pedData.Name }) {
+                    if (string.IsNullOrWhiteSpace(key)) continue;
+                    var handleOpt = GetRecentlyIdentifiedPedHandle(key.Trim());
+                    if (!handleOpt.HasValue) continue;
+                    try {
+                        Ped live = World.GetEntityByHandle<Ped>(handleOpt.Value);
+                        if (live == null || !live.IsValid()) continue;
+                        if (!LivePedIdentityMatchesRecord(live, pedData)) continue;
+                        uint mh = (uint)live.Model.Hash;
+                        string mn = live.Model.Name;
+                        if (mh == 0 || string.IsNullOrEmpty(mn)) continue;
+                        pedData.ModelHash = mh;
+                        pedData.ModelName = mn;
+                        return true;
+                    } catch { }
+                }
+            } catch { }
+            return false;
         }
 
         /// <summary>GTA peds share models; only merge persistent history when names clearly match so we do not graft one person's record onto another (e.g. Stan Pierce vs Stan Bank).</summary>
@@ -1775,7 +1829,8 @@ namespace MDTPro.Data {
                 || n.Contains("manufacturing meth") || n.Contains("possession of cannabis") || n.Contains("possession of marijuana") || n.Contains("possession of cocaine")
                 || n.Contains("possession of methamphetamine") || n.Contains("possession of heroin") || n.Contains("possession of pcp")
                 || n.Contains("possession of lsd") || n.Contains("hallucinogen") || n.Contains("possession of ecstasy") || n.Contains("mdma")
-                || n.Contains("possession of fentanyl") || n.Contains("prescription") && n.Contains("narcotic");
+                || n.Contains("possession of fentanyl") || n.Contains("ritalin") || n.Contains("hydrocodone")
+                || n.Contains("prescription") && n.Contains("narcotic");
         }
 
         /// <summary>True if the case has at least one drug-related charge. Used for evidence relevance (e.g. DocumentedDrugs / drug records directly relevant).</summary>
@@ -2440,7 +2495,8 @@ namespace MDTPro.Data {
                     if (!ped.Exists()) return 0;
                     if (records.Count > 0) {
                         Database.SaveFirearmRecords(records);
-                        Helper.Log($"[Firearm] Saved {records.Count} firearm record(s) from {source} (owner: {ownerName})", false, Helper.LogSeverity.Info);
+                        if (SetupController.GetConfig().firearmDebugLogging)
+                            Helper.Log($"[Firearm] Saved {records.Count} firearm record(s) from {source} (owner: {ownerName})", false, Helper.LogSeverity.Info);
                     }
                     if (drugRecords.Count > 0) Database.SaveDrugRecords(drugRecords);
                 }
@@ -2479,7 +2535,8 @@ namespace MDTPro.Data {
                     LastSeenAt = DateTime.UtcNow.ToString("o")
                 };
                 Database.SaveFirearmRecords(new List<FirearmRecord> { record });
-                Helper.Log($"[Firearm] Saved 1 firearm record from fallback (player-held: {displayName})", false, Helper.LogSeverity.Info);
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"[Firearm] Saved 1 firearm record from fallback (player-held: {displayName})", false, Helper.LogSeverity.Info);
             } catch (Exception e) {
                 Helper.Log($"Firearm fallback failed: {e.Message}", false, Helper.LogSeverity.Warning);
             }
@@ -2585,7 +2642,8 @@ namespace MDTPro.Data {
                                 var records = ExtractFirearmRecordsFromItemList(list, "Evidence (ground)", "Evidence (ground)");
                                 if (records.Count > 0) {
                                     Database.SaveFirearmRecords(records);
-                                    Helper.Log($"[Firearm] Saved {records.Count} firearm record(s) from pickup (Evidence ground)", false, Helper.LogSeverity.Info);
+                                    if (SetupController.GetConfig().firearmDebugLogging)
+                                        Helper.Log($"[Firearm] Saved {records.Count} firearm record(s) from pickup (Evidence ground)", false, Helper.LogSeverity.Info);
                                     lock (capturedPickupHandlesLock) {
                                         capturedPickupHandles.Add(ent.Handle);
                                         if (capturedPickupHandles.Count > 200) {
@@ -2608,7 +2666,8 @@ namespace MDTPro.Data {
         /// <summary>Accepts firearm check result from Dispatch or external system. Call when Dispatch returns serial/owner so it shows in MDT Firearms Check. Source will be "Dispatch".</summary>
         internal static bool SaveFirearmCheckResultFromDispatch(string serialNumber, string ownerName, string weaponType, string status = null, string weaponModelId = null) {
             if (string.IsNullOrWhiteSpace(ownerName)) return false;
-            Helper.Log($"[Firearm] SaveFirearmCheckResultFromDispatch: serial={serialNumber ?? "(none)"}, owner={ownerName}, weapon={weaponType ?? weaponModelId ?? "Firearm"}, status={status ?? "—"}", false, Helper.LogSeverity.Info);
+            if (SetupController.GetConfig().firearmDebugLogging)
+                Helper.Log($"[Firearm] SaveFirearmCheckResultFromDispatch: serial={serialNumber ?? "(none)"}, owner={ownerName}, weapon={weaponType ?? weaponModelId ?? "Firearm"}, status={status ?? "—"}", false, Helper.LogSeverity.Info);
             string serial = string.IsNullOrWhiteSpace(serialNumber) ? null : serialNumber.Trim();
             string weapon = (weaponType ?? weaponModelId ?? "Firearm").Trim();
             if (string.IsNullOrEmpty(weapon)) weapon = "Firearm";
@@ -2880,11 +2939,13 @@ namespace MDTPro.Data {
                             foreach (var p in toRemove) capturedVehicleSearchPlates.Remove(p);
                         }
                     }
-                    Helper.Log($"Vehicle search captured {records.Count} item(s) for plate {plate}", false, Helper.LogSeverity.Info);
+                    if (SetupController.GetConfig().firearmDebugLogging)
+                        Helper.Log($"Vehicle search captured {records.Count} item(s) for plate {plate}", false, Helper.LogSeverity.Info);
                 }
                 if (firearmRecords.Count > 0) {
                     Database.SaveFirearmRecords(firearmRecords);
-                    Helper.Log($"[Firearm] Saved {firearmRecords.Count} firearm record(s) from vehicle search (plate {plate})", false, Helper.LogSeverity.Info);
+                    if (SetupController.GetConfig().firearmDebugLogging)
+                        Helper.Log($"[Firearm] Saved {firearmRecords.Count} firearm record(s) from vehicle search (plate {plate})", false, Helper.LogSeverity.Info);
                 }
             } catch (Exception e) {
                 Helper.Log($"CaptureVehicleSearchItems failed: {e.Message}", false, Helper.LogSeverity.Warning);
@@ -3421,6 +3482,13 @@ namespace MDTPro.Data {
         private static bool HasChargeKeyword(CourtData courtData, string keyword) {
             if (courtData?.Charges == null) return false;
             string k = keyword.ToLowerInvariant();
+            // "Shoplifting …" does not contain the substring "theft"; treat shoplifting as theft for verdict/rationale keyword matching (legacy cases + citations).
+            if (k == "theft") {
+                return courtData.Charges.Any(c => {
+                    string n = (c.Name ?? "").ToLowerInvariant();
+                    return n.Contains("theft") || n.Contains("shoplift");
+                });
+            }
             return courtData.Charges.Any(c => (c.Name ?? "").ToLowerInvariant().Contains(k));
         }
 
@@ -3458,7 +3526,7 @@ namespace MDTPro.Data {
                     || n.Contains("benzodiazepine") || n.Contains("hallucinogen") || n.Contains("ecstasy") || n.Contains("mdma") || n.Contains("pcp")
                     || n.Contains("dmt") || n.Contains("ghb") || n.Contains("ketamine") || n.Contains("steroids") || n.Contains("bath salt")
                     || n.Contains("synthetic cannabinoid") || n.Contains("k2") || n.Contains("spice") || n.Contains("peyote") || n.Contains("psilocybin")
-                    || n.Contains("lysergic") || n.Contains("oxycontin") || n.Contains("percocet") || n.Contains("vicodin") || n.Contains("codeine")
+                    || n.Contains("lysergic") || n.Contains("oxycontin") || n.Contains("percocet") || n.Contains("vicodin") || n.Contains("hydrocodone") || n.Contains("ritalin") || n.Contains("codeine")
                     || n.Contains("promethazine") || n.Contains("demerol") || n.Contains("morphine") || n.Contains("methadone") || n.Contains("opium")
                     || n.Contains("hydromorph") || n.Contains("roxicodone") || n.Contains("roofies") || n.Contains("ativan") || n.Contains("valium")
                     || n.Contains("xanax") || n.Contains("soma") || n.Contains("tramadol") || n.Contains("darvocet") || n.Contains("darvon")

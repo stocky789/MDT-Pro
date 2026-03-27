@@ -33,7 +33,8 @@ namespace MDTPro {
             Log($"Listening on: {fullIp}");
             Log($"Listening on: {fullName}");
             File.WriteAllText(Setup.SetupController.IpAddressesPath, $"{fullIp}\n{fullName}");
-            Utility.RageNotification.ShowAddressNotification(localIp, Environment.MachineName, port);
+            if (Setup.SetupController.GetConfig().showListeningAddressNotification)
+                Utility.RageNotification.ShowAddressNotification(localIp, Environment.MachineName, port);
 
             while (RunServer) {
                 try {
@@ -70,7 +71,7 @@ namespace MDTPro {
                 res.OutputStream.Write(buffer, 0, buffer.Length);
             } catch (Exception e) {
                 Log($"HandleRequest exception: {e.Message}", true, LogSeverity.Error);
-                try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] HandleRequest exception:\n{e}"); } catch { }
+                try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] HandleRequest exception:\n{SanitizeExceptionForLog(e)}"); } catch { }
                 try {
                     res.StatusCode = 500;
                     byte[] errBuffer = System.Text.Encoding.UTF8.GetBytes("Internal Server Error");

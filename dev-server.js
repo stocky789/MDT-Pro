@@ -81,6 +81,7 @@ const mockConfig = {
   initialWindowWidth: 900,
   initialWindowHeight: 600,
   port: PORT,
+  showListeningAddressNotification: true,
 };
 
 const mockLanguage = {

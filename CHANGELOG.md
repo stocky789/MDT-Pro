@@ -4,6 +4,27 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
+## [0.9.7.1] — 2026-03-27
+
+### Minor Features
+
+- **Cleaner logs** — Startup writes a short config summary to **MDTPro.log** instead of the full settings dump and folder listing (turn on **verboseFileLogging** in config if you need the old detail). Optional **log file size cap** with automatic trim so the file doesn’t grow forever. **WebSocket** and **ALPR** lines are still written to **MDTPro.log** as before; they are **no longer duplicated** into the **RPH in-game console** (so routine connects/disconnects and ALPR start/stop don’t spam the plugin console).
+
+- **Easier to share logs** — If an error gets written to **MDTPro.log**, those lines no longer include long **C:\…** folder paths, so snippets are shorter and more comfortable to post on the forum.
+
+- **Streaming / privacy** — **Customization → Config → General**: **Show MDT address in-game** (on by default). Turn it off to skip the in-game pop-up that shows your local IP and PC name when the MDT server starts. URLs are still written to **MDTPro/ipAddresses.txt** and logged; the setting applies the next time you go on duty (when the server starts).
+
+- **Drug charges & seizures** — Filter narcotics by **schedule** (I–V and other wording) when picking **arrest** charges. On **Property and Evidence** reports, choose a **schedule**, then the drug type. New seizure options for **Ritalin** and **Hydrocodone**, plus new arrest charges for both. Overlapping arrest charges removed (**petty theft** kept instead of duplicate shoplifting; one **controlled substance** line instead of a second prescription copy). Existing installs get the updated arrest and citation lists automatically the next time you load the mod.
+
+### Bug Fixes
+
+- **Probation / parole** — People on probation or parole now usually show at least one **prior arrest** on their record so it doesn’t look empty by mistake.
+- **Person Search** — Saved and recent people resolve more reliably; **photos** mix up less often, including when you search a new name before the last search has finished.
+- **ALPR** — Registration and insurance flags use **live game data** for that vehicle (same idea as Callout Interface), not empty fields or old saved-only records when there’s no live owner. Plate scan timing is unchanged from before.
+- **Court** — Drug evidence from **Property and Evidence** still matches **possession / controlled substance** charges after the charge list change. Verdict wording that looks for **theft** also matches older charges that still say **shoplifting**.
+
+---
+
 ## [0.9.7.0] — 2026-03-23
 
 ### Major Features
@@ -18,12 +39,9 @@ All notable changes to MDT Pro are documented here.
 
 ### Bug Fixes
 
-- **California law alignment** — All 143 citation charges and 414 arrest charges verified against California Vehicle Code, Penal Code, Health & Safety Code, and related statutes. Fines, jail ranges, and penalties updated to match 2024–2025 CA bail schedules and statutory amounts (base fine + penalty assessments). Traffic, drugs, firearms, assault, theft, homicide, federal/ICE, and wildlife charges now reflect real-world CA penalties.
 - **Citation/arrest options now update on upgrade** — Bumped `citationArrestOptionsVersion` to 3 so existing installations receive the new charge and citation defaults. Previously the version stayed at 2, so users who already had the 0.9.6.0 files never got the 0.9.7.0 additions.
 - **Correct sentence totals** — Resolved cases now show the actual total jail time imposed, not the statutory maximum.
-- **Fewer crashes** — Fixed issues when viewing cases with missing or corrupted data.
 - **Court display** — Fixed display glitches when attached reports couldn't be loaded.
-- **Court frontend hardening** — createReadOnlyInput handles null/undefined; formatIsoDate returns '-' for invalid dates; EvidenceScore coerced to number; courtCases guarded against non-array API response; null entries filtered from case list; long Prosecutor/Defense "Firm — Lawyer" strings truncate with ellipsis and show full text on hover; createLabel/createLabelWithTooltip handle missing language keys safely.
 - **Charge data robustness** — Court display and case saving now handle missing or invalid charge entries without errors.
 - **Policing Redefined — citation handoff** — Closing a citation in the MDT no longer calls `SetPedAsStopped` on occupants still inside a vehicle, which was putting PR into the wrong interaction state and hiding **Dismiss** (and other options) on the Traffic Stop / Ped Stop menus.
 
