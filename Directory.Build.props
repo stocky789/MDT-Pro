@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <!-- Strip the builder's absolute repo path from PDBs (csc /pathmap) so stack traces never embed e.g. C:\Users\... -->
+  <PropertyGroup>
+    <PathMap>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))=/</PathMap>
+  </PropertyGroup>
+</Project>

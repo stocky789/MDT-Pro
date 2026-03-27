@@ -8,6 +8,7 @@ using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Text.RegularExpressions;
 using System.Xml;
 
 
@@ -249,6 +250,20 @@ namespace MDTPro.Utility {
             process.WaitForExit();
 
             return process.ExitCode == 0;
+        }
+
+        /// <summary>Strip local machine path prefixes from text (e.g. stack traces) before writing logs users may share.</summary>
+        internal static string RedactMachineAbsolutePaths(string text) {
+            if (string.IsNullOrEmpty(text)) return text;
+            text = Regex.Replace(text, @"[A-Za-z]:\\(?:[^\\\r\n]+\\)+", "<...>/");
+            text = Regex.Replace(text, @"[A-Za-z]:\\([^:\r\n]+\.cs)\b", "<...>/$1");
+            text = Regex.Replace(text, @"/Users/[^/\r\n]+/", "<...>/");
+            text = Regex.Replace(text, @"/home/[^/\r\n]+/", "<...>/");
+            return text;
+        }
+
+        internal static string SanitizeExceptionForLog(Exception ex) {
+            return ex == null ? string.Empty : RedactMachineAbsolutePaths(ex.ToString());
         }
     }
 }

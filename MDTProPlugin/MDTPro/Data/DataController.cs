@@ -936,6 +936,8 @@ namespace MDTPro.Data {
                     ?? keepInPedDatabase.FirstOrDefault(x => x.Name?.Equals(pedName, StringComparison.OrdinalIgnoreCase) == true);
                 if (pedData == null) {
                     pedData = new MDTProPedData { Name = pedName };
+                    pedData.Citations = new List<CitationGroup.Charge>();
+                    pedData.Arrests = new List<ArrestGroup.Charge>();
                     pedData.ModelHash = (uint)ped.Model.Hash;
                     pedData.ModelName = ped.Model.Name;
                     pedData.TryParseNameIntoFirstLast();
@@ -1109,7 +1111,8 @@ namespace MDTPro.Data {
                     if (pedIndex != -1) {
                         MDTProPedData pedDataToAdd = pedDatabase[pedIndex];
 
-                        pedDataToAdd.Citations.AddRange(citationReport.Charges.Where(x => !x.addedByReportInEdit));
+                        pedDataToAdd.Citations ??= new List<CitationGroup.Charge>();
+                        pedDataToAdd.Citations.AddRange((citationReport.Charges ?? Enumerable.Empty<CitationReport.Charge>()).Where(x => x != null && !x.addedByReportInEdit));
 
                         KeepPedInDatabase(pedDataToAdd);
                         pedDatabase[pedIndex] = pedDataToAdd;
@@ -1134,7 +1137,8 @@ namespace MDTPro.Data {
 
                 if (newlyClosed) {
                     // Set FinalAmount once when the citation becomes closed; do not recalculate on later saves.
-                    var chargesToHand = citationReport.Charges
+                    var chargesToHand = (citationReport.Charges ?? Enumerable.Empty<CitationReport.Charge>())
+                        .Where(charge => charge != null)
                         .Select(charge => new PRHelper.CitationHandoutCharge {
                             Name = charge.name,
                             Fine = Helper.GetRandomInt(charge.minFine, charge.maxFine),
@@ -1161,7 +1165,8 @@ namespace MDTPro.Data {
                 if (!string.IsNullOrEmpty(arrestReport.OffenderPedName)) {
                     MDTProPedData pedDataToAdd = GetPedDataByName(arrestReport.OffenderPedName);
                     if (pedDataToAdd != null) {
-                        pedDataToAdd.Arrests.AddRange(arrestReport.Charges.Where(x => !x.addedByReportInEdit));
+                        pedDataToAdd.Arrests ??= new List<ArrestGroup.Charge>();
+                        pedDataToAdd.Arrests.AddRange((arrestReport.Charges ?? Enumerable.Empty<ArrestReport.Charge>()).Where(x => x != null && !x.addedByReportInEdit));
 
                         // Arrest satisfies warrant: clear wanted status and sync to CDF so MDT and PR stay consistent
                         pedDataToAdd.IsWanted = false;
@@ -1196,7 +1201,8 @@ namespace MDTPro.Data {
                         courtData.AttachedReportIds.AddRange(arrestReport.AttachedReportIds);
                     }
 
-                    foreach (ArrestReport.Charge charge in arrestReport.Charges) {
+                    foreach (ArrestReport.Charge charge in arrestReport.Charges ?? Enumerable.Empty<ArrestReport.Charge>()) {
+                        if (charge == null) continue;
                         int minDays = charge.minDays;
                         int? maxDays = charge.maxDays;
                         int? time;
