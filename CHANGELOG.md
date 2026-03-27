@@ -12,6 +12,8 @@ All notable changes to MDT Pro are documented here.
 
 - **Easier to share logs** — If an error gets written to **MDTPro.log**, those lines no longer include long **C:\…** folder paths, so snippets are shorter and more comfortable to post on the forum.
 
+- **Streaming / privacy** — **Customization → Config → General**: **Show MDT address in-game** (on by default). Turn it off to skip the in-game pop-up that shows your local IP and PC name when the MDT server starts. URLs are still written to **MDTPro/ipAddresses.txt** and logged; the setting applies the next time you go on duty (when the server starts).
+
 - **Drug charges & seizures** — Filter narcotics by **schedule** (I–V and other wording) when picking **arrest** charges. On **Property and Evidence** reports, choose a **schedule**, then the drug type. New seizure options for **Ritalin** and **Hydrocodone**, plus new arrest charges for both. Overlapping arrest charges removed (**petty theft** kept instead of duplicate shoplifting; one **controlled substance** line instead of a second prescription copy). Existing installs get the updated arrest and citation lists automatically the next time you load the mod.
 
 ### Bug Fixes
