@@ -55,6 +55,44 @@ searchInput.addEventListener('input', function () {
   filterPersonLists(this.value.trim())
 })
 
+/**
+ * ID photo in Person Search is a catalogue still for the ped *model* (shared by many NPCs). CDF/PR do not expose mugshot textures.
+ * Tries multiple URLs: FiveM docs host vanilla peds as webp; png fallback covers older mirrors.
+ */
+function setPedIdPhoto (photoImg, photoPlaceholder, response) {
+  if (!photoImg || !photoPlaceholder) return
+  const modelName = (response.ModelName || '').trim().toLowerCase()
+  const candidates = []
+  if (modelName) {
+    candidates.push(`https://docs.fivem.net/peds/${modelName}.webp`)
+    candidates.push(`https://docs.fivem.net/peds/${modelName}.png`)
+  }
+  if (candidates.length === 0) {
+    photoImg.classList.add('hidden')
+    photoImg.removeAttribute('src')
+    photoPlaceholder.classList.remove('hidden')
+    return
+  }
+  let i = 0
+  const tryNext = () => {
+    if (i >= candidates.length) {
+      photoImg.classList.add('hidden')
+      photoImg.removeAttribute('src')
+      photoPlaceholder.classList.remove('hidden')
+      return
+    }
+    const url = candidates[i++]
+    photoImg.onerror = () => tryNext()
+    photoImg.onload = () => {
+      photoImg.classList.remove('hidden')
+      photoPlaceholder.classList.add('hidden')
+      photoImg.alt = response.Name || ''
+    }
+    photoImg.src = url
+  }
+  tryNext()
+}
+
 function filterPersonLists(searchText) {
   const q = (searchText || '').toLowerCase()
   const lists = [
@@ -257,24 +295,7 @@ async function performSearch(query) {
   // ID photo: use FiveM ped model image when ModelName is available (vanilla GTA peds)
   const photoImg = document.getElementById('pedIdPhotoImg')
   const photoPlaceholder = document.querySelector('.pedIdPhotoPlaceholder')
-  if (photoImg && photoPlaceholder) {
-    const modelName = (response.ModelName || '').trim().toLowerCase()
-    if (modelName) {
-      photoImg.src = `https://docs.fivem.net/peds/${modelName}.webp`
-      photoImg.classList.remove('hidden')
-      photoImg.alt = response.Name || ''
-      photoPlaceholder.classList.add('hidden')
-      photoImg.onerror = () => {
-        photoImg.classList.add('hidden')
-        photoImg.removeAttribute('src')
-        photoPlaceholder.classList.remove('hidden')
-      }
-    } else {
-      photoImg.classList.add('hidden')
-      photoImg.removeAttribute('src')
-      photoPlaceholder.classList.remove('hidden')
-    }
-  }
+  setPedIdPhoto(photoImg, photoPlaceholder, response)
 
   for (const key of Object.keys(response)) {
     const el = document.querySelector(

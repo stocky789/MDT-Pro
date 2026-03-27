@@ -63,22 +63,22 @@ function buildNarcoticsCheatsheetContent () {
   // ─── Drug Schedules ─────────────────────────────────────────────────
   container.appendChild(section('Drug schedules', table([
     ['Schedule', 'Definition', 'Examples'],
-    ['I', 'No accepted medical use, high abuse potential', 'Heroin, LSD, Marijuana*, Ecstasy, Peyote, GHB, DMT, Synthetic cannabinoids (K2/Spice)'],
-    ['II', 'High abuse potential, severe dependence risk', 'Cocaine, Methamphetamine, Fentanyl, Oxycodone, Adderall, Morphine, Hydromorphone, Methadone'],
-    ['III', 'Moderate abuse potential, accepted medical use', 'Ketamine, Codeine (<90mg/dose), Anabolic steroids, Testosterone, Tylenol w/ codeine'],
-    ['IV', 'Low abuse potential, low dependence', 'Xanax, Valium, Ativan, Tramadol, Ambien, Soma, Rohypnol'],
+    ['I', 'No accepted medical use, high abuse potential', 'Heroin, LSD, Cannabis*, Ecstasy/MDMA, Peyote, Psilocybin, DMT, Cocaine base (crack), Illicit GHB, Synthetic cannabinoids (K2/Spice), Synthetic cathinones'],
+    ['II', 'High abuse potential, severe dependence risk', 'Cocaine (salt), Methamphetamine, PCP, Fentanyl, Oxycodone, Hydrocodone, Amphetamine/Adderall, Methylphenidate/Ritalin, Morphine, Methadone, Codeine'],
+    ['III', 'Moderate abuse potential, accepted medical use', 'Ketamine, Anabolic steroids, FDA-approved GHB products, Some codeine/opiate combinations (limited strength), Tylenol w/ codeine'],
+    ['IV', 'Low abuse potential, low dependence', 'Xanax, Valium, Ativan, Tramadol, Ambien (zolpidem), Soma, Rohypnol (flunitrazepam)'],
     ['V', 'Lowest abuse potential, cough/antidiarrheal', 'Lyrica, Lomotil, Cough syrups with limited codeine']
   ])))
   const scheduleNote = document.createElement('p')
   scheduleNote.className = 'narcoticsCheatsheetNote'
-  scheduleNote.textContent = '* Marijuana: federal scheduling changing; state laws vary.'
+  scheduleNote.textContent = '* Cannabis scheduling vs retail rules vary by jurisdiction; treat as a controlled substance for illicit sale/possession in RP as your server prefers.'
   container.querySelector('.narcoticsCheatsheetSection:last-child').appendChild(scheduleNote)
 
   // ─── Drug → Schedule Quick Reference ───────────────────────────────
   container.appendChild(section('Quick: drug → schedule', grid([
-    '<strong>Schedule I:</strong> Heroin, LSD, Ecstasy, Peyote, Psilocybin, DMT, GHB, K2',
-    '<strong>Schedule II:</strong> Cocaine, Crack, Meth, Fentanyl, OxyContin, Adderall, Morphine',
-    '<strong>Schedule III:</strong> Ketamine, Codeine (low dose), Steroids, Promethazine',
+    '<strong>Schedule I:</strong> Heroin, LSD, Ecstasy, Peyote, Psilocybin, DMT, Cannabis (many schedules), Crack (cocaine base), GHB (illicit), K2, bath salts',
+    '<strong>Schedule II:</strong> Powder cocaine, Meth, PCP, Fentanyl, OxyContin, Vicodin, Adderall, Ritalin, Morphine, Codeine',
+    '<strong>Schedule III:</strong> Ketamine, Steroids, Some codeine combos (e.g. Tylenol w/ codeine)',
     '<strong>Schedule IV:</strong> Xanax, Valium, Tramadol, Rohypnol, Soma'
   ], 2)))
 

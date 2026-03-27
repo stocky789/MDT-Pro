@@ -43,7 +43,7 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Hit and Run / Leaving the Scene — Property Damage Only",
+        "name": "Hit and Run / Leaving the Scene \u2014 Property Damage Only",
         "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
@@ -183,7 +183,7 @@
         "canRevokeLicense": true
       },
       {
-        "name": "Driving Under the Influence / DWI — First Offense (0.08% BAC)",
+        "name": "Driving Under the Influence / DWI \u2014 First Offense (0.08% BAC)",
         "minFine": 390,
         "maxFine": 1000,
         "minDays": 2,
@@ -1140,7 +1140,7 @@
     ]
   },
   {
-    "name": "Drug Paraphernalia / Narcotics",
+    "name": "Drug Paraphernalia & General",
     "charges": [
       {
         "name": "Possession Of Drug Paraphernalia",
@@ -1183,25 +1183,30 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Transport Or Sale Of Methamphetamine",
+        "name": "Possession Of Controlled Substance",
         "minFine": 0,
-        "maxFine": 10000,
-        "minDays": 730,
-        "maxDays": 1460,
-        "probation": 0.3,
-        "canBeWarrant": true,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
         "canRevokeLicense": false
       },
       {
-        "name": "Manufacturing Methamphetamine",
+        "name": "Possession of Prescription Pills",
         "minFine": 0,
-        "maxFine": 50000,
-        "minDays": 1095,
-        "maxDays": 2555,
-        "probation": 0.3,
-        "canBeWarrant": true,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.2,
+        "canBeWarrant": false,
         "canRevokeLicense": false
-      },
+      }
+    ]
+  },
+  {
+    "name": "Schedule I",
+    "charges": [
       {
         "name": "Sale Or Transport Of Cannabis",
         "minFine": 0,
@@ -1213,43 +1218,33 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Possession Of Amphetamine",
+        "name": "Simple Possession of Marijuana",
         "minFine": 0,
-        "maxFine": 1000,
+        "maxFine": 100,
         "minDays": 0,
-        "maxDays": 365,
+        "maxDays": 30,
+        "probation": 0.75,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Marijuana (More Than 28 Grams+)",
+        "minFine": 0,
+        "maxFine": 500,
+        "minDays": 0,
+        "maxDays": 180,
         "probation": 0.4,
         "canBeWarrant": false,
         "canRevokeLicense": false
       },
       {
-        "name": "Possession Of Benzodiazepine",
+        "name": "Cultivation of Marijuana",
         "minFine": 0,
-        "maxFine": 1000,
+        "maxFine": 10000,
         "minDays": 0,
-        "maxDays": 365,
-        "probation": 0.4,
-        "canBeWarrant": false,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Possession Of Cocaine",
-        "minFine": 0,
-        "maxFine": 1000,
-        "minDays": 0,
-        "maxDays": 365,
-        "probation": 0.4,
-        "canBeWarrant": false,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Possession Of Methamphetamine",
-        "minFine": 0,
-        "maxFine": 1000,
-        "minDays": 0,
-        "maxDays": 365,
-        "probation": 0.4,
-        "canBeWarrant": false,
+        "maxDays": 1095,
+        "probation": 0.5,
+        "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
@@ -1283,57 +1278,7 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Possession Of Fentanyl",
-        "minFine": 1000,
-        "maxFine": 1000,
-        "minDays": 0,
-        "maxDays": 365,
-        "probation": 0.4,
-        "canBeWarrant": true,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Possession Of Controlled Substance",
-        "minFine": 0,
-        "maxFine": 1000,
-        "minDays": 0,
-        "maxDays": 365,
-        "probation": 0.4,
-        "canBeWarrant": false,
-        "canRevokeLicense": false
-      },
-      {
         "name": "Possession of DMT",
-        "minFine": 0,
-        "maxFine": 1000,
-        "minDays": 0,
-        "maxDays": 365,
-        "probation": 0.1,
-        "canBeWarrant": false,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Possession of Synthetic Cannabinoids (K2 / Spice)",
-        "minFine": 0,
-        "maxFine": 1000,
-        "minDays": 0,
-        "maxDays": 365,
-        "probation": 0.1,
-        "canBeWarrant": false,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Possession of Gamma Hydroxybutyrate (GHB)",
-        "minFine": 0,
-        "maxFine": 1000,
-        "minDays": 0,
-        "maxDays": 365,
-        "probation": 0.1,
-        "canBeWarrant": false,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Possession of Synthetic Cathinones (Bath Salts)",
         "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
@@ -1363,6 +1308,46 @@
         "canRevokeLicense": false
       },
       {
+        "name": "Possession of Synthetic Cannabinoids (K2 / Spice)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.1,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Synthetic Cathinones (Bath Salts)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.1,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Gamma Hydroxybutyrate (GHB)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.1,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Cocaine Base (Crack)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.1,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
         "name": "Possession w/ Intent To Distribute Schedule I Narcotic",
         "minFine": 0,
         "maxFine": 20000,
@@ -1381,6 +1366,71 @@
         "probation": 0.05,
         "canBeWarrant": true,
         "canRevokeLicense": false
+      }
+    ]
+  },
+  {
+    "name": "Schedule II",
+    "charges": [
+      {
+        "name": "Transport Or Sale Of Methamphetamine",
+        "minFine": 0,
+        "maxFine": 10000,
+        "minDays": 730,
+        "maxDays": 1460,
+        "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Manufacturing Methamphetamine",
+        "minFine": 0,
+        "maxFine": 50000,
+        "minDays": 1095,
+        "maxDays": 2555,
+        "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession Of Methamphetamine",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Cultivation of Cocaine",
+        "minFine": 0,
+        "maxFine": 50000,
+        "minDays": 1095,
+        "maxDays": 2555,
+        "probation": 0.3,
+        "canBeWarrant": true,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession Of Cocaine",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession Of Amphetamine",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
       },
       {
         "name": "Possession of Adderall",
@@ -1393,27 +1443,7 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Possession of Cocaine Base (Crack)",
-        "minFine": 0,
-        "maxFine": 1000,
-        "minDays": 0,
-        "maxDays": 365,
-        "probation": 0.1,
-        "canBeWarrant": false,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Possession of Codeine (Promethazine)",
-        "minFine": 0,
-        "maxFine": 1000,
-        "minDays": 0,
-        "maxDays": 365,
-        "probation": 0.25,
-        "canBeWarrant": false,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Possession of Demerol",
+        "name": "Possession of Ritalin",
         "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
@@ -1423,27 +1453,27 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Possession of Hydromorphones",
-        "minFine": 0,
+        "name": "Possession Of Fentanyl",
+        "minFine": 1000,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
-        "probation": 0.15,
-        "canBeWarrant": false,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Possession of Marijuana (More Than 28 Grams+)",
-        "minFine": 0,
-        "maxFine": 500,
-        "minDays": 0,
-        "maxDays": 180,
         "probation": 0.4,
-        "canBeWarrant": false,
+        "canBeWarrant": true,
         "canRevokeLicense": false
       },
       {
         "name": "Possession of Morphine",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.2,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Opium",
         "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
@@ -1463,7 +1493,17 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Possession of Opium",
+        "name": "Possession of Hydromorphones",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.15,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Demerol",
         "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
@@ -1479,16 +1519,6 @@
         "minDays": 0,
         "maxDays": 365,
         "probation": 0.05,
-        "canBeWarrant": false,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Possession of PCP / Angel Dust",
-        "minFine": 0,
-        "maxFine": 1000,
-        "minDays": 0,
-        "maxDays": 365,
-        "probation": 0.15,
         "canBeWarrant": false,
         "canRevokeLicense": false
       },
@@ -1513,22 +1543,32 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Possession of Ritalin",
-        "minFine": 0,
-        "maxFine": 1000,
-        "minDays": 0,
-        "maxDays": 365,
-        "probation": 0.2,
-        "canBeWarrant": false,
-        "canRevokeLicense": false
-      },
-      {
         "name": "Possession of Hydrocodone",
         "minFine": 0,
         "maxFine": 1000,
         "minDays": 0,
         "maxDays": 365,
         "probation": 0.25,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of Codeine (Promethazine)",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.25,
+        "canBeWarrant": false,
+        "canRevokeLicense": false
+      },
+      {
+        "name": "Possession of PCP / Angel Dust",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.15,
         "canBeWarrant": false,
         "canRevokeLicense": false
       },
@@ -1543,16 +1583,6 @@
         "canRevokeLicense": false
       },
       {
-        "name": "Simple Possession of Marijuana",
-        "minFine": 0,
-        "maxFine": 100,
-        "minDays": 0,
-        "maxDays": 30,
-        "probation": 0.75,
-        "canBeWarrant": false,
-        "canRevokeLicense": false
-      },
-      {
         "name": "Trafficking Schedule II Narcotic",
         "minFine": 0,
         "maxFine": 20000,
@@ -1561,7 +1591,12 @@
         "probation": 0.05,
         "canBeWarrant": true,
         "canRevokeLicense": false
-      },
+      }
+    ]
+  },
+  {
+    "name": "Schedule III",
+    "charges": [
       {
         "name": "Possession of Anabolic Steroids",
         "minFine": 0,
@@ -1610,6 +1645,21 @@
         "maxDays": 1825,
         "probation": 0.1,
         "canBeWarrant": true,
+        "canRevokeLicense": false
+      }
+    ]
+  },
+  {
+    "name": "Schedule IV",
+    "charges": [
+      {
+        "name": "Possession Of Benzodiazepine",
+        "minFine": 0,
+        "maxFine": 1000,
+        "minDays": 0,
+        "maxDays": 365,
+        "probation": 0.4,
+        "canBeWarrant": false,
         "canRevokeLicense": false
       },
       {
@@ -1710,36 +1760,6 @@
         "maxDays": 1825,
         "probation": 0.1,
         "canBeWarrant": true,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Cultivation of Cocaine",
-        "minFine": 0,
-        "maxFine": 50000,
-        "minDays": 1095,
-        "maxDays": 2555,
-        "probation": 0.3,
-        "canBeWarrant": true,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Cultivation of Marijuana",
-        "minFine": 0,
-        "maxFine": 10000,
-        "minDays": 0,
-        "maxDays": 1095,
-        "probation": 0.5,
-        "canBeWarrant": true,
-        "canRevokeLicense": false
-      },
-      {
-        "name": "Possession of Prescription Pills",
-        "minFine": 0,
-        "maxFine": 1000,
-        "minDays": 0,
-        "maxDays": 365,
-        "probation": 0.2,
-        "canBeWarrant": false,
         "canRevokeLicense": false
       }
     ]
