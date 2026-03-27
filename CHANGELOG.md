@@ -6,17 +6,21 @@ All notable changes to MDT Pro are documented here.
 
 ## [0.9.7.1] — 2026-03-27
 
-### What’s new
+### Minor Features
 
-- **Drug charges & seizures** — When adding **arrest** charges, use the **schedule** dropdown (Schedules I–V or other wording) to narrow narcotics so the list is easier to use. On **Property and Evidence** reports, choose a **schedule**, then the drug type (new **Ritalin** and **Hydrocodone** options there too).
-- **Charge list cleanup** — Removed a couple of arrest charges that were effectively duplicates (**shoplifting under $950** vs **petty theft**, and a second **controlled substance / prescription** line that matched the generic possession charge). The arrest list file refreshes from the update when you load the mod.
+- **Cleaner logs** — Startup writes a short config summary to **MDTPro.log** instead of the full settings dump and folder listing (turn on **verboseFileLogging** in config if you need the old detail). Optional **log file size cap** with automatic trim so the file doesn’t grow forever. **WebSocket** and **ALPR** messages go to the log file instead of filling the RPH console.
 
-### Fixes & improvements
+- **Easier to share logs** — If an error gets written to **MDTPro.log**, those lines no longer include long **C:\…** folder paths, so snippets are shorter and more comfortable to post on the forum.
 
-- **Probation / parole** — If someone is on probation or parole, their **arrest history** will usually show at least one prior charge so it doesn’t look empty by mistake.
-- **Person Search** — Looks up **saved and recent people** more reliably (not only who’s “live” in the current session), so the right record—and **photo**—shows up more often. Searching another name before the last search finishes no longer mixes up the results.
-- **ALPR (plate reader)** — Registration and insurance hits use **what the game actually has on that vehicle** (aligned with Callout Interface), not guesses from empty fields or old saved vehicle data when there’s no live owner. Scan timing and how often it checks plates are **the same as before** (no extra slowdown/speed-up settings).
-- **Court & seizure evidence** — Drug evidence from **Property and Evidence** reports still lines up with possession and controlled-substance charges after the charge list change. **Theft**-style verdict wording now also picks up charges that say **shoplifting** (helps older arrests that still use that name).
+- **Drug charges & seizures** — Filter narcotics by **schedule** (I–V and other wording) when picking **arrest** charges. On **Property and Evidence** reports, choose a **schedule**, then the drug type. New seizure options for **Ritalin** and **Hydrocodone**, plus new arrest charges for both. Overlapping arrest charges removed (**petty theft** kept instead of duplicate shoplifting; one **controlled substance** line instead of a second prescription copy). Existing installs get the updated arrest and citation lists automatically the next time you load the mod.
+
+### Bug Fixes
+
+- **Probation / parole** — People on probation or parole now usually show at least one **prior arrest** on their record so it doesn’t look empty by mistake.
+- **Person Search** — Saved and recent people resolve more reliably; **photos** mix up less often, including when you search a new name before the last search has finished.
+- **ALPR** — Registration and insurance flags use **live game data** for that vehicle (same idea as Callout Interface), not empty fields or old saved-only records when there’s no live owner. Plate scan timing is unchanged from before.
+- **Court** — Drug evidence from **Property and Evidence** still matches **possession / controlled substance** charges after the charge list change. Verdict wording that looks for **theft** also matches older charges that still say **shoplifting**.
+- **Arrest reports** — Fixed a rare case where saving a closed arrest showed a generic error (object reference) for suspects who only had a light or ID-style person record, or when charge data was missing from the save request.
 
 ---
 

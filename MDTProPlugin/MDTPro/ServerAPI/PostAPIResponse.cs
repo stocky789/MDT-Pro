@@ -1,6 +1,7 @@
 using MDTPro.Data;
 using MDTPro.Data.Reports;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using MDTPro.Setup;
 using MDTPro.Utility;
@@ -156,7 +157,7 @@ namespace MDTPro.ServerAPI {
                     status = 200;
                 } catch (Exception ex) {
                     Utility.Helper.Log($"[createIncidentReport] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
-                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createIncidentReport:\n{ex}"); } catch { }
+                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createIncidentReport:\n{Helper.SanitizeExceptionForLog(ex)}"); } catch { }
                     buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
                     contentType = "application/json";
                     status = 500;
@@ -165,6 +166,7 @@ namespace MDTPro.ServerAPI {
                 try {
                     CitationReport report = JsonConvert.DeserializeObject<CitationReport>(body);
                     if (report == null) { buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid report data." })); contentType = "application/json"; status = 400; return; }
+                    if (report.Charges == null) report.Charges = new List<CitationReport.Charge>();
                     DataController.AddReport(report);
                     Database.SaveCitationReport(report);
                     buffer = Encoding.UTF8.GetBytes("OK");
@@ -172,7 +174,7 @@ namespace MDTPro.ServerAPI {
                     status = 200;
                 } catch (Exception ex) {
                     Utility.Helper.Log($"[createCitationReport] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
-                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createCitationReport:\n{ex}"); } catch { }
+                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createCitationReport:\n{Helper.SanitizeExceptionForLog(ex)}"); } catch { }
                     buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
                     contentType = "application/json";
                     status = 500;
@@ -181,7 +183,8 @@ namespace MDTPro.ServerAPI {
                 try {
                     ArrestReport report = JsonConvert.DeserializeObject<ArrestReport>(body);
                     if (report == null) { buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid report data." })); contentType = "application/json"; status = 400; return; }
-                    if (report.AttachedReportIds == null) report.AttachedReportIds = new System.Collections.Generic.List<string>();
+                    if (report.Charges == null) report.Charges = new List<ArrestReport.Charge>();
+                    if (report.AttachedReportIds == null) report.AttachedReportIds = new List<string>();
 
                     var existing = DataController.ArrestReports?.FirstOrDefault(x => x.Id == report.Id);
                     if (existing != null && !string.IsNullOrEmpty(existing.CourtCaseNumber) && report.Status == ReportStatus.Pending) {
@@ -202,7 +205,7 @@ namespace MDTPro.ServerAPI {
                     status = 200;
                 } catch (Exception ex) {
                     Utility.Helper.Log($"[createArrestReport] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
-                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createArrestReport:\n{ex}"); } catch { }
+                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createArrestReport:\n{Helper.SanitizeExceptionForLog(ex)}"); } catch { }
                     buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
                     contentType = "application/json";
                     status = 500;
@@ -396,7 +399,7 @@ namespace MDTPro.ServerAPI {
                     status = 200;
                 } catch (Exception ex) {
                     Utility.Helper.Log($"[createImpoundReport] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
-                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createImpoundReport:\n{ex}"); } catch { }
+                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createImpoundReport:\n{Helper.SanitizeExceptionForLog(ex)}"); } catch { }
                     buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
                     contentType = "application/json";
                     status = 500;
@@ -412,7 +415,7 @@ namespace MDTPro.ServerAPI {
                     status = 200;
                 } catch (Exception ex) {
                     Utility.Helper.Log($"[createTrafficIncidentReport] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
-                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createTrafficIncidentReport:\n{ex}"); } catch { }
+                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createTrafficIncidentReport:\n{Helper.SanitizeExceptionForLog(ex)}"); } catch { }
                     buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
                     contentType = "application/json";
                     status = 500;
@@ -428,7 +431,7 @@ namespace MDTPro.ServerAPI {
                     status = 200;
                 } catch (Exception ex) {
                     Utility.Helper.Log($"[createInjuryReport] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
-                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createInjuryReport:\n{ex}"); } catch { }
+                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createInjuryReport:\n{Helper.SanitizeExceptionForLog(ex)}"); } catch { }
                     buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
                     contentType = "application/json";
                     status = 500;
@@ -444,7 +447,7 @@ namespace MDTPro.ServerAPI {
                     status = 200;
                 } catch (Exception ex) {
                     Utility.Helper.Log($"[createPropertyEvidenceReceiptReport] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
-                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createPropertyEvidenceReceiptReport:\n{ex}"); } catch { }
+                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createPropertyEvidenceReceiptReport:\n{Helper.SanitizeExceptionForLog(ex)}"); } catch { }
                     buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
                     contentType = "application/json";
                     status = 500;
