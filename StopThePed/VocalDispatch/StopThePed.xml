@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+<VocalDispatch>
+    <Phrases>      
+        <Phrase Event="StopThePed.PrisonerTransport" Priority="9">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll" />
+            <Word PreferredText="transport"/>
+        </Phrase>
+        <Phrase Event="StopThePed.PrisonerTransport" Priority="9">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll" />
+            <Word PreferredText="ten"/>
+            <Word PreferredText="sixteen"/>
+        </Phrase>
+        <Phrase Event="StopThePed.PrisonerTransport" Priority="9">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll" />
+            <Word PreferredText="1016"/>
+        </Phrase>
+        <Phrase Event="StopThePed.TowTruck" Priority="9">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll,dispatch" />
+            <Word PreferredText="tow"/>
+            <Word PreferredText="truck"/>
+        </Phrase>
+        <Phrase Event="StopThePed.TowTruck" Priority="9">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll,dispatch" />
+            <Word PreferredText="towtruck"/>
+        </Phrase>
+        <Phrase Event="StopThePed.TowTruck" Priority="11">
+            <Word PreferredText="ten"/>
+            <Word PreferredText="seventy"/>
+        </Phrase>
+        <Phrase Event="StopThePed.TowTruck" Priority="11">
+            <Word PreferredText="1070"/>
+        </Phrase> 
+        <Phrase Event="StopThePed.TowTruck" Priority="11">
+            <Word PreferredText="need" AcceptedAlternates="require" />
+            <Word PreferredText="vehicle" AcceptedAlternates="car,truck,van"/>
+            <Word PreferredText="towed" AcceptedAlternates="toed,toad"/>
+        </Phrase>
+        <Phrase Event="StopThePed.Coroner" Priority="9">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll" />            
+            <Word PreferredText="coroner" AcceptedAlternates="CSI"/>
+        </Phrase> 	
+        <Phrase Event="StopThePed.Insurance" Priority="9">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll" />            
+            <Word PreferredText="insurance" />
+        </Phrase>
+        <Phrase Event="StopThePed.AnimalControl" Priority="9">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll" />            
+            <Word PreferredText="animal" />
+            <Word PreferredText="control" />
+        </Phrase>
+        <Phrase Event="StopThePed.VehiclePlateCheck" Priority="9">
+            <Word PreferredText="requesting" AcceptedAlternates="need,request" />
+            <Word PreferredText="plate" AcceptedAlternates="vehicle" />
+            <Word PreferredText="check"/>
+        </Phrase>
+        <Phrase Event="StopThePed.PedCheck" Priority="9">
+            <Word PreferredText="requesting" AcceptedAlternates="need,request" />
+            <Word PreferredText="ped"/>
+            <Word PreferredText="check" AcceptedAlternates="record" />
+        </Phrase>
+        <Phrase Event="StopThePed.EndCallout" Priority="9">
+            <Word PreferredText="code"/>
+            <Word PreferredText="four"/>
+        </Phrase>
+    </Phrases>    
+</VocalDispatch>

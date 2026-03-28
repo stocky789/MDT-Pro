@@ -172,5 +172,32 @@ namespace MDTPro.Utility {
                 return false;
             }
         }
+
+        /// <summary>StopThePed.API.Functions.getVehicleRegistrationStatus → <c>STPVehicleStatus</c> (decompiled StopThePed/Decompiled). Single source for what STP shows after a check, separate from CDF document enums.</summary>
+        internal static bool TryGetVehicleRegistrationStatusStp(Vehicle veh, out string status) {
+            return TryGetStpVehicleDocStatus(veh, "getVehicleRegistrationStatus", out status);
+        }
+
+        /// <summary>StopThePed.API.Functions.getVehicleInsuranceStatus → <c>STPVehicleStatus</c>.</summary>
+        internal static bool TryGetVehicleInsuranceStatusStp(Vehicle veh, out string status) {
+            return TryGetStpVehicleDocStatus(veh, "getVehicleInsuranceStatus", out status);
+        }
+
+        private static bool TryGetStpVehicleDocStatus(Vehicle veh, string methodName, out string status) {
+            status = null;
+            if (veh == null || !veh.Exists()) return false;
+            Type fn = ModIntegration.FindTypeInLoadedAssemblies("StopThePed.API.Functions");
+            if (fn == null) return false;
+            MethodInfo m = fn.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase, null, new[] { typeof(Vehicle) }, null);
+            if (m == null) return false;
+            try {
+                object r = m.Invoke(null, new object[] { veh });
+                if (r == null) return false;
+                status = r.ToString();
+                return !string.IsNullOrEmpty(status);
+            } catch {
+                return false;
+            }
+        }
     }
 }

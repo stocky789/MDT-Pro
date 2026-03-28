@@ -190,13 +190,6 @@ const CONFIG_SECTIONS = [
       'citationPostHandoffViolenceDrunkBonus',
     ],
   },
-  {
-    title: 'Updates',
-    keys: [
-      'checkForUpdates',
-      'githubReleasesRepo',
-    ],
-  },
 ]
 
 const PRESET_CUSTOM = { label: 'Custom...', value: '__custom__' }
@@ -714,14 +707,6 @@ const CONFIG_FIELD_META = {
   citationPostHandoffViolenceDrunkBonus: {
     label: 'Hostility — extra if suspect is drunk',
     tooltip: 'Added chance when the game considers the ped drunk.',
-  },
-  checkForUpdates: {
-    label: 'Check for updates on load',
-    tooltip: 'Query GitHub for new MDT Pro releases when you start the game. Disable to skip the check.',
-  },
-  githubReleasesRepo: {
-    label: 'GitHub repo for updates',
-    tooltip: 'Repository in "owner/repo" format (e.g. stocky789/MDT-Pro). Leave empty to skip update checks.',
   },
 }
 

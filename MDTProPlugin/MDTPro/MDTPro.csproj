@@ -161,6 +161,7 @@
     <Compile Include="Utility\CitationPedReactionHelper.cs" />
     <Compile Include="Utility\CitationPostHandoffViolenceHelper.cs" />
     <Compile Include="Utility\SupervisionBackstoryHelper.cs" />
+    <Compile Include="Utility\PedPortraitModelHelper.cs" />
     <Compile Include="Utility\PlayerCoords.cs" />
     <Compile Include="ALPR\ALPRController.cs" />
     <Compile Include="ALPR\ALPRHUD.cs" />

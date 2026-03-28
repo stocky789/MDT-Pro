@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<VocalDispatch>
+    <Phrases>      
+        <Phrase Event="UltimateBackup.Code2" Priority="11">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll"/>
+            <Word PreferredText="code"/>
+            <Word PreferredText="two" AcceptedAlternates="too,2"/>
+            <Word PreferredText="backup"/>
+        </Phrase>
+        <Phrase Event="UltimateBackup.Code3" Priority="11">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll"/>
+            <Word PreferredText="code"/>
+            <Word PreferredText="three" AcceptedAlternates="tree,thre,3"/>
+            <Word PreferredText="backup"/>
+        </Phrase>
+        <Phrase Event="UltimateBackup.Pursuit" Priority="11">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll"/>
+            <Word PreferredText="pursuit"/>
+            <Word PreferredText="backup"/>
+        </Phrase>
+        <Phrase Event="UltimateBackup.Female" Priority="11">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll"/>
+            <Word PreferredText="female"/>
+            <Word PreferredText="backup"/>
+        </Phrase>
+        <Phrase Event="UltimateBackup.NormalStop" Priority="11">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll"/>
+            <Word PreferredText="traffic"/>
+            <Word PreferredText="stop"/>
+            <Word PreferredText="backup"/>
+        </Phrase>
+        <Phrase Event="UltimateBackup.FelonyStop" Priority="11">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll"/>
+            <Word PreferredText="felony"/>
+            <Word PreferredText="stop"/>
+            <Word PreferredText="backup"/>
+        </Phrase>
+        <Phrase Event="UltimateBackup.K9Unit" Priority="11">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll"/>
+            <Word PreferredText="k" AcceptedAlternates="kei,kae"/>
+            <Word PreferredText="nine" AcceptedAlternates="9"/>
+            <Word PreferredText="unit" AcceptedAlternates="backup"/>
+        </Phrase>
+        <Phrase Event="UltimateBackup.SpikeStrips" Priority="11">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll"/>
+            <Word PreferredText="spike"/>
+            <Word PreferredText="strips" AcceptedAlternates="strip"/>
+        </Phrase>
+        <Phrase Event="UltimateBackup.RoadBlock" Priority="11">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll"/>
+            <Word PreferredText="roadblock"/>
+        </Phrase>
+        <Phrase Event="UltimateBackup.Ambulance" Priority="11">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll"/>
+            <Word PreferredText="ambulance"/>
+        </Phrase>
+        <Phrase Event="UltimateBackup.FireDept" Priority="11">
+            <Word PreferredText="requesting" AcceptedAlternates="need,send,request,role,roll"/>
+            <Word PreferredText="fire"/>
+            <Word PreferredText="department"/>
+        </Phrase>
+        <Phrase Event="UltimateBackup.PanicButton" Priority="11">
+            <Word PreferredText="shot"/>
+            <Word PreferredText="fired"/>
+        </Phrase>
+    </Phrases>    
+</VocalDispatch>
