@@ -125,11 +125,10 @@ namespace MDTPro.Utility {
                 PolicingRedefined.API.PedAPI.GiveCitationToPed(ped, citation);
             }
 
-            CitationPedReactionHelper.TryShowSuspectReaction(ped, charges);
-            CitationPostHandoffViolenceHelper.TryMaybeAggressiveAfterCitation(ped, charges);
-
             string message = string.Format(SetupController.GetLanguage().inGame.handCitationTo ?? "Hand citation to {0}", pedName);
             if (!string.IsNullOrWhiteSpace(message)) RageNotification.ShowSuccess(message);
+
+            CitationHandoffPostEffects.ScheduleAfterHandoff(ped, charges, includeStopThePedPaperworkAnimation: false);
         }
     }
 }

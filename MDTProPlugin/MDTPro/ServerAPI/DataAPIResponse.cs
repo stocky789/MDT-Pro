@@ -130,6 +130,8 @@ namespace MDTPro.ServerAPI {
                     DataController.MergeBOLOsFromStubByPlate(vehicleData);
                 if (vehicleData != null && ModIntegration.SubscribedStopThePedStopEvents)
                     DataController.TryRefreshVehicleDocumentsFromLiveWorld(vehicleData);
+                if (vehicleData != null)
+                    DataController.TrySyncVehicleOwnerWantedFromCdf(vehicleData);
 
                 string historyQuery = wantContextOnly ? (vehicleData?.LicensePlate ?? "context") : licensePlateOrVin;
                 Database.SaveSearchHistoryEntry("vehicle", historyQuery, vehicleData?.LicensePlate);
@@ -143,6 +145,8 @@ namespace MDTPro.ServerAPI {
                     DataController.MergeBOLOsFromStubByPlate(ctxV);
                 if (ctxV != null && ModIntegration.SubscribedStopThePedStopEvents)
                     DataController.TryRefreshVehicleDocumentsFromLiveWorld(ctxV);
+                if (ctxV != null)
+                    DataController.TrySyncVehicleOwnerWantedFromCdf(ctxV);
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(ctxV));
                 contentType = "text/json";
                 status = 200;

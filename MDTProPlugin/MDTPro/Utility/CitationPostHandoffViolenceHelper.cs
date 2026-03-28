@@ -171,6 +171,16 @@ namespace MDTPro.Utility {
         }
 
         private static void ApplyCombat(Ped suspect, Ped player, bool equipGun, uint gunHash) {
+            try {
+                player.Tasks.ClearImmediately();
+            } catch {
+                try {
+                    NativeFunction.Natives.CLEAR_PED_TASKS_IMMEDIATELY(player);
+                } catch {
+                    /* ignore */
+                }
+            }
+
             NativeFunction.Natives.SET_BLOCKING_OF_NON_TEMPORARY_EVENTS(suspect, false);
             NativeFunction.Natives.SET_PED_KEEP_TASK(suspect, true);
 

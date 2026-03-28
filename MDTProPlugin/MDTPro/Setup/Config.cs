@@ -45,6 +45,10 @@ namespace MDTPro.Setup {
         public bool citationPostHandoffViolenceTryCdfWeapon = true;
         /// <summary>When true, use Policing Redefined <c>GetPedSearchItems</c> (frisk results) before native inventory. Often empty until the ped is searched.</summary>
         public bool citationPostHandoffViolenceTryPedSearchItemsWeapon = false;
+        /// <summary>After citation handoff (and optional paperwork anim on the StopThePed path), wait this many ms before suspect subtitle and later hostility. Mimics reading the ticket.</summary>
+        public int citationHandoffBehaviorDelayAfterPaperworkMs = 1800;
+        /// <summary>After the suspect subtitle is shown, wait this many ms before rolling hostility. 0 = immediately after subtitle call.</summary>
+        public int citationHandoffDelayBeforeViolenceAfterReactionMs = 1200;
         public int maxNumberOfNearbyPedsOrVehicles = 15;
         public int databaseLimitMultiplier = 10;
         /// <summary>Milliseconds between WebSocket pushes for time, location, and map coords. Higher = less CPU; 1000 is smooth for taskbar/map.</summary>

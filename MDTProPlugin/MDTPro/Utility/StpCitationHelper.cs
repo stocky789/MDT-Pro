@@ -113,7 +113,6 @@ namespace MDTPro.Utility {
                 return;
             }
 
-            bool playPaperworkAnim = false;
             try {
                 Discover();
                 int ok = TryStopThePedPluginHandoff(ped, charges);
@@ -122,9 +121,7 @@ namespace MDTPro.Utility {
                     string message = string.Format(SetupController.GetLanguage().inGame.handCitationTo ?? "Hand citation to {0}", pedName);
                     if (!string.IsNullOrWhiteSpace(message))
                         RageNotification.ShowSuccess(RageNotification.AppendStpCitationMdtBrowserHint(message));
-                    CitationPedReactionHelper.TryShowSuspectReaction(ped, charges);
-                    CitationPostHandoffViolenceHelper.TryMaybeAggressiveAfterCitation(ped, charges);
-                    playPaperworkAnim = true;
+                    CitationHandoffPostEffects.ScheduleAfterHandoff(ped, charges, includeStopThePedPaperworkAnimation: true);
                 } else {
                     // No STP plugin API: queue for in-game keybind + menu (not instant popup).
                     StpCitationHandoffQueue.Enqueue(pedName, charges);
@@ -135,13 +132,8 @@ namespace MDTPro.Utility {
                     if (!string.IsNullOrWhiteSpace(queued))
                         RageNotification.Show(RageNotification.AppendStpCitationMdtBrowserHint(string.Format(queued, keyLabel)), RageNotification.NotificationType.Info);
                 }
-            } finally {
-                try {
-                    if (playPaperworkAnim && ped != null && ped.IsValid())
-                        CitationHandoffAnimation.TryPlayForStopThePed(ped);
-                } catch {
-                    /* ignore */
-                }
+            } catch (Exception ex) {
+                Game.LogTrivial($"[MDT Pro] StopThePed citation handoff error: {ex.Message}");
             }
         }
 
