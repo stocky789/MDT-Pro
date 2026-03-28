@@ -20,6 +20,7 @@ namespace MDTPro.Data {
         private const string LifeIncarcerationValue = "LIFE";
         private const double RealDaysPerGameYear = 7d;
         private const double GameDaysPerYear = 365d;
+        private static readonly object _supervisionBackstoryLock = new object();
         private const float MaxSentenceMultiplier = 2.5f;
         private const int DefaultJuryTrialSeverityThreshold = 15;
         private const int DefaultCourtRosterRotationDays = 14;
@@ -907,6 +908,9 @@ namespace MDTPro.Data {
                 if (ourPed == null) return;
                 ourPed.IsWanted = cdf.Wanted;
                 ourPed.WarrantText = cdf.Wanted ? CitationArrestHelper.GetRandomWarrantCharge().name : null;
+                ourPed.IsOnProbation = cdf.IsOnProbation;
+                ourPed.IsOnParole = cdf.IsOnParole;
+                EnsureSupervisionCourtBackstory(ourPed);
                 KeepPedInDatabase(ourPed);
                 Database.SavePed(ourPed);
             } catch (Exception ex) {
@@ -971,6 +975,10 @@ namespace MDTPro.Data {
                     if (!keepInPedDatabase.Any(x => x.Name == data.Name)) keepInPedDatabase.Add(data);
                     if (!pedDatabase.Any(x => x.Name == data.Name)) pedDatabase.Add(data);
                 }
+            }
+            foreach (MDTProPedData data in fileContent) {
+                if (data == null || data.Name == null) continue;
+                EnsureSupervisionCourtBackstory(data);
             }
         }
 
@@ -1040,6 +1048,7 @@ namespace MDTPro.Data {
                     if (pedDatabase.Any(x => x.Name == mdtProPedData.Name)) return;
                 }
                 TryApplyReEncounterProfile(mdtProPedData);
+                EnsureSupervisionCourtBackstory(mdtProPedData);
                 lock (_pedDbLock) {
                     if (pedDatabase.Any(x => x.Name == mdtProPedData.Name)) return;
                     pedDatabase.Add(mdtProPedData);
@@ -1329,6 +1338,7 @@ namespace MDTPro.Data {
                 SyncSinglePedToCDF(currentPedData);
             }
 
+            EnsureSupervisionCourtBackstory(currentPedData);
             KeepPedInDatabase(currentPedData);
             Helper.Log($"Re-encounter merged prior record (model + name match); live identity kept: {liveName}", false, Helper.LogSeverity.Info);
         }
@@ -1380,6 +1390,7 @@ namespace MDTPro.Data {
                 }
             }
             if (existingPed != null) {
+                EnsureSupervisionCourtBackstory(existingPed);
                 KeepPedInDatabase(existingPed);
                 Database.SavePed(existingPed);
                 SetContextPed(existingPed);
@@ -1387,6 +1398,7 @@ namespace MDTPro.Data {
             }
 
             TryApplyReEncounterProfile(mdtProPedData);
+            EnsureSupervisionCourtBackstory(mdtProPedData);
             lock (_pedDbLock) {
                 if (pedDatabase.Any(x => x.Name == mdtProPedData.Name)) return;
                 pedDatabase.Add(mdtProPedData);
@@ -1625,8 +1637,220 @@ namespace MDTPro.Data {
             return incarceratedUntil <= DateTime.UtcNow;
         }
 
+        /// <summary>
+        /// Ensures any ped on probation/parole has prior arrest charges and a closed synthetic court case explaining the disposition.
+        /// Charges are sampled from arrestOptions.json (coherent multi-count). Idempotent per ped via <see cref="CourtData.SyntheticSupervisionReportId"/>.
+        /// </summary>
+        internal static void EnsureSupervisionCourtBackstory(MDTProPedData ped) {
+            if (ped == null || string.IsNullOrWhiteSpace(ped.Name)) return;
+            if (!ped.IsOnProbation && !ped.IsOnParole) return;
+
+            lock (_supervisionBackstoryLock) {
+                CourtData existing = courtDatabase.FirstOrDefault(c =>
+                    c != null
+                    && string.Equals(c.PedName, ped.Name, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(c.ReportId, CourtData.SyntheticSupervisionReportId, StringComparison.Ordinal));
+
+                if (existing != null) {
+                    if (ped.Arrests == null || ped.Arrests.Count == 0) {
+                        ped.Arrests = (existing.Charges ?? new List<CourtData.Charge>())
+                            .Where(ch => ch != null && !string.IsNullOrWhiteSpace(ch.Name))
+                            .Select(ch => SupervisionBackstoryHelper.FindArrestChargeTemplate(ch.Name))
+                            .ToList();
+                        Database.SavePed(ped);
+                    }
+                    return;
+                }
+
+                var coherent = SupervisionBackstoryHelper.BuildCoherentSupervisionCharges(ped.IsOnParole);
+                if (coherent == null || coherent.Count == 0) return;
+
+                ped.Arrests = coherent;
+                CourtData courtCase = BuildSyntheticSupervisionCourtCase(ped, coherent);
+                if (courtCase == null || string.IsNullOrEmpty(courtCase.Number)) return;
+
+                if (!courtDatabase.Any(x => x.Number == courtCase.Number)) {
+                    if (courtDatabase.Count >= SetupController.GetConfig().courtDatabaseMaxEntries) {
+                        Database.DeleteCourtCase(courtDatabase[0].Number);
+                        courtDatabase.RemoveAt(0);
+                    }
+                    courtDatabase.Add(courtCase);
+                }
+
+                Database.SaveCourtCase(courtCase);
+                Database.SavePed(ped);
+            }
+        }
+
+        /// <summary>Court cases for a defendant, newest hearing/resolution first (Person Search API).</summary>
+        internal static List<CourtData> GetCourtCasesForPedName(string pedName) {
+            if (string.IsNullOrWhiteSpace(pedName)) return new List<CourtData>();
+            string n = pedName.Trim();
+            return courtDatabase
+                .Where(c => c != null && string.Equals(c.PedName, n, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(ParseCourtSortDateForPedCases)
+                .ToList();
+        }
+
+        private static DateTime ParseCourtSortDateForPedCases(CourtData c) {
+            if (c == null) return DateTime.MinValue;
+            if (!string.IsNullOrEmpty(c.HearingDateUtc) && DateTime.TryParse(c.HearingDateUtc, null, DateTimeStyles.RoundtripKind, out DateTime h))
+                return h;
+            if (!string.IsNullOrEmpty(c.ResolveAtUtc) && DateTime.TryParse(c.ResolveAtUtc, null, DateTimeStyles.RoundtripKind, out DateTime r))
+                return r;
+            if (!string.IsNullOrEmpty(c.LastUpdatedUtc) && DateTime.TryParse(c.LastUpdatedUtc, null, DateTimeStyles.RoundtripKind, out DateTime u))
+                return u;
+            return DateTime.MinValue;
+        }
+
+        private static CourtData BuildSyntheticSupervisionCourtCase(MDTProPedData ped, List<ArrestGroup.Charge> arrestCharges) {
+            if (ped == null || string.IsNullOrWhiteSpace(ped.Name) || arrestCharges == null || arrestCharges.Count == 0) return null;
+
+            string caseNumber = Helper.GetCourtCaseNumber();
+            var hearingUtc = DateTime.UtcNow.AddDays(-Helper.GetRandomInt(400, 1100));
+            int shortYear = int.Parse(hearingUtc.ToString("yy", CultureInfo.InvariantCulture));
+
+            string lastName = !string.IsNullOrWhiteSpace(ped.LastName)
+                ? ped.LastName.Trim()
+                : (ped.Name?.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? "Defendant");
+
+            string[] docketOpeners = {
+                "Minutes reflect a prior bench disposition",
+                "The criminal docket reflects a concluded matter",
+                "Register shows a final judgment",
+                "Historical docket entries document a prior resolution",
+            };
+            string opener = docketOpeners[Helper.GetRandomInt(0, docketOpeners.Length - 1)];
+
+            var courtCase = new CourtData(ped.Name.Trim(), caseNumber, CourtData.SyntheticSupervisionReportId, shortYear) {
+                Status = 1,
+                IsJuryTrial = false,
+                JurySize = 0,
+                JuryVotesForConviction = 0,
+                JuryVotesForAcquittal = 0,
+                PriorCitationCount = 0,
+                PriorArrestCount = 0,
+                PriorConvictionCount = 0,
+                Plea = "No Contest",
+                HearingDateUtc = hearingUtc.ToString("o"),
+                ResolveAtUtc = hearingUtc.AddDays(Helper.GetRandomInt(14, 120)).ToString("o"),
+                SentenceMultiplier = 1f,
+                ProsecutionStrength = 55f,
+                DefenseStrength = 40f,
+                DocketPressure = 0.35f,
+                ConvictionChance = 88,
+                RepeatOffenderScore = 0,
+                HasPublicDefender = true,
+                OutcomeNotes = $"{opener} in People v. {lastName}. This entry was reconstructed so the defendant's CDF supervision status (probation/parole) matches a plausible charging history on file. No contemporaneous patrol arrest report is attached in MDT. Case closed.",
+            };
+
+            CourtDistrictProfile district = ResolveSyntheticSupervisionDistrict(ped);
+            courtCase.CourtDistrict = district.District;
+            courtCase.CourtName = district.CourtName;
+            courtCase.CourtType = district.CourtType;
+            courtCase.PolicyAdjustment = district.PolicyAdjustment;
+
+            courtCase.JudgeName = SelectRotatingRosterMember(district.Judges, district.District, "synth-judge", caseNumber, courtCase.SeverityScore);
+            courtCase.ProsecutorName = SelectProsecutor(district, caseNumber, 3);
+            courtCase.DefenseAttorneyName = SelectDefenseAttorney(district, courtCase.HasPublicDefender, caseNumber, 2);
+
+            foreach (ArrestGroup.Charge ac in arrestCharges) {
+                if (ac == null || string.IsNullOrWhiteSpace(ac.name)) continue;
+                int minDays = ac.minDays;
+                int? maxDays = ac.maxDays;
+                int? time;
+                int rangeMin;
+                int? rangeMax;
+                if (maxDays == null) {
+                    int hi = Math.Max(minDays, minDays * 2);
+                    time = minDays > 0 ? Helper.GetRandomInt(minDays, hi) : 0;
+                    rangeMin = minDays;
+                    rangeMax = hi;
+                } else {
+                    time = minDays;
+                    rangeMin = minDays;
+                    rangeMax = maxDays;
+                }
+                courtCase.AddCharge(new CourtData.Charge(
+                    ac.name,
+                    Helper.GetRandomInt(ac.minFine, Math.Max(ac.minFine, ac.maxFine)),
+                    time,
+                    ac.isArrestable,
+                    rangeMin,
+                    rangeMax));
+            }
+
+            ApplySyntheticSupervisionEvidenceTags(courtCase);
+
+            courtCase.SeverityScore = GetSeverityScore(courtCase);
+            Config cfg = SetupController.GetConfig();
+            courtCase.EvidenceScore = GetEvidenceScore(courtCase, cfg);
+            courtCase.EvidenceBand = GetEvidenceBand(courtCase);
+            courtCase.OfficerTestimonySummary = BuildOfficerTestimonySummary(courtCase);
+
+            foreach (CourtData.Charge ch in courtCase.Charges ?? Enumerable.Empty<CourtData.Charge>()) {
+                if (ch == null) continue;
+                ch.Outcome = 1;
+                ch.ConvictionChance = courtCase.ConvictionChance;
+                int minD = ch.MinDays;
+                int maxD = ch.MaxDays ?? ch.MinDays;
+                if (maxD < minD) maxD = minD;
+                if (minD <= 0 && maxD <= 0 && ch.Time.HasValue && ch.Time.Value > 0) {
+                    minD = ch.Time.Value;
+                    maxD = ch.Time.Value;
+                }
+                if (ch.Time == null && (!ch.MaxDays.HasValue || ch.MaxDays.Value <= 0)) {
+                    ch.SentenceDaysServed = null;
+                } else if (minD > 0 || maxD > 0) {
+                    ch.SentenceDaysServed = Helper.GetRandomInt(minD, maxD);
+                } else {
+                    ch.SentenceDaysServed = 0;
+                }
+            }
+
+            // Same verdict and sentencing narrative engines as live arrest-driven cases (plea type, charges, evidence flags, severity, district policy, etc.).
+            courtCase.OutcomeReasoning = BuildOutcomeReasoning(courtCase, courtCase.ConvictionChance, 1);
+            courtCase.SentenceReasoning = BuildSentenceReasoning(courtCase);
+
+            courtCase.LastUpdatedUtc = DateTime.UtcNow.ToString("o");
+            return courtCase;
+        }
+
+        private static CourtDistrictProfile ResolveSyntheticSupervisionDistrict(MDTProPedData ped) {
+            string a = (ped?.Address ?? "").ToLowerInvariant();
+            if (a.Contains("sandy") || a.Contains("paleto") || a.Contains("grapeseed")
+                || a.Contains("blaine") || a.Contains("harmony") || a.Contains("desert")) {
+                return BlaineDistrict;
+            }
+            if (a.Contains("cayo") || a.Contains("yankton")) return IslandDistrict;
+            return LosSantosDistrict;
+        }
+
+        private static void ApplySyntheticSupervisionEvidenceTags(CourtData courtCase) {
+            if (courtCase?.Charges == null) return;
+            foreach (CourtData.Charge ch in courtCase.Charges) {
+                if (ch == null || string.IsNullOrEmpty(ch.Name)) continue;
+                string n = ch.Name.ToLowerInvariant();
+                if (n.Contains("weapon") || n.Contains("firearm") || n.Contains("knife") || n.Contains("deadly weapon"))
+                    courtCase.EvidenceHadWeapon = true;
+                if (n.Contains("drug") || n.Contains("cannabis") || n.Contains("cocaine") || n.Contains("heroin")
+                    || n.Contains("meth") || n.Contains("controlled substance") || n.Contains("narcotic") || n.Contains("paraphernalia"))
+                    courtCase.EvidenceHadDrugs = true;
+                if (n.Contains("elud") || n.Contains("evad") || n.Contains("flee") || n.Contains("pursuit"))
+                    courtCase.EvidenceWasFleeing = true;
+                if (n.Contains("dui") || n.Contains("drunk") || n.Contains("under the influence") || n.Contains("intoxicat"))
+                    courtCase.EvidenceWasDrunk = true;
+                if (n.Contains("resist")) courtCase.EvidenceResisted = true;
+                if (n.Contains("assault") || n.Contains("battery")) courtCase.EvidenceAssaultedPed = true;
+                if (n.Contains("vehicle") && (n.Contains("reckless") || n.Contains("hit and run") || n.Contains("collision")))
+                    courtCase.EvidenceDamagedVehicle = true;
+            }
+        }
+
         private static void UpdatePedIncarcerationFromCourtData(MDTProPedData pedData, CourtData courtData, Config config = null) {
             if (pedData == null || courtData?.Charges == null) return;
+            if (string.Equals(courtData.ReportId, CourtData.SyntheticSupervisionReportId, StringComparison.Ordinal))
+                return;
 
             int totalDays = 0;
             bool hasLifeSentence = false;
