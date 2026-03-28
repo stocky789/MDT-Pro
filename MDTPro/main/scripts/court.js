@@ -29,6 +29,8 @@
     sort: 'updatedDesc',
   }
 
+  let consumedCourtFocusFromStorage = false
+
   const refreshCourtList = async () => {
     courtCases = await (await fetch('/data/court')).json()
     courtCases = Array.isArray(courtCases) ? courtCases : []
@@ -37,6 +39,19 @@
 
   const render = async () => {
     listContainer.innerHTML = ''
+
+    let expandCaseNumber = null
+    if (!consumedCourtFocusFromStorage) {
+      try {
+        expandCaseNumber = sessionStorage.getItem('mdtCourtFocusCaseNumber')
+        if (expandCaseNumber) {
+          sessionStorage.removeItem('mdtCourtFocusCaseNumber')
+          consumedCourtFocusFromStorage = true
+          state.query = expandCaseNumber.trim()
+          if (controls.searchInput) controls.searchInput.value = state.query
+        }
+      } catch (_) {}
+    }
 
     const filteredCases = courtCases
       .filter((c) => c != null && typeof c === 'object')
@@ -68,6 +83,7 @@
     headerRow.classList.add('courtCaseListHeader')
     headerRow.innerHTML = `
       <span class="courtCaseListHeaderExpand"></span>
+      <span class="courtCaseListHeaderBadgeCol" aria-hidden="true"></span>
       <span class="courtCaseListHeaderDefendant">${escapeHtml(language.court.defendant || 'Defendant')}</span>
       <span class="courtCaseListHeaderCaseNumber">${escapeHtml(language.court.number || 'Case')}</span>
       <span class="courtCaseListHeaderDistrict">${escapeHtml(language.court.courtDistrictCol || 'Court District')}</span>
@@ -78,6 +94,22 @@
 
     for (const courtCase of filteredCases) {
       listContainer.appendChild(await createCourtCaseElement(courtCase, language, refreshCourtList))
+    }
+
+    if (expandCaseNumber) {
+      const target = expandCaseNumber.trim()
+      expandCaseNumber = null
+      requestAnimationFrame(() => {
+        const items = listContainer.querySelectorAll('.courtCaseListItem')
+        for (const item of items) {
+          const numEl = item.querySelector('.courtCaseRowCaseNumber')
+          if (numEl && numEl.textContent.trim() === target) {
+            toggleCourtCaseExpanded(item)
+            item.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+            break
+          }
+        }
+      })
     }
   }
 
@@ -130,6 +162,10 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   const listItem = document.createElement('div')
   listItem.classList.add('listItem', 'courtCaseListItem')
 
+  const isSyntheticPriorCase =
+    courtCase.ReportId === 'MDT-SUPERVISION-BACKSTORY' ||
+    courtCase.IsSyntheticSupervisionBackstory === true
+
   const statusMap = language.court.statusMap || ['Pending', 'Convicted', 'Acquitted', 'Dismissed']
   const courtStatusColorMap = { 0: 'info', 1: 'error', 2: 'success', 3: 'warning' }
   const statusLabel = statusMap[courtCase.Status] || 'Unknown'
@@ -155,8 +191,17 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   row.setAttribute('role', 'button')
   row.setAttribute('tabindex', '0')
   row.setAttribute('aria-expanded', 'false')
+  const synthBadgeTitle =
+    (language.court && language.court.syntheticCaseBadge) || 'Prior disposition (reconstructed record)'
+  const synthBadgeLabel =
+    (language.court && language.court.syntheticCaseBadgeShort) || 'Prior'
+  const synthBadge = isSyntheticPriorCase
+    ? `<span class="courtCaseRowSynthBadge" title="${escapeHtml(synthBadgeTitle)}">${escapeHtml(synthBadgeLabel)}</span>`
+    : ''
+
   row.innerHTML = `
     <span class="courtCaseRowExpandIcon" aria-hidden="true"></span>
+    ${synthBadge}
     <span class="courtCaseRowName">${escapeHtml(courtCase.PedName || '–')}</span>
     <span class="courtCaseRowCaseNumber">${escapeHtml(courtCase.Number || '–')}</span>
     <span class="courtCaseRowDistrict">${escapeHtml(courtCase.CourtDistrict || '–')}</span>
@@ -293,12 +338,23 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   inputWrapper.appendChild(pedNameWrapper)
 
   const reportWrapper = document.createElement('div')
-  reportWrapper.classList.add('clickable')
-  reportWrapper.addEventListener('click', async function () {
-    await openIdInReport(courtCase.ReportId)
-  })
-  reportWrapper.appendChild(createLabel(language.court.report))
-  reportWrapper.appendChild(createReadOnlyInput(courtCase.ReportId || ''))
+  if (isSyntheticPriorCase) {
+    reportWrapper.appendChild(createLabel(language.court.report))
+    reportWrapper.appendChild(createReadOnlyInput(courtCase.ReportId || ''))
+    const rh = document.createElement('p')
+    rh.className = 'courtSyntheticReportHint'
+    rh.textContent =
+      language.court.syntheticNoArrestReport ||
+      'No patrol arrest report is linked. This file was generated so supervision status matches a charge history on file.'
+    reportWrapper.appendChild(rh)
+  } else {
+    reportWrapper.classList.add('clickable')
+    reportWrapper.addEventListener('click', async function () {
+      await openIdInReport(courtCase.ReportId)
+    })
+    reportWrapper.appendChild(createLabel(language.court.report))
+    reportWrapper.appendChild(createReadOnlyInput(courtCase.ReportId || ''))
+  }
   inputWrapper.appendChild(reportWrapper)
 
   const attachedIds = courtCase.AttachedReportIds || []
@@ -700,6 +756,12 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   notesWrapper.appendChild(createLabel(language.court.outcomeNotes || 'Outcome Notes'))
   const notesInput = document.createElement('textarea')
   notesInput.value = courtCase.OutcomeNotes || ''
+  if (isSyntheticPriorCase) {
+    notesInput.readOnly = true
+    notesInput.title =
+      language.court.syntheticNotesReadOnly ||
+      'Reconstructed disposition — edit via game data reset only.'
+  }
   notesWrapper.appendChild(notesInput)
   inputWrapper.appendChild(notesWrapper)
 
@@ -929,6 +991,13 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   chargesSearchResponseWrapper.appendChild(chargesInputWrapper)
   details.appendChild(searchResponseWrapper)
   details.appendChild(chargesSearchResponseWrapper)
+
+  if (isSyntheticPriorCase) {
+    const banner = document.createElement('div')
+    banner.className = 'courtSyntheticBanner'
+    banner.innerHTML = `<strong>${escapeHtml(language.court.syntheticCaseBannerTitle || 'Prior disposition')}</strong><span>${escapeHtml(language.court.syntheticCaseBannerBody || 'Reconstructed criminal judgment for probation/parole backstory. Charges align with Person Search arrest history.')}</span>`
+    details.insertBefore(banner, details.firstChild)
+  }
 
   return listItem
 }

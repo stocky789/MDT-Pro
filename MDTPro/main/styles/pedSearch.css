@@ -126,3 +126,95 @@ body {
 .createReportButtons button {
   flex: 1;
 }
+
+.pedCourtCasesHint {
+  margin: -4px 10px 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-primary-half);
+  border-left: 3px solid var(--color-info, #3b82f6);
+  background: var(--color-surface-elevated, rgba(255, 255, 255, 0.04));
+  border-radius: 0 var(--radius-small) var(--radius-small) 0;
+}
+
+.pedCourtCases {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 10px 14px;
+}
+
+.pedCourtCaseCard {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  padding: 10px 12px;
+  background: var(--color-surface);
+}
+
+.pedCourtCaseCard--synthetic {
+  border-color: var(--color-info, #3b82f6);
+  background: var(--color-info-half, rgba(59, 130, 246, 0.08));
+}
+
+.pedCourtCaseHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.pedCourtCaseNumber {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.pedCourtCaseSynthPill {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-info-half, rgba(59, 130, 246, 0.3));
+  border: 1px solid var(--color-info, #3b82f6);
+}
+
+.pedCourtCaseStatus {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--color-text-primary-half);
+}
+
+.pedCourtCaseMeta {
+  font-size: 12px;
+  color: var(--color-text-primary-half);
+  margin-bottom: 6px;
+}
+
+.pedCourtCaseHint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-text-primary);
+}
+
+.pedCourtCaseActions {
+  display: flex;
+  gap: 8px;
+}
+
+.pedCourtCaseOpenBtn {
+  font-size: 12px;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+}
+
+.pedCourtCaseOpenBtn:hover {
+  border-color: var(--color-accent);
+}

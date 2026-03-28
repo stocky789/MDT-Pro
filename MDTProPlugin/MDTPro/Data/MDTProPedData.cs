@@ -69,7 +69,6 @@ namespace MDTPro.Data {
 
         private void PopulateParameters() {
             if (CDFPedData == null) {
-                Helper.Log($"[MDTPro] Ped built with CDF null, using LSPDFR fallback: {(Name ?? "(no name)")}", false, Helper.LogSeverity.Info);
                 PopulateFromLSPDFRPersonaFallback();
                 return;
             }
@@ -129,11 +128,7 @@ namespace MDTPro.Data {
                     : new List<ArrestGroup.Charge>();
             }
 
-            // CDF can mark supervision without any prior charges in our random roll — keep Person Search consistent (forum: probation/parole with empty arrest history).
-            if ((IsOnProbation || IsOnParole) && Arrests.Count == 0) {
-                int cap = Math.Max(1, GetConfig().maxNumberOfPriorArrests);
-                Arrests = GetRandomArrestCharges(Math.Min(2, cap));
-            }
+            // Synthetic PRIOR court dockets: only for CDF probation/parole, and only after LE contact — see DataController.EnsureSupervisionCourtBackstory.
 
             if (Citations.Count > 0 || Arrests.Count > 0) {
                 CDFPedData.TimesStopped += Citations.Count / 2 + Arrests.Count / 2;

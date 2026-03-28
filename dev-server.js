@@ -20,10 +20,60 @@ const placeholderPeds = [
   { Name: 'Jane Smith', FirstName: 'Jane', LastName: 'Smith', ModelName: 'a_f_y_business_01', Gender: 'Female', Address: '456 Alta St, Downtown', Birthday: '1990-03-22', LicenseStatus: 'Valid', LicenseExpiration: '2027-01-15', WeaponPermitStatus: 'None', WeaponPermitType: null, WeaponPermitExpiration: null, IsWanted: false, WarrantText: null, IsOnProbation: false, IsOnParole: false, IsInGang: false, AdvisoryText: null, TimesStopped: 1, IdentificationHistory: [{ Type: 'State ID', Timestamp: ts() }], Citations: [], Arrests: [], HuntingPermitStatus: 'None', HuntingPermitExpiration: null, FishingPermitStatus: 'Valid', FishingPermitExpiration: '2025-08-01' },
   { Name: 'Mike Johnson', FirstName: 'Mike', LastName: 'Johnson', Gender: 'Male', Address: '789 Mirror Park Dr', Birthday: '1978-11-08', LicenseStatus: 'Suspended', LicenseExpiration: '2024-05-01', WeaponPermitStatus: 'None', WeaponPermitType: null, WeaponPermitExpiration: null, IsWanted: true, WarrantText: 'Failure to appear', IsOnProbation: false, IsOnParole: false, IsInGang: false, AdvisoryText: null, TimesStopped: 5, IdentificationHistory: [{ Type: 'State ID', Timestamp: ts() }], Citations: [], Arrests: [], HuntingPermitStatus: 'None', HuntingPermitExpiration: null, FishingPermitStatus: 'None', FishingPermitExpiration: null },
   { Name: 'Sarah Davis', FirstName: 'Sarah', LastName: 'Davis', Gender: 'Female', Address: '321 Davis Ave, Davis', Birthday: '1992-07-14', LicenseStatus: 'Valid', LicenseExpiration: '2026-09-20', WeaponPermitStatus: 'Valid', WeaponPermitType: 'Concealed Carry', WeaponPermitExpiration: '2026-03-01', IsWanted: false, WarrantText: null, IsOnProbation: false, IsOnParole: false, IsInGang: false, AdvisoryText: null, TimesStopped: 0, IdentificationHistory: [{ Type: 'State ID', Timestamp: ts() }], Citations: [], Arrests: [], HuntingPermitStatus: 'None', HuntingPermitExpiration: null, FishingPermitStatus: 'None', FishingPermitExpiration: null },
-  { Name: 'Tom Miller', FirstName: 'Tom', LastName: 'Miller', Gender: 'Male', Address: '555 Palomino Ave, Sandy Shores', Birthday: '1988-01-30', LicenseStatus: 'Valid', LicenseExpiration: '2026-11-10', WeaponPermitStatus: 'None', WeaponPermitType: null, WeaponPermitExpiration: null, IsWanted: false, WarrantText: null, IsOnProbation: false, IsOnParole: false, IsInGang: false, AdvisoryText: null, TimesStopped: 3, IdentificationHistory: [{ Type: 'State ID', Timestamp: ts() }], Citations: [], Arrests: [], HuntingPermitStatus: 'Valid', HuntingPermitExpiration: '2025-12-01', FishingPermitStatus: 'None', FishingPermitExpiration: null },
+  { Name: 'Tom Miller', FirstName: 'Tom', LastName: 'Miller', Gender: 'Male', Address: '555 Palomino Ave, Sandy Shores', Birthday: '1988-01-30', LicenseStatus: 'Valid', LicenseExpiration: '2026-11-10', WeaponPermitStatus: 'None', WeaponPermitType: null, WeaponPermitExpiration: null, IsWanted: false, WarrantText: null, IsOnProbation: true, IsOnParole: false, IsInGang: false, AdvisoryText: null, TimesStopped: 3, IdentificationHistory: [{ Type: 'State ID', Timestamp: ts() }], Citations: [], Arrests: [{ name: 'Reckless Driving', minFine: 145, maxFine: 1000, minDays: 5, maxDays: 90, probation: 0.4, canBeWarrant: false, canRevokeLicense: true, isArrestable: true }, { name: 'Felony Evading / Reckless', minFine: 1000, maxFine: 10000, minDays: 16, maxDays: 36, probation: 0.4, canBeWarrant: true, canRevokeLicense: true, isArrestable: true }], HuntingPermitStatus: 'Valid', HuntingPermitExpiration: '2025-12-01', FishingPermitStatus: 'None', FishingPermitExpiration: null },
   { Name: 'Alice Brown', FirstName: 'Alice', LastName: 'Brown', Gender: 'Female', Address: '100 Grove St, Grapeseed', Birthday: '1982-09-05', LicenseStatus: 'Valid', LicenseExpiration: '2027-02-28', WeaponPermitStatus: 'None', WeaponPermitType: null, WeaponPermitExpiration: null, IsWanted: false, WarrantText: null, IsOnProbation: false, IsOnParole: false, IsInGang: false, AdvisoryText: null, TimesStopped: 1, IdentificationHistory: [{ Type: 'State ID', Timestamp: ts() }], Citations: [], Arrests: [], HuntingPermitStatus: 'None', HuntingPermitExpiration: null, FishingPermitStatus: 'None', FishingPermitExpiration: null },
   { Name: 'Bob Wilson', FirstName: 'Bob', LastName: 'Wilson', Gender: 'Male', Address: '200 Procopio Dr, Paleto Bay', Birthday: '1975-12-18', LicenseStatus: 'Expired', LicenseExpiration: '2023-08-15', WeaponPermitStatus: 'None', WeaponPermitType: null, WeaponPermitExpiration: null, IsWanted: false, WarrantText: null, IsOnProbation: false, IsOnParole: false, IsInGang: false, AdvisoryText: null, TimesStopped: 4, IdentificationHistory: [{ Type: 'State ID', Timestamp: ts() }], Citations: [], Arrests: [], HuntingPermitStatus: 'None', HuntingPermitExpiration: null, FishingPermitStatus: 'None', FishingPermitExpiration: null },
 ];
+
+/** Dev-only mock synthetic supervision case (matches Tom Miller probation demo). */
+const devSyntheticCourtCaseTomMiller = {
+  PedName: 'Tom Miller',
+  Number: 'SA-26-0999',
+  ReportId: 'MDT-SUPERVISION-BACKSTORY',
+  ShortYear: 26,
+  Status: 1,
+  IsJuryTrial: false,
+  JurySize: 0,
+  CourtDistrict: 'Blaine County Circuit',
+  CourtName: 'Blaine County Courthouse',
+  CourtType: 'Circuit Court',
+  HearingDateUtc: new Date(Date.now() - 86400000 * 520).toISOString(),
+  ResolveAtUtc: new Date(Date.now() - 86400000 * 500).toISOString(),
+  LastUpdatedUtc: new Date().toISOString(),
+  CreatedAtUtc: new Date(Date.now() - 86400000 * 530).toISOString(),
+  Plea: 'No Contest',
+  OutcomeNotes:
+    'Minutes reflect a prior bench disposition in People v. Miller. Reconstructed entry aligning probation with charging history (dev mock).',
+  SentenceReasoning:
+    'The court suspended additional custody in favor of formal probation, including compliance checks tied to the convicted counts.',
+  OutcomeReasoning:
+    'The court accepted the no contest plea and found a factual basis. Judgment aligns with ongoing probation supervision.',
+  IsSyntheticSupervisionBackstory: true,
+  SupervisionRecordHint:
+    'Reconstructed prior judgment on file: statutory charges align with this subject\'s current probation status (dev preview).',
+  Charges: [
+    {
+      Name: 'Reckless Driving',
+      Fine: 400,
+      Time: 30,
+      MinDays: 5,
+      MaxDays: 90,
+      Outcome: 1,
+      SentenceDaysServed: 18,
+      IsArrestable: true,
+    },
+    {
+      Name: 'Felony Evading / Reckless',
+      Fine: 2500,
+      Time: 20,
+      MinDays: 16,
+      MaxDays: 36,
+      Outcome: 1,
+      SentenceDaysServed: 22,
+      IsArrestable: true,
+    },
+  ],
+};
 
 const placeholderVehicles = [
   { LicensePlate: '12ABC345', ModelDisplayName: 'Police Cruiser', ModelName: 'POLICE', Make: 'Vapid', Owner: 'John Doe', Color: 'Black / White', VinStatus: 'Valid', VehicleIdentificationNumber: '1HGBH41JXMN109186', IsStolen: false, BOLOs: null, RegistrationStatus: 'Valid', RegistrationExpiration: '2026-06-15', InsuranceStatus: 'Valid', InsuranceExpiration: '2026-07-01' },
@@ -151,8 +201,39 @@ const mockLanguage = {
     },
   },
   desktop: { pedSearch: 'Person Search', vehicleSearch: 'Vehicle Search', reports: 'Reports', shiftHistory: 'Shift History', court: 'Court', map: 'GPS', callout: 'Active Call' },
+  court: {
+    empty: '<p class="courtEmpty">No cases on the docket.</p>',
+    defendant: 'Defendant',
+    number: 'Case',
+    courtDistrictCol: 'District',
+    dateCol: 'Date',
+    status: 'Status',
+    statusMap: ['Pending', 'Convicted', 'Acquitted', 'Dismissed'],
+    searchPlaceholder: 'Search case #, name, report',
+    allStatuses: 'All statuses',
+    sortUpdated: 'Recently updated',
+    sortRisk: 'Highest risk first',
+    sortYear: 'Newest case #',
+    syntheticCaseBadge: 'Prior disposition (reconstructed)',
+    syntheticCaseBadgeShort: 'Prior',
+    syntheticCaseBannerTitle: 'Prior disposition',
+    syntheticCaseBannerBody: 'Reconstructed judgment for probation/parole backstory.',
+    syntheticNoArrestReport: 'No arrest report ID — file generated for supervision alignment.',
+    syntheticNotesReadOnly: 'Read-only reconstructed record.',
+  },
   pedSearch: {
-    static: { title: 'Person Search', noPhoto: 'No photo available', drugRecordsTitle: 'Substance History', vehiclesOwnedTitle: 'Vehicles Owned', registeredFirearmsTitle: 'Registered Firearms', reportsTitle: 'Associated Reports' },
+    static: {
+      title: 'Person Search',
+      noPhoto: 'No photo available',
+      drugRecordsTitle: 'Substance History',
+      vehiclesOwnedTitle: 'Vehicles Owned',
+      registeredFirearmsTitle: 'Registered Firearms',
+      reportsTitle: 'Associated Reports',
+      courtHistoryTitle: 'Court & disposition history',
+      courtHistoryPriorBadge: 'Prior disposition',
+      openInCourtBtn: 'Open in Court',
+      courtHistoryArrestHint: 'Arrest charges below tie to the prior judgment supporting probation/parole. Use Open in Court for the full docket.',
+    },
     notifications: {
       emptySearchInput: 'Enter a name to search.',
       pedNotFound: 'Person not found.',
@@ -412,7 +493,7 @@ const server = http.createServer((req, res) => {
     send(res, 200, '[]', 'application/json');
     return;
   } else if (url === '/data/court') {
-    send(res, 200, '[]', 'application/json');
+    send(res, 200, JSON.stringify([devSyntheticCourtCaseTomMiller]), 'application/json');
     return;
   } else if (url === '/data/activeBolos') {
     send(res, 200, '[]', 'application/json');
@@ -428,7 +509,12 @@ const server = http.createServer((req, res) => {
       const name = parseNameOrPlate(body);
       const reversed = name.split(/\s+/).filter(Boolean).reverse().join(' ');
       const ped = placeholderPeds.find(p => p.Name && (p.Name.toLowerCase() === name.toLowerCase() || p.Name.toLowerCase() === reversed.toLowerCase()));
-      send(res, 200, JSON.stringify(ped != null ? ped : null), 'application/json');
+      if (ped == null) {
+        send(res, 200, JSON.stringify(null), 'application/json');
+        return;
+      }
+      const out = { ...ped, CourtCases: ped.Name === 'Tom Miller' ? [devSyntheticCourtCaseTomMiller] : [] };
+      send(res, 200, JSON.stringify(out), 'application/json');
     }).catch(() => send(res, 500, 'Error reading body', 'text/plain'));
     return;
   } else if (req.method === 'POST' && (url === '/data/specificVehicle' || url === '/data/specificVehicle/')) {

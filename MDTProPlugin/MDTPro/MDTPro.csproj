@@ -149,6 +149,7 @@
     <Compile Include="Setup\Config.cs" />
     <Compile Include="Setup\Language.cs" />
     <Compile Include="Utility\CitationArrestHelper.cs" />
+    <Compile Include="Utility\SupervisionBackstoryHelper.cs" />
     <Compile Include="Utility\PlayerCoords.cs" />
     <Compile Include="ALPR\ALPRController.cs" />
     <Compile Include="ALPR\ALPRHUD.cs" />
