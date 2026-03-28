@@ -69,6 +69,7 @@ namespace MDTPro.ServerAPI {
                 Database.SaveSearchHistoryEntry("ped", name, pedData?.Name);
                 if (pedData != null) {
                     DataController.TryRefreshPedModelFromLiveWorld(pedData, name, reversedName);
+                    DataController.TryRefreshSupervisionFromLiveWorld(pedData, name, reversedName);
                     DataController.KeepPedInDatabase(pedData);
                     if (MDTProPedData.IsMinimalIdentity(pedData)) {
                         Utility.Helper.Log($"[MDTPro] Person Search returning minimal-identity ped (will show N/A): {pedData.Name}", false, Utility.Helper.LogSeverity.Info);
@@ -88,6 +89,9 @@ namespace MDTPro.ServerAPI {
             } else if (path == "contextPed") {
                 MDTProPedData pedData = DataController.GetContextPedIfValid();
                 if (pedData != null) {
+                    string ctxName = pedData.Name?.Trim() ?? "";
+                    string ctxReversed = string.Join(" ", ctxName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Reverse());
+                    DataController.TryRefreshSupervisionFromLiveWorld(pedData, ctxName, ctxReversed);
                     var ctxCases = DataController.GetCourtCasesForPedName(pedData.Name);
                     var ctxJo = JObject.Parse(JsonConvert.SerializeObject(pedData));
                     ctxJo["CourtCases"] = JArray.FromObject(ctxCases ?? new System.Collections.Generic.List<CourtData>());
