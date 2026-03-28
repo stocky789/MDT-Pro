@@ -73,9 +73,7 @@ namespace MDTPro.Setup {
                 File.WriteAllBytes(CitationOptionsPath, File.ReadAllBytes(CitationOptionsDefaultsPath));
             }
 
-            if (!File.Exists(CitationPedReactionsPath) && File.Exists(CitationPedReactionsDefaultsPath)) {
-                File.Copy(CitationPedReactionsDefaultsPath, CitationPedReactionsPath, false);
-            }
+            SyncCitationPedReactionsFromBundledDefaults();
 
             if (!File.Exists(ArrestOptionsPath)) {
                 File.WriteAllBytes(ArrestOptionsPath, File.ReadAllBytes(ArrestOptionsDefaultsPath));
@@ -214,6 +212,35 @@ namespace MDTPro.Setup {
                 Helper.Log("Citation and arrest options updated from defaults (version 10: schedule group label tweak).", true, Helper.LogSeverity.Info);
             } catch (Exception ex) {
                 Helper.Log($"Could not update citation/arrest options from defaults: {ex.Message}", true, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>Copies defaults/citationPedReactions.json over the live file when the bundled copy is newer (see "version" in that JSON). No config fields — updates ship with the mod.</summary>
+        internal static void SyncCitationPedReactionsFromBundledDefaults() {
+            try {
+                if (!File.Exists(CitationPedReactionsDefaultsPath)) return;
+                int bundled = ReadCitationPedReactionsDataVersion(CitationPedReactionsDefaultsPath);
+                int installed = File.Exists(CitationPedReactionsPath) ? ReadCitationPedReactionsDataVersion(CitationPedReactionsPath) : 0;
+                if (bundled <= installed) return;
+                File.WriteAllBytes(CitationPedReactionsPath, File.ReadAllBytes(CitationPedReactionsDefaultsPath));
+                CitationPedReactionHelper.InvalidateLoadedReactions();
+            } catch (Exception ex) {
+                Helper.Log($"Could not sync citation ped reactions: {ex.Message}", true, Helper.LogSeverity.Warning);
+            }
+        }
+
+        private sealed class CitationPedReactionsFileHeader {
+            public int version { get; set; }
+        }
+
+        private static int ReadCitationPedReactionsDataVersion(string path) {
+            try {
+                string json = File.ReadAllText(path);
+                if (string.IsNullOrWhiteSpace(json)) return 0;
+                var h = JsonConvert.DeserializeObject<CitationPedReactionsFileHeader>(json);
+                return h?.version ?? 0;
+            } catch {
+                return 0;
             }
         }
 

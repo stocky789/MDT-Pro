@@ -14,7 +14,17 @@ namespace MDTPro.Utility {
         private static CitationPedReactionsRoot _root;
         private static bool _loadFailed;
 
+        /// <summary>After citationPedReactions.json is replaced on disk (e.g. version migration), clear cache so the next subtitle load reads the new file.</summary>
+        internal static void InvalidateLoadedReactions() {
+            lock (LoadLock) {
+                _root = null;
+                _loadFailed = false;
+            }
+        }
+
         private class CitationPedReactionsRoot {
+            /// <summary>Optional; used to detect updates. Ignored for dialogue selection.</summary>
+            public int version { get; set; }
             public List<ReactionRule> rules = new List<ReactionRule>();
             public Dictionary<string, ReactionPool> pools = new Dictionary<string, ReactionPool>(StringComparer.OrdinalIgnoreCase);
         }
