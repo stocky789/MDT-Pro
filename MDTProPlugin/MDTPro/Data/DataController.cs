@@ -410,9 +410,15 @@ namespace MDTPro.Data {
                 if (mdtProVehicleData.LicensePlate == null) return;
                 TryApplyReEncounterVehicleProfile(mdtProVehicleData, vehicle);
                 MergeBOLOsFromStubByPlate(mdtProVehicleData);
+                if (ModIntegration.SubscribedStopThePedStopEvents)
+                    TryOverlayStopThePedVehicleDocStatusFromApi(mdtProVehicleData, vehicle);
                 lock (_vehicleDbLock) {
-                    if (!vehicleDatabase.Any(x => x.LicensePlate == mdtProVehicleData.LicensePlate))
+                    if (ModIntegration.SubscribedStopThePedStopEvents) {
+                        vehicleDatabase.RemoveAll(x => x != null && string.Equals(x.LicensePlate, mdtProVehicleData.LicensePlate, StringComparison.OrdinalIgnoreCase));
                         vehicleDatabase.Add(mdtProVehicleData);
+                    } else if (!vehicleDatabase.Any(x => x.LicensePlate == mdtProVehicleData.LicensePlate)) {
+                        vehicleDatabase.Add(mdtProVehicleData);
+                    }
                 }
                 KeepVehicleInDatabase(mdtProVehicleData);
 
@@ -1013,16 +1019,14 @@ namespace MDTPro.Data {
                     pedData = new MDTProPedData { Name = pedName };
                     pedData.Citations = new List<CitationGroup.Charge>();
                     pedData.Arrests = new List<ArrestGroup.Charge>();
-                    pedData.ModelHash = (uint)ped.Model.Hash;
-                    pedData.ModelName = ped.Model.Name;
+                    PedPortraitModelHelper.AssignPortraitFromPedIfSuitable(ped, pedData);
                     pedData.TryParseNameIntoFirstLast();
                     pedData.IdentificationHistory = new List<MDTProPedData.IdentificationEntry>();
                     if (!pedDatabase.Any(x => x.Name == pedName)) pedDatabase.Add(pedData);
                 } else {
                     if (!pedDatabase.Any(x => x.Name == pedData.Name)) pedDatabase.Add(pedData);
                     // Always update model from the ped we just identified — ensures ID photo matches the person in front of you
-                    pedData.ModelHash = (uint)ped.Model.Hash;
-                    pedData.ModelName = ped.Model.Name;
+                    PedPortraitModelHelper.AssignPortraitFromPedIfSuitable(ped, pedData);
                 }
                 if (pedData.IdentificationHistory == null) pedData.IdentificationHistory = new List<MDTProPedData.IdentificationEntry>();
                 pedData.IdentificationHistory.Insert(0, new MDTProPedData.IdentificationEntry {
@@ -1079,6 +1083,8 @@ namespace MDTPro.Data {
 
         /// <summary>Lock order: always acquire _pedDbLock before _vehicleDbLock to avoid deadlock.</summary>
         public static void KeepVehicleInDatabase(MDTProVehicleData vehicleData) {
+            if (vehicleData == null || string.IsNullOrWhiteSpace(vehicleData.LicensePlate)) return;
+            string plateKey = vehicleData.LicensePlate.Trim();
             MDTProPedData pedData = null;
             lock (_pedDbLock) {
                 pedData = pedDatabase.FirstOrDefault(x => x.Name == vehicleData.Owner);
@@ -1090,7 +1096,12 @@ namespace MDTPro.Data {
             if (pedData != null) Database.SavePed(pedData);
 
             lock (_vehicleDbLock) {
-                if (!keepInVehicleDatabase.Any(x => x.LicensePlate == vehicleData.LicensePlate)) keepInVehicleDatabase.Add(vehicleData);
+                if (ModIntegration.SubscribedStopThePedStopEvents) {
+                    keepInVehicleDatabase.RemoveAll(x => x != null && string.Equals(x.LicensePlate, plateKey, StringComparison.OrdinalIgnoreCase));
+                    keepInVehicleDatabase.Add(vehicleData);
+                } else if (!keepInVehicleDatabase.Any(x => x.LicensePlate == vehicleData.LicensePlate)) {
+                    keepInVehicleDatabase.Add(vehicleData);
+                }
             }
             Database.SaveVehicle(vehicleData);
         }
@@ -1667,6 +1678,53 @@ namespace MDTPro.Data {
             return plate.Trim().Replace(" ", "").ToUpperInvariant();
         }
 
+        /// <summary>StopThePed-only: copies registration/insurance expiration from CDF on the live vehicle, then overwrites <see cref="MDTProVehicleData.RegistrationStatus"/> / <see cref="MDTProVehicleData.InsuranceStatus"/> from <c>StopThePed.API.Functions.getVehicleRegistrationStatus</c> / <c>getVehicleInsuranceStatus</c> (STP’s own flags, not only CDF enums).</summary>
+        internal static bool TryRefreshVehicleDocumentsFromLiveWorld(MDTProVehicleData vehicleData) {
+            if (!ModIntegration.SubscribedStopThePedStopEvents) return false;
+            if (vehicleData == null || string.IsNullOrWhiteSpace(vehicleData.LicensePlate)) return false;
+            string want = NormalizeVehiclePlateKey(vehicleData.LicensePlate);
+            if (string.IsNullOrEmpty(want)) return false;
+            Vehicle live = null;
+            try {
+                if (vehicleData.Holder != null && vehicleData.Holder.Exists())
+                    live = vehicleData.Holder;
+            } catch { /* entity disposed */ }
+            if (live == null) {
+                try {
+                    foreach (Vehicle v in World.GetAllVehicles()) {
+                        if (v == null || !v.Exists()) continue;
+                        if (NormalizeVehiclePlateKey(v.LicensePlate) != want) continue;
+                        live = v;
+                        break;
+                    }
+                } catch {
+                    return false;
+                }
+            }
+            if (live == null) return false;
+            VehicleData cdf = null;
+            try { cdf = live.GetVehicleData(); } catch { }
+            if (cdf != null)
+                vehicleData.CopyRegistrationInsuranceFromCdf(cdf);
+            bool stp = TryOverlayStopThePedVehicleDocStatusFromApi(vehicleData, live);
+            return cdf != null || stp;
+        }
+
+        /// <summary>STP stop integration: sets registration/insurance status strings from StopThePed public API (matches in-game plate/doc checks). Call on game thread.</summary>
+        internal static bool TryOverlayStopThePedVehicleDocStatusFromApi(MDTProVehicleData vehicleData, Vehicle live) {
+            if (!ModIntegration.SubscribedStopThePedStopEvents || vehicleData == null || live == null || !live.Exists()) return false;
+            bool any = false;
+            if (StpReflectionHelper.TryGetVehicleRegistrationStatusStp(live, out string reg)) {
+                vehicleData.RegistrationStatus = reg;
+                any = true;
+            }
+            if (StpReflectionHelper.TryGetVehicleInsuranceStatusStp(live, out string ins)) {
+                vehicleData.InsuranceStatus = ins;
+                any = true;
+            }
+            return any;
+        }
+
         /// <summary>Store ped handle when we identify someone. Citation handout uses this when Holder is null.</summary>
         internal static void StoreIdentifiedPedHandle(string pedName, Rage.PoolHandle handle) {
             if (string.IsNullOrWhiteSpace(pedName)) return;
@@ -1717,9 +1775,7 @@ namespace MDTPro.Data {
             if (pedData == null) return false;
             try {
                 if (pedData.Holder != null && pedData.Holder.IsValid()) {
-                    uint h = (uint)pedData.Holder.Model.Hash;
-                    string n = pedData.Holder.Model.Name;
-                    if (h != 0 && !string.IsNullOrEmpty(n)) {
+                    if (PedPortraitModelHelper.TryGetPortraitModelFromPed(pedData.Holder, out uint h, out string n)) {
                         pedData.ModelHash = h;
                         pedData.ModelName = n;
                         return true;
@@ -1733,9 +1789,7 @@ namespace MDTPro.Data {
                         Ped live = World.GetEntityByHandle<Ped>(handleOpt.Value);
                         if (live == null || !live.IsValid()) continue;
                         if (!LivePedIdentityMatchesRecord(live, pedData)) continue;
-                        uint mh = (uint)live.Model.Hash;
-                        string mn = live.Model.Name;
-                        if (mh == 0 || string.IsNullOrEmpty(mn)) continue;
+                        if (!PedPortraitModelHelper.TryGetPortraitModelFromPed(live, out uint mh, out string mn)) continue;
                         pedData.ModelHash = mh;
                         pedData.ModelName = mn;
                         return true;

@@ -280,7 +280,17 @@ async function renderConfigPage() {
 
   const allSectionKeys = new Set()
   CONFIG_SECTIONS.forEach((s) => s.keys.forEach((k) => allSectionKeys.add(k)))
-  const hiddenConfigKeys = new Set(['alprEnabled', 'alprPopupDuration', 'alprHudAnchor', 'alprHudOffsetX', 'alprHudOffsetY', 'alprHudScale', 'citationArrestOptionsVersion'])
+  const hiddenConfigKeys = new Set([
+    'alprEnabled',
+    'alprPopupDuration',
+    'alprHudAnchor',
+    'alprHudOffsetX',
+    'alprHudOffsetY',
+    'alprHudScale',
+    'citationArrestOptionsVersion',
+    'checkForUpdates',
+    'githubReleasesRepo',
+  ])
   const otherKeys = Object.keys(config).filter((k) => !allSectionKeys.has(k) && !hiddenConfigKeys.has(k))
   const sectionsToRender = otherKeys.length > 0
     ? [...CONFIG_SECTIONS, { title: 'Other', keys: otherKeys }]

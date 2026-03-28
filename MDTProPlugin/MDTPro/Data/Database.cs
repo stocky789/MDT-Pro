@@ -1074,6 +1074,12 @@ namespace MDTPro.Data {
                 foreach (var ped in peds) {
                     ped.Citations = LoadPedCitations(ped.Name);
                     ped.Arrests = LoadPedArrests(ped.Name);
+                    if (PedPortraitModelHelper.StripInvalidPortraitModelIfNeeded(ped)) {
+                        if (MDTProPedData.IsMinimalIdentity(ped))
+                            ClearPedPortraitModelColumns(ped.Name);
+                        else
+                            SavePed(ped);
+                    }
                 }
 
                 return peds;
@@ -1764,6 +1770,19 @@ namespace MDTPro.Data {
         #endregion
 
         #region Save Methods
+
+        /// <summary>Clears portrait columns only (e.g. junk <c>a_c_*</c> model persisted on a stub). Used when <see cref="SavePed"/> skips minimal-identity rows.</summary>
+        internal static void ClearPedPortraitModelColumns(string pedName) {
+            if (string.IsNullOrEmpty(pedName)) return;
+            lock (dbLock) {
+                if (connection == null) return;
+                using (var cmd = new SQLiteCommand(
+                    "UPDATE peds SET ModelHash = 0, ModelName = NULL WHERE Name = @Name", connection)) {
+                    cmd.Parameters.AddWithValue("@Name", pedName);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
 
         internal static void SavePed(MDTProPedData ped) {
             if (ped?.Name == null) return;

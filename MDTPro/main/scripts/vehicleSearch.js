@@ -171,8 +171,21 @@ async function loadSearchHistory() {
   }
 }
 
+let integrationStopEventsProviderPromise = null
+function getStopEventsProvider() {
+  if (!integrationStopEventsProviderPromise) {
+    integrationStopEventsProviderPromise = fetch('/integration')
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((j) => (j && typeof j.stopEventsProvider === 'string' && j.stopEventsProvider) || 'none')
+      .catch(() => 'none')
+  }
+  return integrationStopEventsProviderPromise
+}
+
 async function performSearch(query) {
   const language = await getLanguage()
+  const stopEventsProvider = await getStopEventsProvider()
+  const stpStopIntegrationActive = stopEventsProvider === 'StopThePed'
   if (!query) {
     topWindow.showNotification(
       language.vehicleSearch.notifications.emptySearchInput,
@@ -217,20 +230,39 @@ async function performSearch(query) {
     if (!el) continue
     switch (key) {
       case 'RegistrationExpiration':
-      case 'InsuranceExpiration':
+      case 'InsuranceExpiration': {
         el.value = await getLanguageValue(response[key])
         el.value =
           response[key] == null
             ? await getLanguageValue(response[key])
             : new Date(response[key]).toLocaleDateString()
 
-        if (
+        if (stpStopIntegrationActive) {
+          const statusKey =
+            key === 'RegistrationExpiration'
+              ? 'RegistrationStatus'
+              : 'InsuranceStatus'
+          const statusNorm = String(response[statusKey] ?? '')
+            .trim()
+            .toLowerCase()
+          const expMs =
+            response[key] != null ? new Date(response[key]).getTime() : NaN
+          const looksPast = !Number.isNaN(expMs) && expMs < Date.now()
+          const warnFromDate = looksPast && statusNorm !== 'valid'
+          const warnFromStatus = /expired|revoked|suspended|invalid|none/i.test(
+            statusNorm
+          )
+          if (warnFromDate || warnFromStatus) {
+            el.style.color = 'var(--color-warning)'
+          }
+        } else if (
           response[key] != null &&
           new Date(response[key]).getTime() < Date.now()
         ) {
           el.style.color = 'var(--color-warning)'
         }
         break
+      }
       case 'VinStatus':
         el.value = await getLanguageValue(response[key])
         if (response[key] === 'Scratched') el.style.color = 'var(--color-warning)'
