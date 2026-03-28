@@ -128,8 +128,7 @@ namespace MDTPro.Data {
                     : new List<ArrestGroup.Charge>();
             }
 
-            // Probation/parole: coherent priors + synthetic closed court case (persisted). Replaces empty/inconsistent random priors for supervised peds.
-            DataController.EnsureSupervisionCourtBackstory(this);
+            // Synthetic PRIOR court dockets: only for CDF probation/parole, and only after LE contact — see DataController.EnsureSupervisionCourtBackstory.
 
             if (Citations.Count > 0 || Arrests.Count > 0) {
                 CDFPedData.TimesStopped += Citations.Count / 2 + Arrests.Count / 2;

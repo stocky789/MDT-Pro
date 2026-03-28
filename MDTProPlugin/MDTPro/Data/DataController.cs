@@ -968,7 +968,8 @@ namespace MDTPro.Data {
                 ourPed.WarrantText = cdf.Wanted ? CitationArrestHelper.GetRandomWarrantCharge().name : null;
                 ourPed.IsOnProbation = cdf.IsOnProbation;
                 ourPed.IsOnParole = cdf.IsOnParole;
-                EnsureSupervisionCourtBackstory(ourPed);
+                if (ourPed.IsOnProbation || ourPed.IsOnParole)
+                    EnsureSupervisionCourtBackstory(ourPed, allowNewSyntheticWithoutLeContact: true);
                 KeepPedInDatabase(ourPed);
                 Database.SavePed(ourPed);
             } catch (Exception ex) {
@@ -1018,7 +1019,16 @@ namespace MDTPro.Data {
                 });
                 if (pedData.IdentificationHistory.Count > 10) pedData.IdentificationHistory.RemoveAt(pedData.IdentificationHistory.Count - 1);
             }
+            try {
+                PedData cdfId = ped.GetPedData();
+                if (cdfId != null) {
+                    pedData.IsOnProbation = cdfId.IsOnProbation;
+                    pedData.IsOnParole = cdfId.IsOnParole;
+                }
+            } catch { }
             KeepPedInDatabase(pedData);
+            if (pedData.IsOnProbation || pedData.IsOnParole)
+                EnsureSupervisionCourtBackstory(pedData);
             Database.SavePed(pedData);
             SetContextPed(pedData);
         }
@@ -1036,7 +1046,8 @@ namespace MDTPro.Data {
             }
             foreach (MDTProPedData data in fileContent) {
                 if (data == null || data.Name == null) continue;
-                EnsureSupervisionCourtBackstory(data);
+                if (data.IsOnProbation || data.IsOnParole)
+                    EnsureSupervisionCourtBackstory(data);
             }
         }
 
@@ -1106,7 +1117,8 @@ namespace MDTPro.Data {
                     if (pedDatabase.Any(x => x.Name == mdtProPedData.Name)) return;
                 }
                 TryApplyReEncounterProfile(mdtProPedData);
-                EnsureSupervisionCourtBackstory(mdtProPedData);
+                if (mdtProPedData.IsOnProbation || mdtProPedData.IsOnParole)
+                    EnsureSupervisionCourtBackstory(mdtProPedData);
                 lock (_pedDbLock) {
                     if (pedDatabase.Any(x => x.Name == mdtProPedData.Name)) return;
                     pedDatabase.Add(mdtProPedData);
@@ -1436,7 +1448,8 @@ namespace MDTPro.Data {
                 SyncSinglePedToCDF(currentPedData);
             }
 
-            EnsureSupervisionCourtBackstory(currentPedData);
+            if (currentPedData.IsOnProbation || currentPedData.IsOnParole)
+                EnsureSupervisionCourtBackstory(currentPedData);
             KeepPedInDatabase(currentPedData);
             Helper.Log($"Re-encounter merged prior record (model + name match); live identity kept: {liveName}", false, Helper.LogSeverity.Info);
         }
@@ -1491,7 +1504,8 @@ namespace MDTPro.Data {
                 }
             }
             if (existingPed != null) {
-                EnsureSupervisionCourtBackstory(existingPed);
+                if (existingPed.IsOnProbation || existingPed.IsOnParole)
+                    EnsureSupervisionCourtBackstory(existingPed);
                 KeepPedInDatabase(existingPed);
                 Database.SavePed(existingPed);
                 SetContextPed(existingPed);
@@ -1499,7 +1513,8 @@ namespace MDTPro.Data {
             }
 
             TryApplyReEncounterProfile(mdtProPedData);
-            EnsureSupervisionCourtBackstory(mdtProPedData);
+            if (mdtProPedData.IsOnProbation || mdtProPedData.IsOnParole)
+                EnsureSupervisionCourtBackstory(mdtProPedData);
             lock (_pedDbLock) {
                 if (pedDatabase.Any(x => x.Name == mdtProPedData.Name)) return;
                 pedDatabase.Add(mdtProPedData);
@@ -1543,7 +1558,8 @@ namespace MDTPro.Data {
                             existing.IsOnParole = updated.IsOnParole;
                             existing.TryParseNameIntoFirstLast();
                         }
-                        EnsureSupervisionCourtBackstory(existing);
+                        if (existing.IsOnProbation || existing.IsOnParole)
+                            EnsureSupervisionCourtBackstory(existing);
                         KeepPedInDatabase(existing);
                         Database.SavePed(existing);
                         Helper.Log($"[MDTPro] Delayed CDF retry filled identity for: {pedName}", false, Helper.LogSeverity.Info);
@@ -1705,7 +1721,8 @@ namespace MDTPro.Data {
                 bool changed = pedData.IsOnProbation != prob || pedData.IsOnParole != par;
                 pedData.IsOnProbation = prob;
                 pedData.IsOnParole = par;
-                EnsureSupervisionCourtBackstory(pedData);
+                if (pedData.IsOnProbation || pedData.IsOnParole)
+                    EnsureSupervisionCourtBackstory(pedData, allowNewSyntheticWithoutLeContact: true);
                 if (changed) {
                     KeepPedInDatabase(pedData);
                     Database.SavePed(pedData);
@@ -1782,10 +1799,11 @@ namespace MDTPro.Data {
         }
 
         /// <summary>
-        /// Ensures any ped on probation/parole has prior arrest charges and a closed synthetic court case explaining the disposition.
+        /// Synthetic PRIOR docket + coherent arrest priors for <b>probation/parole only</b>. Immediate no-op if the subject is not on probation and not on parole.
         /// Charges are sampled from arrestOptions.json (coherent multi-count). Idempotent per ped via <see cref="CourtData.SyntheticSupervisionReportId"/>.
+        /// New dockets are not created from passive nearby-ped scans; set <paramref name="allowNewSyntheticWithoutLeContact"/> when CDF/PR already reflects an intentional records pull (dispatch, person search on live ped).
         /// </summary>
-        internal static void EnsureSupervisionCourtBackstory(MDTProPedData ped) {
+        internal static void EnsureSupervisionCourtBackstory(MDTProPedData ped, bool allowNewSyntheticWithoutLeContact = false) {
             if (ped == null || string.IsNullOrWhiteSpace(ped.Name)) return;
             if (!ped.IsOnProbation && !ped.IsOnParole) return;
 
@@ -1803,6 +1821,11 @@ namespace MDTPro.Data {
                             .ToList();
                         Database.SavePed(ped);
                     }
+                    return;
+                }
+
+                if (!allowNewSyntheticWithoutLeContact
+                    && (ped.IdentificationHistory == null || ped.IdentificationHistory.Count == 0)) {
                     return;
                 }
 
