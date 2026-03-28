@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace MDTPro.Data {
     public class CourtData {
@@ -16,6 +17,24 @@ namespace MDTPro.Data {
         public string PedName;
         public string Number;
         public string ReportId;
+
+        /// <summary>Stable id for MDT-generated prior cases that explain CDF probation/parole (no patrol arrest report).</summary>
+        public const string SyntheticSupervisionReportId = "MDT-SUPERVISION-BACKSTORY";
+
+        /// <summary>True when this case is a reconstructed prior judgment for supervision backstory (API / MDT UI).</summary>
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool IsSyntheticSupervisionBackstory => string.Equals(ReportId, SyntheticSupervisionReportId, System.StringComparison.Ordinal);
+
+        public bool ShouldSerializeIsSyntheticSupervisionBackstory() => IsSyntheticSupervisionBackstory;
+
+        /// <summary>Short explanation for officers in Person Search / Court (serialized only for synthetic cases).</summary>
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public string SupervisionRecordHint => IsSyntheticSupervisionBackstory
+            ? "Reconstructed prior judgment on file: statutory charges align with this subject’s current probation/parole status. Not linked to a patrol arrest report in MDT."
+            : null;
+
+        public bool ShouldSerializeSupervisionRecordHint() => IsSyntheticSupervisionBackstory;
+
         public int ShortYear;
         public int Status = 0;
         public bool IsJuryTrial = false;
