@@ -1147,7 +1147,22 @@ namespace MDTPro.Data {
                 MDTProPedData mdtProPedData = new MDTProPedData(pedData);
                 if (mdtProPedData == null || mdtProPedData.Name == null) return;
                 lock (_pedDbLock) {
-                    if (pedDatabase.Any(x => x.Name == mdtProPedData.Name)) return;
+                    MDTProPedData existingByName = pedDatabase.FirstOrDefault(x => x.Name != null && x.Name.Equals(mdtProPedData.Name, StringComparison.OrdinalIgnoreCase));
+                    if (existingByName != null) {
+                        // Same person already in DB (e.g. prior stop): refresh warrant/supervision from this CDF owner snapshot.
+                        // Otherwise vehicle plate checks show WANTED in STP/CDF but Person Search still shows cleared — we used to return without updating.
+                        existingByName.IsWanted = mdtProPedData.IsWanted;
+                        existingByName.WarrantText = mdtProPedData.WarrantText;
+                        existingByName.IsOnProbation = mdtProPedData.IsOnProbation;
+                        existingByName.IsOnParole = mdtProPedData.IsOnParole;
+                        if (existingByName.CDFPedData != null) {
+                            existingByName.CDFPedData.Wanted = mdtProPedData.CDFPedData.Wanted;
+                            existingByName.CDFPedData.IsOnProbation = mdtProPedData.CDFPedData.IsOnProbation;
+                            existingByName.CDFPedData.IsOnParole = mdtProPedData.CDFPedData.IsOnParole;
+                        }
+                        Database.SavePed(existingByName);
+                        return;
+                    }
                 }
                 TryApplyReEncounterProfile(mdtProPedData);
                 if (mdtProPedData.IsOnProbation || mdtProPedData.IsOnParole)
@@ -1471,6 +1486,16 @@ namespace MDTPro.Data {
 
             string liveName = currentPedData.Name;
             currentPedData.ApplyPersistentRecordPreservingLiveIdentity(persistentMatch);
+            // Merged row can have stale IsWanted=false while live CDF on this ped still has a warrant (vehicle/plate checks update CDF first).
+            if (currentPedData.CDFPedData != null) {
+                currentPedData.IsWanted = currentPedData.CDFPedData.Wanted;
+                if (currentPedData.IsWanted && string.IsNullOrEmpty(currentPedData.WarrantText))
+                    currentPedData.WarrantText = CitationArrestHelper.GetRandomWarrantCharge().name;
+                else if (!currentPedData.IsWanted)
+                    currentPedData.WarrantText = null;
+                currentPedData.IsOnProbation = currentPedData.CDFPedData.IsOnProbation;
+                currentPedData.IsOnParole = currentPedData.CDFPedData.IsOnParole;
+            }
             currentPedData.TimesStopped = Math.Max(currentPedData.TimesStopped, persistentMatch.TimesStopped + 1);
             currentPedData.TryParseNameIntoFirstLast();
 
@@ -1723,6 +1748,38 @@ namespace MDTPro.Data {
                 any = true;
             }
             return any;
+        }
+
+        /// <summary>Align Person Search warrant/supervision with CDF vehicle owner (same source STP uses after a plate check). Fixes stale MDT rows when owner was already in pedDatabase.</summary>
+        internal static void TrySyncVehicleOwnerWantedFromCdf(MDTProVehicleData vehicleData) {
+            if (vehicleData?.CDFVehicleData?.Owner == null) return;
+            try {
+                var owner = vehicleData.CDFVehicleData.Owner;
+                string name = owner.FullName?.Trim();
+                if (string.IsNullOrEmpty(name) || string.Equals(name, "Government", StringComparison.OrdinalIgnoreCase)) return;
+                bool wanted = owner.Wanted;
+                bool onProbation = owner.IsOnProbation;
+                bool onParole = owner.IsOnParole;
+                lock (_pedDbLock) {
+                    MDTProPedData existing = pedDatabase.FirstOrDefault(x => x.Name != null && x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+                    if (existing == null) return;
+                    existing.IsWanted = wanted;
+                    if (wanted && string.IsNullOrEmpty(existing.WarrantText))
+                        existing.WarrantText = CitationArrestHelper.GetRandomWarrantCharge().name;
+                    else if (!wanted)
+                        existing.WarrantText = null;
+                    existing.IsOnProbation = onProbation;
+                    existing.IsOnParole = onParole;
+                    if (existing.CDFPedData != null) {
+                        existing.CDFPedData.Wanted = wanted;
+                        existing.CDFPedData.IsOnProbation = onProbation;
+                        existing.CDFPedData.IsOnParole = onParole;
+                    }
+                    Database.SavePed(existing);
+                }
+            } catch (Exception ex) {
+                Helper.Log($"TrySyncVehicleOwnerWantedFromCdf: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
         }
 
         /// <summary>Store ped handle when we identify someone. Citation handout uses this when Holder is null.</summary>

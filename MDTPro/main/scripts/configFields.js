@@ -162,6 +162,8 @@ const CONFIG_SECTIONS = [
       'stpCitationPaperworkAnimation',
       'stpCitationHandoffMaxDistance',
       'stpCitationHandoffPendingExpireMinutes',
+      'citationHandoffBehaviorDelayAfterPaperworkMs',
+      'citationHandoffDelayBeforeViolenceAfterReactionMs',
     ],
   },
   {
@@ -611,6 +613,26 @@ const CONFIG_FIELD_META = {
       { label: '45 minutes (default)', value: 45 },
       { label: '60 minutes', value: 60 },
       { label: 'Never (0)', value: 0 },
+      PRESET_CUSTOM,
+    ],
+  },
+  citationHandoffBehaviorDelayAfterPaperworkMs: {
+    label: 'Wait after handoff before suspect reacts (ms)',
+    tooltip: 'After the ticket is delivered (and after the paperwork animation on the StopThePed path, if enabled), wait this long before the suspect’s line and any hostility. Gives time to “read” the citation.',
+    presets: [
+      { label: '1 s', value: 1000 },
+      { label: '1.8 s (default)', value: 1800 },
+      { label: '3 s', value: 3000 },
+      PRESET_CUSTOM,
+    ],
+  },
+  citationHandoffDelayBeforeViolenceAfterReactionMs: {
+    label: 'Extra wait before hostility after their line (ms)',
+    tooltip: 'After the suspect subtitle appears, wait this long before rolling whether they attack. Use 0 to check immediately after the line is shown.',
+    presets: [
+      { label: 'None (0)', value: 0 },
+      { label: '1.2 s (default)', value: 1200 },
+      { label: '2.5 s', value: 2500 },
       PRESET_CUSTOM,
     ],
   },

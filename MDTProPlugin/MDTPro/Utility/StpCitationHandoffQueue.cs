@@ -122,12 +122,7 @@ namespace MDTPro.Utility {
             if (!string.IsNullOrWhiteSpace(okMsg))
                 RageNotification.ShowSuccess(okMsg);
 
-            CitationPedReactionHelper.TryShowSuspectReaction(ped, chargesCopy);
-            CitationPostHandoffViolenceHelper.TryMaybeAggressiveAfterCitation(ped, chargesCopy);
-
-            try {
-                CitationHandoffAnimation.TryPlayForStopThePed(ped);
-            } catch { /* ignore */ }
+            CitationHandoffPostEffects.ScheduleAfterHandoff(ped, chargesCopy, includeStopThePedPaperworkAnimation: true);
         }
     }
 }

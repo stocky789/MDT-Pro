@@ -158,6 +158,7 @@
     <Compile Include="Setup\Language.cs" />
     <Compile Include="Utility\CitationArrestHelper.cs" />
     <Compile Include="Utility\CitationHandoffAnimation.cs" />
+    <Compile Include="Utility\CitationHandoffPostEffects.cs" />
     <Compile Include="Utility\CitationPedReactionHelper.cs" />
     <Compile Include="Utility\CitationPostHandoffViolenceHelper.cs" />
     <Compile Include="Utility\SupervisionBackstoryHelper.cs" />
