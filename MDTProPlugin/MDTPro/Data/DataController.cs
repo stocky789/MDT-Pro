@@ -20,7 +20,8 @@ namespace MDTPro.Data {
         private const string LifeIncarcerationValue = "LIFE";
         private const double RealDaysPerGameYear = 7d;
         private const double GameDaysPerYear = 365d;
-        private static readonly object _supervisionBackstoryLock = new object();
+        /// <summary>Serializes case-number allocation and all in-memory <see cref="courtDatabase"/> list mutations. Person Search + supervision backstory run on the HTTP thread while arrest close runs there too; concurrent List enumeration was throwing and aborting arrest → court creation.</summary>
+        private static readonly object _courtDatabaseLock = new object();
         private const float MaxSentenceMultiplier = 2.5f;
         private const int DefaultJuryTrialSeverityThreshold = 15;
         private const int DefaultCourtRosterRotationDays = 14;
@@ -167,6 +168,37 @@ namespace MDTPro.Data {
 
         internal static List<CourtData> courtDatabase = new List<CourtData>();
         public static IReadOnlyList<CourtData> CourtDatabase => courtDatabase;
+
+        /// <summary>Next docket id; caller must hold <see cref="_courtDatabaseLock"/>.</summary>
+        private static string AllocateCourtCaseNumberUnderLock() {
+            Config cfg = SetupController.GetConfig();
+            string number = cfg.courtCaseNumberFormat ?? "{shortYear}-{index}";
+            int yy = int.Parse(DateTime.Now.ToString("yy", CultureInfo.InvariantCulture));
+            int index = 1;
+            foreach (CourtData caseData in courtDatabase) {
+                if (caseData != null && caseData.ShortYear == yy) index++;
+            }
+            int pad = cfg.courtCaseNumberIndexPad > 0 ? cfg.courtCaseNumberIndexPad : 1;
+            number = number.Replace("{shortYear}", DateTime.Now.ToString("yy", CultureInfo.InvariantCulture));
+            number = number.Replace("{year}", DateTime.Now.ToString("yyyy", CultureInfo.InvariantCulture));
+            number = number.Replace("{month}", DateTime.Now.ToString("MM", CultureInfo.InvariantCulture));
+            number = number.Replace("{day}", DateTime.Now.ToString("dd", CultureInfo.InvariantCulture));
+            number = number.Replace("{index}", index.ToString().PadLeft(pad, '0'));
+            return number;
+        }
+
+        internal static string AllocateCourtCaseNumber() {
+            lock (_courtDatabaseLock) {
+                return AllocateCourtCaseNumberUnderLock();
+            }
+        }
+
+        internal static CourtData FindCourtCaseByNumber(string number) {
+            if (string.IsNullOrEmpty(number)) return null;
+            lock (_courtDatabaseLock) {
+                return courtDatabase.Find(x => x.Number == number);
+            }
+        }
 
         internal static OfficerInformationData OfficerInformationData = new OfficerInformationData();
         internal static OfficerInformationData OfficerInformation = new OfficerInformationData();
@@ -1196,76 +1228,78 @@ namespace MDTPro.Data {
 
                 // Only create/update court case when arrest is Closed. Pending = collecting evidence (attach reports).
                 if (arrestReport.Status == ReportStatus.Closed) {
-                    string courtCaseNumber = arrestReport.CourtCaseNumber ?? Helper.GetCourtCaseNumber();
-                    arrestReport.CourtCaseNumber = courtCaseNumber;
+                    lock (_courtDatabaseLock) {
+                        string courtCaseNumber = arrestReport.CourtCaseNumber ?? AllocateCourtCaseNumberUnderLock();
+                        arrestReport.CourtCaseNumber = courtCaseNumber;
 
-                    CourtData courtData = new CourtData(
-                        arrestReport.OffenderPedName,
-                        courtCaseNumber,
-                        arrestReport.Id,
-                        int.Parse(DateTime.Now.ToString("yy"))
-                    );
-
-                    if (arrestReport.AttachedReportIds != null && arrestReport.AttachedReportIds.Count > 0) {
-                        courtData.AttachedReportIds.AddRange(arrestReport.AttachedReportIds);
-                    }
-
-                    foreach (ArrestReport.Charge charge in arrestReport.Charges ?? Enumerable.Empty<ArrestReport.Charge>()) {
-                        if (charge == null) continue;
-                        int minDays = charge.minDays;
-                        int? maxDays = charge.maxDays;
-                        int? time;
-                        int rangeMin;
-                        int? rangeMax;
-                        if (maxDays == null) {
-                            // Life sentence charge: either life or a range (minDays to minDays*2)
-                            if (Helper.GetRandomInt(0, 1) == 0) {
-                                time = Helper.GetRandomInt(minDays, Math.Max(minDays, minDays * 2));
-                                rangeMin = minDays;
-                                rangeMax = Math.Max(minDays, minDays * 2);
-                            } else {
-                                time = null;
-                                rangeMin = 0;
-                                rangeMax = null; // Life
-                            }
-                        } else {
-                            // Store base min for severity; roll at resolution
-                            time = minDays;
-                            rangeMin = minDays;
-                            rangeMax = maxDays;
-                        }
-                        courtData.AddCharge(
-                            new CourtData.Charge(
-                                charge.name,
-                                Helper.GetRandomInt(charge.minFine, charge.maxFine),
-                                time,
-                                charge.isArrestable,
-                                rangeMin,
-                                rangeMax
-                            )
+                        CourtData courtData = new CourtData(
+                            arrestReport.OffenderPedName,
+                            courtCaseNumber,
+                            arrestReport.Id,
+                            int.Parse(DateTime.Now.ToString("yy"))
                         );
-                    }
 
-                    courtData.EvidenceUseOfForce = arrestReport.UseOfForce != null && !string.IsNullOrEmpty(arrestReport.UseOfForce.Type);
-                    BuildCourtCaseMetadata(courtData, arrestReport.OffenderPedName, arrestReport.Location);
-                    ApplyRepeatOffenderSentencing(courtData);
-
-                    if (!string.IsNullOrEmpty(arrestReport.OffenderPedName)) {
-                        int pedIndex = pedDatabase.FindIndex(pedData => pedData.Name?.ToLower() == arrestReport.OffenderPedName.ToLower());
-                        if (pedIndex != -1) {
-                            MDTProPedData pedDataToUpdate = pedDatabase[pedIndex];
-                            UpdatePedIncarcerationFromCourtData(pedDataToUpdate, courtData);
-                            KeepPedInDatabase(pedDataToUpdate);
-                            pedDatabase[pedIndex] = pedDataToUpdate;
+                        if (arrestReport.AttachedReportIds != null && arrestReport.AttachedReportIds.Count > 0) {
+                            courtData.AttachedReportIds.AddRange(arrestReport.AttachedReportIds);
                         }
-                    }
 
-                    if (!courtDatabase.Any(x => x.Number == courtCaseNumber)) {
-                        if (courtDatabase.Count > SetupController.GetConfig().courtDatabaseMaxEntries) {
-                            Database.DeleteCourtCase(courtDatabase[0].Number);
-                            courtDatabase.RemoveAt(0);
+                        foreach (ArrestReport.Charge charge in arrestReport.Charges ?? Enumerable.Empty<ArrestReport.Charge>()) {
+                            if (charge == null) continue;
+                            int minDays = charge.minDays;
+                            int? maxDays = charge.maxDays;
+                            int? time;
+                            int rangeMin;
+                            int? rangeMax;
+                            if (maxDays == null) {
+                                // Life sentence charge: either life or a range (minDays to minDays*2)
+                                if (Helper.GetRandomInt(0, 1) == 0) {
+                                    time = Helper.GetRandomInt(minDays, Math.Max(minDays, minDays * 2));
+                                    rangeMin = minDays;
+                                    rangeMax = Math.Max(minDays, minDays * 2);
+                                } else {
+                                    time = null;
+                                    rangeMin = 0;
+                                    rangeMax = null; // Life
+                                }
+                            } else {
+                                // Store base min for severity; roll at resolution
+                                time = minDays;
+                                rangeMin = minDays;
+                                rangeMax = maxDays;
+                            }
+                            courtData.AddCharge(
+                                new CourtData.Charge(
+                                    charge.name,
+                                    Helper.GetRandomInt(charge.minFine, charge.maxFine),
+                                    time,
+                                    charge.isArrestable,
+                                    rangeMin,
+                                    rangeMax
+                                )
+                            );
                         }
-                        courtDatabase.Add(courtData);
+
+                        courtData.EvidenceUseOfForce = arrestReport.UseOfForce != null && !string.IsNullOrEmpty(arrestReport.UseOfForce.Type);
+                        BuildCourtCaseMetadata(courtData, arrestReport.OffenderPedName, arrestReport.Location);
+                        ApplyRepeatOffenderSentencing(courtData);
+
+                        if (!string.IsNullOrEmpty(arrestReport.OffenderPedName)) {
+                            int pedIndex = pedDatabase.FindIndex(pedData => pedData.Name?.ToLower() == arrestReport.OffenderPedName.ToLower());
+                            if (pedIndex != -1) {
+                                MDTProPedData pedDataToUpdate = pedDatabase[pedIndex];
+                                UpdatePedIncarcerationFromCourtData(pedDataToUpdate, courtData);
+                                KeepPedInDatabase(pedDataToUpdate);
+                                pedDatabase[pedIndex] = pedDataToUpdate;
+                            }
+                        }
+
+                        if (!courtDatabase.Any(x => x.Number == courtCaseNumber)) {
+                            if (courtDatabase.Count > SetupController.GetConfig().courtDatabaseMaxEntries) {
+                                Database.DeleteCourtCase(courtDatabase[0].Number);
+                                courtDatabase.RemoveAt(0);
+                            }
+                            courtDatabase.Add(courtData);
+                        }
                     }
                 }
 
@@ -1691,7 +1725,7 @@ namespace MDTPro.Data {
             if (ped == null || string.IsNullOrWhiteSpace(ped.Name)) return;
             if (!ped.IsOnProbation && !ped.IsOnParole) return;
 
-            lock (_supervisionBackstoryLock) {
+            lock (_courtDatabaseLock) {
                 CourtData existing = courtDatabase.FirstOrDefault(c =>
                     c != null
                     && string.Equals(c.PedName, ped.Name, StringComparison.OrdinalIgnoreCase)
@@ -1720,7 +1754,8 @@ namespace MDTPro.Data {
                 if (coherent == null || coherent.Count == 0) return;
 
                 ped.Arrests = coherent;
-                CourtData courtCase = BuildSyntheticSupervisionCourtCase(ped, coherent);
+                string synthNumber = AllocateCourtCaseNumberUnderLock();
+                CourtData courtCase = BuildSyntheticSupervisionCourtCase(ped, coherent, synthNumber);
                 if (courtCase == null || string.IsNullOrEmpty(courtCase.Number)) return;
 
                 if (!courtDatabase.Any(x => x.Number == courtCase.Number)) {
@@ -1740,10 +1775,12 @@ namespace MDTPro.Data {
         internal static List<CourtData> GetCourtCasesForPedName(string pedName) {
             if (string.IsNullOrWhiteSpace(pedName)) return new List<CourtData>();
             string n = pedName.Trim();
-            return courtDatabase
-                .Where(c => c != null && string.Equals(c.PedName, n, StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(ParseCourtSortDateForPedCases)
-                .ToList();
+            lock (_courtDatabaseLock) {
+                return courtDatabase
+                    .Where(c => c != null && string.Equals(c.PedName, n, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(ParseCourtSortDateForPedCases)
+                    .ToList();
+            }
         }
 
         private static DateTime ParseCourtSortDateForPedCases(CourtData c) {
@@ -1757,10 +1794,9 @@ namespace MDTPro.Data {
             return DateTime.MinValue;
         }
 
-        private static CourtData BuildSyntheticSupervisionCourtCase(MDTProPedData ped, List<ArrestGroup.Charge> arrestCharges) {
+        private static CourtData BuildSyntheticSupervisionCourtCase(MDTProPedData ped, List<ArrestGroup.Charge> arrestCharges, string caseNumber) {
             if (ped == null || string.IsNullOrWhiteSpace(ped.Name) || arrestCharges == null || arrestCharges.Count == 0) return null;
-
-            string caseNumber = Helper.GetCourtCaseNumber();
+            if (string.IsNullOrWhiteSpace(caseNumber)) return null;
             var hearingUtc = DateTime.UtcNow.AddDays(-Helper.GetRandomInt(400, 1100));
             int shortYear = int.Parse(hearingUtc.ToString("yy", CultureInfo.InvariantCulture));
 
