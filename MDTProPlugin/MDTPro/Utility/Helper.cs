@@ -62,6 +62,16 @@ namespace MDTPro.Utility {
             }
         }
 
+        /// <summary>Writes to MDTPro.log only when <see cref="Setup.Config.verboseArrestCourtLogging"/> is true.</summary>
+        internal static void LogArrestCourtVerbose(string message) {
+            try {
+                if (!Setup.SetupController.GetConfig().verboseArrestCourtLogging) return;
+            } catch {
+                return;
+            }
+            Log($"[ArrestCourt] {message}", false, LogSeverity.Info);
+        }
+
         /// <summary>If logFileMaxSizeKb is set, shorten the file when it grows past the limit (keeps the newest half).</summary>
         private static void MaybeTrimLogFile(string logPath) {
             if (++_logWritesForTrimCheck % 32 != 0) return;

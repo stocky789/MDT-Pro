@@ -169,15 +169,9 @@ namespace MDTPro.Data {
         internal static List<CourtData> courtDatabase = new List<CourtData>();
         public static IReadOnlyList<CourtData> CourtDatabase => courtDatabase;
 
-        /// <summary>Next docket id; caller must hold <see cref="_courtDatabaseLock"/>.</summary>
-        private static string AllocateCourtCaseNumberUnderLock() {
-            Config cfg = SetupController.GetConfig();
+        /// <summary>Format one candidate docket id; caller must hold <see cref="_courtDatabaseLock"/> if substituting index.</summary>
+        private static string FormatCourtCaseNumberCandidate(Config cfg, int index) {
             string number = cfg.courtCaseNumberFormat ?? "{shortYear}-{index}";
-            int yy = int.Parse(DateTime.Now.ToString("yy", CultureInfo.InvariantCulture));
-            int index = 1;
-            foreach (CourtData caseData in courtDatabase) {
-                if (caseData != null && caseData.ShortYear == yy) index++;
-            }
             int pad = cfg.courtCaseNumberIndexPad > 0 ? cfg.courtCaseNumberIndexPad : 1;
             number = number.Replace("{shortYear}", DateTime.Now.ToString("yy", CultureInfo.InvariantCulture));
             number = number.Replace("{year}", DateTime.Now.ToString("yyyy", CultureInfo.InvariantCulture));
@@ -185,6 +179,38 @@ namespace MDTPro.Data {
             number = number.Replace("{day}", DateTime.Now.ToString("dd", CultureInfo.InvariantCulture));
             number = number.Replace("{index}", index.ToString().PadLeft(pad, '0'));
             return number;
+        }
+
+        /// <summary>Next unused docket id; caller must hold <see cref="_courtDatabaseLock"/>.</summary>
+        /// <remarks>
+        /// Do not use (1 + count of cases for the year) as the index: gaps exist (deleted rows, synthetic cases, manual DB edits),
+        /// so that value can equal an existing <see cref="CourtData.Number"/> (e.g. 42 rows for &apos;26 but docket 26-000043 already taken).
+        /// </remarks>
+        private static string AllocateCourtCaseNumberUnderLock() {
+            Config cfg = SetupController.GetConfig();
+            int yy = int.Parse(DateTime.Now.ToString("yy", CultureInfo.InvariantCulture));
+            int seedIndex = 1;
+            foreach (CourtData caseData in courtDatabase) {
+                if (caseData != null && caseData.ShortYear == yy) seedIndex++;
+            }
+            const int maxAttempts = 500_000;
+            string template = cfg.courtCaseNumberFormat ?? "{shortYear}-{index}";
+            bool hasIndexToken = template.IndexOf("{index}", StringComparison.Ordinal) >= 0;
+            for (int i = 0; i < maxAttempts; i++) {
+                string candidate = FormatCourtCaseNumberCandidate(cfg, seedIndex + i);
+                if (!courtDatabase.Any(x => x != null && string.Equals(x.Number, candidate, StringComparison.Ordinal)))
+                    return candidate;
+                if (!hasIndexToken)
+                    break;
+            }
+            Helper.Log(
+                "[MDTPro] AllocateCourtCaseNumber: could not find free docket after max attempts; using time-based suffix.",
+                true,
+                Helper.LogSeverity.Warning);
+            string fallback = FormatCourtCaseNumberCandidate(cfg, seedIndex + (int)(DateTime.UtcNow.Ticks % 900_000));
+            if (courtDatabase.Any(x => x != null && string.Equals(x.Number, fallback, StringComparison.Ordinal)))
+                fallback = $"{DateTime.Now:yy}-{(DateTime.UtcNow.Ticks & 0xFFFFFF):x6}";
+            return fallback;
         }
 
         internal static string AllocateCourtCaseNumber() {
@@ -1203,6 +1229,9 @@ namespace MDTPro.Data {
                     citationReports.Add(citationReport);
                 }
             } else if (report is ArrestReport arrestReport) {
+                Helper.LogArrestCourtVerbose(
+                    $"AddReport(arrest): Id={arrestReport.Id}, Status={(int)arrestReport.Status} ({arrestReport.Status}), Offender={arrestReport.OffenderPedName ?? "?"}, Charges={(arrestReport.Charges?.Count ?? 0)}, ExistingCourtCaseNo={arrestReport.CourtCaseNumber ?? "(none)"}");
+
                 if (!string.IsNullOrEmpty(arrestReport.OffenderPedName)) {
                     MDTProPedData pedDataToAdd = GetPedDataByName(arrestReport.OffenderPedName);
                     if (pedDataToAdd != null) {
@@ -1228,9 +1257,20 @@ namespace MDTPro.Data {
 
                 // Only create/update court case when arrest is Closed. Pending = collecting evidence (attach reports).
                 if (arrestReport.Status == ReportStatus.Closed) {
+                    Helper.LogArrestCourtVerbose($"AddReport(arrest): entering Closed branch for report {arrestReport.Id}");
                     lock (_courtDatabaseLock) {
                         string courtCaseNumber = arrestReport.CourtCaseNumber ?? AllocateCourtCaseNumberUnderLock();
+                        // Web UI can send a stale CourtCaseNumber (e.g. recycled DOM / wrong dataset). If that # is already another docket, we used to skip Add entirely — no new case, arrest still "closed for court".
+                        CourtData holder = courtDatabase.FirstOrDefault(x => x != null && string.Equals(x.Number, courtCaseNumber, StringComparison.Ordinal));
+                        if (holder != null && !string.Equals(holder.ReportId, arrestReport.Id, StringComparison.Ordinal)) {
+                            Helper.Log(
+                                $"[MDTPro] Arrest {arrestReport.Id}: case # {courtCaseNumber} is already docket for report {holder.ReportId} (defendant {holder.PedName ?? "?"}); allocating a new number.",
+                                false,
+                                Helper.LogSeverity.Warning);
+                            courtCaseNumber = AllocateCourtCaseNumberUnderLock();
+                        }
                         arrestReport.CourtCaseNumber = courtCaseNumber;
+                        Helper.LogArrestCourtVerbose($"AddReport(arrest): court case number={courtCaseNumber}, in-memory court count={courtDatabase.Count}");
 
                         CourtData courtData = new CourtData(
                             arrestReport.OffenderPedName,
@@ -1283,23 +1323,47 @@ namespace MDTPro.Data {
                         BuildCourtCaseMetadata(courtData, arrestReport.OffenderPedName, arrestReport.Location);
                         ApplyRepeatOffenderSentencing(courtData);
 
-                        if (!string.IsNullOrEmpty(arrestReport.OffenderPedName)) {
-                            int pedIndex = pedDatabase.FindIndex(pedData => pedData.Name?.ToLower() == arrestReport.OffenderPedName.ToLower());
-                            if (pedIndex != -1) {
-                                MDTProPedData pedDataToUpdate = pedDatabase[pedIndex];
-                                UpdatePedIncarcerationFromCourtData(pedDataToUpdate, courtData);
-                                KeepPedInDatabase(pedDataToUpdate);
-                                pedDatabase[pedIndex] = pedDataToUpdate;
-                            }
-                        }
-
                         if (!courtDatabase.Any(x => x.Number == courtCaseNumber)) {
                             if (courtDatabase.Count > SetupController.GetConfig().courtDatabaseMaxEntries) {
+                                string evicted = courtDatabase[0]?.Number;
                                 Database.DeleteCourtCase(courtDatabase[0].Number);
                                 courtDatabase.RemoveAt(0);
+                                Helper.LogArrestCourtVerbose($"AddReport(arrest): evicted oldest case {evicted} (max entries reached)");
                             }
                             courtDatabase.Add(courtData);
+                            Helper.LogArrestCourtVerbose($"AddReport(arrest): added case {courtCaseNumber} to list; calling Database.SaveCourtCase (defendant={courtData.PedName}, reportId={courtData.ReportId})");
+                            // Persist here so a later Find/Save in the HTTP handler is not the only path (avoids lost cases if lookup races).
+                            Database.SaveCourtCase(courtData);
+                            Helper.Log(
+                                $"[MDTPro] Court case {courtCaseNumber} created for arrest {arrestReport.Id} (defendant {arrestReport.OffenderPedName ?? "?"}).",
+                                false,
+                                Helper.LogSeverity.Info);
+                            Helper.LogArrestCourtVerbose($"AddReport(arrest): Database.SaveCourtCase finished for {courtCaseNumber}");
+                        } else {
+                            Helper.LogArrestCourtVerbose($"AddReport(arrest): SKIPPED add — case number {courtCaseNumber} already in courtDatabase (re-save or duplicate?)");
                         }
+                    }
+                } else {
+                    Helper.LogArrestCourtVerbose($"AddReport(arrest): not Closed (status={(int)arrestReport.Status}); no court case branch");
+                }
+
+                // Do not take _pedDbLock while holding _courtDatabaseLock (deadlock with game thread: ped lock → EnsureSupervision → court lock).
+                if (arrestReport.Status == ReportStatus.Closed
+                    && !string.IsNullOrEmpty(arrestReport.CourtCaseNumber)
+                    && !string.IsNullOrEmpty(arrestReport.OffenderPedName)) {
+                    CourtData linkedCase = FindCourtCaseByNumber(arrestReport.CourtCaseNumber);
+                    if (linkedCase != null) {
+                        Helper.LogArrestCourtVerbose($"AddReport(arrest): linked case {arrestReport.CourtCaseNumber} for ped incarceration sync ({arrestReport.OffenderPedName})");
+                        lock (_pedDbLock) {
+                            int pedIndex = pedDatabase.FindIndex(pedData => pedData.Name?.ToLower() == arrestReport.OffenderPedName.ToLower());
+                            if (pedIndex != -1) {
+                                UpdatePedIncarcerationFromCourtData(pedDatabase[pedIndex], linkedCase);
+                            }
+                        }
+                        MDTProPedData pedRef = GetPedDataByName(arrestReport.OffenderPedName);
+                        if (pedRef != null) KeepPedInDatabase(pedRef);
+                    } else {
+                        Helper.LogArrestCourtVerbose($"AddReport(arrest): WARNING Closed with CourtCaseNumber={arrestReport.CourtCaseNumber} but FindCourtCaseByNumber returned null (ped sync skipped)");
                     }
                 }
 

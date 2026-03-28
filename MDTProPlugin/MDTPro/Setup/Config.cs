@@ -156,6 +156,9 @@ namespace MDTPro.Setup {
         /// <summary>When true, log detailed firearm capture flow (PR API results, fallback, event triggers) to MDT Pro log. Use for debugging Firearms Check.</summary>
         public bool firearmDebugLogging = false;
 
+        /// <summary>When true, log each step of POST /post/createArrestReport and in-memory/SQLite court case creation (game fiber). Turn on while testing arrest→court issues; turn off afterward.</summary>
+        public bool verboseArrestCourtLogging = false;
+
         /// <summary>When true, startup writes the full config JSON and MDT folder file list to MDTPro.log. Default off keeps the log short.</summary>
         public bool verboseFileLogging = false;
         /// <summary>When the log file exceeds this size (KB), it is shortened automatically (newest half kept). 0 = no limit.</summary>
