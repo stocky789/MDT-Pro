@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 using MDTPro.Utility;
+using MDTPro.Utility.Backup;
 using static MDTPro.Setup.SetupController;
 using static MDTPro.Utility.Helper;
 
@@ -15,6 +16,7 @@ namespace MDTPro {
 
         internal static Ped Player => Game.LocalPlayer.Character;
         internal static bool usePR = false;
+        internal static bool useSTP = false;
         internal static bool useCI = false;
 
         public override void Initialize() {
@@ -24,6 +26,8 @@ namespace MDTPro {
 
         public override void Finally() {
             UI.SettingsMenu.Stop();
+            UI.CitationHandoffKeybind.Stop();
+            StpCitationHandoffQueue.Clear();
             ALPR.ALPRController.Stop();
             Data.DataController.EndCurrentShift();
             Server.Stop();
@@ -35,6 +39,8 @@ namespace MDTPro {
         private static void Functions_OnOnDutyStateChanged(bool OnDuty) {
             if (!OnDuty) {
                 UI.SettingsMenu.Stop();
+                UI.CitationHandoffKeybind.Stop();
+                StpCitationHandoffQueue.Clear();
                 ALPR.ALPRController.Stop();
                 return;
             }
@@ -89,17 +95,24 @@ namespace MDTPro {
 
                         useCI = DependencyCheck.IsCIAvailable();
                         usePR = DependencyCheck.IsPRAvailable();
+                        useSTP = DependencyCheck.IsStopThePedAvailable();
+
+                        ModIntegration.InitializeOnDuty(usePR, useSTP);
+                        BackupService.ReloadFromConfig();
 
                         Log($"CI: {useCI}", true, useCI ? LogSeverity.Info : LogSeverity.Warning);
                         Log($"PR: {usePR}", true, usePR ? LogSeverity.Info : LogSeverity.Warning);
+                        Log($"STP: {useSTP}", true, useSTP ? LogSeverity.Info : LogSeverity.Warning);
 
                         if (useCI) EventListeners.CalloutEvents.AddCalloutEventWithCI();
 
-                        if (usePR) {
+                        if (ModIntegration.SubscribedPolicingRedefinedStopEvents) {
                             EventListeners.PREvents.SubscribeToPREvents();
                             if (GetConfig().firearmDebugLogging)
                                 Data.DataController.LogPRAssemblyFirearmDiagnostics();
                         }
+                        if (ModIntegration.SubscribedStopThePedStopEvents)
+                            EventListeners.STPEvents.SubscribeToStpEvents();
                         EventListeners.CDFEvents.Subscribe();
                         // Always subscribe to LSPDFR OnPedArrested: PR's OnPedArrested only fires for arrests through PR.
                         // LSPDFR's fires for all arrests (including those done via LSPDFR or other plugins).
@@ -112,6 +125,17 @@ namespace MDTPro {
                         Keys parsedKey;
                         if (!string.IsNullOrWhiteSpace(menuKeyStr) && Enum.TryParse<Keys>(menuKeyStr.Trim(), true, out parsedKey))
                             UI.SettingsMenu.MenuKey = parsedKey;
+
+                        // StopThePed-path citation menu + keybind only when Policing Redefined is not loaded (PR uses GiveCitationToPed / ped menu).
+                        if (!Main.usePR && ModIntegration.StpPluginLoaded) {
+                            string handoffKeyStr = ReadIniValue(iniPath, "MDTPro", "CitationHandoffKey");
+                            if (!string.IsNullOrWhiteSpace(handoffKeyStr) && Enum.TryParse<Keys>(handoffKeyStr.Trim(), true, out Keys handoffKey))
+                                UI.CitationHandoffKeybind.HandoffKey = handoffKey;
+                            UI.CitationHandoffKeybind.Start();
+                        } else {
+                            UI.CitationHandoffKeybind.Stop();
+                            StpCitationHandoffQueue.Clear();
+                        }
 
                         ALPR.ALPRController.Start();
                         UI.SettingsMenu.Start();

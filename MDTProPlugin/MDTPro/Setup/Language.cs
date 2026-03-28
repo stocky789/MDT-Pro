@@ -29,6 +29,10 @@ namespace MDTPro.Setup {
             public string narcoticsCheatsheet = "Narcotics & Drugs Cheat Sheet";
             /// <summary>Close button label for narcotics cheat sheet.</summary>
             public string narcoticsCheatsheetClose = "Close";
+            /// <summary>Shown at the top of the backup Quick Actions menu when Ultimate Backup is the active provider (PR-only actions are hidden).</summary>
+            public string backupUltimateBackupNote = "Ultimate Backup is active. Only actions the mod exposes to plugins are shown. Use Code 2 or Code 3 for patrol-style units.";
+            /// <summary>Replaces “Response code” when Ultimate Backup is active (Code 1 is hidden).</summary>
+            public string backupResponseCodeLabelUb = "Patrol code";
         }
 
         public class Alpr {
@@ -55,6 +59,32 @@ namespace MDTPro.Setup {
             public string handCitationPersonNotPresent = "Citation saved. Have the person present and identified (e.g. run the vehicle or ask for ID) so you can hand them the citation from the ped menu.";
             /// <summary>Shown when citation was saved but the person was not found in the database. {0} = offender name.</summary>
             public string handCitationPersonNotFound = "Citation saved for {0}, but they were not found. Make sure the person was identified (e.g. vehicle stop or ID check) and the name matches exactly.";
+            /// <summary>Appended to StopThePed citation notifications (not used when Policing Redefined handles handoff). {0} = one or two MDT URLs (with ~n~ between if both).</summary>
+            public string stpCitationMdtBrowserLine = "~n~~n~Open the MDT in your browser to review or finish:~n~{0}";
+            /// <summary>StopThePed: no public ticket API found via reflection.</summary>
+            public string stpCitationNoPluginApi = "Citation saved in the MDT. StopThePed did not expose a matching ticket API to plugins — issue the ticket from the StopThePed menu if needed, or use Policing Redefined for direct MDT handoff.";
+            /// <summary>StopThePed: reflection handoff failed.</summary>
+            public string stpCitationHandoffRejected = "Citation saved in the MDT, but StopThePed did not accept the handoff. Issue the ticket from the StopThePed menu if needed.";
+            /// <summary>Subtitle for the in-game citation handoff menu (StopThePed path). {0} = offender name.</summary>
+            public string stpCitationHandoffMenuSubtitle = "~b~Citation~s~ — {0}";
+            /// <summary>Description on disabled charge lines in the handoff menu.</summary>
+            public string stpCitationHandoffChargeDescription = "Charge on this citation.";
+            /// <summary>Primary action: confirm handing the citation to the suspect.</summary>
+            public string stpCitationHandoffDeliver = "Deliver citation";
+            /// <summary>Tooltip for the deliver action.</summary>
+            public string stpCitationHandoffDeliverDescription = "Confirms in-game delivery. StopThePed does not expose a plugin ticket API, so MDT Pro completes the handoff here.";
+            /// <summary>Shown when the officer closes the handoff menu without choosing Deliver.</summary>
+            public string stpCitationHandoffMenuCancelled = "Citation saved in the MDT. You closed the menu without confirming delivery.";
+            /// <summary>After closing a citation (StopThePed path). {0} = key name (e.g. F10).</summary>
+            public string stpCitationHandoffQueued = "Citation saved. When you are ~g~close to the suspect~s~, press ~b~{0}~s~ to open the handoff menu.";
+            /// <summary>Keybind pressed but player too far. {0} = max distance in meters (formatted).</summary>
+            public string stpCitationHandoffTooFar = "Move closer to the suspect (within ~{0}m) to hand the citation.";
+            /// <summary>Queued handoff was not completed before the time limit.</summary>
+            public string stpCitationHandoffPendingExpired = "The pending citation handoff expired. Close the citation again from the MDT if you still need to hand it over.";
+            /// <summary>Prefix before suspect reaction subtitle after citation handoff. GTA color codes OK (~o~ ~s~).</summary>
+            public string citationPedReactionSpeakerPrefix = "~o~Suspect:~s~ ";
+            /// <summary>Optional notification when a suspect turns hostile after a citation (empty = silent).</summary>
+            public string citationPostHandoffViolenceNotify = "~r~Hostile:~s~ The suspect is attacking!";
         }
 
         public class Index {

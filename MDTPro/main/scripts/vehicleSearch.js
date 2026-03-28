@@ -18,6 +18,21 @@
         }
       }
     }
+  } else {
+    try {
+      const ctxRes = await fetch('/data/contextVehicle')
+      if (ctxRes.ok) {
+        const ctx = await ctxRes.json()
+        const plate = ctx && typeof ctx.LicensePlate === 'string' ? ctx.LicensePlate.trim() : ''
+        const input = document.querySelector('.searchInputWrapper #vehicleSearchInput')
+        if (plate && input && !input.value.trim()) {
+          input.value = plate
+          await performSearch(plate)
+        }
+      }
+    } catch {
+      /* ignore — plugin may be offline or no context vehicle */
+    }
   }
 
   await loadNearbyVehicles()

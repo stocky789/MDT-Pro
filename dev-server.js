@@ -486,6 +486,9 @@ const server = http.createServer((req, res) => {
   } else if (url === '/data/vehicles') {
     send(res, 200, JSON.stringify(placeholderVehicles), 'application/json');
     return;
+  } else if (url === '/data/contextVehicle') {
+    send(res, 200, JSON.stringify(null), 'application/json');
+    return;
   } else if (url === '/data/recentIds') {
     send(res, 200, JSON.stringify(getRecentIds()), 'application/json');
     return;

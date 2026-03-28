@@ -531,7 +531,7 @@ const CONFIG_FIELD_META = {
   },
   quickActionsBarEnabled: {
     label: 'Show Quick Actions bar',
-    tooltip: 'Show the floating Quick Actions bar (bottom-center) with one-click buttons for Panic, Backup, and Clear ALPR. Requires Policing Redefined for backup actions.',
+    tooltip: 'Show the floating Quick Actions bar (bottom-center) with one-click buttons for Panic, Backup, and Clear ALPR. Backup uses Policing Redefined or Ultimate Backup automatically. When Ultimate Backup is active, the backup menu only lists actions that mod supports from plugins; Policing Redefined-only items are hidden.',
   },
   checkForUpdates: {
     label: 'Check for updates on load',
