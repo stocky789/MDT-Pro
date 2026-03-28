@@ -4,6 +4,24 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
+## [0.9.7.2] — 2026-03-28
+
+### Minor improvements
+
+- **Probation and parole** — People on probation or parole now get a **sensible prior record**: charges that fit, a **closed court case** that matches, and an **arrest history** that isn’t empty. The MDT labels these as **reconstructed** where there isn’t a real patrol arrest report behind them, so you know what you’re looking at.
+
+- **Person Search** — When someone has court cases on file, you’ll see a **Court & disposition** section with the basics and a button to **open the right case in Court**. If they’re on supervision and that ties to the reconstructed prior case, a short note appears under **History** explaining how it fits together.
+
+- **Court** — Those reconstructed supervision cases show a **Prior** badge and a clear banner at the top of the case details so they’re easy to pick out on the docket.
+
+- **Reconstructed case wording** — Verdict and sentencing blurbs on those prior cases use the **same text generators** as real resolved cases (plea, charges, evidence bands, and the rest), so they read with the same variety as patrol-driven docket entries—not a small set of repeated templates.
+
+- **Quieter log file** — **MDTPro.log** no longer repeats the same line over and over when people nearby don’t have a full saved profile yet. How names and records show up in the MDT is unchanged.
+
+- **Property and Evidence** — When you list drugs you seized, you can now pick **one vial** or **multiple vials** as the amount (handy for things like PCP in a vial). Same idea as pills or capsules.
+
+---
+
 ## [0.9.7.1] — 2026-03-27
 
 ### Minor Features

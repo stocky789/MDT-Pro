@@ -2,6 +2,7 @@ using MDTPro.Data;
 using MDTPro.Data.Reports;
 using MDTPro.Utility;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Specialized;
 using System.Linq;
@@ -74,12 +75,26 @@ namespace MDTPro.ServerAPI {
                     }
                 }
 
-                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(pedData));
+                if (pedData != null) {
+                    var cases = DataController.GetCourtCasesForPedName(pedData.Name);
+                    var jo = JObject.Parse(JsonConvert.SerializeObject(pedData));
+                    jo["CourtCases"] = JArray.FromObject(cases ?? new System.Collections.Generic.List<CourtData>());
+                    buffer = Encoding.UTF8.GetBytes(jo.ToString(Formatting.None));
+                } else {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(pedData));
+                }
                 contentType = "text/json";
                 status = 200;
             } else if (path == "contextPed") {
                 MDTProPedData pedData = DataController.GetContextPedIfValid();
-                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(pedData));
+                if (pedData != null) {
+                    var ctxCases = DataController.GetCourtCasesForPedName(pedData.Name);
+                    var ctxJo = JObject.Parse(JsonConvert.SerializeObject(pedData));
+                    ctxJo["CourtCases"] = JArray.FromObject(ctxCases ?? new System.Collections.Generic.List<CourtData>());
+                    buffer = Encoding.UTF8.GetBytes(ctxJo.ToString(Formatting.None));
+                } else {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(pedData));
+                }
                 contentType = "text/json";
                 status = 200;
             } else if (path == "specificVehicle") {
