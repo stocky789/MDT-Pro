@@ -39,6 +39,8 @@
     { "id": "Multiple Pills", "name": "Multiple Pills" },
     { "id": "1 Capsule", "name": "1 Capsule" },
     { "id": "Multiple Capsules", "name": "Multiple Capsules" },
+    { "id": "1 Vial", "name": "1 Vial" },
+    { "id": "Multiple Vials", "name": "Multiple Vials" },
     { "id": "1 Brick", "name": "1 Brick" },
     { "id": "Multiple Bricks", "name": "Multiple Bricks" },
     { "id": "1 Kilogram+", "name": "1 Kilogram+" },

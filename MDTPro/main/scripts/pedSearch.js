@@ -366,6 +366,8 @@ async function performSearch(query) {
     }
   }
 
+  await renderPedCourtCasesSection(response, language, stale)
+
   // ID History
   const idHistoryTitle = document.querySelector('.searchResponseWrapper .idHistoryTitle')
   const idHistorySection = document.querySelector('.searchResponseWrapper .idHistory')
@@ -636,6 +638,130 @@ async function performSearch(query) {
     if (e?.name === 'AbortError') return
     throw e
   }
+}
+
+function formatPedCourtShortDate(iso) {
+  if (!iso) return ''
+  try {
+    const d = new Date(iso)
+    return Number.isNaN(d.getTime())
+      ? iso
+      : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  } catch (_) {
+    return iso
+  }
+}
+
+async function renderPedCourtCasesSection(response, language, stale) {
+  document
+    .querySelectorAll(
+      '.searchResponseWrapper .pedCourtCases, .searchResponseWrapper .pedCourtCasesTitle, .searchResponseWrapper .pedCourtCasesHint'
+    )
+    .forEach((el) => el.remove())
+
+  const cases = Array.isArray(response.CourtCases) ? response.CourtCases : []
+  if (cases.length === 0) return
+  if (stale()) return
+
+  const ls = language?.pedSearch?.static || {}
+  const courtLang = language?.court || {}
+  const statusMap = courtLang.statusMap || ['Pending', 'Convicted', 'Acquitted', 'Dismissed']
+
+  if ((response.IsOnProbation || response.IsOnParole) && cases.some((c) => c && (c.ReportId === 'MDT-SUPERVISION-BACKSTORY' || c.IsSyntheticSupervisionBackstory))) {
+    const hint = document.createElement('p')
+    hint.className = 'pedCourtCasesHint'
+    hint.textContent =
+      ls.courtHistoryArrestHint ||
+      'Arrest charges below reflect the prior judgment that supports current probation/parole status. Open Court for the full docket narrative.'
+    const historyTitle = document.querySelector('.searchResponseWrapper .searchResponseSectionTitle[data-language="historyTitle"]')
+    if (historyTitle && historyTitle.nextElementSibling) {
+      historyTitle.parentNode.insertBefore(hint, historyTitle.nextElementSibling)
+    }
+  }
+
+  const sectionTitle = document.createElement('div')
+  sectionTitle.classList.add('searchResponseSectionTitle', 'pedCourtCasesTitle')
+  sectionTitle.textContent = ls.courtHistoryTitle || 'Court & disposition history'
+  document.querySelector('.searchResponseWrapper').appendChild(sectionTitle)
+
+  const wrap = document.createElement('div')
+  wrap.classList.add('pedCourtCases')
+
+  for (const c of cases) {
+    if (!c || typeof c !== 'object') continue
+    if (stale()) return
+
+    const card = document.createElement('div')
+    card.classList.add('pedCourtCaseCard')
+    const isSynth = c.ReportId === 'MDT-SUPERVISION-BACKSTORY' || c.IsSyntheticSupervisionBackstory === true
+    if (isSynth) card.classList.add('pedCourtCaseCard--synthetic')
+
+    const head = document.createElement('div')
+    head.className = 'pedCourtCaseHead'
+
+    const num = document.createElement('span')
+    num.className = 'pedCourtCaseNumber'
+    num.textContent = c.Number || '—'
+
+    if (isSynth) {
+      const pill = document.createElement('span')
+      pill.className = 'pedCourtCaseSynthPill'
+      pill.textContent = ls.courtHistoryPriorBadge || 'Prior disposition'
+      head.appendChild(num)
+      head.appendChild(pill)
+    } else {
+      head.appendChild(num)
+    }
+
+    const st = document.createElement('span')
+    st.className = 'pedCourtCaseStatus'
+    st.textContent = statusMap[c.Status] ?? '—'
+    head.appendChild(st)
+
+    card.appendChild(head)
+
+    const meta = document.createElement('div')
+    meta.className = 'pedCourtCaseMeta'
+    const parts = [
+      c.CourtDistrict || '',
+      formatPedCourtShortDate(c.HearingDateUtc || c.ResolveAtUtc),
+      Array.isArray(c.Charges) && c.Charges.length > 0 ? `${c.Charges.length} charge(s)` : '',
+    ].filter(Boolean)
+    meta.textContent = parts.join(' · ')
+    card.appendChild(meta)
+
+    if (c.SupervisionRecordHint) {
+      const p = document.createElement('p')
+      p.className = 'pedCourtCaseHint'
+      p.textContent = c.SupervisionRecordHint
+      card.appendChild(p)
+    } else if (isSynth && typeof c.OutcomeNotes === 'string' && c.OutcomeNotes.trim()) {
+      const p = document.createElement('p')
+      p.className = 'pedCourtCaseHint'
+      const t = c.OutcomeNotes.trim()
+      p.textContent = t.length > 240 ? `${t.slice(0, 237)}...` : t
+      card.appendChild(p)
+    }
+
+    const actions = document.createElement('div')
+    actions.className = 'pedCourtCaseActions'
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'pedCourtCaseOpenBtn'
+    btn.textContent = ls.openInCourtBtn || 'Open in Court'
+    btn.addEventListener('click', async () => {
+      try {
+        if (c.Number) sessionStorage.setItem('mdtCourtFocusCaseNumber', String(c.Number).trim())
+      } catch (_) {}
+      if (typeof topWindow.openWindow === 'function') await topWindow.openWindow('court')
+    })
+    actions.appendChild(btn)
+    card.appendChild(actions)
+
+    wrap.appendChild(card)
+  }
+
+  document.querySelector('.searchResponseWrapper').appendChild(wrap)
 }
 
 function getColorForValue(value) {

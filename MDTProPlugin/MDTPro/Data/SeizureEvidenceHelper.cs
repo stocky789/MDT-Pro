@@ -79,9 +79,9 @@ namespace MDTPro.Data {
             if (string.IsNullOrWhiteSpace(quantity)) return 0.5f;
             string q = quantity.Trim().ToLowerInvariant();
             if (q.Contains("trace") || q == "—" || q == "-") return 0.3f;
-            if (q.Contains("1 baggie") || q.Contains("1 pill") || q.Contains("1 capsule") || q.Contains("less than 1g")) return 0.4f;
+            if (q.Contains("1 baggie") || q.Contains("1 pill") || q.Contains("1 capsule") || q.Contains("1 vial") || q.Contains("less than 1g")) return 0.4f;
             if (q.Contains("2 baggie") || q.Contains("1 bundle") || q.Contains("1g") || q.Contains("2g")) return 0.5f;
-            if (q.Contains("3+ baggie") || q.Contains("2 bundle") || q.Contains("3.5g") || q.Contains("5g") || q.Contains("multiple pill") || q.Contains("multiple capsule")) return 0.7f;
+            if (q.Contains("3+ baggie") || q.Contains("2 bundle") || q.Contains("3.5g") || q.Contains("5g") || q.Contains("multiple pill") || q.Contains("multiple capsule") || q.Contains("multiple vial")) return 0.7f;
             if (q.Contains("3+ bundle") || q.Contains("10g") || q.Contains("1 ounce") || q.Contains("1 brick")) return 0.85f;
             if (q.Contains("multiple ounce") || q.Contains("multiple brick") || q.Contains("1 pound") || q.Contains("kilogram")) return 1f;
             return 0.5f;
