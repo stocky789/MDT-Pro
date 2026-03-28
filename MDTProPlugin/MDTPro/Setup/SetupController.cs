@@ -39,8 +39,10 @@ namespace MDTPro.Setup {
         internal static string ConfigPath => Path.Combine(MDTProPath, "config.json");
         internal static string LanguagePath => Path.Combine(MDTProPath, "language.json");
         internal static string CitationOptionsPath => Path.Combine(MDTProPath, "citationOptions.json");
+        internal static string CitationPedReactionsPath => Path.Combine(MDTProPath, "citationPedReactions.json");
         internal static string ArrestOptionsPath => Path.Combine(MDTProPath, "arrestOptions.json");
         internal static string CitationOptionsDefaultsPath => Path.Combine(DefaultsPath, "citationOptions.json");
+        internal static string CitationPedReactionsDefaultsPath => Path.Combine(DefaultsPath, "citationPedReactions.json");
         internal static string ArrestOptionsDefaultsPath => Path.Combine(DefaultsPath, "arrestOptions.json");
         internal static string SeizureOptionsDefaultsPath => Path.Combine(DefaultsPath, "seizureOptions.json");
         internal static string JudgeProfilesDefaultsPath => Path.Combine(DefaultsPath, "judgeProfiles.json");
@@ -69,6 +71,10 @@ namespace MDTPro.Setup {
 
             if (!File.Exists(CitationOptionsPath)) {
                 File.WriteAllBytes(CitationOptionsPath, File.ReadAllBytes(CitationOptionsDefaultsPath));
+            }
+
+            if (!File.Exists(CitationPedReactionsPath) && File.Exists(CitationPedReactionsDefaultsPath)) {
+                File.Copy(CitationPedReactionsDefaultsPath, CitationPedReactionsPath, false);
             }
 
             if (!File.Exists(ArrestOptionsPath)) {

@@ -63,6 +63,10 @@ MDTPro/citationOptions.json
 MDTPro/arrestOptions.json
 MDTPro/ipAddresses.txt
 
+# ---- Third-party / local mod copies (not tracked) ----
+StopThePed/
+UltimateBackup/
+
 # ---- Secrets / env (never commit) ----
 .env
 .env.*

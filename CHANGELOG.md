@@ -4,6 +4,32 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
+## [0.9.8.0] — 2026-03-28
+
+### Major Features
+
+- **Citations with StopThePed** — Closing a citation in the MDT can hand it to StopThePed when Policing Redefined isn’t the one delivering tickets. You get clear in-game messages if StopThePed can’t take it automatically. If you use Policing Redefined for citations, that path is unchanged—no double prompts or mixed behavior.
+
+- **Finish the ticket next to the suspect** — When the game can’t complete the handoff by itself, the citation waits until you’re close. Press the handoff key (default **F10**, configurable in **MDTPro.ini**) to open a menu and confirm you gave them the ticket.
+
+### Minor Features
+
+- **Browser reminder** — StopThePed citation notifications can include your usual MDT link so you can jump back to the browser tablet quickly.
+
+- **Optional paperwork animation** — After a StopThePed handoff, you can play a short clipboard idle on your officer. It adapts when you’re in a car and skips if the suspect is too far. Turn it off in config if you prefer.
+
+- **Suspect banter** — After a successful handoff, the suspect may say something at the bottom of the screen, loosely tied to the charges. Optional; you can disable it or adjust tone in config.
+
+- **Rare hostile reactions** — Every now and then a suspect may attack you after a citation—even from the driver’s seat (they step out first). It’s meant to be uncommon, mostly with male suspects, and heavier tickets or serious charges nudge it a bit. Someone with a gun might try to use it. Turn the whole feature off in config if you don’t want it.
+
+- **StopThePed and the MDT** — With StopThePed selected for stop integration (or Auto when it applies), person and vehicle info lines up better with your stop where the game allows.
+
+### Bug Fixes
+
+- None.
+
+---
+
 ## [0.9.7.2] — 2026-03-28
 
 ### Minor improvements
@@ -16,9 +42,7 @@ All notable changes to MDT Pro are documented here.
 
 - **Reconstructed case wording** — Verdict and sentencing blurbs on those prior cases use the **same text generators** as real resolved cases (plea, charges, evidence bands, and the rest), so they read with the same variety as patrol-driven docket entries—not a small set of repeated templates.
 
-- **Quieter log file** — **MDTPro.log** no longer repeats the same line over and over when people nearby don’t have a full saved profile yet. How names and records show up in the MDT is unchanged.
-
-- **Property and Evidence** — When you list drugs you seized, you can now pick **one vial** or **multiple vials** as the amount (handy for things like PCP in a vial). Same idea as pills or capsules.
+- **Property and Evidence** — Vials are now a quantity option when doing a seizure report.
 
 ---
 

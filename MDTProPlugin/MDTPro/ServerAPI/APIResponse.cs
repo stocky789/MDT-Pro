@@ -1,5 +1,7 @@
+using MDTPro;
 using MDTPro.Plugins;
 using MDTPro.Setup;
+using MDTPro.Utility;
 using Newtonsoft.Json;
 using System.IO;
 using System.Net;
@@ -40,6 +42,20 @@ namespace MDTPro.ServerAPI {
                 contentType = "text/plain";
             } else if (path == "/config") {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(SetupController.GetConfig()));
+                status = 200;
+                contentType = "text/json";
+            } else if (path == "/integration") {
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new {
+                    version = Main.Version,
+                    policingRedefinedLoaded = Main.usePR,
+                    stopThePedLoaded = Main.useSTP,
+                    stopEventsProvider = ModIntegration.SubscribedPolicingRedefinedStopEvents ? "PolicingRedefined"
+                        : (ModIntegration.SubscribedStopThePedStopEvents ? "StopThePed" : "none"),
+                    backupProvider = string.IsNullOrEmpty(ModIntegration.ActiveBackupProviderId) ? "none" : ModIntegration.ActiveBackupProviderId,
+                    policingRedefinedSearchItemsApi = ModIntegration.HasPolicingRedefinedSearchItemsApi,
+                    integrationStopEvents = ModIntegration.ConfiguredStopEvents,
+                    integrationBackupProvider = ModIntegration.ConfiguredBackupProvider
+                }));
                 status = 200;
                 contentType = "text/json";
             } else if (path == "/language") {
