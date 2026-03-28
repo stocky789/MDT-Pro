@@ -11,6 +11,8 @@ namespace MDTPro.Setup {
         public float stpCitationHandoffMaxDistance = 4f;
         /// <summary>Minutes until a queued StopThePed-path citation handoff expires (0 = never).</summary>
         public int stpCitationHandoffPendingExpireMinutes = 45;
+        /// <summary>When true, StopThePed-path citation notifications include a line with your MDT browser link. When false, only the short in-game message is shown.</summary>
+        public bool citationStpAppendMdtBrowserLink = true;
         /// <summary>After handing a citation, show a random suspect line (subtitle) matched to charge keywords.</summary>
         public bool citationPedReactionEnabled = true;
         /// <summary>How long the suspect subtitle stays on screen (ms).</summary>

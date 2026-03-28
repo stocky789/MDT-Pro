@@ -76,6 +76,11 @@ namespace MDTPro.Utility {
         /// <summary>Appends the MDT browser hint used for StopThePed citation flows (skipped when Policing Redefined handles handoff).</summary>
         internal static string AppendStpCitationMdtBrowserHint(string message) {
             if (string.IsNullOrEmpty(message)) return message;
+            try {
+                if (SetupController.GetConfig()?.citationStpAppendMdtBrowserLink == false) return message;
+            } catch {
+                /* ignore */
+            }
             string urls = BuildMdtBrowserUrlLinesForNotification();
             string fmt = GetLanguage().stpCitationMdtBrowserLine;
             if (string.IsNullOrWhiteSpace(fmt)) fmt = "~n~~n~Open the MDT in your browser to review or finish:~n~{0}";
