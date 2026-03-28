@@ -119,12 +119,29 @@ body {
   inset: 0;
   z-index: 2;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   font-size: 12px;
+  line-height: 1.25;
   color: var(--color-text-primary-half);
   text-align: center;
-  padding: 8px;
+  padding: 6px;
+  box-sizing: border-box;
+}
+
+.pedIdPhotoUnavailableIcon {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  opacity: 0.92;
+  pointer-events: none;
+}
+
+.pedIdPhotoUnavailableText {
+  display: block;
+  max-width: 100%;
 }
 
 .pedIdPhotoPlaceholder.hidden {

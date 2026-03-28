@@ -334,6 +334,15 @@ const server = http.createServer((req, res) => {
     contentType = 'image/svg+xml';
     serveFile(res, filePath, contentType, true);
     return;
+  } else if (url === '/image/pedIdUnavailable.svg' || url === '/image/pedIdUnavailable') {
+    filePath = path.join(ROOT, 'img', 'pedIdUnavailable.svg');
+    contentType = 'image/svg+xml';
+    if (!fs.existsSync(filePath)) {
+      send(res, 404, 'Not found');
+      return;
+    }
+    serveFile(res, filePath, contentType, true);
+    return;
   } else if (url.startsWith('/image/peds/')) {
     const seg = url.slice('/image/peds/'.length)
     if (!/^[\w.-]+\.(webp|png)$/i.test(seg)) {
