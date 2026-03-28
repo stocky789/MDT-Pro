@@ -617,8 +617,8 @@ const CONFIG_FIELD_META = {
     ],
   },
   citationHandoffBehaviorDelayAfterPaperworkMs: {
-    label: 'Wait after handoff before suspect reacts (ms)',
-    tooltip: 'After the ticket is delivered (and after the paperwork animation on the StopThePed path, if enabled), wait this long before the suspect’s line and any hostility. Gives time to “read” the citation.',
+    label: 'Wait after handoff before success toast (ms)',
+    tooltip: 'After the ticket is delivered (and after the paperwork animation on the StopThePed path, if enabled), wait this long, then the in-game success notification runs, then the suspect’s line, then any hostility. Gives a short beat before your “handed citation” toast.',
     presets: [
       { label: '1 s', value: 1000 },
       { label: '1.8 s (default)', value: 1800 },

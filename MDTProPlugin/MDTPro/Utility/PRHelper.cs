@@ -128,7 +128,7 @@ namespace MDTPro.Utility {
             string message = string.Format(SetupController.GetLanguage().inGame.handCitationTo ?? "Hand citation to {0}", pedName);
             if (!string.IsNullOrWhiteSpace(message)) RageNotification.ShowSuccess(message);
 
-            CitationHandoffPostEffects.ScheduleAfterHandoff(ped, charges, includeStopThePedPaperworkAnimation: false);
+            CitationHandoffPostEffects.ScheduleAfterHandoff(ped, charges, includeStopThePedPaperworkAnimation: false, pedName);
         }
     }
 }
