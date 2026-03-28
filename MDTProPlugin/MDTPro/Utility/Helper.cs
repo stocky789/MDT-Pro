@@ -204,19 +204,7 @@ namespace MDTPro.Utility {
         }
 
         internal static string GetCourtCaseNumber() {
-            string number = SetupController.GetConfig().courtCaseNumberFormat;
-            int index = 1;
-            foreach (CourtData caseData in DataController.courtDatabase) {
-                if (caseData.ShortYear == int.Parse(DateTime.Now.ToString("yy"))) index++;
-            }
-
-            number = number.Replace("{shortYear}", DateTime.Now.ToString("yy"));
-            number = number.Replace("{year}", DateTime.Now.ToString("yyyy"));
-            number = number.Replace("{month}", DateTime.Now.ToString("MM"));
-            number = number.Replace("{day}", DateTime.Now.ToString("dd"));
-            number = number.Replace("{index}", index.ToString().PadLeft(SetupController.GetConfig().courtCaseNumberIndexPad, '0'));
-
-            return number;
+            return DataController.AllocateCourtCaseNumber();
         }
 
 

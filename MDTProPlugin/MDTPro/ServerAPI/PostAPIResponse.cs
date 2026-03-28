@@ -197,7 +197,7 @@ namespace MDTPro.ServerAPI {
                     DataController.AddReport(report);
                     Database.SaveArrestReport(report);
 
-                    CourtData courtCase = DataController.courtDatabase.Find(x => x.Number == report.CourtCaseNumber);
+                    CourtData courtCase = DataController.FindCourtCaseByNumber(report.CourtCaseNumber);
                     if (courtCase != null) Database.SaveCourtCase(courtCase);
 
                     buffer = Encoding.UTF8.GetBytes("OK");
