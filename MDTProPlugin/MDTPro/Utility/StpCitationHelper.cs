@@ -121,7 +121,7 @@ namespace MDTPro.Utility {
                     string message = string.Format(SetupController.GetLanguage().inGame.handCitationTo ?? "Hand citation to {0}", pedName);
                     if (!string.IsNullOrWhiteSpace(message))
                         RageNotification.ShowSuccess(RageNotification.AppendStpCitationMdtBrowserHint(message));
-                    CitationHandoffPostEffects.ScheduleAfterHandoff(ped, charges, includeStopThePedPaperworkAnimation: true);
+                    CitationHandoffPostEffects.ScheduleAfterHandoff(ped, charges, includeStopThePedPaperworkAnimation: true, pedName);
                 } else {
                     // No STP plugin API: queue for in-game keybind + menu (not instant popup).
                     StpCitationHandoffQueue.Enqueue(pedName, charges);

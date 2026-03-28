@@ -45,7 +45,7 @@ namespace MDTPro.Setup {
         public bool citationPostHandoffViolenceTryCdfWeapon = true;
         /// <summary>When true, use Policing Redefined <c>GetPedSearchItems</c> (frisk results) before native inventory. Often empty until the ped is searched.</summary>
         public bool citationPostHandoffViolenceTryPedSearchItemsWeapon = false;
-        /// <summary>After citation handoff (and optional paperwork anim on the StopThePed path), wait this many ms before suspect subtitle and later hostility. Mimics reading the ticket.</summary>
+        /// <summary>After citation handoff (and optional paperwork anim on the StopThePed path), wait this many ms before the in-game &quot;handed citation&quot; success notification; suspect subtitle and hostility follow after that.</summary>
         public int citationHandoffBehaviorDelayAfterPaperworkMs = 1800;
         /// <summary>After the suspect subtitle is shown, wait this many ms before rolling hostility. 0 = immediately after subtitle call.</summary>
         public int citationHandoffDelayBeforeViolenceAfterReactionMs = 1200;

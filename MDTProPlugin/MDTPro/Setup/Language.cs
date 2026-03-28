@@ -81,6 +81,8 @@ namespace MDTPro.Setup {
             public string stpCitationHandoffTooFar = "Move closer to the suspect (within ~{0}m) to hand the citation.";
             /// <summary>Queued handoff was not completed before the time limit.</summary>
             public string stpCitationHandoffPendingExpired = "The pending citation handoff expired. Close the citation again from the MDT if you still need to hand it over.";
+            /// <summary>After paperwork animation (if any), suspect reaction line, and short pause — confirms delivery. {0} = first and last name (e.g. from CDF), {1} = formatted total fine (symbol per config).</summary>
+            public string citationHandedSuccess = "You successfully handed {0} a citation for {1}";
             /// <summary>Prefix before suspect reaction subtitle after citation handoff. GTA color codes OK (~o~ ~s~).</summary>
             public string citationPedReactionSpeakerPrefix = "~o~Suspect:~s~ ";
             /// <summary>Optional notification when a suspect turns hostile after a citation (empty = silent).</summary>
