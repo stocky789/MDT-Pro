@@ -38,6 +38,9 @@ x86/
 *.VC.db
 *.VC.VC.opendb
 
+# Ped catalogue fetch log (regenerate with scripts/fetchPedCatalogueImages.mjs)
+scripts/pedCatalogue_fetch_failures.txt
+
 # Node (e.g. dev-server.js)
 node_modules/
 npm-debug.log*
