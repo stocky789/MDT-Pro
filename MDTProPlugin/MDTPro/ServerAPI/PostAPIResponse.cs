@@ -8,6 +8,8 @@ using MDTPro.Utility;
 using Newtonsoft.Json;
 using System.Net;
 using System.Text;
+using System.Threading;
+using Rage;
 
 namespace MDTPro.ServerAPI {
     internal class PostAPIResponse : APIResponse {
@@ -194,11 +196,45 @@ namespace MDTPro.ServerAPI {
                         return;
                     }
 
-                    DataController.AddReport(report);
-                    Database.SaveArrestReport(report);
+                    Helper.LogArrestCourtVerbose(
+                        $"HTTP createArrestReport: Id={report.Id}, Status={(int)report.Status}, Offender={report.OffenderPedName ?? "?"}, Charges={report.Charges?.Count ?? 0}, CourtCaseNo(before)={report.CourtCaseNumber ?? "(none)"} — queueing game fiber");
 
-                    CourtData courtCase = DataController.courtDatabase.Find(x => x.Number == report.CourtCaseNumber);
-                    if (courtCase != null) Database.SaveCourtCase(courtCase);
+                    // RPH / CDF / ped sync expect the game fiber. HTTP uses ThreadPool — running here caused silent failures or deadlocks for arrest→court.
+                    Exception fiberError = null;
+                    var gate = new ManualResetEventSlim(false);
+                    GameFiber.StartNew(() => {
+                        try {
+                            Helper.LogArrestCourtVerbose($"GameFiber createArrestReport: start AddReport for {report.Id}");
+                            DataController.AddReport(report);
+                            Helper.LogArrestCourtVerbose($"GameFiber createArrestReport: AddReport done; SaveArrestReport for {report.Id}");
+                            Database.SaveArrestReport(report);
+                            Helper.LogArrestCourtVerbose($"GameFiber createArrestReport: SaveArrestReport done; CourtCaseNo(after)={report.CourtCaseNumber ?? "(none)"}");
+                            CourtData courtCase = DataController.FindCourtCaseByNumber(report.CourtCaseNumber);
+                            if (courtCase != null) {
+                                Helper.LogArrestCourtVerbose($"GameFiber createArrestReport: FindCourtCaseByNumber hit — second SaveCourtCase for {report.CourtCaseNumber}");
+                                Database.SaveCourtCase(courtCase);
+                            } else {
+                                Helper.LogArrestCourtVerbose($"GameFiber createArrestReport: FindCourtCaseByNumber returned null for '{report.CourtCaseNumber ?? ""}' (no second SaveCourtCase)");
+                            }
+                            if (report.Status == ReportStatus.Closed && !string.IsNullOrEmpty(report.CourtCaseNumber)) {
+                                Utility.Helper.Log($"[MDTPro] Arrest closed for court: report {report.Id}, case {report.CourtCaseNumber}, status={(int)report.Status}", false, Utility.Helper.LogSeverity.Info);
+                            }
+                        } catch (Exception ex) {
+                            fiberError = ex;
+                            Helper.LogArrestCourtVerbose($"GameFiber createArrestReport: EXCEPTION {ex.GetType().Name}: {ex.Message}");
+                        } finally {
+                            gate.Set();
+                        }
+                    });
+                    if (!gate.Wait(TimeSpan.FromSeconds(45))) {
+                        Utility.Helper.Log("[createArrestReport] TIMEOUT waiting 45s for game fiber (arrest not saved on game thread).", true, Utility.Helper.LogSeverity.Warning);
+                        buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Timed out waiting for game thread to save arrest (is the game paused or loading?)." }));
+                        contentType = "application/json";
+                        status = 500;
+                        return;
+                    }
+                    Helper.LogArrestCourtVerbose("HTTP createArrestReport: game fiber finished");
+                    if (fiberError != null) throw fiberError;
 
                     buffer = Encoding.UTF8.GetBytes("OK");
                     contentType = "text/plain";

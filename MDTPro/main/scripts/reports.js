@@ -1440,10 +1440,13 @@ async function saveReport(type, options = {}) {
   const date = new Date(
     `${el.querySelector('#generalInformationSectionDateInput').value}T${el.querySelector('#generalInformationSectionTimeInput').value}`
   )
+  const statusRaw = el.querySelector('.statusInput .selected')?.dataset?.status
+  const statusNum = parseInt(statusRaw, 10)
   const generalInformation = {
     Id: el.querySelector('#generalInformationSectionReportIdInput').value,
     TimeStamp: date,
-    Status: el.querySelector('.statusInput .selected').dataset.status,
+    // Numeric enum for C# ReportStatus (dataset is always a string; "0" must not stay a string in JSON)
+    Status: Number.isFinite(statusNum) ? statusNum : 1,
     Notes: el.querySelector('#notesSectionTextarea').value.trim(),
     ShortYear: date.getFullYear().toString().slice(-2),
   }
@@ -1599,7 +1602,9 @@ async function saveReport(type, options = {}) {
         return false
       }
 
-      report.CourtCaseNumber = el.dataset.courtCaseNumber ?? null
+      // Pending arrests must not carry a court docket (stale dataset/DB would block real case creation on close).
+      report.CourtCaseNumber =
+        report.Status === 0 ? el.dataset.courtCaseNumber ?? null : null
       try {
         report.AttachedReportIds = JSON.parse(el.dataset.attachedReportIds || '[]')
       } catch {

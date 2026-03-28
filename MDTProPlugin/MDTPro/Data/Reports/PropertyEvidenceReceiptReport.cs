@@ -5,7 +5,7 @@ namespace MDTPro.Data.Reports {
     public class PropertyEvidenceReceiptReport : Report {
         /// <summary>Person(s) from whom property/evidence was seized. Multiple subjects supported (e.g. joint seizure).</summary>
         public List<string> SubjectPedNames = new List<string>();
-        /// <summary>Drugs seized: each entry has DrugType and Quantity (e.g. Baggie, Bundle, Grams). Aligned with Policing Redefined search item descriptions.</summary>
+        /// <summary>Drugs seized: each entry has DrugType and Quantity (e.g. Baggie, Vial, Grams). Aligned with Policing Redefined search item descriptions.</summary>
         public List<SeizedDrugEntry> SeizedDrugs = new List<SeizedDrugEntry>();
         /// <summary>Firearms seized. Each add creates an entry (duplicates allowed for multiple of same type).</summary>
         public List<string> SeizedFirearmTypes = new List<string>();

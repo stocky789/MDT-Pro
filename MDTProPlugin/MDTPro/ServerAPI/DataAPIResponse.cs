@@ -2,6 +2,7 @@ using MDTPro.Data;
 using MDTPro.Data.Reports;
 using MDTPro.Utility;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Specialized;
 using System.Linq;
@@ -68,18 +69,36 @@ namespace MDTPro.ServerAPI {
                 Database.SaveSearchHistoryEntry("ped", name, pedData?.Name);
                 if (pedData != null) {
                     DataController.TryRefreshPedModelFromLiveWorld(pedData, name, reversedName);
+                    DataController.TryRefreshSupervisionFromLiveWorld(pedData, name, reversedName);
                     DataController.KeepPedInDatabase(pedData);
                     if (MDTProPedData.IsMinimalIdentity(pedData)) {
                         Utility.Helper.Log($"[MDTPro] Person Search returning minimal-identity ped (will show N/A): {pedData.Name}", false, Utility.Helper.LogSeverity.Info);
                     }
                 }
 
-                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(pedData));
+                if (pedData != null) {
+                    var cases = DataController.GetCourtCasesForPedName(pedData.Name);
+                    var jo = JObject.Parse(JsonConvert.SerializeObject(pedData));
+                    jo["CourtCases"] = JArray.FromObject(cases ?? new System.Collections.Generic.List<CourtData>());
+                    buffer = Encoding.UTF8.GetBytes(jo.ToString(Formatting.None));
+                } else {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(pedData));
+                }
                 contentType = "text/json";
                 status = 200;
             } else if (path == "contextPed") {
                 MDTProPedData pedData = DataController.GetContextPedIfValid();
-                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(pedData));
+                if (pedData != null) {
+                    string ctxName = pedData.Name?.Trim() ?? "";
+                    string ctxReversed = string.Join(" ", ctxName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Reverse());
+                    DataController.TryRefreshSupervisionFromLiveWorld(pedData, ctxName, ctxReversed);
+                    var ctxCases = DataController.GetCourtCasesForPedName(pedData.Name);
+                    var ctxJo = JObject.Parse(JsonConvert.SerializeObject(pedData));
+                    ctxJo["CourtCases"] = JArray.FromObject(ctxCases ?? new System.Collections.Generic.List<CourtData>());
+                    buffer = Encoding.UTF8.GetBytes(ctxJo.ToString(Formatting.None));
+                } else {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(pedData));
+                }
                 contentType = "text/json";
                 status = 200;
             } else if (path == "specificVehicle") {

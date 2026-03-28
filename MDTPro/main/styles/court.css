@@ -53,6 +53,7 @@ body {
 }
 
 .courtCaseListHeaderExpand { flex-shrink: 0; width: 24px; }
+.courtCaseListHeaderBadgeCol { flex-shrink: 0; width: 3.25rem; }
 .courtCaseListHeaderDefendant { flex: 1 1 auto; min-width: 0; }
 .courtCaseListHeaderCaseNumber { flex-shrink: 0; min-width: 6em; }
 .courtCaseListHeaderDistrict { flex-shrink: 0; min-width: 5em; }
@@ -108,6 +109,54 @@ body {
 .courtCaseRow:focus {
   outline: 2px solid var(--color-accent);
   outline-offset: -2px;
+}
+
+.courtCaseRowSynthBadge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-info-half, rgba(59, 130, 246, 0.25));
+  border: 1px solid var(--color-info, #3b82f6);
+  color: var(--color-text-primary);
+  max-width: 3.25rem;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.courtSyntheticBanner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  margin: 0 0 12px;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--color-info, #3b82f6);
+  background: var(--color-info-half, rgba(59, 130, 246, 0.12));
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.courtSyntheticBanner strong {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-primary);
+}
+
+.courtSyntheticBanner span {
+  color: var(--color-text-primary-half);
+  font-weight: 400;
+}
+
+.courtSyntheticReportHint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--color-text-primary-half);
+  line-height: 1.4;
 }
 
 .courtCaseRowExpandIcon {
