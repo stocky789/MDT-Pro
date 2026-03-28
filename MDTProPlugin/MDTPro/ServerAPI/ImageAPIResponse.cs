@@ -58,6 +58,14 @@ namespace MDTPro.ServerAPI {
                     status = 200;
                     contentType = "image/svg+xml";
                 }
+            } else if (path.Equals("pedIdUnavailable.svg", StringComparison.OrdinalIgnoreCase)
+                || path.Equals("pedIdUnavailable", StringComparison.OrdinalIgnoreCase)) {
+                string pedIdSvg = Path.Combine(SetupController.ImgDirPath, "pedIdUnavailable.svg");
+                if (File.Exists(pedIdSvg)) {
+                    buffer = File.ReadAllBytes(pedIdSvg);
+                    status = 200;
+                    contentType = "image/svg+xml";
+                }
             }
         }
 
