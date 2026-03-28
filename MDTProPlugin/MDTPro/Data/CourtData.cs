@@ -18,7 +18,7 @@ namespace MDTPro.Data {
         public string Number;
         public string ReportId;
 
-        /// <summary>Stable id for MDT-generated prior cases that explain CDF probation/parole (no patrol arrest report).</summary>
+        /// <summary>Stable id for MDT-generated prior cases that explain CDF probation/parole only (no patrol arrest report; never used for unsupervised subjects).</summary>
         public const string SyntheticSupervisionReportId = "MDT-SUPERVISION-BACKSTORY";
 
         /// <summary>True when this case is a reconstructed prior judgment for supervision backstory (API / MDT UI).</summary>
