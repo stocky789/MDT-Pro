@@ -14,15 +14,15 @@ All notable changes to MDT Pro are documented here.
 
 ### Minor Features
 
-- **Browser reminder** — StopThePed citation notifications can include your usual MDT link so you can jump back to the browser tablet quickly.
+- **Browser reminder** — StopThePed citation notifications can include your usual MDT link. Toggle and tune under **Config and Plugins → Config** on the MDT (Citations — StopThePed & handoff).
 
-- **Optional paperwork animation** — After a StopThePed handoff, you can play a short clipboard idle on your officer. It adapts when you’re in a car and skips if the suspect is too far. Turn it off in config if you prefer.
+- **Optional paperwork animation** — After a StopThePed handoff, you can play a short clipboard idle on your officer. It adapts when you’re in a car and skips if the suspect is too far. Same **Config** page.
 
-- **Suspect banter** — After a successful handoff, the suspect may say something at the bottom of the screen, loosely tied to the charges. Optional; you can disable it or adjust tone in config.
+- **Suspect banter** — After a successful handoff, the suspect may say something at the bottom of the screen, loosely tied to the charges. Optional; **Citations — suspect lines** in **Config**.
 
-- **Rare hostile reactions** — Every now and then a suspect may attack you after a citation—even from the driver’s seat (they step out first). It’s meant to be uncommon, mostly with male suspects, and heavier tickets or serious charges nudge it a bit. Someone with a gun might try to use it. Turn the whole feature off in config if you don’t want it.
+- **Rare hostile reactions** — Every now and then a suspect may attack you after a citation—even from the driver’s seat (they step out first). It’s meant to be uncommon, mostly with male suspects, and heavier tickets or serious charges nudge it a bit. Someone with a gun might try to use it. **Citations — rare hostile suspect** in **Config**; turn the main switch off if you don’t want it.
 
-- **StopThePed and the MDT** — With StopThePed selected for stop integration (or Auto when it applies), person and vehicle info lines up better with your stop where the game allows.
+- **StopThePed and the MDT** — With StopThePed selected for stop integration (or Auto when it applies), person and vehicle info lines up better with your stop where the game allows. Choose under **Mod integration** in **Config** (traffic stops & events).
 
 ### Bug Fixes
 
