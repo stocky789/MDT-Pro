@@ -334,6 +334,20 @@ const server = http.createServer((req, res) => {
     contentType = 'image/svg+xml';
     serveFile(res, filePath, contentType, true);
     return;
+  } else if (url.startsWith('/image/peds/')) {
+    const seg = url.slice('/image/peds/'.length)
+    if (!/^[\w.-]+\.(webp|png)$/i.test(seg)) {
+      send(res, 400, 'Bad request')
+      return
+    }
+    filePath = path.join(ROOT, 'images', 'peds', seg)
+    contentType = seg.toLowerCase().endsWith('.webp') ? 'image/webp' : 'image/png'
+    if (!fs.existsSync(filePath)) {
+      send(res, 404, 'Not found')
+      return
+    }
+    serveFile(res, filePath, contentType, true)
+    return
   } else if (url === '/image/badge' || url === '/image/badge.png' || url === '/image/badge.svg') {
     const badgeSvg = path.join(ROOT, 'img', 'badge.svg');
     const badgePng = path.join(ROOT, 'img', 'badge.png');

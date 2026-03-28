@@ -57,7 +57,7 @@ searchInput.addEventListener('input', function () {
 
 /**
  * ID photo in Person Search is a catalogue still for the ped *model* (shared by many NPCs). CDF/PR do not expose mugshot textures.
- * Tries multiple URLs: FiveM docs host vanilla peds as webp; png fallback covers older mirrors.
+ * Order: bundled MDTPro/images/peds (served as /image/peds/...) then FiveM docs CDN (webp then png).
  * Keep in sync with plugin PedPortraitModelHelper: never load catalogue art for animals/props (e.g. a_c_seagull).
  */
 function isCataloguePortraitModelSuitable (modelName) {
@@ -81,6 +81,8 @@ function setPedIdPhoto (photoImg, photoPlaceholder, response) {
   const modelName = modelNameRaw.toLowerCase()
   const candidates = []
   if (modelName) {
+    candidates.push(`/image/peds/${modelName}.webp`)
+    candidates.push(`/image/peds/${modelName}.png`)
     candidates.push(`https://docs.fivem.net/peds/${modelName}.webp`)
     candidates.push(`https://docs.fivem.net/peds/${modelName}.png`)
   }
