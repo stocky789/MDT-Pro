@@ -7,10 +7,20 @@ A Police Computer Plugin for LSPDFR. MDT Pro runs a local web server when you go
 ## Requirements
 
 - **LSPDFR**
-- **CommonDataFramework (CDF)** — required; the plugin will not load without it.
+- **CommonDataFramework (CDF)** — **always required.** The plugin will not load without it. This applies to every setup, including if you use StopThePed and Ultimate Backup instead of Policing Redefined.
 - **CalloutInterfaceAPI** — required (DLL in game root or `plugins/LSPDFR/`).
 - **CalloutInterface** — required; the *Active Call* page uses it for live callout details (location, priority, messages). Integration is shallow but required.
-- **Policing Redefined (PR)** — required. A large portion of MDT Pro (roughly half to three-quarters) relies on the PR API for ped/vehicle stops, arrests, and citations. If you don’t run PR, you need to install it or this mod is not for you.
+
+### Stops, backup, and citations — choose **one** integration path
+
+MDT Pro is built to work with **either** Policing Redefined **or** the StopThePed + Ultimate Backup combination. **Do not run Policing Redefined together with StopThePed + Ultimate Backup** — keep PR **uninstalled** (or disabled) on that setup. Mixing them is unsupported and can cause conflicting or duplicate behavior.
+
+| Path | What to install | Notes |
+|------|-----------------|--------|
+| **Policing Redefined** | **Policing Redefined** | Stops, arrests, citations, and backup (when you choose PR in MDT Pro) use PR’s APIs. |
+| **StopThePed + Ultimate Backup** | **StopThePed**, **Ultimate Backup** | Stops and citation handoff use StopThePed; backup requests use Ultimate Backup when selected in MDT Pro **Customization → Config → Mod integration**. **CDF is still required.** **Do not install Policing Redefined** on this profile. |
+
+Use **Customization → Config** in the MDT to select the stop/traffic integration and backup provider (**Auto**, **Policing Redefined**, **StopThePed**, **Ultimate Backup**, etc.) so it matches what you actually run.
 
 ## Building (for developers)
 
@@ -25,7 +35,7 @@ To build the plugin from source:
    Create a `References` folder in the repo root and copy these from your GTA V install:
    - `plugins/LSPDFR/CalloutInterface.dll`
    - `plugins/LSPDFR/CalloutInterfaceAPI.dll` (or from game root)
-   - `plugins/LSPDFR/PolicingRedefined.dll`
+   - `plugins/LSPDFR/PolicingRedefined.dll` (needed to **compile** the plugin; your **runtime** install can still use only StopThePed + Ultimate Backup if you prefer)
    - `plugins/LSPDFR/LSPD First Response.dll` (from `plugins/`)
    - `IPT.Common.dll` (game root)
 
@@ -113,7 +123,7 @@ If you can't reach the MDT from another device (phone, tablet, another PC on you
 #### Citation and arrest reports
 
 - The **charges** you add are stored with the report and, if an offender is set, are added to that person’s record for future lookups.
-- With **PolicingRedefined** installed, citations can be **issued to offenders from the ped menu** in-game; the MDT is used to create and manage the citation reports.
+- **Issuing citations in-game:** With **Policing Redefined**, citations can be delivered from the PR ped menu when you close the citation in the MDT. With **StopThePed** (and **without** Policing Redefined), use the MDT citation handoff flow (e.g. in-game key set in `MDTPro.ini`) so StopThePed receives the ticket. Do not run PR and StopThePed together for this—pick one path (see [Requirements](#requirements)).
 
 ### Person Lookup (Ped Search)
 
@@ -129,7 +139,7 @@ If you can't reach the MDT from another device (phone, tablet, another PC on you
 ### BOLO & Backup
 
 - **BOLO Noticeboard** — Add or remove BOLOs (plate, reason, duration) without the vehicle in front of you. BOLOs sync to CDF and ALPR.
-- **Quick Actions** — Panic, Backup (patrol, traffic stop, transport, tow, etc.), and Clear ALPR from the bottom-right bar. Works with Policing Redefined.
+- **Quick Actions** — Panic, Backup (patrol, traffic stop, transport, tow, etc.), and Clear ALPR from the bottom-right bar. Backup is sent through **Policing Redefined** or **Ultimate Backup** depending on your **Mod integration** settings (and **Auto** picks PR when present, otherwise Ultimate Backup when available).
 
 ### Shift History
 
