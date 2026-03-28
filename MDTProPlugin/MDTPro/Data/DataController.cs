@@ -1366,6 +1366,9 @@ namespace MDTPro.Data {
                     // Always refresh wanted status from CDF so PR dispatch results (warrants) show in MDT search
                     existingPed.IsWanted = mdtProPedData.IsWanted;
                     existingPed.WarrantText = mdtProPedData.WarrantText;
+                    // Supervision must track live CDF too; otherwise DB stays false while the game shows probation/parole and synthetic court never runs
+                    existingPed.IsOnProbation = mdtProPedData.IsOnProbation;
+                    existingPed.IsOnParole = mdtProPedData.IsOnParole;
                     // Always refresh portrait model from the live ped (was incorrectly gated on CDFPedData == null, leaving stale ModelName for most peds)
                     if (mdtProPedData.ModelHash != 0) existingPed.ModelHash = mdtProPedData.ModelHash;
                     if (!string.IsNullOrEmpty(mdtProPedData.ModelName)) existingPed.ModelName = mdtProPedData.ModelName;
@@ -1438,8 +1441,11 @@ namespace MDTPro.Data {
                             if (!string.IsNullOrEmpty(updated.HuntingPermitExpiration)) existing.HuntingPermitExpiration = existing.HuntingPermitExpiration ?? updated.HuntingPermitExpiration;
                             if (updated.ModelHash != 0) existing.ModelHash = updated.ModelHash;
                             if (!string.IsNullOrEmpty(updated.ModelName)) existing.ModelName = updated.ModelName;
+                            existing.IsOnProbation = updated.IsOnProbation;
+                            existing.IsOnParole = updated.IsOnParole;
                             existing.TryParseNameIntoFirstLast();
                         }
+                        EnsureSupervisionCourtBackstory(existing);
                         KeepPedInDatabase(existing);
                         Database.SavePed(existing);
                         Helper.Log($"[MDTPro] Delayed CDF retry filled identity for: {pedName}", false, Helper.LogSeverity.Info);
@@ -1571,6 +1577,46 @@ namespace MDTPro.Data {
             return false;
         }
 
+        /// <summary>Re-read probation/parole from a live ped (holder or recent ID handle) so SQLite-backed records catch up with CDF; then ensure synthetic supervision court case exists.</summary>
+        internal static bool TryRefreshSupervisionFromLiveWorld(MDTProPedData pedData, string searchName, string reversedSearchName) {
+            if (pedData == null || string.IsNullOrWhiteSpace(pedData.Name)) return false;
+            try {
+                Ped live = null;
+                if (pedData.Holder != null && pedData.Holder.IsValid())
+                    live = pedData.Holder;
+                if (live == null) {
+                    foreach (string key in new[] { searchName, reversedSearchName, pedData.Name }) {
+                        if (string.IsNullOrWhiteSpace(key)) continue;
+                        var handleOpt = GetRecentlyIdentifiedPedHandle(key.Trim());
+                        if (!handleOpt.HasValue) continue;
+                        try {
+                            Ped p = World.GetEntityByHandle<Ped>(handleOpt.Value);
+                            if (p == null || !p.IsValid()) continue;
+                            if (!LivePedIdentityMatchesRecord(p, pedData)) continue;
+                            live = p;
+                            break;
+                        } catch { }
+                    }
+                }
+                if (live == null || !live.IsValid()) return false;
+                PedData cdf = null;
+                try { cdf = live.GetPedData(); } catch { }
+                if (cdf == null) return false;
+                bool prob = cdf.IsOnProbation;
+                bool par = cdf.IsOnParole;
+                bool changed = pedData.IsOnProbation != prob || pedData.IsOnParole != par;
+                pedData.IsOnProbation = prob;
+                pedData.IsOnParole = par;
+                EnsureSupervisionCourtBackstory(pedData);
+                if (changed) {
+                    KeepPedInDatabase(pedData);
+                    Database.SavePed(pedData);
+                }
+                return true;
+            } catch { }
+            return false;
+        }
+
         /// <summary>GTA peds share models; only merge persistent history when names clearly match so we do not graft one person's record onto another (e.g. Stan Pierce vs Stan Bank).</summary>
         private static bool PedNamesConsistentForModelReEncounter(MDTProPedData persisted, MDTProPedData live) {
             if (persisted == null || live == null) return false;
@@ -1663,6 +1709,14 @@ namespace MDTPro.Data {
                 }
 
                 var coherent = SupervisionBackstoryHelper.BuildCoherentSupervisionCharges(ped.IsOnParole);
+                if (coherent == null || coherent.Count == 0) {
+                    if (ped.Arrests != null && ped.Arrests.Count > 0) {
+                        coherent = ped.Arrests
+                            .Where(ch => ch != null && !string.IsNullOrWhiteSpace(ch.name))
+                            .Select(SupervisionBackstoryHelper.CloneCharge)
+                            .ToList();
+                    }
+                }
                 if (coherent == null || coherent.Count == 0) return;
 
                 ped.Arrests = coherent;
