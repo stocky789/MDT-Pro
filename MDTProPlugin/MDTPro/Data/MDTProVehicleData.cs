@@ -102,6 +102,23 @@ namespace MDTPro.Data {
             return $"{primary.R}-{primary.G}-{primary.B}";
         }
 
+        /// <summary>Updates registration/insurance string fields from CDF (expirations and default statuses). With StopThePed stops, <see cref="DataController.TryOverlayStopThePedVehicleDocStatusFromApi"/> overwrites statuses from STP’s API (<c>getVehicleRegistrationStatus</c> / <c>getVehicleInsuranceStatus</c>). Does not replace Holder/CDFVehicleData.</summary>
+        internal void CopyRegistrationInsuranceFromCdf(VehicleData cdf) {
+            if (cdf == null) return;
+            try {
+                if (cdf.Registration != null) {
+                    RegistrationStatus = cdf.Registration.Status.ToString();
+                    RegistrationExpiration = cdf.Registration.ExpirationDate?.ToString("s");
+                }
+            } catch { /* CDF version differences */ }
+            try {
+                if (cdf.Insurance != null) {
+                    InsuranceStatus = cdf.Insurance.Status.ToString();
+                    InsuranceExpiration = cdf.Insurance.ExpirationDate?.ToString("s");
+                }
+            } catch { }
+        }
+
         /// <summary>Apply persistent vehicle identity from a previously seen vehicle (same owner + model). Keeps current LicensePlate.
         /// Registration and Insurance are NOT copied from source — CDF/PR is authoritative at stop time (revoked/expired can change).</summary>
         internal void ApplyPersistentVehicleIdentity(MDTProVehicleData source) {

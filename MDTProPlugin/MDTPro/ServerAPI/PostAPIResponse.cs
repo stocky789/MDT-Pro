@@ -13,6 +13,23 @@ using Rage;
 
 namespace MDTPro.ServerAPI {
     internal class PostAPIResponse : APIResponse {
+        private static string FormatBackupError(string action, bool ok, string whenAvailableFail) {
+            if (ok) return null;
+            if (!BackupHelper.IsAvailable)
+                return "No backup integration available. Install Policing Redefined or Ultimate Backup.";
+            string p = ModIntegration.ActiveBackupProviderId ?? "";
+            if (p.Equals("UltimateBackup", StringComparison.OrdinalIgnoreCase)) {
+                switch (action) {
+                    case "tow":
+                    case "transport":
+                    case "coroner":
+                    case "animalcontrol":
+                        return "This Quick Action needs Policing Redefined’s backup API. Ultimate Backup does not support it from the MDT.";
+                }
+            }
+            return whenAvailableFail;
+        }
+
         internal PostAPIResponse(HttpListenerRequest req) : base(null) {
             string rawPath = req.Url?.AbsolutePath ?? "";
             if (!rawPath.StartsWith("/post/", StringComparison.OrdinalIgnoreCase)) return;
@@ -583,6 +600,7 @@ namespace MDTPro.ServerAPI {
                     status = 400;
                 }
             } else if (path == "requestBackup") {
+                try {
                 var reqData = JsonConvert.DeserializeAnonymousType(body, new { action = (string)null, unit = (string)null, responseCode = 2 });
                 if (reqData == null || string.IsNullOrWhiteSpace(reqData.action)) {
                     buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "action is required. Supported: panic, localPatrol, statePatrol, localSwat, nooseSwat, localK9, stateK9, ambulance, fire, coroner, animalControl, trafficStop, transport, tow, group, airLocal, airNoose, spikeStrips, felonyStop, dismiss" }));
@@ -596,84 +614,84 @@ namespace MDTPro.ServerAPI {
                 string err = null;
                 switch (act) {
                     case "panic":
-                        ok = Utility.BackupHelper.RequestPanicBackup();
-                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        ok = BackupHelper.RequestPanicBackup();
+                        err = FormatBackupError(act, ok, "Panic backup failed.");
                         break;
                     case "localpatrol":
-                        ok = Utility.BackupHelper.RequestBackup("LocalPatrol", rc);
-                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        ok = BackupHelper.RequestBackup("LocalPatrol", rc);
+                        err = FormatBackupError(act, ok, "Patrol backup failed.");
                         break;
                     case "statepatrol":
-                        ok = Utility.BackupHelper.RequestBackup("StatePatrol", rc);
-                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        ok = BackupHelper.RequestBackup("StatePatrol", rc);
+                        err = FormatBackupError(act, ok, "State patrol backup failed.");
                         break;
                     case "localswat":
-                        ok = Utility.BackupHelper.RequestBackup("LocalSWAT", rc);
-                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        ok = BackupHelper.RequestBackup("LocalSWAT", rc);
+                        err = FormatBackupError(act, ok, "SWAT backup failed.");
                         break;
                     case "nooseswat":
-                        ok = Utility.BackupHelper.RequestBackup("NooseSWAT", rc);
-                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        ok = BackupHelper.RequestBackup("NooseSWAT", rc);
+                        err = FormatBackupError(act, ok, "NOOSE SWAT backup failed.");
                         break;
                     case "localk9":
-                        ok = Utility.BackupHelper.RequestBackup("LocalK9Patrol", rc);
-                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        ok = BackupHelper.RequestBackup("LocalK9Patrol", rc);
+                        err = FormatBackupError(act, ok, "K9 backup failed.");
                         break;
                     case "statek9":
-                        ok = Utility.BackupHelper.RequestBackup("StateK9Patrol", rc);
-                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        ok = BackupHelper.RequestBackup("StateK9Patrol", rc);
+                        err = FormatBackupError(act, ok, "State K9 backup failed.");
                         break;
                     case "ambulance":
-                        ok = Utility.BackupHelper.RequestBackup("Ambulance", rc);
-                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        ok = BackupHelper.RequestBackup("Ambulance", rc);
+                        err = FormatBackupError(act, ok, "Ambulance backup failed.");
                         break;
                     case "fire":
-                        ok = Utility.BackupHelper.RequestBackup("FireDepartment", rc);
-                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        ok = BackupHelper.RequestBackup("FireDepartment", rc);
+                        err = FormatBackupError(act, ok, "Fire department backup failed.");
                         break;
                     case "coroner":
-                        ok = Utility.BackupHelper.RequestBackup("Coroner", rc);
-                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        ok = BackupHelper.RequestBackup("Coroner", rc);
+                        err = FormatBackupError(act, ok, "Coroner backup failed.");
                         break;
                     case "animalcontrol":
-                        ok = Utility.BackupHelper.RequestBackup("AnimalControl", rc);
-                        err = ok ? null : "Policing Redefined not available or backup failed.";
+                        ok = BackupHelper.RequestBackup("AnimalControl", rc);
+                        err = FormatBackupError(act, ok, "Animal control backup failed.");
                         break;
                     case "trafficstop":
                         var tsUnit = !string.IsNullOrWhiteSpace(reqData.unit) ? reqData.unit.Trim() : "LocalPatrol";
-                        ok = Utility.BackupHelper.RequestTrafficStopBackup(tsUnit, rc);
-                        err = ok ? null : "Policing Redefined not available, or not on a traffic stop.";
+                        ok = BackupHelper.RequestTrafficStopBackup(tsUnit, rc);
+                        err = FormatBackupError(act, ok, "Traffic stop backup failed (ensure you are in a traffic stop) or backup mod declined.");
                         break;
                     case "transport":
-                        ok = Utility.BackupHelper.RequestPoliceTransport(rc);
-                        err = ok ? null : "Policing Redefined not available or transport failed.";
+                        ok = BackupHelper.RequestPoliceTransport(rc);
+                        err = FormatBackupError(act, ok, "Police transport failed.");
                         break;
                     case "tow":
-                        ok = Utility.BackupHelper.RequestTowServiceBackup();
-                        err = ok ? null : "Policing Redefined not available or tow menu failed.";
+                        ok = BackupHelper.RequestTowServiceBackup();
+                        err = FormatBackupError(act, ok, "Tow menu could not be opened.");
                         break;
                     case "group":
-                        ok = Utility.BackupHelper.RequestGroupBackup();
-                        err = ok ? null : "Policing Redefined not available or group backup failed.";
+                        ok = BackupHelper.RequestGroupBackup();
+                        err = FormatBackupError(act, ok, "Group backup failed.");
                         break;
                     case "airlocal":
-                        ok = Utility.BackupHelper.RequestAirBackup("LocalAir");
-                        err = ok ? null : "Policing Redefined not available or not in a pursuit.";
+                        ok = BackupHelper.RequestAirBackup("LocalAir");
+                        err = FormatBackupError(act, ok, "Air backup failed (often requires an active pursuit).");
                         break;
                     case "airnoose":
-                        ok = Utility.BackupHelper.RequestAirBackup("NooseAir");
-                        err = ok ? null : "Policing Redefined not available or not in a pursuit.";
+                        ok = BackupHelper.RequestAirBackup("NooseAir");
+                        err = FormatBackupError(act, ok, "NOOSE air backup failed (often requires an active pursuit).");
                         break;
                     case "spikestrips":
-                        ok = Utility.BackupHelper.RequestSpikeStripsBackup();
-                        err = ok ? null : "Policing Redefined not available or not in a pursuit.";
+                        ok = BackupHelper.RequestSpikeStripsBackup();
+                        err = FormatBackupError(act, ok, "Spike strips backup failed (often requires an active pursuit).");
                         break;
                     case "felonystop":
-                        ok = Utility.BackupHelper.InitiateFelonyStop();
-                        err = ok ? null : "Policing Redefined not available or felony stop failed.";
+                        ok = BackupHelper.InitiateFelonyStop();
+                        err = FormatBackupError(act, ok, "Felony stop failed.");
                         break;
                     case "dismiss":
-                        Utility.BackupHelper.DismissAllBackupUnits(false);
+                        BackupHelper.DismissAllBackupUnits(false);
                         ok = true;
                         break;
                     default:
@@ -688,6 +706,12 @@ namespace MDTPro.ServerAPI {
                     buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = err ?? "Backup request failed." }));
                     contentType = "text/json";
                     status = 400;
+                }
+                } catch (Exception ex) {
+                    Utility.Helper.Log($"[requestBackup] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "Backup error: " + ex.Message }));
+                    contentType = "text/json";
+                    status = 500;
                 }
             } else if (path == "removeBOLO") {
                 var data = JsonConvert.DeserializeAnonymousType(body, new { LicensePlate = "", Reason = "" });
