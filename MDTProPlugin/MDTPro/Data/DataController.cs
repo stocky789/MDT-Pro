@@ -1827,6 +1827,27 @@ namespace MDTPro.Data {
             return string.Equals(live.Trim(), pedData.Name.Trim(), StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>Before citation handoff: if CDF/persona exposes a full name, it must match the MDT record (if any) or the citation offender name. If no live name is available, returns true so handoff is not blocked.</summary>
+        internal static bool CitationHandoffLiveIdentityMatches(Ped ped, string offenderPedName, MDTProPedData pedData) {
+            if (ped == null || !ped.IsValid()) return false;
+            string live = null;
+            try { live = ped.GetPedData()?.FullName; } catch { }
+            if (string.IsNullOrWhiteSpace(live)) {
+                try {
+                    var persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped);
+                    if (persona != null && !string.IsNullOrEmpty(persona.FullName)) live = persona.FullName;
+                } catch { }
+            }
+            if (string.IsNullOrWhiteSpace(live))
+                return true;
+            live = live.Trim();
+            if (pedData != null && !string.IsNullOrWhiteSpace(pedData.Name))
+                return string.Equals(live, pedData.Name.Trim(), StringComparison.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(offenderPedName))
+                return string.Equals(live, offenderPedName.Trim(), StringComparison.OrdinalIgnoreCase);
+            return true;
+        }
+
         /// <summary>Refresh ModelHash/ModelName from a live ped (Holder or recently ID'd handle) so Person Search ID photos match the entity in the world. CDF does not supply portrait data; we use GTA model name against public ped image CDNs.</summary>
         internal static bool TryRefreshPedModelFromLiveWorld(MDTProPedData pedData, string searchName, string reversedSearchName) {
             if (pedData == null) return false;

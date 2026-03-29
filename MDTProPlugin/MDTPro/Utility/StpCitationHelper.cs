@@ -1,4 +1,5 @@
 // StopThePed: reflect public static citation & ticket APIs (References/StopThePed decompile + runtime discovery).
+using MDTPro.Data;
 using MDTPro.Setup;
 using Rage;
 using System;
@@ -95,21 +96,29 @@ namespace MDTPro.Utility {
             var list = charges.ToList();
             if (list.Count == 0) return;
 
-            if (!PRHelper.TryGetCitationPedHandle(pedName, out Rage.PoolHandle pedHandle, out _)) return;
+            if (!PRHelper.TryGetCitationPedHandle(pedName, out Rage.PoolHandle pedHandle, out MDTProPedData pedDataForHandoff)) return;
 
             if (GameFiber.CanSleepNow)
-                GiveOnGameThread(pedHandle, pedName, list);
+                GiveOnGameThread(pedHandle, pedName, list, pedDataForHandoff);
             else
-                GameFiber.StartNew(() => GiveOnGameThread(pedHandle, pedName, list));
+                GameFiber.StartNew(() => GiveOnGameThread(pedHandle, pedName, list, pedDataForHandoff));
         }
 
-        private static void GiveOnGameThread(Rage.PoolHandle pedHandle, string pedName, List<PRHelper.CitationHandoutCharge> charges) {
+        private static void GiveOnGameThread(Rage.PoolHandle pedHandle, string pedName, List<PRHelper.CitationHandoutCharge> charges, MDTProPedData pedDataForHandoff) {
             Ped ped = null;
             try { ped = World.GetEntityByHandle<Ped>(pedHandle); } catch { }
             if (ped == null || !ped.IsValid()) {
                 string msg = SetupController.GetLanguage().inGame.handCitationPersonNotPresent;
                 if (!string.IsNullOrWhiteSpace(msg))
                     RageNotification.Show(RageNotification.AppendStpCitationMdtBrowserHint(msg), RageNotification.NotificationType.Info);
+                return;
+            }
+
+            if (!DataController.CitationHandoffLiveIdentityMatches(ped, pedName, pedDataForHandoff)) {
+                var lang = SetupController.GetLanguage().inGame;
+                string msg = lang.handCitationIdentityMismatch;
+                if (!string.IsNullOrWhiteSpace(msg))
+                    RageNotification.Show(RageNotification.AppendStpCitationMdtBrowserHint(string.Format(msg, pedName)), RageNotification.NotificationType.Info);
                 return;
             }
 

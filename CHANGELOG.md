@@ -10,9 +10,7 @@ All notable changes to MDT Pro are documented here.
 
 - **StopThePed + Ultimate Backup** — Works with **StopThePed** for stops / traffic events and **Ultimate Backup** for Quick Actions backup when **Mod integration → Backup** is **Ultimate Backup** or **Auto** (with PR absent, Auto uses UB). **CDF still required.** Don’t run **Policing Redefined** together with StopThePed + UB; it’s unsupported. README / release **README.txt** / **Config** list PR vs STP+UB requirements.
 
-- **Citations → StopThePed** — Closed citations can hand off to StopThePed when PR isn’t loaded. Messages if handoff fails. PR citation behavior unchanged when PR is present.
-
-- **Citation handoff menu** — If reflection can’t hand off, pending citation uses distance check + key (**F10** default, **MDTPro.ini**). Menu to confirm delivery.
+- **Citation handoff menu** — Youj can hand a citation to a PED using the Citation Menu (F10 by default) - this menu is only when using STP. It is disabled in PR mode.
 
 ### Minor Features
 

@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MDTPro.Data;
 using MDTPro.Setup;
 using MDTPro.UI;
 using Rage;
@@ -76,7 +77,7 @@ namespace MDTPro.Utility {
                 }).ToList();
             }
 
-            if (!PRHelper.TryGetCitationPedHandle(pedName, out Rage.PoolHandle handle, out _))
+            if (!PRHelper.TryGetCitationPedHandle(pedName, out Rage.PoolHandle handle, out MDTProPedData pedDataForHandoff))
                 return;
 
             Ped ped = null;
@@ -85,6 +86,13 @@ namespace MDTPro.Utility {
                 string msg = GetLanguage().inGame.handCitationPersonNotPresent;
                 if (!string.IsNullOrWhiteSpace(msg))
                     RageNotification.Show(msg, RageNotification.NotificationType.Info);
+                return;
+            }
+
+            if (!DataController.CitationHandoffLiveIdentityMatches(ped, pedName, pedDataForHandoff)) {
+                string msg = GetLanguage().inGame.handCitationIdentityMismatch;
+                if (!string.IsNullOrWhiteSpace(msg))
+                    RageNotification.Show(RageNotification.AppendStpCitationMdtBrowserHint(string.Format(msg, pedName)), RageNotification.NotificationType.Info);
                 return;
             }
 

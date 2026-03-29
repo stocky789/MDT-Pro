@@ -54,18 +54,18 @@ namespace MDTPro.Utility {
             var chargesList = charges.ToList();
             if (chargesList.Count == 0) return;
 
-            if (!TryGetCitationPedHandle(pedName, out Rage.PoolHandle handleToUse, out _)) return;
+            if (!TryGetCitationPedHandle(pedName, out Rage.PoolHandle handleToUse, out MDTProPedData pedDataForHandoff)) return;
             string name = pedName;
 
             // PR API must run on game thread. Citation handout and ped menu are game-thread-only.
             if (GameFiber.CanSleepNow) {
-                GiveCitationOnGameThread(handleToUse, name, chargesList);
+                GiveCitationOnGameThread(handleToUse, name, chargesList, pedDataForHandoff);
             } else {
-                GameFiber.StartNew(() => GiveCitationOnGameThread(handleToUse, name, chargesList));
+                GameFiber.StartNew(() => GiveCitationOnGameThread(handleToUse, name, chargesList, pedDataForHandoff));
             }
         }
 
-        private static void GiveCitationOnGameThread(Rage.PoolHandle pedHandle, string pedName, List<CitationHandoutCharge> charges) {
+        private static void GiveCitationOnGameThread(Rage.PoolHandle pedHandle, string pedName, List<CitationHandoutCharge> charges, MDTProPedData pedDataForHandoff) {
             Ped ped = null;
             try {
                 ped = Rage.World.GetEntityByHandle<Ped>(pedHandle);
@@ -73,6 +73,12 @@ namespace MDTPro.Utility {
             if (ped == null || !ped.IsValid()) {
                 string msg = SetupController.GetLanguage().inGame.handCitationPersonNotPresent;
                 if (!string.IsNullOrWhiteSpace(msg)) RageNotification.Show(msg, RageNotification.NotificationType.Info);
+                return;
+            }
+
+            if (!DataController.CitationHandoffLiveIdentityMatches(ped, pedName, pedDataForHandoff)) {
+                string msg = SetupController.GetLanguage().inGame.handCitationIdentityMismatch;
+                if (!string.IsNullOrWhiteSpace(msg)) RageNotification.Show(string.Format(msg, pedName), RageNotification.NotificationType.Info);
                 return;
             }
 
