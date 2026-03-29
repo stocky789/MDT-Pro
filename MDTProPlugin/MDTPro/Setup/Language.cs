@@ -59,6 +59,8 @@ namespace MDTPro.Setup {
             public string handCitationPersonNotPresent = "Citation saved. Have the person present and identified (e.g. run the vehicle or ask for ID) so you can hand them the citation from the ped menu.";
             /// <summary>Shown when citation was saved but the person was not found in the database. {0} = offender name.</summary>
             public string handCitationPersonNotFound = "Citation saved for {0}, but they were not found. Make sure the person was identified (e.g. vehicle stop or ID check) and the name matches exactly.";
+            /// <summary>Resolved ped handle did not match the citation offender (CDF/persona name differed). {0} = offender name from citation.</summary>
+            public string handCitationIdentityMismatch = "Citation saved for {0}, but the ped in front of you doesn't match that person. Identify the right suspect or close the citation again.";
             /// <summary>Appended to StopThePed citation notifications (not used when Policing Redefined handles handoff). {0} = one or two MDT URLs (with ~n~ between if both).</summary>
             public string stpCitationMdtBrowserLine = "~n~~n~Open the MDT in your browser to review or finish:~n~{0}";
             /// <summary>StopThePed: no public ticket API found via reflection.</summary>
