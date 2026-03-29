@@ -8,6 +8,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace MDTPro.Setup {
     internal class SetupController {
@@ -215,30 +218,56 @@ namespace MDTPro.Setup {
             }
         }
 
-        /// <summary>Copies defaults/citationPedReactions.json over the live file when the bundled copy is newer (see "version" in that JSON). No config fields — updates ship with the mod.</summary>
+        /// <summary>Copies defaults/citationPedReactions.json over the live file when the bundled copy is newer (see "version" in that JSON). Uses a small read + regex (no full-file JSON parse) and defers upgrade copies to the thread pool so go-on-duty does not freeze the game fiber.</summary>
         internal static void SyncCitationPedReactionsFromBundledDefaults() {
             try {
                 if (!File.Exists(CitationPedReactionsDefaultsPath)) return;
-                int bundled = ReadCitationPedReactionsDataVersion(CitationPedReactionsDefaultsPath);
-                int installed = File.Exists(CitationPedReactionsPath) ? ReadCitationPedReactionsDataVersion(CitationPedReactionsPath) : 0;
+                int bundled = ReadCitationPedReactionsDataVersionFromFileHead(CitationPedReactionsDefaultsPath);
+                bool liveExists = File.Exists(CitationPedReactionsPath);
+                int installed = liveExists ? ReadCitationPedReactionsDataVersionFromFileHead(CitationPedReactionsPath) : 0;
                 if (bundled <= installed) return;
-                File.WriteAllBytes(CitationPedReactionsPath, File.ReadAllBytes(CitationPedReactionsDefaultsPath));
-                CitationPedReactionHelper.InvalidateLoadedReactions();
+
+                string src = CitationPedReactionsDefaultsPath;
+                string dst = CitationPedReactionsPath;
+                // First-time install: must block until the file exists (server / reactions may read immediately).
+                if (!liveExists) {
+                    File.WriteAllBytes(dst, File.ReadAllBytes(src));
+                    CitationPedReactionHelper.InvalidateLoadedReactions();
+                    return;
+                }
+
+                ThreadPool.QueueUserWorkItem(_ => {
+                    try {
+                        File.WriteAllBytes(dst, File.ReadAllBytes(src));
+                        GameFiber.StartNew(() => {
+                            try {
+                                CitationPedReactionHelper.InvalidateLoadedReactions();
+                            } catch {
+                                /* ignore */
+                            }
+                        });
+                    } catch (Exception ex) {
+                        Helper.Log($"Could not sync citation ped reactions: {ex.Message}", false, Helper.LogSeverity.Warning);
+                    }
+                });
             } catch (Exception ex) {
                 Helper.Log($"Could not sync citation ped reactions: {ex.Message}", true, Helper.LogSeverity.Warning);
             }
         }
 
-        private sealed class CitationPedReactionsFileHeader {
-            public int version { get; set; }
-        }
-
-        private static int ReadCitationPedReactionsDataVersion(string path) {
+        /// <summary>Reads "version" from the first chunk of the file only. Missing or old files without a top-level version return 0 (upgrade path).</summary>
+        private static int ReadCitationPedReactionsDataVersionFromFileHead(string path) {
             try {
-                string json = File.ReadAllText(path);
-                if (string.IsNullOrWhiteSpace(json)) return 0;
-                var h = JsonConvert.DeserializeObject<CitationPedReactionsFileHeader>(json);
-                return h?.version ?? 0;
+                const int headBytes = 16384;
+                byte[] buf = new byte[headBytes];
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)) {
+                    int n = fs.Read(buf, 0, headBytes);
+                    if (n <= 0) return 0;
+                    string s = Encoding.UTF8.GetString(buf, 0, n);
+                    Match m = Regex.Match(s, @"""version""\s*:\s*(\d+)");
+                    if (m.Success && int.TryParse(m.Groups[1].Value, out int v)) return v;
+                }
+                return 0;
             } catch {
                 return 0;
             }
