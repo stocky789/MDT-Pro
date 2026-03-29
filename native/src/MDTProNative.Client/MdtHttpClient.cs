@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using MDTProNative.Core;
@@ -42,6 +43,32 @@ public sealed class MdtHttpClient : IDisposable
         response.EnsureSuccessStatusCode();
         var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         return string.IsNullOrWhiteSpace(text) ? null : JToken.Parse(text);
+    }
+
+    /// <summary>POST with JSON body (same pattern as browser MDT for many <c>/data/*</c> routes).</summary>
+    public async Task<(HttpStatusCode Status, string Body)> PostAsync(string relativePath, string? body, CancellationToken cancellationToken = default)
+    {
+        using var content = new StringContent(body ?? "", Encoding.UTF8, "application/json");
+        using var response = await _http.PostAsync(relativePath.TrimStart('/'), content, cancellationToken).ConfigureAwait(false);
+        var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        return (response.StatusCode, text);
+    }
+
+    public async Task<JToken?> PostForJsonAsync(string relativePath, string? body, CancellationToken cancellationToken = default)
+    {
+        var (status, text) = await PostAsync(relativePath, body, cancellationToken).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var t = text.TrimStart();
+        if (t.StartsWith('{') || t.StartsWith('[')) return JToken.Parse(text);
+        _ = status;
+        return null;
+    }
+
+    /// <summary><c>/post/*</c> mutations; response may be plain text or JSON.</summary>
+    public async Task<(HttpStatusCode Status, string Body)> PostActionAsync(string postPath, string? jsonBody, CancellationToken cancellationToken = default)
+    {
+        var path = "post/" + postPath.TrimStart('/');
+        return await PostAsync(path, jsonBody, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<JToken?> PostJsonAsync(string relativePath, string? body, CancellationToken cancellationToken = default)
