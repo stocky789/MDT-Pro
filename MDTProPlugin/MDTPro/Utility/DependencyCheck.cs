@@ -30,5 +30,13 @@ namespace MDTPro.Utility {
         internal static bool IsPRAvailable() {
             return LSPD_First_Response.Mod.API.Functions.GetAllUserPlugins().Any(x => x.GetName().Name.Equals("PolicingRedefined"));
         }
+
+        internal static bool IsStopThePedAvailable() {
+            return LSPD_First_Response.Mod.API.Functions.GetAllUserPlugins().Any(x => x.GetName().Name.Equals("StopThePed"));
+        }
+
+        internal static bool IsUltimateBackupPluginPresent() {
+            return LSPD_First_Response.Mod.API.Functions.GetAllUserPlugins().Any(x => x.GetName().Name.Equals("UltimateBackup"));
+        }
     }
 }

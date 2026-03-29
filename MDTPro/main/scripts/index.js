@@ -1,12 +1,67 @@
+/** Backup Quick Actions: hide Policing-Redefine-only controls when Ultimate Backup is the active provider (see GET /integration). */
+function applyQuickBackupMenuForProvider(menu, ultimateBackup, lang) {
+  if (!menu) return
+  const ubNote = document.getElementById('qabBackupMenuUbNote')
+  const codeLabel = document.getElementById('qabBackupResponseCodeLabel')
+
+  menu.querySelectorAll('[data-qab-pr-only]').forEach((el) => {
+    el.hidden = !!ultimateBackup
+  })
+
+  menu.querySelectorAll('.qabBackupSection').forEach((sec) => {
+    const buttons = sec.querySelectorAll('button')
+    const anyVisible = [...buttons].some((b) => !b.hidden)
+    sec.hidden = buttons.length > 0 && !anyVisible
+  })
+
+  if (ultimateBackup) {
+    const active = menu.querySelector('.qabBackupCode.active')
+    if (active && (active.hidden || active.dataset.code === '1')) {
+      menu.querySelectorAll('.qabBackupCode').forEach((b) => {
+        b.classList.remove('active')
+        b.setAttribute('aria-pressed', 'false')
+      })
+      const c2 = menu.querySelector('.qabBackupCode[data-code="2"]')
+      if (c2 && !c2.hidden) {
+        c2.classList.add('active')
+        c2.setAttribute('aria-pressed', 'true')
+      }
+    }
+  }
+
+  if (codeLabel) {
+    if (!codeLabel.dataset.qabDefaultLabel) {
+      codeLabel.dataset.qabDefaultLabel = codeLabel.textContent.trim()
+    }
+    codeLabel.textContent = ultimateBackup
+      ? (lang.quickActions?.backupResponseCodeLabelUb || 'Patrol code')
+      : codeLabel.dataset.qabDefaultLabel
+  }
+
+  if (ubNote) {
+    ubNote.hidden = !ultimateBackup
+    ubNote.textContent = ultimateBackup ? (lang.quickActions?.backupUltimateBackupNote || '') : ''
+  }
+}
+
 ;(async function () {
   const config = await getConfig()
   const language = await getLanguage()
+  let integration = {}
+  try {
+    const intRes = await fetch('/integration')
+    if (intRes.ok) integration = await intRes.json()
+  } catch (_) {
+    /* older plugin or offline */
+  }
   if (config.updateDomWithLanguageOnLoad) await updateDomWithLanguage('index')
   applySettingsInfoTooltips(language)
 
   // Quick Actions Bar visibility and handlers
   const quickActionsBar = document.getElementById('quickActionsBar')
   const qabBackupMenu = document.getElementById('qabBackupMenu')
+  const useUbBackupMenu = integration.backupProvider === 'UltimateBackup'
+  if (qabBackupMenu) applyQuickBackupMenuForProvider(qabBackupMenu, useUbBackupMenu, language)
   const requestBackupAction = async (action, btnEl) => {
     const code = parseInt(qabBackupMenu?.querySelector('.qabBackupCode.active')?.dataset?.code ?? '2', 10) || 2
     const res = await (await fetch('/post/requestBackup', {

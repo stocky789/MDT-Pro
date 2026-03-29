@@ -105,13 +105,49 @@ namespace MDTPro.ServerAPI {
                 string licensePlateOrVin = Helper.GetRequestBodyAsString(req);
                 if (!string.IsNullOrEmpty(licensePlateOrVin)) licensePlateOrVin = licensePlateOrVin.Trim();
 
-                MDTProVehicleData vehicleData = DataController.GetVehicleByPlateOrVin(licensePlateOrVin);
+                MDTProVehicleData vehicleData = null;
+                bool wantContextOnly = string.Equals(licensePlateOrVin, "context", StringComparison.OrdinalIgnoreCase)
+                    || licensePlateOrVin == "%context"
+                    || string.Equals(licensePlateOrVin, "current", StringComparison.OrdinalIgnoreCase);
+                if (wantContextOnly) {
+                    vehicleData = DataController.GetContextVehicleIfValid();
+                } else if (!string.IsNullOrEmpty(licensePlateOrVin)) {
+                    var contextVeh = DataController.GetContextVehicleIfValid();
+                    if (contextVeh != null) {
+                        string key = DataController.NormalizeVehiclePlateKey(licensePlateOrVin);
+                        if (!string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(contextVeh.LicensePlate)
+                            && DataController.NormalizeVehiclePlateKey(contextVeh.LicensePlate) == key)
+                            vehicleData = contextVeh;
+                        else if (!string.IsNullOrEmpty(contextVeh.VehicleIdentificationNumber)
+                            && string.Equals(contextVeh.VehicleIdentificationNumber.Trim(), licensePlateOrVin, StringComparison.OrdinalIgnoreCase))
+                            vehicleData = contextVeh;
+                    }
+                }
+                if (vehicleData == null && !string.IsNullOrEmpty(licensePlateOrVin) && !wantContextOnly)
+                    vehicleData = DataController.GetVehicleByPlateOrVin(licensePlateOrVin);
+
                 if (vehicleData != null && vehicleData.CDFVehicleData != null)
                     DataController.MergeBOLOsFromStubByPlate(vehicleData);
+                if (vehicleData != null && ModIntegration.SubscribedStopThePedStopEvents)
+                    DataController.TryRefreshVehicleDocumentsFromLiveWorld(vehicleData);
+                if (vehicleData != null)
+                    DataController.TrySyncVehicleOwnerWantedFromCdf(vehicleData);
 
-                Database.SaveSearchHistoryEntry("vehicle", licensePlateOrVin, vehicleData?.LicensePlate);
+                string historyQuery = wantContextOnly ? (vehicleData?.LicensePlate ?? "context") : licensePlateOrVin;
+                Database.SaveSearchHistoryEntry("vehicle", historyQuery, vehicleData?.LicensePlate);
 
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(vehicleData));
+                contentType = "text/json";
+                status = 200;
+            } else if (path == "contextVehicle") {
+                MDTProVehicleData ctxV = DataController.GetContextVehicleIfValid();
+                if (ctxV != null && ctxV.CDFVehicleData != null)
+                    DataController.MergeBOLOsFromStubByPlate(ctxV);
+                if (ctxV != null && ModIntegration.SubscribedStopThePedStopEvents)
+                    DataController.TryRefreshVehicleDocumentsFromLiveWorld(ctxV);
+                if (ctxV != null)
+                    DataController.TrySyncVehicleOwnerWantedFromCdf(ctxV);
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(ctxV));
                 contentType = "text/json";
                 status = 200;
             } else if (path == "activeBolos") {

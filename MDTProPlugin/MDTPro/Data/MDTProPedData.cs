@@ -76,8 +76,10 @@ namespace MDTPro.Data {
             Name = CDFPedData.FullName;
             FirstName = CDFPedData.Firstname;
             LastName = CDFPedData.Lastname;
-            ModelHash = Holder != null && Holder.IsValid() ? (uint)Holder.Model.Hash : 0;
-            ModelName = Holder != null && Holder.IsValid() ? Holder.Model.Name : null;
+            ModelHash = 0;
+            ModelName = null;
+            if (Holder != null && Holder.IsValid())
+                PedPortraitModelHelper.TryGetPortraitModelFromPed(Holder, out ModelHash, out ModelName);
             Birthday = CDFPedData.Birthday.ToString("s");
             Gender = CDFPedData.Gender.ToString();
             IsWanted = CDFPedData.Wanted;
@@ -190,8 +192,9 @@ namespace MDTPro.Data {
                     FirstName = persona.Forename;
                     LastName = persona.Surname;
                 }
-                ModelHash = (uint)Holder.Model.Hash;
-                ModelName = Holder.Model.Name;
+                ModelHash = 0;
+                ModelName = null;
+                PedPortraitModelHelper.TryGetPortraitModelFromPed(Holder, out ModelHash, out ModelName);
             } catch { /* LSPDFR not available or ped invalid */ }
             TryParseNameIntoFirstLast();
         }

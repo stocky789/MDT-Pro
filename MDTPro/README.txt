@@ -3,10 +3,16 @@ MDT Pro - Installation
 
 REQUIREMENTS
   • LSPDFR
-  • CommonDataFramework (CDF)
+  • CommonDataFramework (CDF) — ALWAYS required (including if you use StopThePed + Ultimate Backup).
   • CalloutInterfaceAPI (in game root or plugins/LSPDFR/)
   • CalloutInterface — required (Active Call page uses it for live callout details).
-  • Policing Redefined (PR) — required. Most of MDT Pro uses the PR API (stops, arrests, citations). You need PR installed or this mod is not for you.
+
+  Stops / backup / citations — use ONE path (do not mix):
+  • Policing Redefined — install PR; use MDT Pro Mod integration for PR-based stops, citations, backup.
+  • StopThePed + Ultimate Backup — supported. Install StopThePed and Ultimate Backup; set Mod integration
+    in the MDT (Customization → Config) to match. IMPORTANT: do NOT install Policing Redefined on this
+    setup — PR + StopThePed + Ultimate Backup together is unsupported and can break behavior.
+    You still NEED CommonDataFramework.
 
 INSTALL
   1. Extract the full mod ZIP into your GTA V folder (the one with GTA5.exe).

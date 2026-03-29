@@ -57,36 +57,79 @@ searchInput.addEventListener('input', function () {
 
 /**
  * ID photo in Person Search is a catalogue still for the ped *model* (shared by many NPCs). CDF/PR do not expose mugshot textures.
- * Tries multiple URLs: FiveM docs host vanilla peds as webp; png fallback covers older mirrors.
+ * Order: bundled MDTPro/images/peds (served as /image/peds/...) then FiveM docs CDN (webp then png).
+ * There is no fuzzy match: only exact model name URLs. Wrong faces usually mean wrong ModelName on the record or catalogue vs in-world variation.
+ * Keep in sync with plugin PedPortraitModelHelper: never load catalogue art for animals/props (e.g. a_c_seagull).
  */
+function isCataloguePortraitModelSuitable (modelName) {
+  const n = (modelName || '').trim().toLowerCase()
+  if (n.length < 3) return false
+  if (n === 'null' || n === 'undefined') return false
+  if (n.startsWith('a_c_')) return false
+  if (n.startsWith('prop_')) return false
+  return true
+}
+
+let _pedPhotoLoadGen = 0
+
+function showPedIdPhotoUnavailable (photoImg, photoPlaceholder) {
+  if (!photoImg || !photoPlaceholder) return
+  photoImg.onload = null
+  photoImg.onerror = null
+  photoImg.removeAttribute('src')
+  photoImg.classList.add('hidden')
+  photoPlaceholder.classList.remove('hidden')
+}
+
 function setPedIdPhoto (photoImg, photoPlaceholder, response) {
   if (!photoImg || !photoPlaceholder) return
-  const modelName = (response.ModelName || '').trim().toLowerCase()
+  const loadGen = ++_pedPhotoLoadGen
+  const stalePhoto = () => loadGen !== _pedPhotoLoadGen
+
+  photoImg.onload = null
+  photoImg.onerror = null
+  photoImg.removeAttribute('src')
+  photoImg.classList.add('hidden')
+  photoPlaceholder.classList.add('hidden')
+
+  const modelNameRaw = (response.ModelName || '').trim()
+  if (!isCataloguePortraitModelSuitable(modelNameRaw)) {
+    if (!stalePhoto()) showPedIdPhotoUnavailable(photoImg, photoPlaceholder)
+    return
+  }
+  const modelName = modelNameRaw.toLowerCase()
   const candidates = []
   if (modelName) {
+    candidates.push(`/image/peds/${modelName}.webp`)
+    candidates.push(`/image/peds/${modelName}.png`)
     candidates.push(`https://docs.fivem.net/peds/${modelName}.webp`)
     candidates.push(`https://docs.fivem.net/peds/${modelName}.png`)
   }
   if (candidates.length === 0) {
-    photoImg.classList.add('hidden')
-    photoImg.removeAttribute('src')
-    photoPlaceholder.classList.remove('hidden')
+    if (!stalePhoto()) showPedIdPhotoUnavailable(photoImg, photoPlaceholder)
     return
   }
+
   let i = 0
   const tryNext = () => {
+    if (stalePhoto()) return
     if (i >= candidates.length) {
-      photoImg.classList.add('hidden')
-      photoImg.removeAttribute('src')
-      photoPlaceholder.classList.remove('hidden')
+      showPedIdPhotoUnavailable(photoImg, photoPlaceholder)
       return
     }
     const url = candidates[i++]
-    photoImg.onerror = () => tryNext()
+    photoImg.onerror = () => {
+      if (!stalePhoto()) tryNext()
+    }
     photoImg.onload = () => {
+      if (stalePhoto()) return
+      if (photoImg.naturalWidth < 4 || photoImg.naturalHeight < 4) {
+        tryNext()
+        return
+      }
       photoImg.classList.remove('hidden')
       photoPlaceholder.classList.add('hidden')
-      photoImg.alt = response.Name || ''
+      photoImg.alt = response.Name ? `ID catalogue (${response.Name})` : ''
     }
     photoImg.src = url
   }
@@ -215,6 +258,17 @@ let _pedSearchAbort = null
 async function performSearch(query) {
   _pedSearchSeq++
   const thisSearch = _pedSearchSeq
+  _pedPhotoLoadGen++
+  const prevPhoto = document.getElementById('pedIdPhotoImg')
+  const prevPh = document.querySelector('.pedIdPhotoPlaceholder')
+  if (prevPhoto) {
+    prevPhoto.onload = null
+    prevPhoto.onerror = null
+    prevPhoto.removeAttribute('src')
+    prevPhoto.classList.add('hidden')
+  }
+  if (prevPh) prevPh.classList.add('hidden')
+
   _pedSearchAbort?.abort()
   _pedSearchAbort = new AbortController()
   const signal = _pedSearchAbort.signal

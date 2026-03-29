@@ -111,6 +111,11 @@ namespace MDTPro.Data {
         private static DateTime _lastContextPedSetAt = DateTime.MinValue;
         private static readonly TimeSpan ContextPedTtl = TimeSpan.FromSeconds(60);
 
+        private static readonly object _contextVehicleLock = new object();
+        private static MDTProVehicleData _lastContextVehicleData;
+        private static DateTime _lastContextVehicleSetAt = DateTime.MinValue;
+        private static readonly TimeSpan ContextVehicleTtl = TimeSpan.FromSeconds(60);
+
         /// <summary>Maps ped name -> (handle, timestamp) for recently identified peds. Citation handout uses this when Holder is null (e.g. DB loaded from file, stub).</summary>
         private static readonly Dictionary<string, (Rage.PoolHandle Handle, DateTime At)> recentlyIdentifiedPedHandles = new Dictionary<string, (Rage.PoolHandle, DateTime)>(StringComparer.OrdinalIgnoreCase);
         private static readonly object _recentlyIdentifiedLock = new object();
@@ -405,11 +410,24 @@ namespace MDTPro.Data {
                 if (mdtProVehicleData.LicensePlate == null) return;
                 TryApplyReEncounterVehicleProfile(mdtProVehicleData, vehicle);
                 MergeBOLOsFromStubByPlate(mdtProVehicleData);
+                if (ModIntegration.SubscribedStopThePedStopEvents)
+                    TryOverlayStopThePedVehicleDocStatusFromApi(mdtProVehicleData, vehicle);
                 lock (_vehicleDbLock) {
-                    if (!vehicleDatabase.Any(x => x.LicensePlate == mdtProVehicleData.LicensePlate))
+                    if (ModIntegration.SubscribedStopThePedStopEvents) {
+                        vehicleDatabase.RemoveAll(x => x != null && string.Equals(x.LicensePlate, mdtProVehicleData.LicensePlate, StringComparison.OrdinalIgnoreCase));
                         vehicleDatabase.Add(mdtProVehicleData);
+                    } else if (!vehicleDatabase.Any(x => x.LicensePlate == mdtProVehicleData.LicensePlate)) {
+                        vehicleDatabase.Add(mdtProVehicleData);
+                    }
                 }
                 KeepVehicleInDatabase(mdtProVehicleData);
+
+                MDTProVehicleData contextSource = GetVehicleByPlateOrVin(mdtProVehicleData.LicensePlate);
+                if (contextSource != null) {
+                    if (contextSource.CDFVehicleData != null)
+                        MergeBOLOsFromStubByPlate(contextSource);
+                    SetContextVehicle(contextSource);
+                }
             } catch (Exception ex) {
                 Helper.Log($"ResolveVehicleAndDriverForStop: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
@@ -1001,16 +1019,14 @@ namespace MDTPro.Data {
                     pedData = new MDTProPedData { Name = pedName };
                     pedData.Citations = new List<CitationGroup.Charge>();
                     pedData.Arrests = new List<ArrestGroup.Charge>();
-                    pedData.ModelHash = (uint)ped.Model.Hash;
-                    pedData.ModelName = ped.Model.Name;
+                    PedPortraitModelHelper.AssignPortraitFromPedIfSuitable(ped, pedData);
                     pedData.TryParseNameIntoFirstLast();
                     pedData.IdentificationHistory = new List<MDTProPedData.IdentificationEntry>();
                     if (!pedDatabase.Any(x => x.Name == pedName)) pedDatabase.Add(pedData);
                 } else {
                     if (!pedDatabase.Any(x => x.Name == pedData.Name)) pedDatabase.Add(pedData);
                     // Always update model from the ped we just identified — ensures ID photo matches the person in front of you
-                    pedData.ModelHash = (uint)ped.Model.Hash;
-                    pedData.ModelName = ped.Model.Name;
+                    PedPortraitModelHelper.AssignPortraitFromPedIfSuitable(ped, pedData);
                 }
                 if (pedData.IdentificationHistory == null) pedData.IdentificationHistory = new List<MDTProPedData.IdentificationEntry>();
                 pedData.IdentificationHistory.Insert(0, new MDTProPedData.IdentificationEntry {
@@ -1031,6 +1047,16 @@ namespace MDTPro.Data {
                 EnsureSupervisionCourtBackstory(pedData);
             Database.SavePed(pedData);
             SetContextPed(pedData);
+        }
+
+        /// <summary>StopThePed passenger ID flow supplies a vehicle; record ID history for the driver when possible.</summary>
+        internal static void AddIdentificationEventForVehicleOccupantsStp(Vehicle vehicle, string eventType) {
+            if (vehicle == null || !vehicle.Exists()) return;
+            try {
+                Ped driver = vehicle.Driver;
+                if (driver != null && driver.IsValid())
+                    AddIdentificationEvent(driver, eventType);
+            } catch { /* ignore */ }
         }
 
         internal static void LoadPedDatabaseFromFile() {
@@ -1057,6 +1083,8 @@ namespace MDTPro.Data {
 
         /// <summary>Lock order: always acquire _pedDbLock before _vehicleDbLock to avoid deadlock.</summary>
         public static void KeepVehicleInDatabase(MDTProVehicleData vehicleData) {
+            if (vehicleData == null || string.IsNullOrWhiteSpace(vehicleData.LicensePlate)) return;
+            string plateKey = vehicleData.LicensePlate.Trim();
             MDTProPedData pedData = null;
             lock (_pedDbLock) {
                 pedData = pedDatabase.FirstOrDefault(x => x.Name == vehicleData.Owner);
@@ -1068,7 +1096,12 @@ namespace MDTPro.Data {
             if (pedData != null) Database.SavePed(pedData);
 
             lock (_vehicleDbLock) {
-                if (!keepInVehicleDatabase.Any(x => x.LicensePlate == vehicleData.LicensePlate)) keepInVehicleDatabase.Add(vehicleData);
+                if (ModIntegration.SubscribedStopThePedStopEvents) {
+                    keepInVehicleDatabase.RemoveAll(x => x != null && string.Equals(x.LicensePlate, plateKey, StringComparison.OrdinalIgnoreCase));
+                    keepInVehicleDatabase.Add(vehicleData);
+                } else if (!keepInVehicleDatabase.Any(x => x.LicensePlate == vehicleData.LicensePlate)) {
+                    keepInVehicleDatabase.Add(vehicleData);
+                }
             }
             Database.SaveVehicle(vehicleData);
         }
@@ -1114,7 +1147,22 @@ namespace MDTPro.Data {
                 MDTProPedData mdtProPedData = new MDTProPedData(pedData);
                 if (mdtProPedData == null || mdtProPedData.Name == null) return;
                 lock (_pedDbLock) {
-                    if (pedDatabase.Any(x => x.Name == mdtProPedData.Name)) return;
+                    MDTProPedData existingByName = pedDatabase.FirstOrDefault(x => x.Name != null && x.Name.Equals(mdtProPedData.Name, StringComparison.OrdinalIgnoreCase));
+                    if (existingByName != null) {
+                        // Same person already in DB (e.g. prior stop): refresh warrant/supervision from this CDF owner snapshot.
+                        // Otherwise vehicle plate checks show WANTED in STP/CDF but Person Search still shows cleared — we used to return without updating.
+                        existingByName.IsWanted = mdtProPedData.IsWanted;
+                        existingByName.WarrantText = mdtProPedData.WarrantText;
+                        existingByName.IsOnProbation = mdtProPedData.IsOnProbation;
+                        existingByName.IsOnParole = mdtProPedData.IsOnParole;
+                        if (existingByName.CDFPedData != null) {
+                            existingByName.CDFPedData.Wanted = mdtProPedData.CDFPedData.Wanted;
+                            existingByName.CDFPedData.IsOnProbation = mdtProPedData.CDFPedData.IsOnProbation;
+                            existingByName.CDFPedData.IsOnParole = mdtProPedData.CDFPedData.IsOnParole;
+                        }
+                        Database.SavePed(existingByName);
+                        return;
+                    }
                 }
                 TryApplyReEncounterProfile(mdtProPedData);
                 if (mdtProPedData.IsOnProbation || mdtProPedData.IsOnParole)
@@ -1227,8 +1275,11 @@ namespace MDTPro.Data {
                     citationReport.FinalAmount = chargesToHand.Sum(c => c.Fine);
                     Database.SaveCitationReport(citationReport);
 
+                    // Citations: Policing Redefined exclusively when loaded (native ped menu / GiveCitationToPed). Never mix with STP handoff queue.
                     if (Main.usePR) {
                         PRHelper.GiveCitation(citationReport.OffenderPedName, chargesToHand);
+                    } else if (ModIntegration.StpPluginLoaded) {
+                        StpCitationHelper.GiveCitation(citationReport.OffenderPedName, chargesToHand);
                     }
                 } else if (citationReport.Status == ReportStatus.Closed) {
                     // Already closed: persist any other edits without recalculating FinalAmount or re-issuing citation.
@@ -1435,6 +1486,16 @@ namespace MDTPro.Data {
 
             string liveName = currentPedData.Name;
             currentPedData.ApplyPersistentRecordPreservingLiveIdentity(persistentMatch);
+            // Merged row can have stale IsWanted=false while live CDF on this ped still has a warrant (vehicle/plate checks update CDF first).
+            if (currentPedData.CDFPedData != null) {
+                currentPedData.IsWanted = currentPedData.CDFPedData.Wanted;
+                if (currentPedData.IsWanted && string.IsNullOrEmpty(currentPedData.WarrantText))
+                    currentPedData.WarrantText = CitationArrestHelper.GetRandomWarrantCharge().name;
+                else if (!currentPedData.IsWanted)
+                    currentPedData.WarrantText = null;
+                currentPedData.IsOnProbation = currentPedData.CDFPedData.IsOnProbation;
+                currentPedData.IsOnParole = currentPedData.CDFPedData.IsOnParole;
+            }
             currentPedData.TimesStopped = Math.Max(currentPedData.TimesStopped, persistentMatch.TimesStopped + 1);
             currentPedData.TryParseNameIntoFirstLast();
 
@@ -1457,14 +1518,18 @@ namespace MDTPro.Data {
         internal static void ResolvePedForReEncounter(Ped ped) {
             if (ped == null || !ped.IsValid()) return;
             if (NativeFunction.Natives.IS_PED_FLEEING<bool>(ped)) MarkPedFleeing(ped);
+
+            // StopThePed often fires stopPedEvent before CDF has a full name, then askIdEvent once ID is shown.
+            // Do not register resolvedPedHandles until we have a name — otherwise the ID event hits the early
+            // return and never runs SetContextPed, so Person Search does not auto-open like with PR.
+            MDTProPedData mdtProPedData = new MDTProPedData(ped);
+            if (mdtProPedData == null || string.IsNullOrEmpty(mdtProPedData.Name)) return;
+
             lock (_resolvedPedHandlesLock) {
                 PruneResolvedPedHandlesCore();
                 if (resolvedPedHandles.Contains(ped.Handle)) return;
                 resolvedPedHandles.Add(ped.Handle);
             }
-
-            MDTProPedData mdtProPedData = new MDTProPedData(ped);
-            if (mdtProPedData == null || string.IsNullOrEmpty(mdtProPedData.Name)) return;
 
             StoreIdentifiedPedHandle(mdtProPedData.Name, ped.Handle);
 
@@ -1613,6 +1678,110 @@ namespace MDTPro.Data {
             }
         }
 
+        internal static void SetContextVehicle(MDTProVehicleData vehicleData) {
+            if (vehicleData == null || string.IsNullOrWhiteSpace(vehicleData.LicensePlate)) return;
+            lock (_contextVehicleLock) {
+                _lastContextVehicleData = vehicleData;
+                _lastContextVehicleSetAt = DateTime.UtcNow;
+            }
+        }
+
+        internal static MDTProVehicleData GetContextVehicleIfValid() {
+            lock (_contextVehicleLock) {
+                if (_lastContextVehicleData == null) return null;
+                if (DateTime.UtcNow - _lastContextVehicleSetAt > ContextVehicleTtl) {
+                    _lastContextVehicleData = null;
+                    return null;
+                }
+                return _lastContextVehicleData;
+            }
+        }
+
+        /// <summary>Compare plates ignoring spaces and case (Person / Vehicle Search context matching).</summary>
+        internal static string NormalizeVehiclePlateKey(string plate) {
+            if (string.IsNullOrWhiteSpace(plate)) return "";
+            return plate.Trim().Replace(" ", "").ToUpperInvariant();
+        }
+
+        /// <summary>StopThePed-only: copies registration/insurance expiration from CDF on the live vehicle, then overwrites <see cref="MDTProVehicleData.RegistrationStatus"/> / <see cref="MDTProVehicleData.InsuranceStatus"/> from <c>StopThePed.API.Functions.getVehicleRegistrationStatus</c> / <c>getVehicleInsuranceStatus</c> (STP’s own flags, not only CDF enums).</summary>
+        internal static bool TryRefreshVehicleDocumentsFromLiveWorld(MDTProVehicleData vehicleData) {
+            if (!ModIntegration.SubscribedStopThePedStopEvents) return false;
+            if (vehicleData == null || string.IsNullOrWhiteSpace(vehicleData.LicensePlate)) return false;
+            string want = NormalizeVehiclePlateKey(vehicleData.LicensePlate);
+            if (string.IsNullOrEmpty(want)) return false;
+            Vehicle live = null;
+            try {
+                if (vehicleData.Holder != null && vehicleData.Holder.Exists())
+                    live = vehicleData.Holder;
+            } catch { /* entity disposed */ }
+            if (live == null) {
+                try {
+                    foreach (Vehicle v in World.GetAllVehicles()) {
+                        if (v == null || !v.Exists()) continue;
+                        if (NormalizeVehiclePlateKey(v.LicensePlate) != want) continue;
+                        live = v;
+                        break;
+                    }
+                } catch {
+                    return false;
+                }
+            }
+            if (live == null) return false;
+            VehicleData cdf = null;
+            try { cdf = live.GetVehicleData(); } catch { }
+            if (cdf != null)
+                vehicleData.CopyRegistrationInsuranceFromCdf(cdf);
+            bool stp = TryOverlayStopThePedVehicleDocStatusFromApi(vehicleData, live);
+            return cdf != null || stp;
+        }
+
+        /// <summary>STP stop integration: sets registration/insurance status strings from StopThePed public API (matches in-game plate/doc checks). Call on game thread.</summary>
+        internal static bool TryOverlayStopThePedVehicleDocStatusFromApi(MDTProVehicleData vehicleData, Vehicle live) {
+            if (!ModIntegration.SubscribedStopThePedStopEvents || vehicleData == null || live == null || !live.Exists()) return false;
+            bool any = false;
+            if (StpReflectionHelper.TryGetVehicleRegistrationStatusStp(live, out string reg)) {
+                vehicleData.RegistrationStatus = reg;
+                any = true;
+            }
+            if (StpReflectionHelper.TryGetVehicleInsuranceStatusStp(live, out string ins)) {
+                vehicleData.InsuranceStatus = ins;
+                any = true;
+            }
+            return any;
+        }
+
+        /// <summary>Align Person Search warrant/supervision with CDF vehicle owner (same source STP uses after a plate check). Fixes stale MDT rows when owner was already in pedDatabase.</summary>
+        internal static void TrySyncVehicleOwnerWantedFromCdf(MDTProVehicleData vehicleData) {
+            if (vehicleData?.CDFVehicleData?.Owner == null) return;
+            try {
+                var owner = vehicleData.CDFVehicleData.Owner;
+                string name = owner.FullName?.Trim();
+                if (string.IsNullOrEmpty(name) || string.Equals(name, "Government", StringComparison.OrdinalIgnoreCase)) return;
+                bool wanted = owner.Wanted;
+                bool onProbation = owner.IsOnProbation;
+                bool onParole = owner.IsOnParole;
+                lock (_pedDbLock) {
+                    MDTProPedData existing = pedDatabase.FirstOrDefault(x => x.Name != null && x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+                    if (existing == null) return;
+                    existing.IsWanted = wanted;
+                    if (wanted && string.IsNullOrEmpty(existing.WarrantText))
+                        existing.WarrantText = CitationArrestHelper.GetRandomWarrantCharge().name;
+                    else if (!wanted)
+                        existing.WarrantText = null;
+                    existing.IsOnProbation = onProbation;
+                    existing.IsOnParole = onParole;
+                    if (existing.CDFPedData != null) {
+                        existing.CDFPedData.Wanted = wanted;
+                        existing.CDFPedData.IsOnProbation = onProbation;
+                        existing.CDFPedData.IsOnParole = onParole;
+                    }
+                    Database.SavePed(existing);
+                }
+            } catch (Exception ex) {
+                Helper.Log($"TrySyncVehicleOwnerWantedFromCdf: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
         /// <summary>Store ped handle when we identify someone. Citation handout uses this when Holder is null.</summary>
         internal static void StoreIdentifiedPedHandle(string pedName, Rage.PoolHandle handle) {
             if (string.IsNullOrWhiteSpace(pedName)) return;
@@ -1658,14 +1827,33 @@ namespace MDTPro.Data {
             return string.Equals(live.Trim(), pedData.Name.Trim(), StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>Before citation handoff: if CDF/persona exposes a full name, it must match the MDT record (if any) or the citation offender name. If no live name is available, returns true so handoff is not blocked.</summary>
+        internal static bool CitationHandoffLiveIdentityMatches(Ped ped, string offenderPedName, MDTProPedData pedData) {
+            if (ped == null || !ped.IsValid()) return false;
+            string live = null;
+            try { live = ped.GetPedData()?.FullName; } catch { }
+            if (string.IsNullOrWhiteSpace(live)) {
+                try {
+                    var persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped);
+                    if (persona != null && !string.IsNullOrEmpty(persona.FullName)) live = persona.FullName;
+                } catch { }
+            }
+            if (string.IsNullOrWhiteSpace(live))
+                return true;
+            live = live.Trim();
+            if (pedData != null && !string.IsNullOrWhiteSpace(pedData.Name))
+                return string.Equals(live, pedData.Name.Trim(), StringComparison.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(offenderPedName))
+                return string.Equals(live, offenderPedName.Trim(), StringComparison.OrdinalIgnoreCase);
+            return true;
+        }
+
         /// <summary>Refresh ModelHash/ModelName from a live ped (Holder or recently ID'd handle) so Person Search ID photos match the entity in the world. CDF does not supply portrait data; we use GTA model name against public ped image CDNs.</summary>
         internal static bool TryRefreshPedModelFromLiveWorld(MDTProPedData pedData, string searchName, string reversedSearchName) {
             if (pedData == null) return false;
             try {
                 if (pedData.Holder != null && pedData.Holder.IsValid()) {
-                    uint h = (uint)pedData.Holder.Model.Hash;
-                    string n = pedData.Holder.Model.Name;
-                    if (h != 0 && !string.IsNullOrEmpty(n)) {
+                    if (PedPortraitModelHelper.TryGetPortraitModelFromPed(pedData.Holder, out uint h, out string n)) {
                         pedData.ModelHash = h;
                         pedData.ModelName = n;
                         return true;
@@ -1679,9 +1867,7 @@ namespace MDTPro.Data {
                         Ped live = World.GetEntityByHandle<Ped>(handleOpt.Value);
                         if (live == null || !live.IsValid()) continue;
                         if (!LivePedIdentityMatchesRecord(live, pedData)) continue;
-                        uint mh = (uint)live.Model.Hash;
-                        string mn = live.Model.Name;
-                        if (mh == 0 || string.IsNullOrEmpty(mn)) continue;
+                        if (!PedPortraitModelHelper.TryGetPortraitModelFromPed(live, out uint mh, out string mn)) continue;
                         pedData.ModelHash = mh;
                         pedData.ModelName = mn;
                         return true;
@@ -2766,6 +2952,58 @@ namespace MDTPro.Data {
             }
         }
 
+        /// <summary>Uses StopThePed.API.Functions isPedAlcoholOverLimit / isPedUnderDrugsInfluence (see StopThePed/Decompiled) after breathalyzer, drug swab, or SFST events.</summary>
+        internal static void ApplyStopThePedImpairmentEvidence(Ped ped) {
+            if (ped == null || !ped.IsValid()) return;
+            try {
+                Persona persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped);
+                if (persona == null || string.IsNullOrWhiteSpace(persona.FullName)) return;
+                string cacheKey = GetPedDataForPed(ped)?.Name ?? persona.FullName;
+                if (string.IsNullOrWhiteSpace(cacheKey)) return;
+                bool alcohol = StpReflectionHelper.TryIsPedAlcoholOverLimit(ped);
+                bool drugs = StpReflectionHelper.TryIsPedUnderDrugsInfluence(ped);
+                if (!alcohol && !drugs) return;
+                string now = DateTime.UtcNow.ToString("o");
+                lock (pedEvidenceLock) {
+                    if (!pedEvidenceCache.TryGetValue(cacheKey, out PedEvidenceContext ctx)) {
+                        ctx = new PedEvidenceContext();
+                        pedEvidenceCache[cacheKey] = ctx;
+                    }
+                    if (alcohol) ctx.WasDrunk = true;
+                    if (ctx.CapturedAt == default(DateTime)) ctx.CapturedAt = DateTime.UtcNow;
+                    Database.UpsertPedEvidenceEntry(new PedEvidenceCacheEntry {
+                        PedName = cacheKey,
+                        CapturedAt = ctx.CapturedAt,
+                        HadWeapon = ctx.HadWeapon,
+                        WasWanted = ctx.WasWanted,
+                        WasPatDown = ctx.WasPatDown,
+                        WasDrunk = ctx.WasDrunk,
+                        WasFleeing = ctx.WasFleeing,
+                        AssaultedPed = ctx.AssaultedPed,
+                        DamagedVehicle = ctx.DamagedVehicle,
+                        HadIllegalWeapon = ctx.HadIllegalWeapon,
+                        ViolatedSupervision = ctx.ViolatedSupervision,
+                        Resisted = ctx.Resisted,
+                    });
+                }
+                if (drugs) {
+                    Database.SaveDrugRecords(new List<DrugRecord> {
+                        new DrugRecord {
+                            OwnerPedName = cacheKey,
+                            DrugType = "Field test",
+                            DrugCategory = "StopThePed",
+                            Description = "StopThePed API indicates controlled substance influence",
+                            Source = "StopThePed",
+                            FirstSeenAt = now,
+                            LastSeenAt = now
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                Helper.Log($"ApplyStopThePedImpairmentEvidence: {e.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
         /// <summary>When firearmDebugLogging is true, reflects PolicingRedefined assembly and logs public types/events that might relate to weapons. Run once on load to discover what PR exposes.</summary>
         internal static void LogPRAssemblyFirearmDiagnostics() {
             if (!Main.usePR || !SetupController.GetConfig().firearmDebugLogging) return;
@@ -2794,15 +3032,15 @@ namespace MDTPro.Data {
                 relevant.Sort();
                 Helper.Log($"[Firearm] PR assembly ({asm.GetName().Name} {asm.GetName().Version}): {relevant.Count} relevant types/events:\n  " + string.Join("\n  ", relevant.Take(60)), false, Helper.LogSeverity.Info);
                 if (relevant.Count > 60)
-                    Helper.Log($"[Firearm] ... and {relevant.Count - 60} more. See docs/FIREARM-DATA-SOURCES.md", false, Helper.LogSeverity.Info);
+                    Helper.Log($"[Firearm] ... and {relevant.Count - 60} more.", false, Helper.LogSeverity.Info);
             } catch (Exception ex) {
                 Helper.Log($"[Firearm] PR assembly diagnostics failed: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
         }
 
-        /// <summary>Uses PR SearchItemsAPI.GetPedSearchItems to capture weapon/firearm items and persist to firearm_records.</summary>
+        /// <summary>Uses PR SearchItemsAPI when available; otherwise StopThePed injectPedSearchItems + reflected getters (same thread as caller; use game fiber).</summary>
         internal static void CaptureFirearmsFromPed(Ped ped, string source = "Search") {
-            if (ped == null || !ped.IsValid() || !Main.usePR) return;
+            if (ped == null || !ped.IsValid()) return;
             try {
                 if (SetupController.GetConfig().firearmDebugLogging)
                     Helper.Log($"[Firearm] CaptureFirearmsFromPed called: source={source}, pedHandle={ped?.Handle}", false, Helper.LogSeverity.Info);
@@ -2814,17 +3052,42 @@ namespace MDTPro.Data {
                         Helper.Log($"[Firearm] CaptureFirearmsFromPed skipped: no owner name for source={source}", false, Helper.LogSeverity.Info);
                     return;
                 }
-                int count = CaptureFirearmsFromPedWithOwner(ped, ownerName, source);
-                if (SetupController.GetConfig().firearmDebugLogging && count > 0)
-                    Helper.Log($"[Firearm] CaptureFirearmsFromPed saved {count} record(s) from {source}", false, Helper.LogSeverity.Info);
+                if (ModIntegration.HasPolicingRedefinedSearchItemsApi) {
+                    int count = CaptureFirearmsFromPedWithOwner(ped, ownerName, source);
+                    if (SetupController.GetConfig().firearmDebugLogging && count > 0)
+                        Helper.Log($"[Firearm] CaptureFirearmsFromPed saved {count} record(s) from {source}", false, Helper.LogSeverity.Info);
+                    return;
+                }
+                if (ModIntegration.SubscribedStopThePedStopEvents)
+                    TryCaptureStpPedSearchFirearms(ped, ownerName, source);
             } catch (Exception e) {
                 Helper.Log($"Firearm/drug capture failed: {e.Message}", false, Helper.LogSeverity.Warning);
             }
         }
 
+        /// <summary>StopThePed ped search: inject + yield + IEnumerable getters → firearm_records (weapon-shaped items).</summary>
+        private static void TryCaptureStpPedSearchFirearms(Ped ped, string ownerName, string source) {
+            try {
+                StpReflectionHelper.TryInvokeInjectPedSearchItems(ped);
+                GameFiber.Wait(150);
+                if (StpReflectionHelper.TryGetPedSearchItemsEnumerable(ped, out System.Collections.IEnumerable list)) {
+                    var records = ExtractFirearmRecordsFromItemList(list, ownerName, source);
+                    if (records.Count > 0)
+                        Database.SaveFirearmRecords(records);
+                    if (SetupController.GetConfig().firearmDebugLogging)
+                        Helper.Log($"[Firearm] STP ped search {source}: extracted {records.Count} firearm record(s)", false, Helper.LogSeverity.Info);
+                    return;
+                }
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"[Firearm] STP ped search: no IEnumerable getter for {source}", false, Helper.LogSeverity.Info);
+            } catch (Exception ex) {
+                Helper.Log($"TryCaptureStpPedSearchFirearms: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
         /// <summary>Captures firearms from ped using an explicit owner (e.g. "Evidence (pickup)" for player-held weapons). Returns count of firearm records captured.</summary>
         private static int CaptureFirearmsFromPedWithOwner(Ped ped, string ownerName, string source) {
-            if (ped == null || !ped.IsValid() || !Main.usePR || string.IsNullOrWhiteSpace(ownerName)) return 0;
+            if (ped == null || !ped.IsValid() || !ModIntegration.HasPolicingRedefinedSearchItemsApi || string.IsNullOrWhiteSpace(ownerName)) return 0;
             bool debug = SetupController.GetConfig().firearmDebugLogging;
             try {
                 Type searchApiType = Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined")
@@ -2945,7 +3208,7 @@ namespace MDTPro.Data {
 
         /// <summary>Poll-based: for vehicles in vehicleDatabase with valid Holder, if PR reports vehicle searched and we haven't captured yet, persist search items.</summary>
         internal static void TryCaptureVehicleSearches() {
-            if (!Main.usePR) return;
+            if (!ModIntegration.HasPolicingRedefinedSearchItemsApi) return;
             try {
                 MethodInfo getHasSearched = null;
                 var searchApiTypeNames = new[] {
@@ -2999,7 +3262,14 @@ namespace MDTPro.Data {
 
         /// <summary>Captures firearms from (1) player's held weapon when PR has run a check on it, (2) weapon pickups on the ground via GetPickupSearchItems if PR exposes it. Ground/pickup weapons use "Evidence (ground)" as owner.</summary>
         internal static void TryCapturePickupAndPlayerFirearms() {
-            if (!Main.usePR || Main.Player == null || !Main.Player.IsValid()) return;
+            if (Main.Player == null || !Main.Player.IsValid()) return;
+            bool prSearch = ModIntegration.HasPolicingRedefinedSearchItemsApi;
+            bool stpStops = ModIntegration.SubscribedStopThePedStopEvents;
+            if (!prSearch && !stpStops) return;
+            if (!prSearch && stpStops) {
+                TryCapturePlayerHeldWeaponFallback();
+                return;
+            }
             try {
                 // Try GetPedSearchItems on the player - when you pick up a weapon and run a firearm check, PR may add it to the player's search items. Use "Evidence (pickup)" as owner so it appears in Firearms Check.
                 int prCount = CaptureFirearmsFromPedWithOwner(Main.Player, "Evidence (pickup)", "Evidence (pickup)");
@@ -3184,16 +3454,291 @@ namespace MDTPro.Data {
             return records;
         }
 
-        /// <summary>Uses PR SearchItemsAPI.GetVehicleSearchItems to capture items and persist to vehicle_search_records. Also creates firearm_records for Weapon/FirearmItems so they appear in Firearms Check.</summary>
+        /// <summary>First firearm hash from PR <c>GetPedSearchItems</c> (same shape as firearm capture). Read-only; does not persist. Game thread.</summary>
+        internal static uint TryGetPedSearchItemsFirearmHash(Ped ped) {
+            if (ped == null || !ped.IsValid() || !ModIntegration.HasPolicingRedefinedSearchItemsApi) return 0u;
+            try {
+                Type searchApiType = Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined")
+                    ?? Type.GetType("PolicingRedefined.API.SearchItemAPI, PolicingRedefined")
+                    ?? Type.GetType("PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined");
+                if (searchApiType == null) return 0u;
+                MethodInfo getItems = searchApiType.GetMethod("GetPedSearchItems", BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase, null, new[] { typeof(Rage.Ped) }, null);
+                if (getItems == null) return 0u;
+                object result = getItems.Invoke(null, new object[] { ped });
+                if (!(result is System.Collections.IEnumerable list)) return 0u;
+                var recs = ExtractFirearmRecordsFromItemList(list, "_", "_");
+                foreach (FirearmRecord r in recs) {
+                    if (r != null && r.WeaponModelHash != 0u && !IsMeleeOrNonFirearm(r.WeaponModelHash, r.WeaponModelId))
+                        return r.WeaponModelHash;
+                }
+            } catch {
+                /* ignore */
+            }
+            return 0u;
+        }
+
+        /// <summary>Reflection over CDF <c>PedData</c> for weapon-shaped fields or collections. Not all CDF builds expose on-person weapons; returns false when nothing matches.</summary>
+        internal static bool TryGetCdfPedDataFirearmHash(Ped ped, out uint hash) {
+            hash = 0u;
+            if (ped == null || !ped.IsValid()) return false;
+            try {
+                PedData cdf = ped.GetPedData();
+                if (cdf == null) return false;
+                Type t = cdf.GetType();
+                foreach (PropertyInfo pi in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
+                    if (!pi.CanRead) continue;
+                    string n = pi.Name ?? "";
+                    if (n.IndexOf("Permit", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                    if (n.IndexOf("License", StringComparison.OrdinalIgnoreCase) >= 0 && n.IndexOf("Weapon", StringComparison.OrdinalIgnoreCase) < 0) continue;
+
+                    object val;
+                    try { val = pi.GetValue(cdf); } catch { continue; }
+                    if (val == null) continue;
+
+                    if (val is System.Collections.IEnumerable enumerable && !(val is string)) {
+                        foreach (object el in enumerable) {
+                            if (el == null) continue;
+                            if (TryGetWeaponHashFromWeaponShapedObject(el, out uint h) && h != 0u) {
+                                hash = h;
+                                return true;
+                            }
+                        }
+                        continue;
+                    }
+
+                    bool nameHintsWeapon = n.IndexOf("Weapon", StringComparison.OrdinalIgnoreCase) >= 0
+                        || n.IndexOf("Firearm", StringComparison.OrdinalIgnoreCase) >= 0
+                        || n.IndexOf("Holster", StringComparison.OrdinalIgnoreCase) >= 0;
+                    if (nameHintsWeapon && TryCoerceUIntWeaponHash(val, out uint uh) && uh != 0u && uh != 0xA2719263u && !IsMeleeOrNonFirearm(uh, null)) {
+                        hash = uh;
+                        return true;
+                    }
+                }
+            } catch {
+                /* ignore */
+            }
+            return false;
+        }
+
+        private static bool TryCoerceUIntWeaponHash(object val, out uint hash) {
+            hash = 0u;
+            if (val == null) return false;
+            try {
+                if (val is uint u) { hash = u; return hash != 0u; }
+                if (val is int i && i > 0) { hash = unchecked((uint)i); return true; }
+                if (val is long l && l > 0 && l <= uint.MaxValue) { hash = (uint)l; return true; }
+                hash = Convert.ToUInt32(val);
+                return hash != 0u;
+            } catch {
+                return false;
+            }
+        }
+
+        private static bool TryGetWeaponHashFromWeaponShapedObject(object item, out uint hash) {
+            hash = 0u;
+            if (item == null) return false;
+            Type t = item.GetType();
+            bool looksWeapon = t.Name.IndexOf("Weapon", StringComparison.OrdinalIgnoreCase) >= 0
+                || t.Name.IndexOf("Firearm", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (!looksWeapon) return false;
+
+            uint h = 0u;
+            string modelId = null;
+            foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
+                try {
+                    object val = prop.GetValue(item);
+                    if (val == null) continue;
+                    string name = prop.Name;
+                    if (name == "WeaponModelHash" || name == "ModelHash") {
+                        if (val is int ii) h = unchecked((uint)ii);
+                        else if (val is uint uu) h = uu;
+                        else if (val is long ll) h = unchecked((uint)ll);
+                        else { try { h = Convert.ToUInt32(val); } catch { } }
+                    } else if (name == "WeaponModelId" || name == "ModelId") modelId = val?.ToString();
+                } catch { /* property read */ }
+            }
+            if (h == 0u || h == 0xA2719263u || IsMeleeOrNonFirearm(h, modelId)) return false;
+            hash = h;
+            return true;
+        }
+
+        /// <summary>Parses search item enumerable (PR or STP shapes) into vehicle_search + firearm_records. Requires game thread for natives.</summary>
+        private static void PersistVehicleSearchItemsFromEnumerable(Vehicle vehicle, System.Collections.IEnumerable list) {
+            if (vehicle == null || !vehicle.Exists() || list == null) return;
+            string plate = vehicle.LicensePlate?.Trim();
+            if (string.IsNullOrEmpty(plate)) return;
+            string ownerForFirearms = GetVehicleDriverNameForFirearmOwner(vehicle, plate);
+            var records = new List<VehicleSearchRecord>();
+            var firearmRecords = new List<FirearmRecord>();
+            string now = DateTime.UtcNow.ToString("o");
+
+            foreach (object item in list) {
+                if (item == null) continue;
+                Type t = item.GetType();
+                string itemType = "Contraband";
+                string drugType = null;
+                string itemLocation = null;
+                string description = null;
+                uint weaponHash = 0u;
+                string weaponModelId = null;
+                string serial = null;
+                bool isStolen = false;
+                bool isSerialScratched = false;
+
+                if (t.Name.Contains("DrugItem") || t.Name.Contains("Drug")) {
+                    itemType = "Drug";
+                    string amountStr = null;
+                    foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
+                        try {
+                            object val = prop.GetValue(item);
+                            if (val == null) continue;
+                            string pn = prop.Name;
+                            string vs = val?.ToString()?.Trim();
+                            if (string.IsNullOrEmpty(vs)) continue;
+                            if (pn == "DrugType" || pn == "SubstanceType" || pn == "Substance" || pn == "Name" || pn == "DrugName") drugType = drugType ?? vs;
+                            else if (pn == "Value" || pn == "Description" || pn == "FlavorText") description = description ?? vs;
+                            else if (pn == "Location" || pn == "ItemLocation") itemLocation = itemLocation ?? vs;
+                            else if (pn == "Amount" || pn == "Quantity") amountStr = amountStr ?? vs;
+                        } catch { }
+                    }
+                    if (string.IsNullOrEmpty(description) && !string.IsNullOrEmpty(amountStr))
+                        description = string.IsNullOrEmpty(drugType) ? amountStr : $"{drugType} ({amountStr})";
+                    if (string.IsNullOrEmpty(description)) description = drugType;
+                } else if (t.Name.Contains("WeaponItem") || t.Name.Contains("FirearmItem") || (t.Name.Contains("Weapon") && t.Name.Contains("Item"))) {
+                    itemType = "Weapon";
+                    string itemOwner = null;
+                    foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
+                        try {
+                            object val = prop.GetValue(item);
+                            if (val == null) continue;
+                            string pn = prop.Name;
+                            if (pn == "WeaponModelHash" || pn == "ModelHash") weaponHash = Convert.ToUInt32(val);
+                            else if (pn == "WeaponModelId" || pn == "ModelId") weaponModelId = val?.ToString();
+                            else if (pn == "Value" || pn == "Description" || pn == "FlavorText") description = description ?? val?.ToString();
+                            else if (pn == "Location" || pn == "ItemLocation") itemLocation = itemLocation ?? val?.ToString();
+                            else if (pn == "SerialNumber" || pn == "Serial") serial = serial ?? val?.ToString();
+                            else if (pn == "Owner" || pn == "RegisteredOwner" || pn == "OwnerName" || pn == "OwnerPedName")
+                                itemOwner = string.IsNullOrWhiteSpace(itemOwner) ? val?.ToString()?.Trim() : itemOwner;
+                            else if (pn == "IsStolen") { try { isStolen = Convert.ToBoolean(val); } catch { } }
+                            else if ((pn == "State" || pn == "FirearmState" || pn == "SerialState") && val != null) {
+                                string stateStr = val.ToString();
+                                if (string.Equals(stateStr, "ScratchedSN", StringComparison.OrdinalIgnoreCase) || (int.TryParse(stateStr, out int si) && si == 1))
+                                    isSerialScratched = true;
+                            }
+                        } catch { }
+                    }
+                    string firearmOwner = !string.IsNullOrWhiteSpace(itemOwner) ? itemOwner : ownerForFirearms;
+                    if (weaponHash != 0u && firearmOwner != null && !IsMeleeOrNonFirearm(weaponHash, weaponModelId)) {
+                        string displayName = GetWeaponDisplayNameFromHash(weaponHash) ?? description ?? weaponModelId;
+                        firearmRecords.Add(new FirearmRecord {
+                            SerialNumber = isSerialScratched ? null : (string.IsNullOrWhiteSpace(serial) ? null : serial.Trim()),
+                            IsSerialScratched = isSerialScratched,
+                            OwnerPedName = firearmOwner,
+                            WeaponModelId = weaponModelId,
+                            WeaponDisplayName = displayName,
+                            WeaponModelHash = weaponHash,
+                            IsStolen = isStolen,
+                            Description = description,
+                            Source = "Vehicle search",
+                            FirstSeenAt = now,
+                            LastSeenAt = now
+                        });
+                    }
+                } else {
+                    foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
+                        try {
+                            object val = prop.GetValue(item);
+                            if (val == null) continue;
+                            string pn = prop.Name;
+                            string vs = val?.ToString()?.Trim();
+                            if (string.IsNullOrEmpty(vs)) continue;
+                            if (pn == "Value" || pn == "Description" || pn == "FlavorText" || pn == "Name" || pn == "DisplayName" || pn == "Type")
+                                description = description ?? vs;
+                            else if (pn == "Location" || pn == "ItemLocation") itemLocation = itemLocation ?? vs;
+                        } catch { }
+                    }
+                }
+                if (string.IsNullOrEmpty(description) && string.IsNullOrEmpty(drugType)) continue;
+
+                records.Add(new VehicleSearchRecord {
+                    LicensePlate = plate,
+                    ItemType = itemType,
+                    DrugType = drugType,
+                    ItemLocation = itemLocation,
+                    Description = description,
+                    WeaponModelHash = weaponHash,
+                    WeaponModelId = weaponModelId,
+                    Source = "Vehicle search",
+                    CapturedAt = now
+                });
+            }
+            if (records.Count > 0) {
+                Database.DeleteVehicleSearchRecordsByPlate(plate);
+                const int maxItemsPerCapture = 5;
+                var toSave = records.Count > maxItemsPerCapture ? records.Take(maxItemsPerCapture).ToList() : records;
+                Database.SaveVehicleSearchRecords(toSave);
+                lock (capturedVehicleSearchLock) {
+                    capturedVehicleSearchPlates.Add(plate);
+                    if (capturedVehicleSearchPlates.Count > MaxCapturedVehicleSearchPlates) {
+                        var toRemove = capturedVehicleSearchPlates.Take(MaxCapturedVehicleSearchPlates / 2).ToList();
+                        foreach (var p in toRemove) capturedVehicleSearchPlates.Remove(p);
+                    }
+                }
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"Vehicle search captured {records.Count} item(s) for plate {plate}", false, Helper.LogSeverity.Info);
+            }
+            if (firearmRecords.Count > 0) {
+                Database.SaveFirearmRecords(firearmRecords);
+                if (SetupController.GetConfig().firearmDebugLogging)
+                    Helper.Log($"[Firearm] Saved {firearmRecords.Count} firearm record(s) from vehicle search (plate {plate})", false, Helper.LogSeverity.Info);
+            }
+        }
+
+        /// <summary>StopThePed: injectVehicleSearchItems, yield, reflect IEnumerable getters — same persistence as PR (no GTA natives; contraband lives in STP state).</summary>
+        private static void TryCaptureStpVehicleSearchItems(Vehicle vehicle) {
+            if (vehicle == null || !vehicle.Exists()) return;
+            try {
+                StpReflectionHelper.TryInvokeInjectVehicleSearchItems(vehicle);
+                GameFiber.Wait(200);
+                if (StpReflectionHelper.TryGetVehicleSearchItemsEnumerable(vehicle, out System.Collections.IEnumerable list))
+                    PersistVehicleSearchItemsFromEnumerable(vehicle, list);
+                else {
+                    Type fn = ModIntegration.FindTypeInLoadedAssemblies("StopThePed.API.Functions");
+                    if (fn != null) {
+                        foreach (string methodName in new[] { "GetVehicleSearchItems", "getVehicleSearchItems", "GetVehicleItems" }) {
+                            var m = fn.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase, null, new[] { typeof(Vehicle) }, null);
+                            if (m == null) continue;
+                            object result;
+                            try { result = m.Invoke(null, new object[] { vehicle }); } catch { continue; }
+                            if (result is System.Collections.IEnumerable legacy && !(legacy is string)) {
+                                PersistVehicleSearchItemsFromEnumerable(vehicle, legacy);
+                                return;
+                            }
+                        }
+                    }
+                    if (SetupController.GetConfig().firearmDebugLogging) {
+                        string p = vehicle.LicensePlate?.Trim() ?? "—";
+                        Helper.Log($"[MDTPro] STP vehicle search: no item list for plate {p} after inject.", false, Helper.LogSeverity.Info);
+                    }
+                }
+            } catch (Exception ex) {
+                Helper.Log($"TryCaptureStpVehicleSearchItems: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>PR: SearchItemsAPI.GetVehicleSearchItems. STP: injectVehicleSearchItems + reflected static getters (inventory is mod state — not a GTA native list; see nativedb for world props, not STP menus).</summary>
         internal static void CaptureVehicleSearchItems(Vehicle vehicle) {
-            if (vehicle == null || !vehicle.Exists() || !Main.usePR) return;
+            if (vehicle == null || !vehicle.Exists()) return;
+            if (!ModIntegration.HasPolicingRedefinedSearchItemsApi) {
+                if (ModIntegration.SubscribedStopThePedStopEvents)
+                    TryCaptureStpVehicleSearchItems(vehicle);
+                return;
+            }
             try {
                 string plate = vehicle.LicensePlate?.Trim();
                 if (string.IsNullOrEmpty(plate)) return;
                 if (SetupController.GetConfig().firearmDebugLogging)
                     Helper.Log($"[Firearm] CaptureVehicleSearchItems called for plate {plate}", false, Helper.LogSeverity.Info);
-
-                string ownerForFirearms = GetVehicleDriverNameForFirearmOwner(vehicle, plate);
 
                 MethodInfo getItems = null;
                 foreach (string typeName in new[] {
@@ -3221,133 +3766,7 @@ namespace MDTPro.Data {
                 }
                 var list = result as System.Collections.IEnumerable;
                 if (list == null) return;
-
-                var records = new List<VehicleSearchRecord>();
-                var firearmRecords = new List<FirearmRecord>();
-                string now = DateTime.UtcNow.ToString("o");
-
-                foreach (object item in list) {
-                    if (item == null) continue;
-                    Type t = item.GetType();
-                    string itemType = "Contraband";
-                    string drugType = null;
-                    string itemLocation = null;
-                    string description = null;
-                    uint weaponHash = 0u;
-                    string weaponModelId = null;
-                    string serial = null;
-                    bool isStolen = false;
-                    bool isSerialScratched = false;
-
-                    if (t.Name.Contains("DrugItem") || t.Name.Contains("Drug")) {
-                        itemType = "Drug";
-                        string amountStr = null;
-                        foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
-                            try {
-                                object val = prop.GetValue(item);
-                                if (val == null) continue;
-                                string pn = prop.Name;
-                                string vs = val?.ToString()?.Trim();
-                                if (string.IsNullOrEmpty(vs)) continue;
-                                if (pn == "DrugType" || pn == "SubstanceType" || pn == "Substance" || pn == "Name" || pn == "DrugName") drugType = drugType ?? vs;
-                                else if (pn == "Value" || pn == "Description" || pn == "FlavorText") description = description ?? vs;
-                                else if (pn == "Location" || pn == "ItemLocation") itemLocation = itemLocation ?? vs;
-                                else if (pn == "Amount" || pn == "Quantity") amountStr = amountStr ?? vs;
-                            } catch { }
-                        }
-                        if (string.IsNullOrEmpty(description) && !string.IsNullOrEmpty(amountStr))
-                            description = string.IsNullOrEmpty(drugType) ? amountStr : $"{drugType} ({amountStr})";
-                        if (string.IsNullOrEmpty(description)) description = drugType;
-                    } else if (t.Name.Contains("WeaponItem") || t.Name.Contains("FirearmItem") || (t.Name.Contains("Weapon") && t.Name.Contains("Item"))) {
-                        itemType = "Weapon";
-                        string itemOwner = null;
-                        foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
-                            try {
-                                object val = prop.GetValue(item);
-                                if (val == null) continue;
-                                string pn = prop.Name;
-                                if (pn == "WeaponModelHash" || pn == "ModelHash") weaponHash = Convert.ToUInt32(val);
-                                else if (pn == "WeaponModelId" || pn == "ModelId") weaponModelId = val?.ToString();
-                                else if (pn == "Value" || pn == "Description" || pn == "FlavorText") description = description ?? val?.ToString();
-                                else if (pn == "Location" || pn == "ItemLocation") itemLocation = itemLocation ?? val?.ToString();
-                                else if (pn == "SerialNumber" || pn == "Serial") serial = serial ?? val?.ToString();
-                                else if (pn == "Owner" || pn == "RegisteredOwner" || pn == "OwnerName" || pn == "OwnerPedName")
-                                    itemOwner = string.IsNullOrWhiteSpace(itemOwner) ? val?.ToString()?.Trim() : itemOwner;
-                                else if (pn == "IsStolen") { try { isStolen = Convert.ToBoolean(val); } catch { } }
-                                else if ((pn == "State" || pn == "FirearmState" || pn == "SerialState") && val != null) {
-                                    string stateStr = val.ToString();
-                                    if (string.Equals(stateStr, "ScratchedSN", StringComparison.OrdinalIgnoreCase) || (int.TryParse(stateStr, out int si) && si == 1))
-                                        isSerialScratched = true;
-                                }
-                            } catch { }
-                        }
-                        string firearmOwner = !string.IsNullOrWhiteSpace(itemOwner) ? itemOwner : ownerForFirearms;
-                        if (weaponHash != 0u && firearmOwner != null && !IsMeleeOrNonFirearm(weaponHash, weaponModelId)) {
-                            string displayName = GetWeaponDisplayNameFromHash(weaponHash) ?? description ?? weaponModelId;
-                            firearmRecords.Add(new FirearmRecord {
-                                SerialNumber = isSerialScratched ? null : (string.IsNullOrWhiteSpace(serial) ? null : serial.Trim()),
-                                IsSerialScratched = isSerialScratched,
-                                OwnerPedName = firearmOwner,
-                                WeaponModelId = weaponModelId,
-                                WeaponDisplayName = displayName,
-                                WeaponModelHash = weaponHash,
-                                IsStolen = isStolen,
-                                Description = description,
-                                Source = "Vehicle search",
-                                FirstSeenAt = now,
-                                LastSeenAt = now
-                            });
-                        }
-                    } else {
-                        foreach (PropertyInfo prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
-                            try {
-                                object val = prop.GetValue(item);
-                                if (val == null) continue;
-                                string pn = prop.Name;
-                                string vs = val?.ToString()?.Trim();
-                                if (string.IsNullOrEmpty(vs)) continue;
-                                if (pn == "Value" || pn == "Description" || pn == "FlavorText" || pn == "Name" || pn == "DisplayName" || pn == "Type")
-                                    description = description ?? vs;
-                                else if (pn == "Location" || pn == "ItemLocation") itemLocation = itemLocation ?? vs;
-                            } catch { }
-                        }
-                    }
-                    // Skip items with no useful info — PR often returns empty/placeholder slots that flood the list
-                    if (string.IsNullOrEmpty(description) && string.IsNullOrEmpty(drugType)) continue;
-
-                    records.Add(new VehicleSearchRecord {
-                        LicensePlate = plate,
-                        ItemType = itemType,
-                        DrugType = drugType,
-                        ItemLocation = itemLocation,
-                        Description = description,
-                        WeaponModelHash = weaponHash,
-                        WeaponModelId = weaponModelId,
-                        Source = "Vehicle search",
-                        CapturedAt = now
-                    });
-                }
-                if (records.Count > 0) {
-                    // Replace previous records for this plate (prevents duplicate captures from poll + delayed + events)
-                    Database.DeleteVehicleSearchRecordsByPlate(plate);
-                    const int maxItemsPerCapture = 5;
-                    var toSave = records.Count > maxItemsPerCapture ? records.Take(maxItemsPerCapture).ToList() : records;
-                    Database.SaveVehicleSearchRecords(toSave);
-                    lock (capturedVehicleSearchLock) {
-                        capturedVehicleSearchPlates.Add(plate);
-                        if (capturedVehicleSearchPlates.Count > MaxCapturedVehicleSearchPlates) {
-                            var toRemove = capturedVehicleSearchPlates.Take(MaxCapturedVehicleSearchPlates / 2).ToList();
-                            foreach (var p in toRemove) capturedVehicleSearchPlates.Remove(p);
-                        }
-                    }
-                    if (SetupController.GetConfig().firearmDebugLogging)
-                        Helper.Log($"Vehicle search captured {records.Count} item(s) for plate {plate}", false, Helper.LogSeverity.Info);
-                }
-                if (firearmRecords.Count > 0) {
-                    Database.SaveFirearmRecords(firearmRecords);
-                    if (SetupController.GetConfig().firearmDebugLogging)
-                        Helper.Log($"[Firearm] Saved {firearmRecords.Count} firearm record(s) from vehicle search (plate {plate})", false, Helper.LogSeverity.Info);
-                }
+                PersistVehicleSearchItemsFromEnumerable(vehicle, list);
             } catch (Exception e) {
                 Helper.Log($"CaptureVehicleSearchItems failed: {e.Message}", false, Helper.LogSeverity.Warning);
             }

@@ -8,6 +8,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace MDTPro.Setup {
     internal class SetupController {
@@ -39,8 +42,10 @@ namespace MDTPro.Setup {
         internal static string ConfigPath => Path.Combine(MDTProPath, "config.json");
         internal static string LanguagePath => Path.Combine(MDTProPath, "language.json");
         internal static string CitationOptionsPath => Path.Combine(MDTProPath, "citationOptions.json");
+        internal static string CitationPedReactionsPath => Path.Combine(MDTProPath, "citationPedReactions.json");
         internal static string ArrestOptionsPath => Path.Combine(MDTProPath, "arrestOptions.json");
         internal static string CitationOptionsDefaultsPath => Path.Combine(DefaultsPath, "citationOptions.json");
+        internal static string CitationPedReactionsDefaultsPath => Path.Combine(DefaultsPath, "citationPedReactions.json");
         internal static string ArrestOptionsDefaultsPath => Path.Combine(DefaultsPath, "arrestOptions.json");
         internal static string SeizureOptionsDefaultsPath => Path.Combine(DefaultsPath, "seizureOptions.json");
         internal static string JudgeProfilesDefaultsPath => Path.Combine(DefaultsPath, "judgeProfiles.json");
@@ -70,6 +75,8 @@ namespace MDTPro.Setup {
             if (!File.Exists(CitationOptionsPath)) {
                 File.WriteAllBytes(CitationOptionsPath, File.ReadAllBytes(CitationOptionsDefaultsPath));
             }
+
+            SyncCitationPedReactionsFromBundledDefaults();
 
             if (!File.Exists(ArrestOptionsPath)) {
                 File.WriteAllBytes(ArrestOptionsPath, File.ReadAllBytes(ArrestOptionsDefaultsPath));
@@ -208,6 +215,61 @@ namespace MDTPro.Setup {
                 Helper.Log("Citation and arrest options updated from defaults (version 10: schedule group label tweak).", true, Helper.LogSeverity.Info);
             } catch (Exception ex) {
                 Helper.Log($"Could not update citation/arrest options from defaults: {ex.Message}", true, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>Copies defaults/citationPedReactions.json over the live file when the bundled copy is newer (see "version" in that JSON). Uses a small read + regex (no full-file JSON parse) and defers upgrade copies to the thread pool so go-on-duty does not freeze the game fiber.</summary>
+        internal static void SyncCitationPedReactionsFromBundledDefaults() {
+            try {
+                if (!File.Exists(CitationPedReactionsDefaultsPath)) return;
+                int bundled = ReadCitationPedReactionsDataVersionFromFileHead(CitationPedReactionsDefaultsPath);
+                bool liveExists = File.Exists(CitationPedReactionsPath);
+                int installed = liveExists ? ReadCitationPedReactionsDataVersionFromFileHead(CitationPedReactionsPath) : 0;
+                if (bundled <= installed) return;
+
+                string src = CitationPedReactionsDefaultsPath;
+                string dst = CitationPedReactionsPath;
+                // First-time install: must block until the file exists (server / reactions may read immediately).
+                if (!liveExists) {
+                    File.WriteAllBytes(dst, File.ReadAllBytes(src));
+                    CitationPedReactionHelper.InvalidateLoadedReactions();
+                    return;
+                }
+
+                ThreadPool.QueueUserWorkItem(_ => {
+                    try {
+                        File.WriteAllBytes(dst, File.ReadAllBytes(src));
+                        GameFiber.StartNew(() => {
+                            try {
+                                CitationPedReactionHelper.InvalidateLoadedReactions();
+                            } catch {
+                                /* ignore */
+                            }
+                        });
+                    } catch (Exception ex) {
+                        Helper.Log($"Could not sync citation ped reactions: {ex.Message}", false, Helper.LogSeverity.Warning);
+                    }
+                });
+            } catch (Exception ex) {
+                Helper.Log($"Could not sync citation ped reactions: {ex.Message}", true, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>Reads "version" from the first chunk of the file only. Missing or old files without a top-level version return 0 (upgrade path).</summary>
+        private static int ReadCitationPedReactionsDataVersionFromFileHead(string path) {
+            try {
+                const int headBytes = 16384;
+                byte[] buf = new byte[headBytes];
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)) {
+                    int n = fs.Read(buf, 0, headBytes);
+                    if (n <= 0) return 0;
+                    string s = Encoding.UTF8.GetString(buf, 0, n);
+                    Match m = Regex.Match(s, @"""version""\s*:\s*(\d+)");
+                    if (m.Success && int.TryParse(m.Groups[1].Value, out int v)) return v;
+                }
+                return 0;
+            } catch {
+                return 0;
             }
         }
 

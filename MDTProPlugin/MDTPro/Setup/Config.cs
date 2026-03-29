@@ -5,6 +5,50 @@ namespace MDTPro.Setup {
         public int port = 9000;
         /// <summary>When true, show the in-game notification with MDT URLs (local IP and PC name) when the HTTP server starts. Disable for streaming to avoid exposing host/network info on screen; URLs remain in MDTPro/ipAddresses.txt and the log.</summary>
         public bool showListeningAddressNotification = true;
+        /// <summary>After a StopThePed citation handoff attempt (when Policing Redefined is not handling citations), play a short vanilla GTA clipboard idle on the player for a paperwork moment. Uses amb@world_human_clipboard clips, not StopThePed internals.</summary>
+        public bool stpCitationPaperworkAnimation = true;
+        /// <summary>Max distance (meters) from the suspect to open the citation handoff menu or play the paperwork animation (StopThePed path).</summary>
+        public float stpCitationHandoffMaxDistance = 4f;
+        /// <summary>Minutes until a queued StopThePed-path citation handoff expires (0 = never).</summary>
+        public int stpCitationHandoffPendingExpireMinutes = 45;
+        /// <summary>When true, StopThePed-path citation notifications include a line with your MDT browser link. When false, only the short in-game message is shown.</summary>
+        public bool citationStpAppendMdtBrowserLink = true;
+        /// <summary>After handing a citation, show a random suspect line (subtitle) matched to charge keywords.</summary>
+        public bool citationPedReactionEnabled = true;
+        /// <summary>How long the suspect subtitle stays on screen (ms).</summary>
+        public int citationPedReactionDurationMs = 7500;
+        /// <summary>When false, only lines in each pool's "clean" list are used (no "mature" profanity lines).</summary>
+        public bool citationPedReactionAllowProfanity = true;
+        /// <summary>After citation handoff, small chance the suspect attacks the officer (TASK_COMBAT_PED; firearm if equipped). Works on foot or in a vehicle (ped is tasked to exit first when inside one).</summary>
+        public bool citationPostHandoffViolenceEnabled = true;
+        /// <summary>Base probability (0–1) before fines and charge modifiers. Typical range ~0.05–0.08.</summary>
+        public float citationPostHandoffViolenceBaseChance = 0.055f;
+        /// <summary>Hard cap on final roll probability (0 = no cap).</summary>
+        public float citationPostHandoffViolenceMaxChance = 0.12f;
+        /// <summary>Added to probability per dollar of total citation fines (e.g. 0.0000025 = +2.5% at $1000).</summary>
+        public float citationPostHandoffViolenceFinePerDollar = 0.0000025f;
+        /// <summary>Max extra probability from fines alone (0 = unlimited).</summary>
+        public float citationPostHandoffViolenceFineBonusCap = 0.045f;
+        /// <summary>Extra probability when any charge is arrestable.</summary>
+        public float citationPostHandoffViolenceArrestableBonus = 0.025f;
+        /// <summary>Extra probability for assault/resist/disorderly-style charge names.</summary>
+        public float citationPostHandoffViolenceHostileChargeBonus = 0.018f;
+        /// <summary>Extra probability when the ped is drunk (native check).</summary>
+        public float citationPostHandoffViolenceDrunkBonus = 0.012f;
+        /// <summary>If the ped has a firearm, probability (0–1) that the combat task equips it (else unarmed/melee).</summary>
+        public float citationPostHandoffViolenceShootWhenArmedChance = 0.5f;
+        /// <summary>Minimum milliseconds between violence rolls after any citation (global cooldown).</summary>
+        public int citationPostHandoffViolenceCooldownMs = 45000;
+        /// <summary>When true, only male suspects can roll post-citation violence. Uses CDF gender from person data when present, else the ped model&apos;s male flag.</summary>
+        public bool citationPostHandoffViolenceMaleOnly = true;
+        /// <summary>When resolving a firearm for the shoot roll, try CommonDataFramework <c>PedData</c> first (reflection: weapon collections / weapon hash fields). CDF versions differ; if nothing matches, native inventory is used.</summary>
+        public bool citationPostHandoffViolenceTryCdfWeapon = true;
+        /// <summary>When true, use Policing Redefined <c>GetPedSearchItems</c> (frisk results) before native inventory. Often empty until the ped is searched.</summary>
+        public bool citationPostHandoffViolenceTryPedSearchItemsWeapon = false;
+        /// <summary>After citation handoff (and optional paperwork anim on the StopThePed path), wait this many ms before the in-game &quot;handed citation&quot; success notification; suspect subtitle and hostility follow after that.</summary>
+        public int citationHandoffBehaviorDelayAfterPaperworkMs = 1800;
+        /// <summary>After the suspect subtitle is shown, wait this many ms before rolling hostility. 0 = immediately after subtitle call.</summary>
+        public int citationHandoffDelayBeforeViolenceAfterReactionMs = 1200;
         public int maxNumberOfNearbyPedsOrVehicles = 15;
         public int databaseLimitMultiplier = 10;
         /// <summary>Milliseconds between WebSocket pushes for time, location, and map coords. Higher = less CPU; 1000 is smooth for taskbar/map.</summary>
@@ -155,6 +199,12 @@ namespace MDTPro.Setup {
 
         /// <summary>When true, log detailed firearm capture flow (PR API results, fallback, event triggers) to MDT Pro log. Use for debugging Firearms Check.</summary>
         public bool firearmDebugLogging = false;
+
+        /// <summary>Backup Quick Actions: Auto (Policing Redefined BackupAPI if present, else Ultimate Backup), PolicingRedefined, or UltimateBackup.</summary>
+        public string integrationBackupProvider = "Auto";
+
+        /// <summary>Traffic/stop/event integration: Auto (PR events if Policing Redefined loaded, else StopThePed), PolicingRedefined, or StopThePed.</summary>
+        public string integrationStopEvents = "Auto";
 
         /// <summary>When true, log each step of POST /post/createArrestReport and in-memory/SQLite court case creation (game fiber). Turn on while testing arrest→court issues; turn off afterward.</summary>
         public bool verboseArrestCourtLogging = false;

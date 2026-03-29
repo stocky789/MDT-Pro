@@ -19,16 +19,11 @@ namespace MDTPro.Utility {
             public bool IsArrestable;
         }
 
-        /// <summary>Queues citation handoff to the specified ped. Safe to call from any thread; PR API runs on game thread.</summary>
-        internal static void GiveCitation(string pedName, IEnumerable<CitationHandoutCharge> charges) {
-            if (string.IsNullOrWhiteSpace(pedName) || charges == null) return;
-
-            var chargesList = charges.ToList();
-            if (chargesList.Count == 0) return;
-
-            // Lookup ped handle: Holder from ped data, or recently identified cache (e.g. when DB entry was loaded from file with no Holder).
+        /// <summary>Resolve the ped handle for citation handoff; shows the same notifications as <see cref="GiveCitation"/> when resolution fails.</summary>
+        internal static bool TryGetCitationPedHandle(string pedName, out Rage.PoolHandle handle, out MDTProPedData pedData) {
+            handle = default;
+            pedData = DataController.GetPedDataByName(pedName);
             Rage.PoolHandle? pedHandle = null;
-            MDTProPedData pedData = DataController.GetPedDataByName(pedName);
             if (pedData != null) {
                 Ped holder = pedData.Holder;
                 if (holder != null && holder.IsValid())
@@ -45,21 +40,32 @@ namespace MDTPro.Utility {
                     string msg = SetupController.GetLanguage().inGame.handCitationPersonNotPresent;
                     if (!string.IsNullOrWhiteSpace(msg)) RageNotification.Show(msg, RageNotification.NotificationType.Info);
                 }
-                return;
+                return false;
             }
 
-            var handleToUse = pedHandle.Value;
+            handle = pedHandle.Value;
+            return true;
+        }
+
+        /// <summary>Queues citation handoff to the specified ped. Safe to call from any thread; PR API runs on game thread.</summary>
+        internal static void GiveCitation(string pedName, IEnumerable<CitationHandoutCharge> charges) {
+            if (string.IsNullOrWhiteSpace(pedName) || charges == null) return;
+
+            var chargesList = charges.ToList();
+            if (chargesList.Count == 0) return;
+
+            if (!TryGetCitationPedHandle(pedName, out Rage.PoolHandle handleToUse, out MDTProPedData pedDataForHandoff)) return;
             string name = pedName;
 
             // PR API must run on game thread. Citation handout and ped menu are game-thread-only.
             if (GameFiber.CanSleepNow) {
-                GiveCitationOnGameThread(handleToUse, name, chargesList);
+                GiveCitationOnGameThread(handleToUse, name, chargesList, pedDataForHandoff);
             } else {
-                GameFiber.StartNew(() => GiveCitationOnGameThread(handleToUse, name, chargesList));
+                GameFiber.StartNew(() => GiveCitationOnGameThread(handleToUse, name, chargesList, pedDataForHandoff));
             }
         }
 
-        private static void GiveCitationOnGameThread(Rage.PoolHandle pedHandle, string pedName, List<CitationHandoutCharge> charges) {
+        private static void GiveCitationOnGameThread(Rage.PoolHandle pedHandle, string pedName, List<CitationHandoutCharge> charges, MDTProPedData pedDataForHandoff) {
             Ped ped = null;
             try {
                 ped = Rage.World.GetEntityByHandle<Ped>(pedHandle);
@@ -67,6 +73,12 @@ namespace MDTPro.Utility {
             if (ped == null || !ped.IsValid()) {
                 string msg = SetupController.GetLanguage().inGame.handCitationPersonNotPresent;
                 if (!string.IsNullOrWhiteSpace(msg)) RageNotification.Show(msg, RageNotification.NotificationType.Info);
+                return;
+            }
+
+            if (!DataController.CitationHandoffLiveIdentityMatches(ped, pedName, pedDataForHandoff)) {
+                string msg = SetupController.GetLanguage().inGame.handCitationIdentityMismatch;
+                if (!string.IsNullOrWhiteSpace(msg)) RageNotification.Show(string.Format(msg, pedName), RageNotification.NotificationType.Info);
                 return;
             }
 
@@ -121,6 +133,8 @@ namespace MDTPro.Utility {
 
             string message = string.Format(SetupController.GetLanguage().inGame.handCitationTo ?? "Hand citation to {0}", pedName);
             if (!string.IsNullOrWhiteSpace(message)) RageNotification.ShowSuccess(message);
+
+            CitationHandoffPostEffects.ScheduleAfterHandoff(ped, charges, includeStopThePedPaperworkAnimation: false, pedName);
         }
     }
 }

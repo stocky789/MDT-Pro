@@ -4,6 +4,34 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
+## [0.9.8.0] — 2026-03-28
+
+### Major Features
+
+- **StopThePed + Ultimate Backup** — Works with **StopThePed** for stops / traffic events and **Ultimate Backup** for Quick Actions backup when **Mod integration → Backup** is **Ultimate Backup** or **Auto** (with PR absent, Auto uses UB). **CDF still required.** Don’t run **Policing Redefined** together with StopThePed + UB; it’s unsupported. README / release **README.txt** / **Config** list PR vs STP+UB requirements.
+
+- **Citation handoff menu** — Youj can hand a citation to a PED using the Citation Menu (F10 by default) - this menu is only when using STP. It is disabled in PR mode.
+
+### Minor Features
+
+- **StopThePed** — Optional MDT URL line on citation notifications; optional post-handoff clipboard animation (**Config** → Citations — StopThePed & handoff).
+
+- **Suspect lines** — Subtitle after handoff; lines come from `citationPedReactions.json` (version in file; defaults sync when bundled version is newer). Toggle / profanity in **Config** → Citations — suspect lines.
+
+- **Citation handed notification** — In-game message: name + total fine, before suspect line / hostility roll.
+
+- **Post-citation hostility** — Optional rare combat after citation; config under **Citations — rare hostile suspect**.
+
+- **StopThePed stop integration** — **Mod integration** → traffic stops / events: STP or Auto aligns ped/vehicle data with stops where possible.
+
+### Bug Fixes
+
+- **HttpListener** — `Server.Stop()` is synchronous; stop also runs **off duty**. Avoids port still bound (`Listening on Server failed`) and listener threads stacking across duty toggles / reloads.
+
+- **citationPedReactions sync** — Version read from file head (regex); full JSON not parsed on game thread; upgrade copy can run on thread pool.
+
+---
+
 ## [0.9.7.2] — 2026-03-28
 
 ### Minor improvements
@@ -16,9 +44,7 @@ All notable changes to MDT Pro are documented here.
 
 - **Reconstructed case wording** — Verdict and sentencing blurbs on those prior cases use the **same text generators** as real resolved cases (plea, charges, evidence bands, and the rest), so they read with the same variety as patrol-driven docket entries—not a small set of repeated templates.
 
-- **Quieter log file** — **MDTPro.log** no longer repeats the same line over and over when people nearby don’t have a full saved profile yet. How names and records show up in the MDT is unchanged.
-
-- **Property and Evidence** — When you list drugs you seized, you can now pick **one vial** or **multiple vials** as the amount (handy for things like PCP in a vial). Same idea as pills or capsules.
+- **Property and Evidence** — Vials are now a quantity option when doing a seizure report.
 
 ---
 

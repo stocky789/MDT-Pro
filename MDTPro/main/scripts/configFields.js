@@ -152,10 +152,44 @@ const CONFIG_SECTIONS = [
     keys: ['quickActionsBarEnabled'],
   },
   {
-    title: 'Updates',
+    title: 'Mod integration',
+    keys: ['integrationStopEvents', 'integrationBackupProvider'],
+  },
+  {
+    title: 'Citations — StopThePed & handoff',
     keys: [
-      'checkForUpdates',
-      'githubReleasesRepo',
+      'citationStpAppendMdtBrowserLink',
+      'stpCitationPaperworkAnimation',
+      'stpCitationHandoffMaxDistance',
+      'stpCitationHandoffPendingExpireMinutes',
+      'citationHandoffBehaviorDelayAfterPaperworkMs',
+      'citationHandoffDelayBeforeViolenceAfterReactionMs',
+    ],
+  },
+  {
+    title: 'Citations — suspect lines',
+    keys: [
+      'citationPedReactionEnabled',
+      'citationPedReactionDurationMs',
+      'citationPedReactionAllowProfanity',
+    ],
+  },
+  {
+    title: 'Citations — rare hostile suspect',
+    keys: [
+      'citationPostHandoffViolenceEnabled',
+      'citationPostHandoffViolenceMaleOnly',
+      'citationPostHandoffViolenceCooldownMs',
+      'citationPostHandoffViolenceShootWhenArmedChance',
+      'citationPostHandoffViolenceTryCdfWeapon',
+      'citationPostHandoffViolenceTryPedSearchItemsWeapon',
+      'citationPostHandoffViolenceBaseChance',
+      'citationPostHandoffViolenceMaxChance',
+      'citationPostHandoffViolenceFinePerDollar',
+      'citationPostHandoffViolenceFineBonusCap',
+      'citationPostHandoffViolenceArrestableBonus',
+      'citationPostHandoffViolenceHostileChargeBonus',
+      'citationPostHandoffViolenceDrunkBonus',
     ],
   },
 ]
@@ -531,15 +565,170 @@ const CONFIG_FIELD_META = {
   },
   quickActionsBarEnabled: {
     label: 'Show Quick Actions bar',
-    tooltip: 'Show the floating Quick Actions bar (bottom-center) with one-click buttons for Panic, Backup, and Clear ALPR. Requires Policing Redefined for backup actions.',
+    tooltip: 'Show the floating Quick Actions bar (bottom-center) with one-click buttons for Panic, Backup, and Clear ALPR. Backup uses Policing Redefined or Ultimate Backup automatically. When Ultimate Backup is active, the backup menu only lists actions that mod supports from plugins; Policing Redefined-only items are hidden.',
   },
-  checkForUpdates: {
-    label: 'Check for updates on load',
-    tooltip: 'Query GitHub for new MDT Pro releases when you start the game. Disable to skip the check.',
+  integrationStopEvents: {
+    label: 'Traffic stops & events',
+    tooltip: 'Which mod feeds stop/traffic events into MDT Pro. Auto uses Policing Redefined when it is running, otherwise StopThePed.',
+    presets: [
+      { label: 'Auto', value: 'Auto' },
+      { label: 'Policing Redefined', value: 'PolicingRedefined' },
+      { label: 'StopThePed', value: 'StopThePed' },
+      PRESET_CUSTOM,
+    ],
   },
-  githubReleasesRepo: {
-    label: 'GitHub repo for updates',
-    tooltip: 'Repository in "owner/repo" format (e.g. stocky789/MDT-Pro). Leave empty to skip update checks.',
+  integrationBackupProvider: {
+    label: 'Backup (Quick Actions)',
+    tooltip: 'Which backup mod Quick Actions calls. Auto uses Policing Redefined when available, otherwise Ultimate Backup.',
+    presets: [
+      { label: 'Auto', value: 'Auto' },
+      { label: 'Policing Redefined', value: 'PolicingRedefined' },
+      { label: 'Ultimate Backup', value: 'UltimateBackup' },
+      PRESET_CUSTOM,
+    ],
+  },
+  citationStpAppendMdtBrowserLink: {
+    label: 'Add MDT link to StopThePed citation notes',
+    tooltip: 'When on, in-game citation messages (StopThePed path) also show your MDT web address so you can open the tablet in a browser. Turn off if you do not want that extra line.',
+  },
+  stpCitationPaperworkAnimation: {
+    label: 'Paperwork animation after citation (StopThePed)',
+    tooltip: 'After handing a citation on the StopThePed path, play a short clipboard idle on your officer. Works in or out of a car (upper body only in a vehicle).',
+  },
+  stpCitationHandoffMaxDistance: {
+    label: 'Handoff menu — max distance (meters)',
+    tooltip: 'How close you must be to the suspect to open the in-game handoff menu or play the paperwork animation. The key that opens the menu is set in MDTPro.ini (CitationHandoffKey), not here.',
+    presets: [
+      { label: '3 m', value: 3 },
+      { label: '4 m (default)', value: 4 },
+      { label: '6 m', value: 6 },
+      PRESET_CUSTOM,
+    ],
+  },
+  stpCitationHandoffPendingExpireMinutes: {
+    label: 'Pending handoff expires after (minutes)',
+    tooltip: 'If you close a citation but have not used the in-game handoff menu yet, this is how long MDT Pro remembers it. Use 0 to never expire automatically.',
+    presets: [
+      { label: '30 minutes', value: 30 },
+      { label: '45 minutes (default)', value: 45 },
+      { label: '60 minutes', value: 60 },
+      { label: 'Never (0)', value: 0 },
+      PRESET_CUSTOM,
+    ],
+  },
+  citationHandoffBehaviorDelayAfterPaperworkMs: {
+    label: 'Wait after handoff before success toast (ms)',
+    tooltip: 'After the ticket is delivered (and after the paperwork animation on the StopThePed path, if enabled), wait this long, then the in-game success notification runs, then the suspect’s line, then any hostility. Gives a short beat before your “handed citation” toast.',
+    presets: [
+      { label: '1 s', value: 1000 },
+      { label: '1.8 s (default)', value: 1800 },
+      { label: '3 s', value: 3000 },
+      PRESET_CUSTOM,
+    ],
+  },
+  citationHandoffDelayBeforeViolenceAfterReactionMs: {
+    label: 'Extra wait before hostility after their line (ms)',
+    tooltip: 'After the suspect subtitle appears, wait this long before rolling whether they attack. Use 0 to check immediately after the line is shown.',
+    presets: [
+      { label: 'None (0)', value: 0 },
+      { label: '1.2 s (default)', value: 1200 },
+      { label: '2.5 s', value: 2500 },
+      PRESET_CUSTOM,
+    ],
+  },
+  citationPedReactionEnabled: {
+    label: 'Suspect lines after a citation',
+    tooltip: 'After the ticket is handed off, show a short line of dialogue from the suspect at the bottom of the screen (matched loosely to the charges).',
+  },
+  citationPedReactionDurationMs: {
+    label: 'Suspect line duration (ms)',
+    tooltip: 'How long the suspect line stays on screen, in milliseconds (1000 = 1 second).',
+    presets: [
+      { label: '5 s', value: 5000 },
+      { label: '7.5 s (default)', value: 7500 },
+      { label: '10 s', value: 10000 },
+      PRESET_CUSTOM,
+    ],
+  },
+  citationPedReactionAllowProfanity: {
+    label: 'Allow stronger language in suspect lines',
+    tooltip: 'When off, only “clean” reaction lines are used. When on, the pool can include mature lines as well.',
+  },
+  citationPostHandoffViolenceEnabled: {
+    label: 'Rare attacks after a citation',
+    tooltip: 'When on, a suspect may rarely become hostile after you hand them a citation (including stepping out of a vehicle first). Turn off to disable this entirely.',
+  },
+  citationPostHandoffViolenceMaleOnly: {
+    label: 'Only male suspects can attack',
+    tooltip: 'When on, female suspects will not roll this hostile behavior. Gender comes from person data when available, otherwise the game model.',
+  },
+  citationPostHandoffViolenceCooldownMs: {
+    label: 'Minimum time between attacks (ms)',
+    tooltip: 'After a hostile reaction, wait at least this long before another citation can trigger one. Default 45000 = 45 seconds.',
+    presets: [
+      { label: '30 s', value: 30000 },
+      { label: '45 s (default)', value: 45000 },
+      { label: '60 s', value: 60000 },
+      PRESET_CUSTOM,
+    ],
+  },
+  citationPostHandoffViolenceShootWhenArmedChance: {
+    label: 'Chance armed suspect uses gun (0–1)',
+    tooltip: 'If they have a firearm and a hostile reaction fired, this is how often they try to shoot instead of only fighting unarmed. 0.5 = half the time. Use 0 for melee only when armed, 1 to always try the gun.',
+    presets: [
+      { label: 'Never use gun (0)', value: 0 },
+      { label: 'Half the time (0.5)', value: 0.5 },
+      { label: 'Always if armed (1)', value: 1 },
+      PRESET_CUSTOM,
+    ],
+  },
+  citationPostHandoffViolenceTryCdfWeapon: {
+    label: 'Prefer person-record weapon info',
+    tooltip: 'When checking if they have a gun for the scene above, look at Common Data Framework person data first when the game exposes it. If unsure, leave on; the game still checks what they are carrying.',
+  },
+  citationPostHandoffViolenceTryPedSearchItemsWeapon: {
+    label: 'Use frisk/search results for gun check',
+    tooltip: 'When on, Policing Redefined search items (after a frisk) can count as having a firearm. Often empty until you search the ped. Most players can leave this off.',
+  },
+  citationPostHandoffViolenceBaseChance: {
+    label: 'Hostility — base chance (0–1)',
+    tooltip: 'Starting likelihood before fines and charge type are applied. Typical default is low; raise carefully if you want more fights.',
+    presets: [
+      { label: 'Low (0.04)', value: 0.04 },
+      { label: 'Default (0.055)', value: 0.055 },
+      { label: 'Higher (0.08)', value: 0.08 },
+      PRESET_CUSTOM,
+    ],
+  },
+  citationPostHandoffViolenceMaxChance: {
+    label: 'Hostility — max chance cap (0–1)',
+    tooltip: 'Upper limit after all bonuses. Stops tickets from making fights too common. Use 0 in the box to mean no cap (advanced).',
+    presets: [
+      { label: 'Cap at ~10% (0.10)', value: 0.1 },
+      { label: 'Default cap (0.12)', value: 0.12 },
+      { label: 'No cap (0)', value: 0 },
+      PRESET_CUSTOM,
+    ],
+  },
+  citationPostHandoffViolenceFinePerDollar: {
+    label: 'Hostility — extra chance per fine dollar',
+    tooltip: 'Tiny bump per dollar of total fine. Leave at default unless you are tuning balance.',
+  },
+  citationPostHandoffViolenceFineBonusCap: {
+    label: 'Hostility — max extra from fines (0–1)',
+    tooltip: 'Caps how much heavy fines can increase the chance. 0 = no cap on that part.',
+  },
+  citationPostHandoffViolenceArrestableBonus: {
+    label: 'Hostility — extra if any arrestable charge',
+    tooltip: 'Added chance when the citation includes at least one arrestable charge.',
+  },
+  citationPostHandoffViolenceHostileChargeBonus: {
+    label: 'Hostility — extra for assault/resist-style charges',
+    tooltip: 'Added chance when charge wording looks like assault, resist, battery, or disorderly conduct.',
+  },
+  citationPostHandoffViolenceDrunkBonus: {
+    label: 'Hostility — extra if suspect is drunk',
+    tooltip: 'Added chance when the game considers the ped drunk.',
   },
 }
 
