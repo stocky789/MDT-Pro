@@ -204,6 +204,7 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/json";
             } else if (path == "playerLocation") {
+                DataController.RefreshMdtLocationOnGameFiberBlocking(1500);
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.MdtPreferredLocation));
                 status = 200;
                 contentType = "text/json";

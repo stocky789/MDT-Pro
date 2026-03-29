@@ -5,6 +5,13 @@
 
 let autosaveInterval = null
 
+function readApiLocationField(loc, key) {
+  if (!loc) return ''
+  const camel = key.charAt(0).toLowerCase() + key.slice(1)
+  const v = loc[key] ?? loc[camel]
+  return v != null ? String(v) : ''
+}
+
 function serializeDraft() {
   const el = document.querySelector('.createPage .reportInformation')
   if (!el || el.children.length === 0) return
@@ -1313,7 +1320,13 @@ async function onCreatePageTypeSelectorButtonClick(type) {
 
   const language = await getLanguage()
   const config = await getConfig()
-  const location = await (await fetch('/data/playerLocation')).json()
+  const rawPlayerLoc = await (await fetch('/data/playerLocation')).json()
+  const location = {
+    Postal: readApiLocationField(rawPlayerLoc, 'Postal'),
+    Street: readApiLocationField(rawPlayerLoc, 'Street'),
+    Area: readApiLocationField(rawPlayerLoc, 'Area'),
+    County: readApiLocationField(rawPlayerLoc, 'County'),
+  }
   const officerInformation = await (
     await fetch('/data/officerInformationData')
   ).json()
@@ -1376,10 +1389,10 @@ async function onCreatePageTypeSelectorButtonClick(type) {
     const loc = latest?.Location
     const el = document.querySelector('.createPage .reportInformation')
     const fields = {
-      '#locationSectionAreaInput': loc?.Area ?? '',
-      '#locationSectionStreetInput': loc?.Street ?? '',
-      '#locationSectionCountyInput': loc?.County ?? '',
-      '#locationSectionPostalInput': loc?.Postal ?? '',
+      '#locationSectionAreaInput': readApiLocationField(loc, 'Area'),
+      '#locationSectionStreetInput': readApiLocationField(loc, 'Street'),
+      '#locationSectionCountyInput': readApiLocationField(loc, 'County'),
+      '#locationSectionPostalInput': readApiLocationField(loc, 'Postal'),
     }
     for (const [selector, value] of Object.entries(fields)) {
       const input = el.querySelector(selector)

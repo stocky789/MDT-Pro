@@ -1,3 +1,4 @@
+using MDTPro.Utility;
 using Newtonsoft.Json;
 using Rage;
 using System;
@@ -52,11 +53,19 @@ namespace MDTPro.Data.Reports {
                 var zone = LSPD_First_Response.Mod.API.Functions.GetZoneAtPosition(vector3);
                 if (zone != null) {
                     Area = zone.RealAreaName ?? "";
-                    County = zone.County.ToString() ?? "";
+                    County = Helper.SpacedWordsFromPascalIdentifier(zone.County.ToString() ?? "");
                 }
-                Street = World.GetStreetName(vector3) ?? "";
             } catch {
-                Area = Street = County = "";
+                Area = County = "";
+            }
+            try {
+                Street = GtaLocationNatives.TryGetStreetDisplayName(vector3);
+            } catch {
+                Street = "";
+            }
+            if (string.IsNullOrWhiteSpace(Area)) {
+                string zn = GtaLocationNatives.TryGetLocalizedZoneName(vector3);
+                if (!string.IsNullOrWhiteSpace(zn)) Area = zn;
             }
             try {
                 string p = CommonDataFramework.Modules.Postals.PostalCodeController.GetPostalCode(vector3);
@@ -66,7 +75,9 @@ namespace MDTPro.Data.Reports {
             }
         }
 
-        public Location() { }
+        public Location() {
+            Area = Street = County = Postal = "";
+        }
     }
     
     public enum ReportStatus {

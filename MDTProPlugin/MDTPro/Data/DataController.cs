@@ -14,6 +14,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace MDTPro.Data {
     public class DataController {
@@ -276,6 +277,11 @@ namespace MDTPro.Data {
         private static Vector3? _stpStopScenePosition;
         private static DateTime _stpStopSceneUtc = DateTime.MinValue;
         private static readonly TimeSpan StpStopLocationMaxAge = TimeSpan.FromMinutes(20);
+        private static string _locationDebugLastSignature;
+        private static DateTime _locationDebugLastUtc = DateTime.MinValue;
+        private static DateTime _locationPlayerSkippedLastLogUtc = DateTime.MinValue;
+        private static int _emptyLocationTicksWhilePlaced;
+        private static bool _warnedEmptyWorldAddressOnce;
         internal static string CurrentTime = World.TimeOfDay.ToString();
         internal static PlayerCoords PlayerCoords = new PlayerCoords();
 
@@ -300,6 +306,26 @@ namespace MDTPro.Data {
             UpdatePlayerLocation();
             CurrentTime = World.TimeOfDay.ToString();
             UpdateCachedNearbyVehicles();
+        }
+
+        /// <summary>HTTP/WebSocket run on the thread pool; schedule <see cref="UpdatePlayerLocation"/> on the game fiber then wait so reads are not stale or never filled.</summary>
+        internal static void RefreshMdtLocationOnGameFiberBlocking(int timeoutMs = 1500) {
+            try {
+                var done = new ManualResetEventSlim(false);
+                GameFiber.StartNew(() => {
+                    try {
+                        UpdatePlayerLocation();
+                    } catch (Exception ex) {
+                        Helper.Log($"RefreshMdtLocationOnGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
+                    } finally {
+                        try { done.Set(); } catch { /* ignore */ }
+                    }
+                }, "mdtpro-loc-refresh");
+                if (!done.Wait(timeoutMs))
+                    Helper.Log("RefreshMdtLocationOnGameFiberBlocking: timed out (game paused or overloaded).", false, Helper.LogSeverity.Warning);
+            } catch (Exception ex) {
+                Helper.Log($"RefreshMdtLocationOnGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
         }
 
         private static void UpdateCachedNearbyVehicles() {
@@ -6266,24 +6292,120 @@ namespace MDTPro.Data {
         }
 
         internal static void RecomputeMdtPreferredLocation() {
+            string source = "player";
             try {
                 if (ModIntegration.SubscribedStopThePedStopEvents
                     && _stpStopScenePosition.HasValue
                     && (DateTime.UtcNow - _stpStopSceneUtc) <= StpStopLocationMaxAge) {
-                    MdtPreferredLocation = new Location(_stpStopScenePosition.Value);
-                    return;
+                    try {
+                        MdtPreferredLocation = new Location(_stpStopScenePosition.Value);
+                        source = "stp_scene";
+                    } catch {
+                        MdtPreferredLocation = PlayerLocation;
+                        source = "stp_scene_ctor_failed";
+                    }
+                } else {
+                    MdtPreferredLocation = PlayerLocation;
                 }
+            } catch {
+                MdtPreferredLocation = PlayerLocation;
+                source = "recompute_error";
+            }
+            LogMdtLocationDebug(source);
+        }
+
+        /// <summary>Throttled: logs when <see cref="Setup.Config.locationDebugLogging"/> is on (signature change or 30s heartbeat).</summary>
+        private static void LogMdtLocationDebug(string source) {
+            try {
+                if (!SetupController.GetConfig().locationDebugLogging) return;
+                Location m = MdtPreferredLocation;
+                string sig = $"{source}|{m.Postal}|{m.Street}|{m.Area}|{m.County}|{_stpStopScenePosition.HasValue}";
+                DateTime now = DateTime.UtcNow;
+                bool changed = sig != _locationDebugLastSignature;
+                bool heartbeat = (now - _locationDebugLastUtc).TotalSeconds >= 30d;
+                if (!changed && !heartbeat) return;
+                _locationDebugLastSignature = sig;
+                _locationDebugLastUtc = now;
+                Vector3 pos = default;
+                bool posOk = false;
+                try {
+                    Ped pl = Main.Player;
+                    if (pl != null && (pl.Exists() || pl.IsValid())) {
+                        pos = pl.Position;
+                        posOk = true;
+                    }
+                } catch { /* ignore */ }
+                double stpAge = _stpStopScenePosition.HasValue ? (now - _stpStopSceneUtc).TotalSeconds : -1;
+                Helper.Log(
+                    $"[Location] source={source} playerPos={(posOk ? $"({pos.X:F1},{pos.Y:F1},{pos.Z:F1})" : "n/a")} stpScene={_stpStopScenePosition.HasValue} stpAgeSec={stpAge:F0} " +
+                    $"Postal='{m.Postal}' Street='{m.Street}' Area='{m.Area}' County='{m.County}' stpEvents={(ModIntegration.SubscribedStopThePedStopEvents ? "yes" : "no")}",
+                    false,
+                    Helper.LogSeverity.Info);
             } catch {
                 /* ignore */
             }
-            MdtPreferredLocation = PlayerLocation;
+        }
+
+        private static void LogMdtLocationPlayerSkippedThrottled() {
+            try {
+                if (!SetupController.GetConfig().locationDebugLogging) return;
+                DateTime now = DateTime.UtcNow;
+                if ((now - _locationPlayerSkippedLastLogUtc).TotalSeconds < 30d) return;
+                _locationPlayerSkippedLastLogUtc = now;
+                Helper.Log("[Location] Skipped player position (ped null or not Exists/IsValid). MDT location will not refresh until your character is valid — Recompute still runs for STP scene.", false, Helper.LogSeverity.Info);
+            } catch {
+                /* ignore */
+            }
+        }
+
+        /// <summary>After several ticks with a valid ped but empty resolved address, log once (avoids load-screen false positive).</summary>
+        private static void MaybeWarnEmptyWorldAddressLookup() {
+            try {
+                Location m = MdtPreferredLocation;
+                bool empty = string.IsNullOrWhiteSpace(m.Street) && string.IsNullOrWhiteSpace(m.Area)
+                    && string.IsNullOrWhiteSpace(m.Postal) && string.IsNullOrWhiteSpace(m.County);
+                if (!empty) {
+                    _emptyLocationTicksWhilePlaced = 0;
+                    _warnedEmptyWorldAddressOnce = false;
+                    return;
+                }
+                _emptyLocationTicksWhilePlaced++;
+                if (_emptyLocationTicksWhilePlaced < 5) return;
+                if (_warnedEmptyWorldAddressOnce) return;
+                _warnedEmptyWorldAddressOnce = true;
+                Helper.Log(
+                    "MDT Pro: address fields are empty at your position (street/area/postal/county). Check CommonDataFramework + postals and that you are in the open world. For details set \"locationDebugLogging\": true in config.json — look for [Location] lines in MDTPro.log.",
+                    false,
+                    Helper.LogSeverity.Warning);
+            } catch {
+                /* ignore */
+            }
         }
 
         private static void UpdatePlayerLocation() {
-            if (Main.Player == null || !Main.Player.Exists()) return;
-            PlayerLocation = new Location(Main.Player.Position);
-            PlayerCoords = new PlayerCoords(Main.Player.Position, Main.Player.Heading);
+            Ped p = null;
+            try {
+                p = Main.Player;
+            } catch {
+                p = null;
+            }
+            bool placed = false;
+            if (p != null) {
+                try {
+                    if (p.Exists() || p.IsValid()) {
+                        PlayerLocation = new Location(p.Position);
+                        PlayerCoords = new PlayerCoords(p.Position, p.Heading);
+                        placed = true;
+                    }
+                } catch (Exception ex) {
+                    Helper.Log($"UpdatePlayerLocation: {ex.Message}", false, Helper.LogSeverity.Warning);
+                }
+            }
+            if (!placed)
+                LogMdtLocationPlayerSkippedThrottled();
             RecomputeMdtPreferredLocation();
+            if (placed)
+                MaybeWarnEmptyWorldAddressLookup();
         }
     }
 }

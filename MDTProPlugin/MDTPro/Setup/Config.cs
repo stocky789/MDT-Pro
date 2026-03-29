@@ -200,6 +200,9 @@ namespace MDTPro.Setup {
         /// <summary>When true, log detailed firearm capture flow (PR API results, fallback, event triggers) to MDT Pro log. Use for debugging Firearms Check.</summary>
         public bool firearmDebugLogging = false;
 
+        /// <summary>When true, log MDT location resolution (player position, STP stop scene, postal/street/area/county strings) to MDTPro.log on change or every 30s. Use when taskbar/report location is blank or wrong.</summary>
+        public bool locationDebugLogging = false;
+
         /// <summary>Backup Quick Actions: Auto (Policing Redefined BackupAPI if present, else Ultimate Backup), PolicingRedefined, or UltimateBackup.</summary>
         public string integrationBackupProvider = "Auto";
 

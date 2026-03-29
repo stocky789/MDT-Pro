@@ -120,32 +120,35 @@ namespace MDTPro.ServerAPI {
 
         private static Task SendUpdatesOnInterval(WebSocket webSocket, string clientMsg, CancellationToken token) {
             return Task.Run(async () => {
+                string lastLocationJson = null;
+                string lastTimeJson = null;
+                string lastCoordsJson = null;
                 try {
                     while (webSocket.State == WebSocketState.Open && Server.RunServer && !token.IsCancellationRequested) {
-                        string lastResponseMsg = "";
                         string responseMsg;
                         switch (clientMsg) {
                             case "playerLocation":
+                                DataController.RefreshMdtLocationOnGameFiberBlocking(800);
                                 responseMsg = JsonConvert.SerializeObject(DataController.MdtPreferredLocation);
 
-                                if (responseMsg != lastResponseMsg) {
-                                    lastResponseMsg = responseMsg;
+                                if (responseMsg != lastLocationJson) {
+                                    lastLocationJson = responseMsg;
                                     await SendData(webSocket, responseMsg, clientMsg, token);
                                 }
                                 break;
                             case "time":
                                 responseMsg = $"\"{DataController.CurrentTime}\"";
 
-                                if (responseMsg != lastResponseMsg) {
-                                    lastResponseMsg = responseMsg;
+                                if (responseMsg != lastTimeJson) {
+                                    lastTimeJson = responseMsg;
                                     await SendData(webSocket, responseMsg, clientMsg, token);
                                 }
                                 break;
                             case "playerCoords":
                                 responseMsg = JsonConvert.SerializeObject(DataController.PlayerCoords);
 
-                                if (responseMsg != lastResponseMsg) {
-                                    lastResponseMsg = responseMsg;
+                                if (responseMsg != lastCoordsJson) {
+                                    lastCoordsJson = responseMsg;
                                     await SendData(webSocket, responseMsg, clientMsg, token);
                                 }
                                 break;
