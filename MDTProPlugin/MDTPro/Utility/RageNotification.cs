@@ -1,3 +1,4 @@
+using MDTPro.Setup;
 using Rage;
 using System;
 
@@ -58,6 +59,34 @@ namespace MDTPro.Utility {
             Show(text, NotificationType.Info, subtitle);
         }
 
+        /// <summary>Same URL line(s) as the listening-address notification, for embedding in other messages.</summary>
+        internal static string BuildMdtBrowserUrlLinesForNotification() {
+            string localIp = Helper.GetLocalIPAddress();
+            if (string.IsNullOrEmpty(localIp)) localIp = "localhost";
+            int port = SetupController.GetConfig()?.port ?? 0;
+            if (port <= 0) port = 9000;
+            string machineName = string.IsNullOrWhiteSpace(Environment.MachineName) ? "localhost" : Environment.MachineName;
+            string localUrl = $"http://{localIp}:{port}";
+            string machineUrl = $"http://{machineName}:{port}";
+            return string.Equals(localIp, machineName, StringComparison.OrdinalIgnoreCase)
+                ? localUrl
+                : $"{localUrl}~n~{machineUrl}";
+        }
+
+        /// <summary>Appends the MDT browser hint used for StopThePed citation flows (skipped when Policing Redefined handles handoff).</summary>
+        internal static string AppendStpCitationMdtBrowserHint(string message) {
+            if (string.IsNullOrEmpty(message)) return message;
+            try {
+                if (SetupController.GetConfig()?.citationStpAppendMdtBrowserLink == false) return message;
+            } catch {
+                /* ignore */
+            }
+            string urls = BuildMdtBrowserUrlLinesForNotification();
+            string fmt = GetLanguage().stpCitationMdtBrowserLine;
+            if (string.IsNullOrWhiteSpace(fmt)) fmt = "~n~~n~Open the MDT in your browser to review or finish:~n~{0}";
+            return message + string.Format(fmt, urls);
+        }
+
         private static void ShowInternal(string message, NotificationType type, string subtitle) {
             (string textureDict, string textureName) = GetTextureForType(type);
             string sub = subtitle ?? GetDefaultSubtitle(type);
@@ -90,8 +119,8 @@ namespace MDTPro.Utility {
             return text.Replace("<", " ").Replace(">", " ");
         }
 
-        private static Setup.Language.InGame GetLanguage() =>
-            Setup.SetupController.GetLanguage().inGame;
+        private static Language.InGame GetLanguage() =>
+            SetupController.GetLanguage().inGame;
 
         public enum NotificationType {
             Info,

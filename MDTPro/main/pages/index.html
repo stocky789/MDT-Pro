@@ -22,10 +22,11 @@
           <svg class="qabChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         <div class="qabBackupMenu" id="qabBackupMenu" role="menu" aria-hidden="true">
+          <div class="qabBackupMenuUbNote" id="qabBackupMenuUbNote" hidden></div>
           <div class="qabBackupSection qabBackupCodeSelector" role="none">
-            <span class="qabBackupLabel">Response code</span>
+            <span class="qabBackupLabel" id="qabBackupResponseCodeLabel">Response code</span>
             <div class="qabBackupCodeRow" role="group" aria-label="Response code">
-              <button type="button" class="qabBackupCode" data-code="1" aria-pressed="false">Code 1</button>
+              <button type="button" class="qabBackupCode" data-code="1" data-qab-pr-only="true" aria-pressed="false">Code 1</button>
               <button type="button" class="qabBackupCode active" data-code="2" aria-pressed="true">Code 2</button>
               <button type="button" class="qabBackupCode" data-code="3" aria-pressed="false">Code 3</button>
             </div>
@@ -41,13 +42,13 @@
           <div class="qabBackupSection" role="none">
             <button type="button" role="menuitem" data-action="ambulance">Ambulance</button>
             <button type="button" role="menuitem" data-action="fire">Fire Department</button>
-            <button type="button" role="menuitem" data-action="coroner">Coroner</button>
-            <button type="button" role="menuitem" data-action="animalControl">Animal Control</button>
+            <button type="button" role="menuitem" data-action="coroner" data-qab-pr-only="true">Coroner</button>
+            <button type="button" role="menuitem" data-action="animalControl" data-qab-pr-only="true">Animal Control</button>
           </div>
           <div class="qabBackupSection" role="none">
             <button type="button" role="menuitem" data-action="trafficStop">Traffic Stop</button>
-            <button type="button" role="menuitem" data-action="transport">Police Transport</button>
-            <button type="button" role="menuitem" data-action="tow">Tow Service</button>
+            <button type="button" role="menuitem" data-action="transport" data-qab-pr-only="true">Police Transport</button>
+            <button type="button" role="menuitem" data-action="tow" data-qab-pr-only="true">Tow Service</button>
             <button type="button" role="menuitem" data-action="group">Group Backup</button>
           </div>
           <div class="qabBackupSection qabBackupPursuit" role="none">
