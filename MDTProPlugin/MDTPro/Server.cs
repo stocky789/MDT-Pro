@@ -8,20 +8,29 @@ using static MDTPro.Utility.Helper;
 
 namespace MDTPro {
     internal class Server {
-        internal static bool RunServer;
+        internal static volatile bool RunServer;
 
         private static HttpListener listener;
 
+        /// <summary>HTTP server thread entry. Call <see cref="Stop"/> from the game side before starting a new thread so the prior listener releases its port.</summary>
         internal static void Start() {
-            listener?.Close();
+            // Prior Stop() should have run on the game fiber; give Windows a moment to release the socket.
+            Thread.Sleep(120);
+
             RunServer = true;
-            listener = new HttpListener();
-            listener.Prefixes.Add($"http://+:{Setup.SetupController.GetConfig().port}/");
+            var http = new HttpListener();
+            http.Prefixes.Add($"http://+:{Setup.SetupController.GetConfig().port}/");
+            listener = http;
             try {
-                listener.Start();
-            } catch {
-                Log("Listening on Server failed", true, LogSeverity.Error);
-                listener?.Close();
+                http.Start();
+            } catch (Exception ex) {
+                Log($"Listening on Server failed — port may be in use or URL ACL missing. {ex.GetType().Name}: {ex.Message}", true, LogSeverity.Error);
+                try {
+                    http.Close();
+                } catch {
+                    /* ignore */
+                }
+                listener = null;
                 RunServer = false;
                 return;
             }
@@ -38,16 +47,28 @@ namespace MDTPro {
 
             while (RunServer) {
                 try {
-                    var context = listener.GetContext();
+                    var ctxListener = listener;
+                    if (ctxListener == null) break;
+                    var context = ctxListener.GetContext();
                     ThreadPool.QueueUserWorkItem(_ => HandleRequest(context));
-                } catch (HttpListenerException e) {
-                    if (RunServer) Log($"HTTP Listener Exception: {e.Message}", true, LogSeverity.Error);
+                } catch (HttpListenerException) {
+                    // Expected when Stop() calls HttpListener.Stop() — ends the accept loop.
+                    break;
+                } catch (ObjectDisposedException) {
+                    break;
+                } catch (InvalidOperationException) {
+                    break;
                 } catch (Exception e) {
-                    Log($"Server Exception: {e.Message}", true, LogSeverity.Error);
+                    if (RunServer) Log($"Server Exception: {e.Message}", true, LogSeverity.Error);
                 }
             }
 
-            listener.Close();
+            try {
+                listener?.Close();
+            } catch {
+                /* ignore */
+            }
+            listener = null;
         }
 
         private static void HandleRequest(HttpListenerContext ctx) {
@@ -83,12 +104,31 @@ namespace MDTPro {
             }
         }
 
-        internal static async void Stop() {
+        /// <summary>Stops accepting HTTP; unblocks <see cref="HttpListener.GetContext"/>. Safe to call from the game fiber (synchronous, quick). WebSocket cleanup runs in the thread pool so we do not block on async.</summary>
+        internal static void Stop() {
             RunServer = false;
-            try {
-                await WebSocketHandler.CloseAllWebSockets();
-                listener?.Stop();
-            } catch {}
+            HttpListener http = listener;
+            if (http != null) {
+                try {
+                    http.Stop();
+                } catch {
+                    /* ignore */
+                }
+                try {
+                    http.Close();
+                } catch {
+                    /* ignore */
+                }
+            }
+            listener = null;
+
+            ThreadPool.QueueUserWorkItem(_ => {
+                try {
+                    WebSocketHandler.CloseAllWebSockets().ConfigureAwait(false).GetAwaiter().GetResult();
+                } catch {
+                    /* ignore */
+                }
+            });
         }
 
         internal static APIResponse GetAPIResponse(HttpListenerRequest req) {

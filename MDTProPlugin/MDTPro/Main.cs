@@ -42,6 +42,7 @@ namespace MDTPro {
                 UI.CitationHandoffKeybind.Stop();
                 StpCitationHandoffQueue.Clear();
                 ALPR.ALPRController.Stop();
+                Server.Stop();
                 return;
             }
             {
@@ -87,6 +88,10 @@ namespace MDTPro {
 
                         SetupDirectory();
                         GetLanguage(); // load language file into cache to prevent server thread issues
+
+                        // Release port and end prior listener thread (e.g. after off-duty without plugin unload, or RPH reload).
+                        Server.Stop();
+                        GameFiber.Wait(400);
 
                         Thread serverThread = new Thread(Server.Start) {
                             IsBackground = true
