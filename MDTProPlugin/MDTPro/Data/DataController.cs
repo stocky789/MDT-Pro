@@ -271,6 +271,11 @@ namespace MDTPro.Data {
         }
 
         internal static Location PlayerLocation = new Location();
+        /// <summary>Used for <c>/data/playerLocation</c> and the desktop taskbar: recent StopThePed stop scene when that integration is active, otherwise same as <see cref="PlayerLocation"/>.</summary>
+        internal static Location MdtPreferredLocation = new Location();
+        private static Vector3? _stpStopScenePosition;
+        private static DateTime _stpStopSceneUtc = DateTime.MinValue;
+        private static readonly TimeSpan StpStopLocationMaxAge = TimeSpan.FromMinutes(20);
         internal static string CurrentTime = World.TimeOfDay.ToString();
         internal static PlayerCoords PlayerCoords = new PlayerCoords();
 
@@ -6243,10 +6248,42 @@ namespace MDTPro.Data {
             OfficerInformation = GetOfficerInformation();
         }
 
+        /// <summary>Game thread: refresh last-known STP stop coordinates so report/taskbar location matches the traffic stop.</summary>
+        internal static void TouchStopThePedStopScene(Vector3 position) {
+            try {
+                _stpStopScenePosition = position;
+                _stpStopSceneUtc = DateTime.UtcNow;
+                RecomputeMdtPreferredLocation();
+            } catch {
+                /* ignore */
+            }
+        }
+
+        /// <summary>Game thread: drop STP scene bias after release so new reports use the officer position again.</summary>
+        internal static void ClearStopThePedStopScene() {
+            _stpStopScenePosition = null;
+            RecomputeMdtPreferredLocation();
+        }
+
+        internal static void RecomputeMdtPreferredLocation() {
+            try {
+                if (ModIntegration.SubscribedStopThePedStopEvents
+                    && _stpStopScenePosition.HasValue
+                    && (DateTime.UtcNow - _stpStopSceneUtc) <= StpStopLocationMaxAge) {
+                    MdtPreferredLocation = new Location(_stpStopScenePosition.Value);
+                    return;
+                }
+            } catch {
+                /* ignore */
+            }
+            MdtPreferredLocation = PlayerLocation;
+        }
+
         private static void UpdatePlayerLocation() {
-            if (!Main.Player.IsValid()) return;
+            if (Main.Player == null || !Main.Player.Exists()) return;
             PlayerLocation = new Location(Main.Player.Position);
             PlayerCoords = new PlayerCoords(Main.Player.Position, Main.Player.Heading);
+            RecomputeMdtPreferredLocation();
         }
     }
 }

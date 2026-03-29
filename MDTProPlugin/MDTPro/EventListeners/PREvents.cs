@@ -51,6 +51,27 @@ namespace MDTPro.EventListeners {
             new[] { "OnVehicleSearched", "OnVehicleSearchComplete", "OnVehicleSearchFinished" },
             StringComparer.OrdinalIgnoreCase);
 
+        private static readonly List<(EventInfo Event, Delegate Handler)> _prHandlerRegistrations = new List<(EventInfo, Delegate)>();
+
+        private static void RegisterPrHandler(EventInfo eventInfo, Delegate handler) {
+            eventInfo.AddEventHandler(null, handler);
+            _prHandlerRegistrations.Add((eventInfo, handler));
+        }
+
+        /// <summary>Unregister PR static handlers so RPH plugin reload does not leave stale delegates into this assembly.</summary>
+        internal static void UnsubscribeAll() {
+            for (int i = _prHandlerRegistrations.Count - 1; i >= 0; i--) {
+                var (evt, handler) = _prHandlerRegistrations[i];
+                try {
+                    evt?.RemoveEventHandler(null, handler);
+                } catch {
+                    /* ignore */
+                }
+            }
+            _prHandlerRegistrations.Clear();
+            subscribed = false;
+        }
+
         internal static void SubscribeToPREvents() {
             if (subscribed) return;
 
@@ -63,7 +84,7 @@ namespace MDTPro.EventListeners {
                     if (eventInfo == null) continue;
 
                     Delegate handler = CreateForwardingDelegate(eventInfo.EventHandlerType, eventName);
-                    eventInfo.AddEventHandler(null, handler);
+                    RegisterPrHandler(eventInfo, handler);
                 }
 
                 SubscribeToOnFootTrafficStopStarted();
@@ -84,7 +105,7 @@ namespace MDTPro.EventListeners {
                 if (eventInfo == null) return;
 
                 Delegate handler = CreateForwardingDelegate(eventInfo.EventHandlerType, "OnFootTrafficStopStarted");
-                eventInfo.AddEventHandler(null, handler);
+                RegisterPrHandler(eventInfo, handler);
             } catch (Exception e) {
                 Game.LogTrivial($"MDT Pro: [Warning] Failed to subscribe to PR OnFootTrafficStopStarted: {e.Message}");
             }
@@ -99,7 +120,7 @@ namespace MDTPro.EventListeners {
                     if (evt == null) continue;
                     try {
                         Delegate handler = CreateForwardingDelegate(evt.EventHandlerType, name);
-                        evt.AddEventHandler(null, handler);
+                        RegisterPrHandler(evt, handler);
                         Game.LogTrivial($"[MDTPro] Subscribed to PR event: {name} (vehicle search contraband)");
                         return; // One handler is enough
                     } catch (Exception ex) {
@@ -121,7 +142,7 @@ namespace MDTPro.EventListeners {
                     if (evt == null) continue;
                     try {
                         Delegate handler = CreateForwardingDelegate(evt.EventHandlerType, name);
-                        evt.AddEventHandler(null, handler);
+                        RegisterPrHandler(evt, handler);
                         Game.LogTrivial($"[MDTPro] Subscribed to PR event: {name}");
                     } catch (Exception ex) {
                         Game.LogTrivial($"[MDTPro] Could not subscribe to {name}: {ex.Message}");
@@ -140,7 +161,7 @@ namespace MDTPro.EventListeners {
                 if (eventInfo == null) return;
 
                 Delegate handler = CreateForwardingDelegate(eventInfo.EventHandlerType, "OnFootTrafficStopEnded");
-                eventInfo.AddEventHandler(null, handler);
+                RegisterPrHandler(eventInfo, handler);
             } catch (Exception e) {
                 Game.LogTrivial($"MDT Pro: [Warning] Failed to subscribe to PR OnFootTrafficStopEnded: {e.Message}");
             }

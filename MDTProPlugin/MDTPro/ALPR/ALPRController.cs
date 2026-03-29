@@ -84,7 +84,9 @@ namespace MDTPro.ALPR {
             int loopCount = 0;
 
             int intervalMs = 2000;
-            while (IsRunning && Server.RunServer) {
+            // Do not require Server.RunServer here: it stays false until the HTTP thread finishes its startup delay,
+            // so the scan fiber would terminate immediately if started in the same on-duty block as the server thread.
+            while (IsRunning) {
                 try {
                     ExpireDisplayedHitIfNeeded();
                     var cfg = GetConfig();

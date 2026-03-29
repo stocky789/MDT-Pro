@@ -388,7 +388,8 @@ namespace MDTPro.UI {
         }
 
         private static void MenuLoop() {
-            while (!_stopRequested && Server.RunServer) {
+            // Same as CitationHandoffKeybind: RunServer flips true ~120ms after the server thread starts; don't exit before that.
+            while (!_stopRequested) {
                 try {
                     bool keyDown = Game.IsKeyDownRightNow(MenuKey);
                     if (keyDown && !_menuKeyWasDown && _mainMenu != null && !_mainMenu.Visible) {

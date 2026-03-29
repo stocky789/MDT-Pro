@@ -4,6 +4,7 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Windows.Forms;
+using MDTPro.EventListeners;
 using MDTPro.Utility;
 using MDTPro.Utility.Backup;
 using static MDTPro.Setup.SetupController;
@@ -25,6 +26,15 @@ namespace MDTPro {
         }
 
         public override void Finally() {
+            try {
+                CalloutEvents.RemoveCalloutCiHandlers();
+                STPEvents.UnsubscribeAll();
+                PREvents.UnsubscribeAll();
+                CDFEvents.UnsubscribeAll();
+                LSPDFREvents.UnsubscribeAll();
+            } catch {
+                /* do not block unload if a host event API throws */
+            }
             UI.SettingsMenu.Stop();
             UI.CitationHandoffKeybind.Stop();
             StpCitationHandoffQueue.Clear();
@@ -109,19 +119,19 @@ namespace MDTPro {
                         Log($"PR: {usePR}", true, usePR ? LogSeverity.Info : LogSeverity.Warning);
                         Log($"STP: {useSTP}", true, useSTP ? LogSeverity.Info : LogSeverity.Warning);
 
-                        if (useCI) EventListeners.CalloutEvents.AddCalloutEventWithCI();
+                        if (useCI) CalloutEvents.AddCalloutEventWithCI();
 
                         if (ModIntegration.SubscribedPolicingRedefinedStopEvents) {
-                            EventListeners.PREvents.SubscribeToPREvents();
+                            PREvents.SubscribeToPREvents();
                             if (GetConfig().firearmDebugLogging)
                                 Data.DataController.LogPRAssemblyFirearmDiagnostics();
                         }
                         if (ModIntegration.SubscribedStopThePedStopEvents)
-                            EventListeners.STPEvents.SubscribeToStpEvents();
-                        EventListeners.CDFEvents.Subscribe();
+                            STPEvents.SubscribeToStpEvents();
+                        CDFEvents.Subscribe();
                         // Always subscribe to LSPDFR OnPedArrested: PR's OnPedArrested only fires for arrests through PR.
                         // LSPDFR's fires for all arrests (including those done via LSPDFR or other plugins).
-                        EventListeners.LSPDFREvents.SubscribeToLSPDFREvents();
+                        LSPDFREvents.SubscribeToLSPDFREvents();
 
                         RageNotification.ShowSuccess($"{GetLanguage().inGame.loaded} v{Version}");
 

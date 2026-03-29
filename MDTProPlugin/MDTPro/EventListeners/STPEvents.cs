@@ -14,6 +14,8 @@ namespace MDTPro.EventListeners {
         private static readonly HashSet<string> _stpHandlersAttached = new HashSet<string>(StringComparer.Ordinal);
         private static readonly HashSet<string> _stpEventsAbsent = new HashSet<string>(StringComparer.Ordinal);
         private static readonly object _stpSubscribeLock = new object();
+        /// <summary>So we can <see cref="EventInfo.RemoveEventHandler"/> on plugin unload / RPH reload — otherwise STP keeps delegates into a torn-down MDT Pro assembly.</summary>
+        private static readonly List<(EventInfo Event, Delegate Handler)> _stpRegistrations = new List<(EventInfo, Delegate)>();
 
         // Keep in sync with StopThePed/Decompiled/StopThePed.API/Events.cs (StopThePed.dll 4.9.x public surface).
         private static readonly string[] subscriptionEventNames = {
@@ -77,6 +79,7 @@ namespace MDTPro.EventListeners {
                         try {
                             Delegate handler = CreateForwardingDelegate(delegateType, eventName, kind);
                             evt.AddEventHandler(null, handler);
+                            _stpRegistrations.Add((evt, handler));
                             _stpHandlersAttached.Add(eventName);
                             newThisPass++;
                         } catch (Exception ex) {
@@ -89,6 +92,22 @@ namespace MDTPro.EventListeners {
                 } catch (Exception e) {
                     Game.LogTrivial($"MDT Pro: [Warning] STPEvents subscribe failed: {e.Message}");
                 }
+            }
+        }
+
+        /// <summary>Removes all STP static event handlers registered by this plugin load. Call from Main.Finally before the assembly unloads.</summary>
+        internal static void UnsubscribeAll() {
+            lock (_stpSubscribeLock) {
+                for (int i = _stpRegistrations.Count - 1; i >= 0; i--) {
+                    var (evt, handler) = _stpRegistrations[i];
+                    try {
+                        evt?.RemoveEventHandler(null, handler);
+                    } catch {
+                        /* ignore */
+                    }
+                }
+                _stpRegistrations.Clear();
+                _stpHandlersAttached.Clear();
             }
         }
 
@@ -129,6 +148,7 @@ namespace MDTPro.EventListeners {
                 }
 
                 if (kind == "vehicle" && args != null && args.Length >= 1 && args[0] is Vehicle veh && veh.Exists()) {
+                    DataController.TouchStopThePedStopScene(veh.Position);
                     if (eventName == "askPassengerIdEvent") {
                         DataController.ResolveVehicleAndDriverForStop(veh);
                         DataController.AddIdentificationEventForVehicleOccupantsStp(veh, "Occupant ID (STP)");
@@ -149,17 +169,20 @@ namespace MDTPro.EventListeners {
                 if (kind != "ped" || args == null || args.Length < 1 || !(args[0] is Ped ped) || !ped.IsValid())
                     return;
 
-                if (eventName == "pedArrestedEvent") {
-                    DataController.ResolvePedForReEncounter(ped);
-                    DataController.CaptureFirearmsFromPed(ped, "Arrest (STP)");
-                    return;
-                }
-
                 if (eventName == "releasePedArrestEvent") {
                     try {
                         if (ped == null || !ped.IsValid()) return;
                     } catch { return; }
                     DataController.ResolvePedForReEncounter(ped);
+                    DataController.ClearStopThePedStopScene();
+                    return;
+                }
+
+                DataController.TouchStopThePedStopScene(ped.Position);
+
+                if (eventName == "pedArrestedEvent") {
+                    DataController.ResolvePedForReEncounter(ped);
+                    DataController.CaptureFirearmsFromPed(ped, "Arrest (STP)");
                     return;
                 }
 

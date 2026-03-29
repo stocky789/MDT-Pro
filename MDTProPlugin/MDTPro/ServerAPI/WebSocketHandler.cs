@@ -126,7 +126,7 @@ namespace MDTPro.ServerAPI {
                         string responseMsg;
                         switch (clientMsg) {
                             case "playerLocation":
-                                responseMsg = JsonConvert.SerializeObject(DataController.PlayerLocation);
+                                responseMsg = JsonConvert.SerializeObject(DataController.MdtPreferredLocation);
 
                                 if (responseMsg != lastResponseMsg) {
                                     lastResponseMsg = responseMsg;

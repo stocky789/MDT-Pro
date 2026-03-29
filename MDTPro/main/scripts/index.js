@@ -421,8 +421,11 @@ locationWS.onopen = () => locationWS.send('interval/playerLocation')
 locationWS.onmessage = async (event) => {
   const location = JSON.parse(event.data).response
   const icon = document.querySelector('.iconAccess .location').innerHTML
+  const postal = location?.Postal ?? ''
+  const street = location?.Street ?? ''
+  const area = location?.Area ?? ''
   document.querySelector('.taskbar .location').innerHTML =
-    `${icon} ${location.Postal} ${location.Street},<br>${location.Area}`
+    `${icon} ${postal} ${street},<br>${area}`
 }
 
 locationWS.onclose = async () => {

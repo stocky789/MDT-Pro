@@ -32,7 +32,9 @@ namespace MDTPro.UI {
         }
 
         private static void Loop() {
-            while (!_stopRequested && Server.RunServer) {
+            // Do not gate on Server.RunServer: the listener thread sets RunServer true only after Thread.Sleep(120),
+            // so this fiber can start first and exit immediately — F10 would never work. Handoff is in-game only.
+            while (!_stopRequested) {
                 try {
                     bool down = Game.IsKeyDownRightNow(HandoffKey);
                     if (down && !_keyWasDown)

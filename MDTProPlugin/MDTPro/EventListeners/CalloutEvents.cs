@@ -61,64 +61,77 @@ namespace MDTPro.EventListeners {
         internal delegate void CalloutEventHandler(CalloutInformation calloutInfo);
         internal static event CalloutEventHandler OnCalloutEvent;
 
+        private const int MaxCalloutsInList = 20;
+        private static bool _calloutCiHandlersRegistered;
+
         internal static void AddCalloutEventWithCI() {
-            LSPD_First_Response.Mod.API.Events.OnCalloutDisplayed += Events_OnCalloutDisplayed;
-            LSPD_First_Response.Mod.API.Events.OnCalloutFinished += Events_OnCalloutFinished;
-            LSPD_First_Response.Mod.API.Events.OnCalloutAccepted += Events_OnCalloutAccepted;
-            const int MaxCalloutsInList = 20;
+            if (_calloutCiHandlersRegistered) return;
+            _calloutCiHandlersRegistered = true;
+            LSPD_First_Response.Mod.API.Events.OnCalloutDisplayed += OnCalloutDisplayedForCi;
+            LSPD_First_Response.Mod.API.Events.OnCalloutFinished += OnCalloutFinishedForCi;
+            LSPD_First_Response.Mod.API.Events.OnCalloutAccepted += OnCalloutAcceptedForCi;
+        }
 
-            void Events_OnCalloutDisplayed(LHandle handle) {
-                if (handle == null) return;
-                Callout callout = CalloutInterface.API.Functions.GetCalloutFromHandle(handle);
-                var info = new CalloutInformation(callout);
+        /// <summary>Detach LSPDFR callout handlers on plugin unload (same delegate instances as <see cref="AddCalloutEventWithCI"/>).</summary>
+        internal static void RemoveCalloutCiHandlers() {
+            if (!_calloutCiHandlersRegistered) return;
+            LSPD_First_Response.Mod.API.Events.OnCalloutDisplayed -= OnCalloutDisplayedForCi;
+            LSPD_First_Response.Mod.API.Events.OnCalloutFinished -= OnCalloutFinishedForCi;
+            LSPD_First_Response.Mod.API.Events.OnCalloutAccepted -= OnCalloutAcceptedForCi;
+            _calloutCiHandlersRegistered = false;
+        }
 
-                lock (CalloutListLock) {
-                    CalloutInfo = info;
-                    CalloutsByHandle.Insert(0, (handle, info));
-                    CalloutList.Insert(0, info);
-                    while (CalloutsByHandle.Count > MaxCalloutsInList) {
-                        CalloutsByHandle.RemoveAt(CalloutsByHandle.Count - 1);
-                        CalloutList.RemoveAt(CalloutList.Count - 1);
-                    }
+        private static void OnCalloutDisplayedForCi(LHandle handle) {
+            if (handle == null) return;
+            Callout callout = CalloutInterface.API.Functions.GetCalloutFromHandle(handle);
+            var info = new CalloutInformation(callout);
+
+            lock (CalloutListLock) {
+                CalloutInfo = info;
+                CalloutsByHandle.Insert(0, (handle, info));
+                CalloutList.Insert(0, info);
+                while (CalloutsByHandle.Count > MaxCalloutsInList) {
+                    CalloutsByHandle.RemoveAt(CalloutsByHandle.Count - 1);
+                    CalloutList.RemoveAt(CalloutList.Count - 1);
                 }
-
-                if (SetupController.GetConfig().addCalloutSuspectNamesFromMessages) {
-                    TryAddCalloutSuspectNameFromText(info.Message);
-                    TryAddCalloutSuspectNameFromText(info.Advisory);
-                }
-
-                OnCalloutEvent?.Invoke(info);
             }
 
-            void Events_OnCalloutAccepted(LHandle handle) {
-                if (handle == null) return;
-                Callout callout = CalloutInterface.API.Functions.GetCalloutFromHandle(handle);
-                CalloutInformation info = null;
-                lock (CalloutListLock) {
-                    foreach (var (h, i) in CalloutsByHandle) {
-                        if (object.ReferenceEquals(h, handle)) { info = i; break; }
-                    }
-                    if (info == null) return;
-                    info.AcceptanceState = callout.AcceptanceState;
-                    info.AcceptedTime = DateTime.Now;
-                }
-                OnCalloutEvent?.Invoke(info);
+            if (SetupController.GetConfig().addCalloutSuspectNamesFromMessages) {
+                TryAddCalloutSuspectNameFromText(info.Message);
+                TryAddCalloutSuspectNameFromText(info.Advisory);
             }
 
-            void Events_OnCalloutFinished(LHandle handle) {
-                if (handle == null) return;
-                Callout callout = CalloutInterface.API.Functions.GetCalloutFromHandle(handle);
-                CalloutInformation info = null;
-                lock (CalloutListLock) {
-                    foreach (var (h, i) in CalloutsByHandle) {
-                        if (object.ReferenceEquals(h, handle)) { info = i; break; }
-                    }
-                    if (info == null) return;
-                    info.AcceptanceState = callout.AcceptanceState;
-                    info.FinishedTime = DateTime.Now;
+            OnCalloutEvent?.Invoke(info);
+        }
+
+        private static void OnCalloutAcceptedForCi(LHandle handle) {
+            if (handle == null) return;
+            Callout callout = CalloutInterface.API.Functions.GetCalloutFromHandle(handle);
+            CalloutInformation info = null;
+            lock (CalloutListLock) {
+                foreach (var (h, i) in CalloutsByHandle) {
+                    if (object.ReferenceEquals(h, handle)) { info = i; break; }
                 }
-                OnCalloutEvent?.Invoke(info);
+                if (info == null) return;
+                info.AcceptanceState = callout.AcceptanceState;
+                info.AcceptedTime = DateTime.Now;
             }
+            OnCalloutEvent?.Invoke(info);
+        }
+
+        private static void OnCalloutFinishedForCi(LHandle handle) {
+            if (handle == null) return;
+            Callout callout = CalloutInterface.API.Functions.GetCalloutFromHandle(handle);
+            CalloutInformation info = null;
+            lock (CalloutListLock) {
+                foreach (var (h, i) in CalloutsByHandle) {
+                    if (object.ReferenceEquals(h, handle)) { info = i; break; }
+                }
+                if (info == null) return;
+                info.AcceptanceState = callout.AcceptanceState;
+                info.FinishedTime = DateTime.Now;
+            }
+            OnCalloutEvent?.Invoke(info);
         }
 
         /// <summary>Patterns to extract a suspect name from callout dispatch text (e.g. "associated with Joe Thomas" -> Joe Thomas).</summary>
