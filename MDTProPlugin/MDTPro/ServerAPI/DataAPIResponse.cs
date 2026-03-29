@@ -204,7 +204,7 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/json";
             } else if (path == "playerLocation") {
-                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.PlayerLocation));
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.MdtPreferredLocation));
                 status = 200;
                 contentType = "text/json";
             } else if (path == "currentTime") {

@@ -47,14 +47,22 @@ namespace MDTPro.Data.Reports {
         public string Postal;
 
         internal Location(Vector3 vector3) {
-            LSPD_First_Response.Engine.Scripting.WorldZone zone = LSPD_First_Response.Mod.API.Functions.GetZoneAtPosition(vector3);
-            Area = zone.RealAreaName;
-            Street = World.GetStreetName(vector3);
-            County = zone.County.ToString();
+            Area = Street = County = Postal = "";
             try {
-                Postal = CommonDataFramework.Modules.Postals.PostalCodeController.GetPostalCode(vector3);
+                var zone = LSPD_First_Response.Mod.API.Functions.GetZoneAtPosition(vector3);
+                if (zone != null) {
+                    Area = zone.RealAreaName ?? "";
+                    County = zone.County.ToString() ?? "";
+                }
+                Street = World.GetStreetName(vector3) ?? "";
             } catch {
-                Postal = null;
+                Area = Street = County = "";
+            }
+            try {
+                string p = CommonDataFramework.Modules.Postals.PostalCodeController.GetPostalCode(vector3);
+                Postal = p ?? "";
+            } catch {
+                Postal = "";
             }
         }
 
