@@ -8,25 +8,29 @@ All notable changes to MDT Pro are documented here.
 
 ### Major Features
 
-- **Citations with StopThePed** — Closing a citation in the MDT can hand it to StopThePed when Policing Redefined isn’t the one delivering tickets. You get clear in-game messages if StopThePed can’t take it automatically. If you use Policing Redefined for citations, that path is unchanged—no double prompts or mixed behavior.
+- **StopThePed + Ultimate Backup** — Works with **StopThePed** for stops / traffic events and **Ultimate Backup** for Quick Actions backup when **Mod integration → Backup** is **Ultimate Backup** or **Auto** (with PR absent, Auto uses UB). **CDF still required.** Don’t run **Policing Redefined** together with StopThePed + UB; it’s unsupported. README / release **README.txt** / **Config** list PR vs STP+UB requirements.
 
-- **Finish the ticket next to the suspect** — When the game can’t complete the handoff by itself, the citation waits until you’re close. Press the handoff key (default **F10**, configurable in **MDTPro.ini**) to open a menu and confirm you gave them the ticket.
+- **Citations → StopThePed** — Closed citations can hand off to StopThePed when PR isn’t loaded. Messages if handoff fails. PR citation behavior unchanged when PR is present.
+
+- **Citation handoff menu** — If reflection can’t hand off, pending citation uses distance check + key (**F10** default, **MDTPro.ini**). Menu to confirm delivery.
 
 ### Minor Features
 
-- **Browser reminder** — StopThePed citation notifications can include your usual MDT link. Toggle and tune under **Config and Plugins → Config** on the MDT (Citations — StopThePed & handoff).
+- **StopThePed** — Optional MDT URL line on citation notifications; optional post-handoff clipboard animation (**Config** → Citations — StopThePed & handoff).
 
-- **Optional paperwork animation** — After a StopThePed handoff, you can play a short clipboard idle on your officer. It adapts when you’re in a car and skips if the suspect is too far. Same **Config** page.
+- **Suspect lines** — Subtitle after handoff; lines come from `citationPedReactions.json` (version in file; defaults sync when bundled version is newer). Toggle / profanity in **Config** → Citations — suspect lines.
 
-- **Suspect banter** — After a successful handoff, the suspect may say something at the bottom of the screen, loosely tied to the charges. Optional; **Citations — suspect lines** in **Config**.
+- **Citation handed notification** — In-game message: name + total fine, before suspect line / hostility roll.
 
-- **Rare hostile reactions** — Every now and then a suspect may attack you after a citation—even from the driver’s seat (they step out first). It’s meant to be uncommon, mostly with male suspects, and heavier tickets or serious charges nudge it a bit. Someone with a gun might try to use it. **Citations — rare hostile suspect** in **Config**; turn the main switch off if you don’t want it.
+- **Post-citation hostility** — Optional rare combat after citation; config under **Citations — rare hostile suspect**.
 
-- **StopThePed and the MDT** — With StopThePed selected for stop integration (or Auto when it applies), person and vehicle info lines up better with your stop where the game allows. Choose under **Mod integration** in **Config** (traffic stops & events).
+- **StopThePed stop integration** — **Mod integration** → traffic stops / events: STP or Auto aligns ped/vehicle data with stops where possible.
 
 ### Bug Fixes
 
-- None.
+- **HttpListener** — `Server.Stop()` is synchronous; stop also runs **off duty**. Avoids port still bound (`Listening on Server failed`) and listener threads stacking across duty toggles / reloads.
+
+- **citationPedReactions sync** — Version read from file head (regex); full JSON not parsed on game thread; upgrade copy can run on thread pool.
 
 ---
 
