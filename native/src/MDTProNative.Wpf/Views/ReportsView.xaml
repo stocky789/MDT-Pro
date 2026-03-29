@@ -1,0 +1,33 @@
+<UserControl x:Class="MDTProNative.Wpf.Views.ReportsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel Margin="8">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+            <Button Content="Refresh tab" Style="{StaticResource CadAccentButton}" Click="RefreshTab_Click" />
+            <CheckBox x:Name="AutoRefresh" Content="Auto 5s" Margin="12,0,0,0" Foreground="{StaticResource CadText}" VerticalAlignment="Center" Checked="Auto_Changed" Unchecked="Auto_Changed" />
+        </StackPanel>
+        <TabControl x:Name="Tabs" Background="{StaticResource CadPanel}" BorderBrush="{StaticResource CadBorder}" SelectionChanged="Tabs_OnSelectionChanged">
+            <TabItem Header="Incident">
+                <DataGrid x:Name="GIncident" AutoGenerateColumns="True" IsReadOnly="True" Background="{StaticResource CadPanel}" Foreground="{StaticResource CadText}" BorderThickness="0" />
+            </TabItem>
+            <TabItem Header="Citation">
+                <DataGrid x:Name="GCitation" AutoGenerateColumns="True" IsReadOnly="True" Background="{StaticResource CadPanel}" Foreground="{StaticResource CadText}" BorderThickness="0" />
+            </TabItem>
+            <TabItem Header="Arrest">
+                <DataGrid x:Name="GArrest" AutoGenerateColumns="True" IsReadOnly="True" Background="{StaticResource CadPanel}" Foreground="{StaticResource CadText}" BorderThickness="0" />
+            </TabItem>
+            <TabItem Header="Impound">
+                <DataGrid x:Name="GImpound" AutoGenerateColumns="True" IsReadOnly="True" Background="{StaticResource CadPanel}" Foreground="{StaticResource CadText}" BorderThickness="0" />
+            </TabItem>
+            <TabItem Header="Traffic">
+                <DataGrid x:Name="GTraffic" AutoGenerateColumns="True" IsReadOnly="True" Background="{StaticResource CadPanel}" Foreground="{StaticResource CadText}" BorderThickness="0" />
+            </TabItem>
+            <TabItem Header="Injury">
+                <DataGrid x:Name="GInjury" AutoGenerateColumns="True" IsReadOnly="True" Background="{StaticResource CadPanel}" Foreground="{StaticResource CadText}" BorderThickness="0" />
+            </TabItem>
+            <TabItem Header="Property / evidence">
+                <DataGrid x:Name="GProperty" AutoGenerateColumns="True" IsReadOnly="True" Background="{StaticResource CadPanel}" Foreground="{StaticResource CadText}" BorderThickness="0" />
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</UserControl>

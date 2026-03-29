@@ -1,0 +1,19 @@
+<UserControl x:Class="MDTProNative.Wpf.Views.VehicleSearchView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel Margin="8">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Plate / VIN" Style="{StaticResource CadLabelMuted}" Margin="0,0,8,0" VerticalAlignment="Center" />
+            <TextBox x:Name="PlateBox" Width="200" Style="{StaticResource CadTextBox}" VerticalAlignment="Center" />
+            <Button Content="Search" Style="{StaticResource CadAccentButton}" Margin="8,0,0,0" Click="Search_Click" />
+            <Button Content="Context vehicle" Style="{StaticResource CadButton}" Margin="8,0,0,0" Click="Context_Click" />
+            <Button Content="Nearby (5)" Style="{StaticResource CadButton}" Margin="8,0,0,0" Click="Nearby_Click" />
+        </StackPanel>
+        <Border Background="{StaticResource CadPanel}" BorderBrush="{StaticResource CadBorder}" BorderThickness="1" Padding="8">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <TextBox x:Name="ResultBox" IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"
+                         Background="Transparent" BorderThickness="0" Foreground="{StaticResource CadText}" />
+            </ScrollViewer>
+        </Border>
+    </DockPanel>
+</UserControl>

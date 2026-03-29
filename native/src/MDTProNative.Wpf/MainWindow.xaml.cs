@@ -2,31 +2,76 @@ using System.Collections.ObjectModel;
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
-using MDTProNative.Client;
-using MDTProNative.Core;
-using Newtonsoft.Json.Linq;
+using MDTProNative.Wpf.Services;
+using MDTProNative.Wpf.Views;
 
 namespace MDTProNative.Wpf;
 
 public partial class MainWindow : Window
 {
-    MdtHttpClient? _http;
-    MdtWebSocketSession? _wsTime;
-    MdtWebSocketSession? _wsLocation;
-    MdtWebSocketSession? _wsCallouts;
-    readonly ObservableCollection<string> _calloutLines = new();
+    readonly MdtConnectionManager _connection;
     readonly ObservableCollection<string> _logLines = new();
-    JArray? _lastCallouts;
+    readonly ObservableCollection<NavItem> _nav = new();
+    bool _navInit;
 
     public MainWindow()
     {
         InitializeComponent();
-        CalloutList.ItemsSource = _calloutLines;
+        _connection = new MdtConnectionManager(Dispatcher);
+        _connection.TimeUpdated += s => StatusTime.Text = s;
+        _connection.LocationUpdated += s => StatusLocation.Text = s;
+        _connection.CalloutsUpdated += (_, count) => StatusCallouts.Text = count == 0 && !_connection.IsConnected ? "—" : count.ToString();
+        _connection.Log += AppendLog;
+
         MessageLog.ItemsSource = _logLines;
-        _calloutLines.Add("— Not connected —");
-        CalloutList.SelectionChanged += CalloutList_OnSelectionChanged;
-        Closing += async (_, _) => await TeardownAsync();
+        _nav.Add(new NavItem("dashboard", "Dashboard"));
+        _nav.Add(new NavItem("person", "Person search"));
+        _nav.Add(new NavItem("vehicle", "Vehicle search"));
+        _nav.Add(new NavItem("firearms", "Firearms"));
+        _nav.Add(new NavItem("bolo", "BOLO"));
+        _nav.Add(new NavItem("reports", "Reports"));
+        _nav.Add(new NavItem("shiftcourt", "Shift / Court"));
+        _nav.Add(new NavItem("map", "Map"));
+        _nav.Add(new NavItem("officer", "Officer profile"));
+        NavList.ItemsSource = _nav;
+
+        Closing += async (_, _) =>
+        {
+            if (ContentHost.Content is IMdtBoundView b) b.Bind(null);
+            await _connection.DisposeAsync();
+        };
     }
+
+    protected override void OnContentRendered(EventArgs e)
+    {
+        base.OnContentRendered(e);
+        if (_navInit) return;
+        _navInit = true;
+        NavList.SelectedIndex = 0;
+    }
+
+    void NavList_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (NavList.SelectedItem is not NavItem nav) return;
+        if (ContentHost.Content is IMdtBoundView old) old.Bind(null);
+        var view = CreateView(nav.Id);
+        ContentHost.Content = view;
+        if (view is IMdtBoundView bound) bound.Bind(_connection.IsConnected ? _connection : null);
+    }
+
+    static UserControl CreateView(string id) => id switch
+    {
+        "dashboard" => new DashboardView(),
+        "person" => new PersonSearchView(),
+        "vehicle" => new VehicleSearchView(),
+        "firearms" => new FirearmsView(),
+        "bolo" => new BoloView(),
+        "reports" => new ReportsView(),
+        "shiftcourt" => new ShiftCourtView(),
+        "map" => new MapView(),
+        "officer" => new OfficerView(),
+        _ => new DashboardView()
+    };
 
     async void Connect_Click(object sender, RoutedEventArgs e)
     {
@@ -38,63 +83,34 @@ public partial class MainWindow : Window
                 MessageBox.Show(this, "Port must be between 1 and 65535.", "MDT Pro Native", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-
-            var host = HostBox.Text.Trim();
-            if (string.IsNullOrEmpty(host)) host = "127.0.0.1";
-
-            await TeardownAsync();
-
-            var endpoint = new MdtServerEndpoint(host, port);
-            _http = new MdtHttpClient(endpoint);
-
-            var timePlain = await _http.GetCurrentTimePlainAsync();
-            Log($"HTTP data/currentTime: {timePlain}");
-            var cfg = await _http.GetConfigJsonAsync();
-            if (cfg != null)
-                Log("HTTP config: OK");
-
-            _wsTime = new MdtWebSocketSession(endpoint);
-            _wsTime.MessageReceived += OnTimeMessage;
-            await _wsTime.ConnectAsync();
-            await _wsTime.SendRawAsync("interval/time");
-            Log("WS: interval/time subscribed");
-
-            _wsLocation = new MdtWebSocketSession(endpoint);
-            _wsLocation.MessageReceived += OnLocationMessage;
-            await _wsLocation.ConnectAsync();
-            await _wsLocation.SendRawAsync("interval/playerLocation");
-            Log("WS: interval/playerLocation subscribed");
-
-            _wsCallouts = new MdtWebSocketSession(endpoint);
-            _wsCallouts.MessageReceived += OnCalloutMessage;
-            await _wsCallouts.ConnectAsync();
-            await _wsCallouts.SendRawAsync("calloutEvent");
-            Log("WS: calloutEvent subscribed");
-
+            var host = string.IsNullOrWhiteSpace(HostBox.Text) ? "127.0.0.1" : HostBox.Text.Trim();
+            await _connection.ConnectAsync(host, port);
             try
             {
-                var officer = await _http.GetDataJsonAsync("officerInformation", default);
+                var http = _connection.Http!;
+                var officer = await http.GetDataJsonAsync("officerInformation");
                 var unit = officer?["callSign"]?.ToString() ?? officer?["callsign"]?.ToString();
-                if (!string.IsNullOrEmpty(unit))
-                    StatusUnit.Text = unit;
+                StatusUnit.Text = string.IsNullOrEmpty(unit) ? "—" : unit;
             }
-            catch { /* optional */ }
+            catch { StatusUnit.Text = "—"; }
 
             ConnStateText.Text = "ONLINE";
             ConnStateText.Foreground = (System.Windows.Media.Brush)FindResource("CadAccent");
             DisconnectBtn.IsEnabled = true;
+
+            if (ContentHost.Content is IMdtBoundView nb) nb.Bind(_connection);
         }
         catch (HttpRequestException ex)
         {
-            Log($"HTTP error: {ex.Message}");
+            AppendLog($"HTTP error: {ex.Message}");
             MessageBox.Show(this, "Could not reach MDT Pro. Is the game on duty and the plugin listening?\n\n" + ex.Message, "MDT Pro Native", MessageBoxButton.OK, MessageBoxImage.Error);
-            await TeardownAsync();
+            await DisconnectCoreAsync();
         }
         catch (Exception ex)
         {
-            Log($"Error: {ex.Message}");
+            AppendLog($"Error: {ex.Message}");
             MessageBox.Show(this, ex.Message, "MDT Pro Native", MessageBoxButton.OK, MessageBoxImage.Error);
-            await TeardownAsync();
+            await DisconnectCoreAsync();
         }
         finally
         {
@@ -102,98 +118,28 @@ public partial class MainWindow : Window
         }
     }
 
-    async void Disconnect_Click(object sender, RoutedEventArgs e) => await TeardownAsync();
+    async void Disconnect_Click(object sender, RoutedEventArgs e) => await DisconnectCoreAsync();
 
-    void OnTimeMessage(string request, JToken? response)
+    async Task DisconnectCoreAsync()
     {
-        if (request != "time") return;
-        var s = response?.ToString().Trim('"') ?? "—";
-        Dispatcher.Invoke(() => StatusTime.Text = s);
+        await _connection.DisconnectAsync();
+        ConnStateText.Text = "OFFLINE";
+        ConnStateText.Foreground = (System.Windows.Media.Brush)FindResource("CadUrgent");
+        DisconnectBtn.IsEnabled = false;
+        StatusTime.Text = "—";
+        StatusLocation.Text = "—";
+        StatusUnit.Text = "—";
+        StatusCallouts.Text = "—";
+        if (ContentHost.Content is IMdtBoundView b) b.Bind(null);
     }
 
-    void OnLocationMessage(string request, JToken? response)
-    {
-        if (request != "playerLocation") return;
-        var line = response?.ToString(Newtonsoft.Json.Formatting.None) ?? "—";
-        Dispatcher.Invoke(() => StatusLocation.Text = line);
-    }
-
-    void OnCalloutMessage(string request, JToken? response)
-    {
-        if (request != "calloutEvent" || response is not JObject root) return;
-        var list = root["callouts"] as JArray;
-        var count = list?.Count ?? 0;
-        Dispatcher.Invoke(() =>
-        {
-            _lastCallouts = list;
-            StatusCallouts.Text = count.ToString();
-            _calloutLines.Clear();
-            if (list == null || count == 0)
-            {
-                _calloutLines.Add("— No active callouts —");
-                DetailText.Text = "No active callouts.";
-                return;
-            }
-            foreach (var item in list)
-            {
-                var name = item["Name"]?.ToString() ?? item["name"]?.ToString() ?? "(callout)";
-                var loc = item["Location"]?.ToString() ?? item["location"]?.ToString() ?? "";
-                _calloutLines.Add(string.IsNullOrEmpty(loc) ? name : $"{name}  @  {loc}");
-            }
-            if (CalloutList.SelectedIndex < 0 || CalloutList.SelectedIndex >= _calloutLines.Count)
-                CalloutList.SelectedIndex = 0;
-            UpdateDetailForSelectedCallout();
-        });
-        Log($"calloutEvent: {count} active");
-    }
-
-    void Log(string line)
+    void AppendLog(string line)
     {
         var stamp = DateTime.Now.ToString("HH:mm:ss");
-        Dispatcher.Invoke(() =>
-        {
-            _logLines.Insert(0, $"[{stamp}] {line}");
-            while (_logLines.Count > 500)
-                _logLines.RemoveAt(_logLines.Count - 1);
-        });
+        _logLines.Insert(0, $"[{stamp}] {line}");
+        while (_logLines.Count > 400)
+            _logLines.RemoveAt(_logLines.Count - 1);
     }
 
-    void CalloutList_OnSelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateDetailForSelectedCallout();
-
-    void UpdateDetailForSelectedCallout()
-    {
-        if (_lastCallouts == null || _lastCallouts.Count == 0) return;
-        var i = CalloutList.SelectedIndex;
-        if (i < 0 || i >= _lastCallouts.Count) return;
-        DetailText.Text = _lastCallouts[i].ToString(Newtonsoft.Json.Formatting.Indented);
-    }
-
-    async Task TeardownAsync()
-    {
-        if (_wsTime != null) { _wsTime.MessageReceived -= OnTimeMessage; await DisposeWs(_wsTime); _wsTime = null; }
-        if (_wsLocation != null) { _wsLocation.MessageReceived -= OnLocationMessage; await DisposeWs(_wsLocation); _wsLocation = null; }
-        if (_wsCallouts != null) { _wsCallouts.MessageReceived -= OnCalloutMessage; await DisposeWs(_wsCallouts); _wsCallouts = null; }
-        _http?.Dispose();
-        _http = null;
-
-        Dispatcher.Invoke(() =>
-        {
-            ConnStateText.Text = "OFFLINE";
-            ConnStateText.Foreground = (System.Windows.Media.Brush)FindResource("CadUrgent");
-            DisconnectBtn.IsEnabled = false;
-            StatusTime.Text = "—";
-            StatusLocation.Text = "—";
-            StatusCallouts.Text = "—";
-            _lastCallouts = null;
-            _calloutLines.Clear();
-            _calloutLines.Add("— Not connected —");
-            DetailText.Text = "Disconnected.";
-        });
-    }
-
-    static async Task DisposeWs(MdtWebSocketSession? ws)
-    {
-        if (ws == null) return;
-        try { await ws.DisposeAsync(); } catch { }
-    }
+    sealed record NavItem(string Id, string Title);
 }

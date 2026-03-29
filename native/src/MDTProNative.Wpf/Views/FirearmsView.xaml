@@ -1,0 +1,16 @@
+<UserControl x:Class="MDTProNative.Wpf.Views.FirearmsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel Margin="8">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Serial" Style="{StaticResource CadLabelMuted}" Margin="0,0,8,0" VerticalAlignment="Center" />
+            <TextBox x:Name="SerialBox" Width="200" Style="{StaticResource CadTextBox}" VerticalAlignment="Center" />
+            <Button Content="Lookup" Style="{StaticResource CadAccentButton}" Margin="8,0,0,0" Click="Lookup_Click" />
+            <Button Content="Refresh recent" Style="{StaticResource CadButton}" Margin="8,0,0,0" Click="Refresh_Click" />
+        </StackPanel>
+        <DataGrid x:Name="GridRecent" AutoGenerateColumns="True" IsReadOnly="True"
+                  Background="{StaticResource CadPanel}" Foreground="{StaticResource CadText}"
+                  BorderBrush="{StaticResource CadBorder}" RowBackground="{StaticResource CadElevated}"
+                  AlternatingRowBackground="{StaticResource CadPanel}" HeadersVisibility="Column" />
+    </DockPanel>
+</UserControl>

@@ -1,0 +1,27 @@
+<UserControl x:Class="MDTProNative.Wpf.Views.ShiftCourtView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel Margin="8">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+            <Button Content="Refresh all" Style="{StaticResource CadAccentButton}" Click="Refresh_Click" />
+            <CheckBox x:Name="AutoRefresh" Content="Auto 6s" Margin="12,0,0,0" Foreground="{StaticResource CadText}" VerticalAlignment="Center" Checked="Auto_Changed" Unchecked="Auto_Changed" />
+        </StackPanel>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <DockPanel Grid.Column="0">
+                <TextBlock DockPanel.Dock="Top" Text="SHIFT HISTORY" FontSize="11" Foreground="{StaticResource CadMuted}" Margin="0,0,0,6" />
+                <DataGrid x:Name="ShiftGrid" AutoGenerateColumns="True" IsReadOnly="True"
+                          Background="{StaticResource CadPanel}" Foreground="{StaticResource CadText}" BorderBrush="{StaticResource CadBorder}" />
+            </DockPanel>
+            <DockPanel Grid.Column="2">
+                <TextBlock DockPanel.Dock="Top" Text="COURT" FontSize="11" Foreground="{StaticResource CadMuted}" Margin="0,0,0,6" />
+                <DataGrid x:Name="CourtGrid" AutoGenerateColumns="True" IsReadOnly="True"
+                          Background="{StaticResource CadPanel}" Foreground="{StaticResource CadText}" BorderBrush="{StaticResource CadBorder}" />
+            </DockPanel>
+        </Grid>
+    </DockPanel>
+</UserControl>

@@ -20,17 +20,27 @@ Run the WPF app:
 dotnet run --project src/MDTProNative.Wpf -c Release
 ```
 
-## Current scope (vertical slice)
+## Current scope
 
-- CAD-style **dark theme** (`Themes/CadResources.xaml`): status strip, multi-panel layout, monospace message log.
-- **HTTP**: `data/currentTime`, `config`, `data/officerInformation` (for unit line).
-- **WebSocket**: three connections (same as the web client) — `interval/time`, `interval/playerLocation`, `calloutEvent`.
+- **Navigation**: Dashboard, Person search, Vehicle search, Firearms, BOLO (add/remove + auto-refresh), Reports (all major list endpoints), Shift/Court, **Map** (WebView2 loads the same `page/map.html` as the web MDT), Officer profile (load/save).
+- **CAD-style** theme: status strip (time, location, unit, callout count), message log, monospace readouts.
+- **WebSocket** (same protocol as browser): `interval/time`, `interval/playerLocation`, `calloutEvent`.
+- **HTTP**: wraps the same `/data/*` and `/post/*` routes the web UI uses (POST bodies match browser MDT where required).
 
-## Next work (not implemented yet)
+### Not in this client (use web MDT)
 
-- Broader `/data` and `/post` coverage, BOLO and reports screens.
-- **Real-time collaboration** requires **plugin-side** event fan-out and likely **auth**; see `docs/` in this folder.
-- **macOS**: separate shell (e.g. .NET MAUI or SwiftUI) reusing `MDTProNative.Client` patterns.
+- Full **report composer** (all sections / drafts / autosave) — large; keep using the browser for creating/editing complex reports unless we add a dedicated native form later.
+- **Plugins** (Calendar, ALPR popups, Department Styling) — web-only for now.
+- **True multi-user live co-editing** — still requires additive plugin work; see `docs/COLLABORATION_ROADMAP.md`.
+
+### Requirements
+
+- **[WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)** for the Map screen.
+
+## Next work (optional)
+
+- **Real-time push** for lists (reports, BOLO) without polling timers — plugin WebSocket fan-out.
+- **macOS**: .NET MAUI or SwiftUI using the same HTTP/WS contract.
 
 ## Projects
 

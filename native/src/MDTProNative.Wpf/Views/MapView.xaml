@@ -1,0 +1,10 @@
+<UserControl x:Class="MDTProNative.Wpf.Views.MapView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf">
+    <DockPanel Margin="8">
+        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{StaticResource CadMuted}" FontSize="11"
+                   Text="Embedded browser map (same page as web MDT). Requires WebView2 Runtime. Uses live WebSocket from the page." />
+        <wv2:WebView2 x:Name="Web" />
+    </DockPanel>
+</UserControl>
