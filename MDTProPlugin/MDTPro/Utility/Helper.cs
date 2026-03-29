@@ -263,5 +263,13 @@ namespace MDTPro.Utility {
         internal static string SanitizeExceptionForLog(Exception ex) {
             return ex == null ? string.Empty : RedactMachineAbsolutePaths(ex.ToString());
         }
+
+        /// <summary>LSPDFR <c>County</c> enum <c>ToString()</c> is PascalCase without spaces (e.g. LosSantos). Inserts spaces before in-word capitals for display.</summary>
+        internal static string SpacedWordsFromPascalIdentifier(string s) {
+            if (string.IsNullOrWhiteSpace(s)) return s == null ? "" : s.Trim();
+            string t = s.Trim();
+            if (t.IndexOf(' ') >= 0) return t;
+            return Regex.Replace(t, "([a-z])([A-Z])", "$1 $2");
+        }
     }
 }

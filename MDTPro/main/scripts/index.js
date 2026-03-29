@@ -418,14 +418,33 @@ timeWS.onclose = async () => {
 const locationWS = new WebSocket(`ws://${location.host}/ws`)
 locationWS.onopen = () => locationWS.send('interval/playerLocation')
 
+function readApiLocationField(loc, key) {
+  if (!loc) return ''
+  const camel = key.charAt(0).toLowerCase() + key.slice(1)
+  const v = loc[key] ?? loc[camel]
+  return v != null ? String(v) : ''
+}
+
+function formatTaskbarLocationHtml(loc) {
+  const postal = readApiLocationField(loc, 'Postal').trim()
+  const street = readApiLocationField(loc, 'Street').trim()
+  const area = readApiLocationField(loc, 'Area').trim()
+  const county = readApiLocationField(loc, 'County').trim()
+  const line1 = [postal, street].filter(Boolean).join(' ')
+  const line2 = [area, county].filter(Boolean).join(', ')
+  if (line1 && line2) return `${line1},<br>${line2}`
+  if (line1) return line1
+  if (line2) return line2
+  return ''
+}
+
 locationWS.onmessage = async (event) => {
   const location = JSON.parse(event.data).response
   const icon = document.querySelector('.iconAccess .location').innerHTML
-  const postal = location?.Postal ?? ''
-  const street = location?.Street ?? ''
-  const area = location?.Area ?? ''
-  document.querySelector('.taskbar .location').innerHTML =
-    `${icon} ${postal} ${street},<br>${area}`
+  const text = formatTaskbarLocationHtml(location)
+  document.querySelector('.taskbar .location').innerHTML = text
+    ? `${icon} ${text}`
+    : `${icon}`
 }
 
 locationWS.onclose = async () => {

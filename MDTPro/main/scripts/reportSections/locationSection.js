@@ -1,3 +1,10 @@
+function readApiLocationField(loc, key) {
+  if (!loc) return ''
+  const camel = key.charAt(0).toLowerCase() + key.slice(1)
+  const v = loc[key] ?? loc[camel]
+  return v != null ? String(v) : ''
+}
+
 async function getLocationSection(location, isList = false) {
   const language = await getLanguage()
 
@@ -16,7 +23,7 @@ async function getLocationSection(location, isList = false) {
   postalLabel.htmlFor = 'locationSectionPostalInput'
   const postalInput = document.createElement('input')
   postalInput.type = 'text'
-  postalInput.value = location.Postal || ''
+  postalInput.value = readApiLocationField(location, 'Postal') || ''
   postalInput.id = 'locationSectionPostalInput'
   postalInput.autocomplete = 'off'
   postalInput.disabled = isList
@@ -30,7 +37,7 @@ async function getLocationSection(location, isList = false) {
   streetLabel.htmlFor = 'locationSectionStreetInput'
   const streetInput = document.createElement('input')
   streetInput.type = 'text'
-  streetInput.value = location.Street || ''
+  streetInput.value = readApiLocationField(location, 'Street') || ''
   streetInput.id = 'locationSectionStreetInput'
   streetInput.autocomplete = 'off'
   streetInput.disabled = isList
@@ -44,7 +51,7 @@ async function getLocationSection(location, isList = false) {
   areaLabel.htmlFor = 'locationSectionAreaInput'
   const areaInput = document.createElement('input')
   areaInput.type = 'text'
-  areaInput.value = location.Area || ''
+  areaInput.value = readApiLocationField(location, 'Area') || ''
   areaInput.id = 'locationSectionAreaInput'
   areaInput.autocomplete = 'off'
   areaInput.disabled = isList
@@ -58,7 +65,10 @@ async function getLocationSection(location, isList = false) {
   countyLabel.htmlFor = 'locationSectionCountyInput'
   const countyInput = document.createElement('input')
   countyInput.type = 'text'
-  countyInput.value = language.values[location.County] || location.County || ''
+  countyInput.value =
+    language.values[readApiLocationField(location, 'County')] ||
+    readApiLocationField(location, 'County') ||
+    ''
   countyInput.id = 'locationSectionCountyInput'
   countyInput.autocomplete = 'off'
   countyInput.disabled = isList

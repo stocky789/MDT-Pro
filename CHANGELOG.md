@@ -4,7 +4,27 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
-## [0.9.8.0] — 2026-03-28
+## [0.9.8.1] — 2026-03-29
+
+### Bug Fixes
+
+- **Citation handoff key STP only (F10)** — After the in-game message told you to press **F10**, the key sometimes did nothing when you used **StopThePed**. That’s fixed. The same underlying issue could affect the **Settings menu** hotkey and **ALPR**; those should behave reliably again right after you go on duty.
+
+- **Reloading the plugin** — If you reload MDT Pro (or related plugins) without restarting the game, crashes were more likely after using **StopThePed** or other integrations. MDT Pro now cleans up its hooks properly on unload so reloads are safer.
+
+- **Address & location on the MDT** — The **taskbar location** line and **new report** address fields could stay empty or show junk (like the word “null” or only a comma), especially with **StopThePed**. They should now fill in with a real street and area, match your traffic stop better when you’re using STP, and show **Los Santos**-style county names correctly (with a space). If something still looks wrong, you can turn on **location debugging** in **config.json** (`locationDebugLogging`) and check **MDTPro.log** for details.
+
+### Minor Features
+
+- **Safer citation handoff** — When handing off a citation in-game, the person in front of you must match the offender name on the citation / MDT record when the game can read their full name. If it doesn’t match, handoff is blocked and you’ll see a clear message (new default text: identity mismatch).
+
+### Other
+
+- **Callouts** — Starting a new shift no longer stacks duplicate callout listeners over time; that keeps callout behaviour stable for long play sessions.
+
+---
+
+## [0.9.8.0] — 2026-03-29
 
 ### Major Features
 
