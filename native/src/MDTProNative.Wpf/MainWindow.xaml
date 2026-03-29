@@ -1,0 +1,94 @@
+<Window x:Class="MDTProNative.Wpf.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MDT Pro — Native CAD / MDC"
+        MinHeight="620" MinWidth="980"
+        Height="720" Width="1200"
+        WindowStartupLocation="CenterScreen">
+    <DockPanel LastChildFill="True">
+        <!-- Top: connection strip (dispatch / admin connects to officer PC) -->
+        <Border DockPanel.Dock="Top" Background="{StaticResource CadStatusBar}" BorderBrush="{StaticResource CadBorder}" BorderThickness="0,0,0,1" Padding="10,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="72" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Host" Style="{StaticResource CadLabelMuted}" Margin="0,0,8,0" />
+                <TextBox x:Name="HostBox" Grid.Column="1" Style="{StaticResource CadTextBox}" Text="127.0.0.1" VerticalContentAlignment="Center" />
+                <TextBlock Grid.Column="2" Text="Port" Style="{StaticResource CadLabelMuted}" Margin="12,0,8,0" />
+                <TextBox x:Name="PortBox" Grid.Column="3" Style="{StaticResource CadTextBox}" Text="9000" VerticalContentAlignment="Center" />
+                <StackPanel Grid.Column="4" Orientation="Horizontal" Margin="12,0,0,0">
+                    <Button x:Name="ConnectBtn" Content="Connect" Style="{StaticResource CadAccentButton}" Click="Connect_Click" Margin="0,0,8,0" />
+                    <Button x:Name="DisconnectBtn" Content="Disconnect" Style="{StaticResource CadButton}" Click="Disconnect_Click" IsEnabled="False" />
+                </StackPanel>
+                <TextBlock x:Name="ConnStateText" Grid.Column="6" VerticalAlignment="Center" Foreground="{StaticResource CadUrgent}" FontWeight="SemiBold" Text="OFFLINE" />
+            </Grid>
+        </Border>
+
+        <!-- Operational status line (persistent like in-car MDC chrome) -->
+        <Border DockPanel.Dock="Top" Background="{StaticResource CadPanel}" BorderBrush="{StaticResource CadBorder}" BorderThickness="0,0,0,1" Padding="10,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock Text="TIME" Style="{StaticResource CadLabelMuted}" Margin="0,0,8,0" FontSize="11" />
+                    <TextBlock x:Name="StatusTime" Text="—" FontFamily="Consolas" VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <TextBlock Text="LOCATION" Style="{StaticResource CadLabelMuted}" Margin="0,0,8,0" FontSize="11" />
+                    <TextBlock x:Name="StatusLocation" Text="—" FontFamily="Consolas" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <TextBlock Text="UNIT" Style="{StaticResource CadLabelMuted}" Margin="0,0,8,0" FontSize="11" />
+                    <TextBlock x:Name="StatusUnit" Text="—" FontFamily="Consolas" VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <TextBlock Text="CALLOUTS" Style="{StaticResource CadLabelMuted}" Margin="0,0,8,0" FontSize="11" />
+                    <TextBlock x:Name="StatusCallouts" Text="—" FontFamily="Consolas" VerticalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Multi-panel body: unit/event list + detail + message log -->
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="2*" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0" Margin="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="280" />
+                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Background="{StaticResource CadPanel}" BorderBrush="{StaticResource CadBorder}" BorderThickness="1" CornerRadius="2" Padding="8">
+                    <DockPanel LastChildFill="True">
+                        <TextBlock DockPanel.Dock="Top" Text="ACTIVE CALLOUTS" FontWeight="SemiBold" Margin="0,0,0,8" FontSize="11" Foreground="{StaticResource CadMuted}" />
+                        <ListBox x:Name="CalloutList" Style="{StaticResource CadListBox}" FontFamily="Consolas" FontSize="12" />
+                    </DockPanel>
+                </Border>
+                <Border Grid.Column="2" Background="{StaticResource CadPanel}" BorderBrush="{StaticResource CadBorder}" BorderThickness="1" CornerRadius="2" Padding="10">
+                    <DockPanel LastChildFill="True">
+                        <TextBlock DockPanel.Dock="Top" Text="DETAIL" FontWeight="SemiBold" Margin="0,0,0,8" FontSize="11" Foreground="{StaticResource CadMuted}" />
+                        <TextBlock x:Name="DetailText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" Text="Select a callout or connect to the MDT plugin. Web MDT is unchanged; this client uses the same HTTP and WebSocket endpoints." Foreground="{StaticResource CadMuted}" />
+                    </DockPanel>
+                </Border>
+            </Grid>
+            <Border Grid.Row="1" Margin="8,0,8,8" Background="{StaticResource CadPanel}" BorderBrush="{StaticResource CadBorder}" BorderThickness="1" CornerRadius="2" Padding="8">
+                <DockPanel LastChildFill="True">
+                    <TextBlock DockPanel.Dock="Top" Text="CAD MESSAGE LOG" FontWeight="SemiBold" Margin="0,0,0,6" FontSize="11" Foreground="{StaticResource CadMuted}" />
+                    <ListBox x:Name="MessageLog" Style="{StaticResource CadListBox}" FontFamily="Consolas" FontSize="12" />
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>
