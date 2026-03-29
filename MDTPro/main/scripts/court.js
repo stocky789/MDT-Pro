@@ -587,7 +587,7 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   noEvidenceNote.classList.add('evidenceBreakdownNote')
   noEvidenceNote.innerText = hasAnyRealEvidence
     ? (language.court.evidenceCapturedNote || 'In-game evidence was captured for this case.')
-    : (language.court.evidenceNotCapturedNote || 'No in-game evidence captured. Either the arrest was processed before evidence hooks fired, or PR/LSPDFR events did not trigger for this ped.')
+    : (language.court.evidenceNotCapturedNote || 'No in-game evidence captured. Either the arrest was processed before evidence hooks fired, or in-game integration (LSPDFR / Policing Redefined / StopThePed) did not supply hooks for this ped.')
   evidenceBreakdown.appendChild(noEvidenceNote)
 
   // Repeat offender score — not shown anywhere else in the card

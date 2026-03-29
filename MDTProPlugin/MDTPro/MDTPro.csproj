@@ -121,11 +121,19 @@
     <Compile Include="Data\ShiftData.cs" />
     <Compile Include="Plugins\PluginController.cs" />
     <Compile Include="Plugins\PluginInfo.cs" />
+    <Compile Include="Utility\Backup\BackupService.cs" />
+    <Compile Include="Utility\Backup\IBackupDispatcher.cs" />
+    <Compile Include="Utility\Backup\NullBackupDispatcher.cs" />
+    <Compile Include="Utility\Backup\PolicingRedefinedBackupDispatcher.cs" />
+    <Compile Include="Utility\Backup\UltimateBackupBackupDispatcher.cs" />
+    <Compile Include="Utility\StpReflectionHelper.cs" />
+    <Compile Include="Utility\ModIntegration.cs" />
     <Compile Include="Utility\DependencyCheck.cs" />
     <Compile Include="EventListeners\CDFEvents.cs" />
     <Compile Include="EventListeners\CalloutEvents.cs" />
     <Compile Include="EventListeners\LSPDFREvents.cs" />
     <Compile Include="EventListeners\PREvents.cs" />
+    <Compile Include="EventListeners\STPEvents.cs" />
     <Compile Include="Functions.cs" />
     <Compile Include="ServerAPI\ImageAPIResponse.cs" />
     <Compile Include="ServerAPI\PageAPIResponse.cs" />
@@ -149,13 +157,22 @@
     <Compile Include="Setup\Config.cs" />
     <Compile Include="Setup\Language.cs" />
     <Compile Include="Utility\CitationArrestHelper.cs" />
+    <Compile Include="Utility\CitationHandoffAnimation.cs" />
+    <Compile Include="Utility\CitationHandoffPostEffects.cs" />
+    <Compile Include="Utility\CitationPedReactionHelper.cs" />
+    <Compile Include="Utility\CitationPostHandoffViolenceHelper.cs" />
     <Compile Include="Utility\SupervisionBackstoryHelper.cs" />
+    <Compile Include="Utility\PedPortraitModelHelper.cs" />
     <Compile Include="Utility\PlayerCoords.cs" />
     <Compile Include="ALPR\ALPRController.cs" />
     <Compile Include="ALPR\ALPRHUD.cs" />
     <Compile Include="Utility\PRHelper.cs" />
+    <Compile Include="Utility\StpCitationHandoffQueue.cs" />
+    <Compile Include="Utility\StpCitationHelper.cs" />
     <Compile Include="Utility\BackupHelper.cs" />
     <Compile Include="Utility\GpsHelper.cs" />
+    <Compile Include="UI\CitationHandoffKeybind.cs" />
+    <Compile Include="UI\CitationHandoffMenu.cs" />
     <Compile Include="UI\SettingsMenu.cs" />
   </ItemGroup>
   <ItemGroup>

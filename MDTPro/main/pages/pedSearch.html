@@ -39,8 +39,13 @@
         <div class="pedIdPhotoCell">
           <label data-language="labels.idPhoto">Photo</label>
           <div class="pedIdPhotoContainer">
-            <img id="pedIdPhotoImg" class="pedIdPhotoImg hidden" alt="" />
-            <div class="pedIdPhotoPlaceholder hidden" data-language="noPhoto">No photo available</div>
+            <div class="pedIdPhotoFaceCrop">
+              <img id="pedIdPhotoImg" class="pedIdPhotoImg hidden" alt="" />
+            </div>
+            <div class="pedIdPhotoPlaceholder hidden">
+              <img class="pedIdPhotoUnavailableIcon" src="/image/pedIdUnavailable.svg" width="48" height="48" alt="" />
+              <span class="pedIdPhotoUnavailableText" data-language="noPhoto">No photo available</span>
+            </div>
           </div>
         </div>
         <div>

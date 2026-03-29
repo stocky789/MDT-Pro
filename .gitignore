@@ -38,6 +38,9 @@ x86/
 *.VC.db
 *.VC.VC.opendb
 
+# Ped catalogue fetch log (regenerate with scripts/fetchPedCatalogueImages.mjs)
+scripts/pedCatalogue_fetch_failures.txt
+
 # Node (e.g. dev-server.js)
 node_modules/
 npm-debug.log*
@@ -62,6 +65,10 @@ MDTPro/language.json
 MDTPro/citationOptions.json
 MDTPro/arrestOptions.json
 MDTPro/ipAddresses.txt
+
+# ---- Third-party / local mod copies (not tracked) ----
+StopThePed/
+UltimateBackup/
 
 # ---- Secrets / env (never commit) ----
 .env

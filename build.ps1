@@ -374,8 +374,83 @@ $deleteXml
 # README with install instructions (always)
 $readmePath = Join-Path $release 'README.txt'
 @"
-MDT Pro - Install instructions
-===============================
+MDT Pro — install & requirements
+=================================
+
+MDT Pro runs a small web server while you are on duty so you can use the MDT in a browser (same PC or
+another device on your network).
+
+
+REQUIREMENTS (install these before MDT Pro)
+--------------------------------------------
+  • LSPDFR and RagePluginHook
+  • Common Data Framework (CDF) — REQUIRED for every setup. The plugin will not load without it.
+    You still need CDF if you use StopThePed and Ultimate Backup instead of Policing Redefined.
+  • CalloutInterfaceAPI (GTA V root or plugins\LSPDFR\)
+  • CalloutInterface — required for the Active Call page (live callout details)
+
+  Stops, citations, and backup — pick ONE integration path (do not mix):
+
+  A) Policing Redefined
+     Install Policing Redefined. In the MDT: Customization → Config → Mod integration, choose settings
+     that match PR (stops, citations, backup via PR or Auto when PR is present).
+
+  B) StopThePed + Ultimate Backup
+     Install StopThePed and Ultimate Backup. In the MDT: Customization → Config → Mod integration, set
+     stop/traffic integration to StopThePed and backup to Ultimate Backup (or Auto if only UB is present).
+
+     IMPORTANT: If you use StopThePed + Ultimate Backup, do NOT install Policing Redefined. Running PR
+     together with that stack is unsupported and can cause broken or duplicate behavior. CDF is still
+     required.
+
+
+OPENIV INSTALL (recommended)
+-----------------------------
+  • MDTPro-*.oiv          — Install package. OpenIV: Edit mode, drag the .oiv onto OpenIV, or
+                           Tools → Package Installer, then install into the game folder.
+  • MDTPro-*-Uninstall.oiv — Removes MDT Pro via OpenIV. For a full cleanup you may still delete the
+                           MDTPro folder manually if needed.
+
+
+MANUAL INSTALL (no OpenIV)
+--------------------------
+Copy into your GTA V folder (the folder that contains GTA5.exe). Do NOT copy the .oiv files into the game.
+
+Merge these paths:
+
+  From this release                    Into your GTA V folder
+  -------------------------            ------------------------
+  plugins\lspdfr\MDTPro.dll            plugins\LSPDFR\MDTPro.dll
+  plugins\lspdfr\Newtonsoft.Json.dll   plugins\LSPDFR\Newtonsoft.Json.dll
+  MDTPro\  (entire folder)             MDTPro\
+  System.Data.SQLite.dll               (GTA V root, next to GTA5.exe)
+  x64\SQLite.Interop.dll               x64\SQLite.Interop.dll
+
+SQLite: System.Data.SQLite.dll MUST be in the game root (not only under plugins). The native loader uses
+the game directory. If the database fails to open, check both that DLL and x64\SQLite.Interop.dll.
+
+
+FIRST RUN & USE
+---------------
+  1. Start the game, go on duty with LSPDFR.
+  2. MDT Pro shows notification(s) with addresses such as http://127.0.0.1:9000 (default port 9000).
+  3. Open that URL in a browser (Chrome / Brave recommended). Addresses are also in MDTPro\ipAddresses.txt.
+
+  Another device (phone, tablet, PC) cannot connect: usually Windows Firewall on the game PC — add an
+  inbound rule for the port you use (9000 by default), or change the port under Customization → Config.
+
+
+UPDATING
+--------
+  Overwrite the plugin DLLs, MDTPro folder, and SQLite files with the new release. Your existing
+  MDTPro\data\ and MDTPro\config.json are kept if you do not delete the MDTPro folder outright.
+
+
+TROUBLESHOOTING
+---------------
+  • Log file: MDTPro\MDTPro.log (next to config.json)
+  • Plugin load errors: also check RAGEPluginHook.log in the GTA V folder
+
 
 Credits
 -------
@@ -384,31 +459,8 @@ Thanks to the EPC authors and contributors for the original project and idea.
 
 License
 -------
-MDT Pro is licensed under the Eclipse Public License 2.0 (EPL-2.0).
-The full license text is in the LICENSE file included with this release (same folder as this README).
-Some data files (e.g. default charge lists) may be under the MIT License; see the project repository for details.
-
-
-OPENIV INSTALL (recommended)
-----------------------------
-- MDTPro-*.oiv = Install package. In OpenIV: Edit mode -> drag the .oiv onto OpenIV, or Tools -> Package Installer, then install.
-- MDTPro-*-Uninstall.oiv = Uninstall package. Use this to remove the mod via OpenIV.
-
-
-MANUAL INSTALL (no OpenIV)
--------------------------
-Copy everything from this folder into your GTA V folder (the folder containing GTA5.exe), EXCEPT the .oiv files.
-
-Copy:
-  - plugins\   (into GTA V\plugins\)   <- MDTPro.dll and Newtonsoft.Json.dll
-  - MDTPro\    (into GTA V\MDTPro\)
-  - x64\       (into GTA V\x64\)       <- SQLite.Interop.dll (required for database)
-  - System.Data.SQLite.dll  (into GTA V root)  <- required for database
-
-Do NOT copy the .oiv files into your game folder; they are only for OpenIV.
-
-If SQL/database features stop working, ensure both System.Data.SQLite.dll (game root) and x64\SQLite.Interop.dll are present.
-Requirements: LSPDFR, RagePluginHook, Common Data Framework. See the mod page for full requirements.
+MDT Pro is licensed under the Eclipse Public License 2.0 (EPL-2.0). Full text: LICENSE in this folder.
+Some default data files may be under the MIT License; see the project repository for details.
 "@ | Out-File -FilePath $readmePath -Encoding UTF8
 Write-Host "  -> $readmePath (install instructions)"
 
