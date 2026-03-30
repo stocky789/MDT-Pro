@@ -158,15 +158,15 @@
                         </StackPanel>
                         <StackPanel Margin="0,0,0,6">
                             <TextBlock Text="Impound reason" Style="{StaticResource ReportDocLabel}" />
-                            <TextBox x:Name="ImpoundReasonBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                            <ComboBox x:Name="ImpoundReasonCombo" Style="{StaticResource ReportDocCombo}" Margin="0,4,0,0" />
                         </StackPanel>
                         <StackPanel Margin="0,0,8,6">
                             <TextBlock Text="Tow company" Style="{StaticResource ReportDocLabel}" />
-                            <TextBox x:Name="TowCompanyBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                            <ComboBox x:Name="TowCompanyCombo" Style="{StaticResource ReportDocCombo}" Margin="0,4,0,0" />
                         </StackPanel>
                         <StackPanel Margin="0,0,0,6">
                             <TextBlock Text="Impound lot" Style="{StaticResource ReportDocLabel}" />
-                            <TextBox x:Name="ImpoundLotBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                            <ComboBox x:Name="ImpoundLotCombo" Style="{StaticResource ReportDocCombo}" Margin="0,4,0,0" />
                         </StackPanel>
                     </UniformGrid>
 

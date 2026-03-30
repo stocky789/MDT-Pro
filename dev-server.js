@@ -664,7 +664,7 @@ const server = http.createServer((req, res) => {
     return;
   } else if (req.method === 'POST' && url === '/data/nearbyVehicles') {
     readBody(req).then(body => {
-      const limit = Math.min(20, Math.max(1, parseInt(body, 10) || 5));
+      const limit = Math.min(20, Math.max(1, parseInt(body, 10) || 8));
       const list = placeholderVehicles.slice(0, limit).map(v => ({
         LicensePlate: v.LicensePlate,
         ModelDisplayName: v.ModelDisplayName,
@@ -672,7 +672,7 @@ const server = http.createServer((req, res) => {
         IsStolen: v.IsStolen,
       }));
       send(res, 200, JSON.stringify(list), 'application/json');
-    }).catch(() => send(res, 200, JSON.stringify(placeholderVehicles.slice(0, 5)), 'application/json'));
+    }).catch(() => send(res, 200, JSON.stringify(placeholderVehicles.slice(0, 8)), 'application/json'));
     return;
   } else if (req.method === 'POST' && url === '/data/vehicleSearchByPlate') {
     readBody(req).then(body => {

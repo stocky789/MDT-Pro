@@ -2,12 +2,11 @@ async function getInjurySection (data = {}, isList = false) {
   const language = await getLanguage()
   const section = document.createElement('div')
   section.classList.add('section', 'injurySection')
-  if (isList) section.classList.add('searchResponseWrapper')
 
   const labels = language.reports?.sections?.injury || {}
 
   const title = document.createElement('div')
-  title.classList.add(isList ? 'searchResponseSectionTitle' : 'title')
+  title.classList.add('title')
   title.innerHTML = labels.title || 'Injury Details'
   section.appendChild(title)
 

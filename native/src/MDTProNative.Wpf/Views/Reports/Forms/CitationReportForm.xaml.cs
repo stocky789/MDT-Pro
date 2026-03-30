@@ -107,10 +107,13 @@ public partial class CitationReportForm : UserControl, IReportFormPane
         if (sender is not ComboBox cb || cb.DataContext is not CitationChargeRow row) return;
         if (cb.SelectedItem is not CitationChargePickerOption opt) return;
         opt.ApplyTo(row);
+        // Clearing selection resets editable ComboBox Text and pushes "" into the ChargeName binding.
+        var name = opt.ChargeName;
         _suppressCitationChargePick = true;
         try
         {
             cb.SelectedItem = null;
+            row.ChargeName = name;
         }
         finally
         {

@@ -95,7 +95,7 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
         if (http == null) return;
         try
         {
-            var (status, text) = await http.PostAsync("data/nearbyVehicles", "10").ConfigureAwait(false);
+            var (status, text) = await http.PostAsync("data/nearbyVehicles", "8").ConfigureAwait(false);
             var rows = new List<NearbyRow>();
             if (status == HttpStatusCode.OK && !string.IsNullOrWhiteSpace(text))
             {
@@ -334,6 +334,7 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
         }
 
         var canMod = v["CanModifyBOLOs"]?.Value<bool>() == true;
+        var plateOk = !string.IsNullOrWhiteSpace(v["LicensePlate"]?.ToString());
         if (canMod && plate != "—")
         {
             var reasonBox = new TextBox { Style = (Style)FindResource("CadTextBox"), Margin = new Thickness(0, 0, 0, 6) };
@@ -342,13 +343,37 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
                 Content = "ADD BOLO",
                 Style = (Style)FindResource("CadAccentButton"),
                 HorizontalAlignment = HorizontalAlignment.Left,
-                Margin = new Thickness(0, 0, 0, 12)
+                Margin = new Thickness(0, 0, 8, 0)
             };
             addBtn.Click += async (_, _) => await TryAddBoloAsync(plate, reasonBox.Text, NativeMdtFormat.Text(v["ModelDisplayName"]));
+            var impoundBtn = new Button
+            {
+                Content = "IMPOUND REPORT",
+                Style = (Style)FindResource("CadRailOutlineButton"),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 0, 0, 0)
+            };
+            impoundBtn.Click += (_, _) => TryOpenImpoundReportFromVehicle(v);
+            var btnRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12) };
+            btnRow.Children.Add(addBtn);
+            btnRow.Children.Add(impoundBtn);
             DetailPanel.Children.Add(SectionTitle("Add BOLO (vehicle in range)"));
             DetailPanel.Children.Add(new TextBlock { Text = "REASON", Style = (Style)FindResource("CadFieldLabel"), Margin = new Thickness(0, 0, 0, 4) });
             DetailPanel.Children.Add(reasonBox);
-            DetailPanel.Children.Add(addBtn);
+            DetailPanel.Children.Add(btnRow);
+        }
+        else if (plateOk)
+        {
+            var impoundBtn = new Button
+            {
+                Content = "IMPOUND REPORT",
+                Style = (Style)FindResource("CadRailOutlineButton"),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+            impoundBtn.Click += (_, _) => TryOpenImpoundReportFromVehicle(v);
+            DetailPanel.Children.Add(SectionTitle("Create report from vehicle"));
+            DetailPanel.Children.Add(impoundBtn);
         }
 
         if (searchRecords != null && searchRecords.Count > 0)
@@ -776,6 +801,17 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
             Background = R("CadElevated"),
             Child = sp
         };
+    }
+
+    void TryOpenImpoundReportFromVehicle(JObject vehicle)
+    {
+        if (_connection?.Http == null)
+        {
+            MessageBox.Show("Connect to MDT Pro first.", "Vehicle search", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        MdtShellEvents.RequestNavigateToNewReportFromVehicleSearch("impound", (JObject)vehicle.DeepClone());
     }
 
     TextBlock SectionTitle(string s) => new()

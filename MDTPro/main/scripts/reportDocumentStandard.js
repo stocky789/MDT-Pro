@@ -24,11 +24,13 @@
   /**
    * @param {HTMLElement} reportInformationEl
    * @param {string} reportType
+   * @param {{ readOnly?: boolean }} [options]
    * @returns {HTMLElement} Body element to append sections into
    */
-  window.mdtproMountStandardReportDocument = function (reportInformationEl, reportType) {
+  window.mdtproMountStandardReportDocument = function (reportInformationEl, reportType, options = {}) {
     const shell = document.createElement('div')
     shell.className = 'standardReportDocumentShell'
+    if (options.readOnly) shell.classList.add('mdtpro-standard-report-shell--view')
     const toolbar = document.createElement('div')
     toolbar.className = 'report-doc-toolbar'
     const printBtn = document.createElement('button')

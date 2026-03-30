@@ -12,7 +12,7 @@ public static class ReportNearbyVehiclesClient
 
     public static async Task<IReadOnlyList<NearbySummary>> FetchNearbyAsync(
         MdtHttpClient http,
-        int limit = 12,
+        int limit = 8,
         CancellationToken cancellationToken = default)
     {
         limit = Math.Clamp(limit, 1, 20);

@@ -100,7 +100,8 @@ namespace MDTPro.EventListeners {
             if (!CiApi.IsCalloutInterfaceAvailable)
                 return new CalloutActionOutcome { Result = CalloutActionResult.Error, Message = "CalloutInterface is not available in-game." };
             try {
-                var callout = CalloutHandleResolver.TryGetCallout(handle);
+                // CI’s log expects the same Callout instance its API resolves from the handle; LSPDFR’s object can fail SendMessage.
+                var callout = CiApi.GetCalloutFromHandle(handle) ?? CalloutHandleResolver.TryGetCallout(handle);
                 if (callout == null)
                     return new CalloutActionOutcome { Result = CalloutActionResult.Error, Message = "Could not resolve callout from handle." };
                 CiApi.SendMessage(callout, message.Trim());

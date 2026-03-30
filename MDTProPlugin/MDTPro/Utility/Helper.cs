@@ -10,6 +10,7 @@ using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
 
@@ -135,7 +136,9 @@ namespace MDTPro.Utility {
         internal static string GetRequestPostData(HttpListenerRequest req) {
             if (!req.HasEntityBody) return null;
             using Stream body = req.InputStream;
-            using StreamReader reader = new StreamReader(body, req.ContentEncoding);
+            // HttpListenerRequest.ContentEncoding often defaults to a legacy code page when clients omit charset;
+            // browsers and native MDT send UTF-8 JSON — always decode as UTF-8 to avoid corrupt JSON / parse failures.
+            using StreamReader reader = new StreamReader(body, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
             return reader.ReadToEnd();
         }
 
@@ -249,7 +252,10 @@ namespace MDTPro.Utility {
 
 
         private static readonly Random random = new Random();
-        internal static int GetRandomInt(int min, int max) => random.Next(min, max + 1);
+        internal static int GetRandomInt(int min, int max) {
+            if (max < min) (min, max) = (max, min);
+            return random.Next(min, max + 1);
+        }
 
         internal static bool UrlAclExists(string url) {
             Process process = new Process();

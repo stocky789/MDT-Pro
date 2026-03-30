@@ -9,11 +9,7 @@ async function getLocationSection(location, isList = false) {
   const language = await getLanguage()
 
   const title = document.createElement('div')
-  if (isList) {
-    title.classList.add('searchResponseSectionTitle')
-  } else {
-    title.classList.add('title')
-  }
+  title.classList.add('title')
   title.innerHTML = language.reports.sections.location.title
 
   const postal = document.createElement('div')
@@ -86,7 +82,6 @@ async function getLocationSection(location, isList = false) {
 
   const sectionWrapper = document.createElement('div')
   sectionWrapper.classList.add('section')
-  if (isList) sectionWrapper.classList.add('searchResponseWrapper')
 
   sectionWrapper.appendChild(title)
   sectionWrapper.appendChild(inputWrapper)

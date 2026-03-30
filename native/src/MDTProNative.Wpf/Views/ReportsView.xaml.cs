@@ -28,6 +28,10 @@ public partial class ReportsView : UserControl, IMdtBoundView
 
     internal static PendingPersonSearchReport? PendingNewReportFromPersonSearch;
 
+    internal sealed record PendingVehicleSearchReport(string TypeKey, JObject Vehicle);
+
+    internal static PendingVehicleSearchReport? PendingNewReportFromVehicleSearch;
+
     const string FormsClrNamespace = "MDTProNative.Wpf.Views.Reports.Forms";
 
     MdtConnectionManager? _connection;
@@ -121,6 +125,11 @@ public partial class ReportsView : UserControl, IMdtBoundView
             {
                 PendingNewReportFromPersonSearch = null;
                 _ = OpenNewReportFromPersonSearchAsync(pn);
+            }
+            else if (PendingNewReportFromVehicleSearch is { } pv)
+            {
+                PendingNewReportFromVehicleSearch = null;
+                _ = OpenNewReportFromVehicleSearchAsync(pv);
             }
             else
                 _ = ReloadListAsync();
@@ -516,6 +525,71 @@ public partial class ReportsView : UserControl, IMdtBoundView
         catch (Exception ex)
         {
             MessageBox.Show("Could not open new report from person search.\n\n" + ex.Message, "Reports", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    async Task OpenNewReportFromVehicleSearchAsync(PendingVehicleSearchReport pr)
+    {
+        var http = _connection?.Http;
+        if (http == null)
+        {
+            await Dispatcher.InvokeAsync(() =>
+                MessageBox.Show("Connect to MDT Pro first.", "Reports", MessageBoxButton.OK, MessageBoxImage.Information));
+            return;
+        }
+
+        if (NativeReportDraftFactory.DataPathFor(pr.TypeKey) == null)
+        {
+            await Dispatcher.InvokeAsync(() =>
+                MessageBox.Show($"Unknown report type “{pr.TypeKey}”.", "Reports", MessageBoxButton.OK, MessageBoxImage.Warning));
+            await Dispatcher.InvokeAsync(() => _ = ReloadListAsync());
+            return;
+        }
+
+        try
+        {
+            await MdtBusyUi.RunAsync(ModuleBusy, "REPORTS", "New report from vehicle search…", async () =>
+            {
+                var draft = await NativeReportDraftFactory.CreateDraftAsync(http, pr.TypeKey).ConfigureAwait(false);
+                if (draft == null)
+                {
+                    await Dispatcher.InvokeAsync(() =>
+                        MessageBox.Show("Could not create draft for this report type.", "Reports", MessageBoxButton.OK, MessageBoxImage.Warning));
+                    return;
+                }
+
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    _suppressCategoryReload = true;
+                    try
+                    {
+                        CategoryCombo.SelectedValue = pr.TypeKey;
+                    }
+                    finally
+                    {
+                        _suppressCategoryReload = false;
+                    }
+
+                    _suppressSelection = true;
+                    ReportList.SelectedItem = null;
+                    _suppressSelection = false;
+                    AttachFormHost(pr.TypeKey);
+                    var pane = GetOrCreateFormPane(pr.TypeKey);
+                    pane?.LoadFromReport((JObject)draft.DeepClone());
+                    pane?.ApplyVehicleSearchPrefill(pr.Vehicle);
+                    EditorHint.Text =
+                        "New draft — vehicle fields prefilled from vehicle search. Complete the form, then SAVE TO MDT.";
+                    MdtShellEvents.LogCad("Reports: new draft from vehicle search " + pr.TypeKey);
+                    UpdateFormScrollVisibility();
+                    UpdateSaveEnabled();
+                });
+
+                await ReloadListCoreAsync(null, preserveOpenEditor: true).ConfigureAwait(false);
+            }, minimumVisibleMs: 480);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Could not open new report from vehicle search.\n\n" + ex.Message, "Reports", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

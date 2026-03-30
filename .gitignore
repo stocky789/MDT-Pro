@@ -71,7 +71,6 @@ MDTPro/ipAddresses.txt
 # ---- Third-party / local mod copies (not tracked) ----
 STP/
 UltimateBackup/
-
 # ---- Secrets / env (never commit) ----
 .env
 .env.*

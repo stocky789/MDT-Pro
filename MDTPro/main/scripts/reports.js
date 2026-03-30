@@ -715,11 +715,14 @@ async function renderReportInformation(report, type, isList) {
 
   let reportBodyMount = reportInformationEl
   if (
-    !isList &&
     type !== 'propertyEvidence' &&
     typeof window.mdtproMountStandardReportDocument === 'function'
   ) {
-    reportBodyMount = window.mdtproMountStandardReportDocument(reportInformationEl, type)
+    reportBodyMount = window.mdtproMountStandardReportDocument(
+      reportInformationEl,
+      type,
+      { readOnly: isList }
+    )
   }
 
   const timeStamp = new Date(report.TimeStamp)
@@ -1470,7 +1473,7 @@ async function saveReport(type, options = {}) {
     // Numeric enum for C# ReportStatus (dataset is always a string; "0" must not stay a string in JSON)
     Status: Number.isFinite(statusNum) ? statusNum : 1,
     Notes: el.querySelector('#notesSectionTextarea').value.trim(),
-    ShortYear: date.getFullYear().toString().slice(-2),
+    ShortYear: date.getFullYear() % 100,
   }
 
   if (!isValidDate(generalInformation.TimeStamp)) {
@@ -1482,6 +1485,9 @@ async function saveReport(type, options = {}) {
     return false
   }
 
+  const badgeRaw = el
+    .querySelector('#officerInformationSectionBadgeNumberInput')
+    .value.trim()
   const officerInformation = {
     firstName: el
       .querySelector('#officerInformationSectionFirstNameInput')
@@ -1489,9 +1495,8 @@ async function saveReport(type, options = {}) {
     lastName: el
       .querySelector('#officerInformationSectionLastNameInput')
       .value.trim(),
-    badgeNumber: el
-      .querySelector('#officerInformationSectionBadgeNumberInput')
-      .value.trim(),
+    // C# stores INTEGER; send null unless badge is all digits (avoids Json.NET 500 on "" or alphanumeric)
+    badgeNumber: /^\d+$/.test(badgeRaw) ? parseInt(badgeRaw, 10) : null,
     rank: el.querySelector('#officerInformationSectionRankInput').value.trim(),
     callSign: el
       .querySelector('#officerInformationSectionCallSignInput')

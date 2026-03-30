@@ -230,12 +230,93 @@
 
 @media print {
   .report-doc-toolbar,
+  .report-doc-modal-overlay,
   .createPage > .buttonWrapper,
   .createPage .typeSelector {
     display: none !important;
   }
+
+  .standardReportDocumentShell,
+  .propertyEvidenceDocumentShell {
+    max-width: none !important;
+    margin: 0 !important;
+  }
+
   .report-document {
-    border: none;
-    padding: 8px;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 9.5pt !important;
+    line-height: 1.28 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .report-doc-header {
+    display: grid !important;
+    grid-template-columns: 1fr 64px 1fr !important;
+    gap: 6px !important;
+    margin-bottom: 8px !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  .report-doc-seal {
+    width: 56px !important;
+    height: 56px !important;
+    font-size: 9px !important;
+  }
+
+  .report-doc-main-title {
+    font-size: 11pt !important;
+    margin-bottom: 4px !important;
+  }
+
+  .report-doc-header-left,
+  .report-doc-header-right {
+    font-size: 8.5pt !important;
+  }
+
+  .report-document-body .section {
+    margin-bottom: 8px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Long free-text should be allowed to split across pages */
+  .report-document-body .section:has(#notesSectionTextarea),
+  .report-document-body .section:has(.notesTextarea),
+  .report-document-body .notesTextarea,
+  .report-document-body textarea {
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  .report-doc-auth-bar {
+    padding: 6px 8px !important;
+    margin: 8px 0 !important;
+    font-size: 8.5pt !important;
+    page-break-inside: avoid !important;
+  }
+
+  .report-doc-footer {
+    margin-top: 8px !important;
+    font-size: 8pt !important;
+  }
+
+  .report-document-body .title,
+  .report-document-body .sectionTitle {
+    page-break-after: avoid !important;
+  }
+
+  .report-document-body input,
+  .report-document-body textarea,
+  .report-document-body select {
+    border-color: #333 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }

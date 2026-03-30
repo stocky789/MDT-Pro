@@ -50,7 +50,7 @@ namespace MDTPro.Utility {
 
         /// <summary>Game-thread only. Opens the handoff menu when a pending citation exists, the key was pressed, distance is OK, and the ped resolves.</summary>
         internal static void TryProcessKeyPress() {
-            if (Main.usePR || !ModIntegration.StpPluginLoaded) return; // PR handles citations via PedAPI; no MDT handoff menu
+            if (Main.usePR) return; // PR handles citations via PedAPI; no MDT handoff menu
 
             string pedName;
             List<PRHelper.CitationHandoutCharge> chargesCopy;

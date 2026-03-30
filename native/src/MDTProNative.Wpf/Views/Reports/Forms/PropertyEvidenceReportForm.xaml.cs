@@ -211,10 +211,17 @@ public partial class PropertyEvidenceReportForm : UserControl, IReportFormPane
         }
         catch (Exception ex)
         {
-            MessageBox.Show("Could not load recent IDs.\n\n" + ex.Message, "Recent IDs", MessageBoxButton.OK, MessageBoxImage.Warning);
+            await Dispatcher.InvokeAsync(() =>
+                MessageBox.Show("Could not load recent IDs.\n\n" + ex.Message, "Recent IDs", MessageBoxButton.OK, MessageBoxImage.Warning));
             return;
         }
 
+        // HTTP used ConfigureAwait(false); window creation and ShowDialog must run on the UI thread.
+        await Dispatcher.InvokeAsync(() => ShowRecentIdsPickerDialog(arr));
+    }
+
+    void ShowRecentIdsPickerDialog(JArray? arr)
+    {
         var owner = Window.GetWindow(this);
         var dlg = new Window
         {
@@ -286,35 +293,10 @@ public partial class PropertyEvidenceReportForm : UserControl, IReportFormPane
 
     void ExportPdf()
     {
-        var scroll = DocumentBodyScroll;
-        var prevClip = scroll.ClipToBounds;
-        scroll.ClipToBounds = false;
-
-        try
-        {
-            var root = DocumentPrintRoot;
-            var paperWidth = double.IsNaN(root.MaxWidth) || root.MaxWidth <= 0 ? 920 : root.MaxWidth;
-            root.Measure(new Size(paperWidth, double.PositiveInfinity));
-            root.Arrange(new Rect(0, 0, root.DesiredSize.Width, Math.Max(root.DesiredSize.Height, 1)));
-            root.UpdateLayout();
-
-            var pd = new PrintDialog();
-            if (pd.ShowDialog() != true)
-                return;
-
-            pd.PrintVisual(root, "MDT Property/Evidence " + (GeneralIdBox.Text.Trim().Length > 0 ? GeneralIdBox.Text.Trim() : "report"));
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show("Print / PDF failed.\n\n" + ex.Message, "Export PDF", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
-        finally
-        {
-            scroll.ClipToBounds = prevClip;
-            DocumentPrintRoot.InvalidateMeasure();
-            DocumentPrintRoot.InvalidateArrange();
-            scroll.InvalidateMeasure();
-        }
+        ReportDocumentBrandingHelper.PrintToPdf(
+            DocumentBodyScroll,
+            DocumentPrintRoot,
+            "MDT Property/Evidence " + (GeneralIdBox.Text.Trim().Length > 0 ? GeneralIdBox.Text.Trim() : "report"));
     }
 
     static ContentControl? FindFormHost(DependencyObject? start)

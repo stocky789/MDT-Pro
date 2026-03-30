@@ -302,7 +302,7 @@ namespace MDTPro.Setup {
                 public class Labels {
                     public string licensePlate = "License Plate";
                     public string modelDisplayName = "Display name";
-                    public string model = "Model (CDF)";
+                    public string model = "Model";
                     public string make = "Make";
                     public string owner = "Owner";
                     public string isStolen = "Stolen";

@@ -24,6 +24,14 @@ function escapeHtmlAttr(s) {
     .replace(/>/g, '&gt;')
 }
 
+/** Coerce plugin JSON (Pascal/camel, string/number) to LSPDFR CalloutAcceptanceState int. */
+function normalizeCalloutAcceptanceState(data) {
+  const v = data?.AcceptanceState ?? data?.acceptanceState
+  if (v == null || v === '') return 0
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+
 function updateCadUnitReadout(text) {
   const el = document.getElementById('cadUnitStatusReadout')
   if (!el) return
@@ -92,7 +100,7 @@ function getCalloutStatusLabel(state, language) {
 }
 
 function renderCalloutCard(data, index, language, config) {
-  const state = data.AcceptanceState
+  const state = normalizeCalloutAcceptanceState(data)
   const statusLabel = getCalloutStatusLabel(state, language)
   const address = `${(data.Location?.Postal || '').trim()} ${(data.Location?.Street || '').trim()}`.trim() || '—'
   const hasId = !!data.Id

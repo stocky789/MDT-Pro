@@ -69,16 +69,29 @@ public static class NativeReportDraftFactory
             .Replace("{day}", now.Day.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)
             .Replace("{index}", index.ToString(CultureInfo.InvariantCulture).PadLeft(pad, '0'), StringComparison.Ordinal);
 
-        JObject? officerTok = null;
+        // Browser reports.js uses /data/officerInformationData for new reports (badge, rank from Officer tab).
+        // /data/officerInformation is live persona (name/callsign) but omits rank/badge — merge like MainWindow officer strip.
+        JObject? officerData = null;
         try
         {
-            var off = await http.GetDataJsonAsync("officerInformation", cancellationToken).ConfigureAwait(false);
-            officerTok = off as JObject ?? JObject.Parse("{}");
+            officerData = await http.GetDataJsonAsync("officerInformationData", cancellationToken).ConfigureAwait(false) as JObject;
         }
         catch
         {
-            officerTok = new JObject();
+            /* use live only */
         }
+
+        JObject? officerLive = null;
+        try
+        {
+            officerLive = await http.GetDataJsonAsync("officerInformation", cancellationToken).ConfigureAwait(false) as JObject;
+        }
+        catch
+        {
+            /* use data only */
+        }
+
+        var officerTok = MergeOfficerInformationForDraft(officerData, officerLive);
 
         JObject? locationTok = null;
         try
@@ -149,7 +162,8 @@ public static class NativeReportDraftFactory
                 root["Vin"] = "";
                 root["ImpoundReason"] = "";
                 root["TowCompany"] = "";
-                root["ImpoundLot"] = "";
+                // Match impoundSection.js: random lot when none set.
+                root["ImpoundLot"] = RandomImpoundLot();
                 break;
             case "trafficincident":
                 root["DriverNames"] = new JArray();
@@ -178,6 +192,35 @@ public static class NativeReportDraftFactory
         }
 
         return root;
+    }
+
+    static readonly string[] OfficerDraftMergeKeys =
+    [
+        "firstName", "lastName", "rank", "callSign", "agency", "agencyScriptName", "badgeNumber"
+    ];
+
+    /// <summary>Prefer persisted officer tab fields; fill gaps from live session (persona / IPT callsign).</summary>
+    static JObject MergeOfficerInformationForDraft(JObject? data, JObject? live)
+    {
+        var o = data != null ? (JObject)data.DeepClone() : new JObject();
+        if (live == null) return o;
+
+        foreach (var key in OfficerDraftMergeKeys)
+        {
+            if (MeaningfulOfficerToken(o[key])) continue;
+            var lv = live[key];
+            if (lv == null || !MeaningfulOfficerToken(lv)) continue;
+            o[key] = lv.DeepClone();
+        }
+
+        return o;
+    }
+
+    static bool MeaningfulOfficerToken(JToken? tok)
+    {
+        if (tok == null || tok.Type == JTokenType.Null) return false;
+        if (tok.Type is JTokenType.Integer or JTokenType.Float or JTokenType.Boolean) return true;
+        return !string.IsNullOrWhiteSpace(tok.ToString());
     }
 
     /// <summary>True if report JSON is for the same two-digit year as <paramref name="shortYearInt"/> (browser uses <c>report.ShortYear == "26"</c>).</summary>
@@ -232,5 +275,15 @@ public static class NativeReportDraftFactory
             "propertyEvidence" => "PER",
             _ => (key.Length >= 3 ? key[..3] : key).ToUpperInvariant()
         };
+    }
+
+    static string RandomImpoundLot()
+    {
+        string[] lots =
+        [
+            "LSPD Auto Impound — Mission Row (Sinner St & Vespucci Blvd)",
+            "LSPD Auto Impound — Davis (Roy Lowenstein Blvd & Innocence Blvd)",
+        ];
+        return lots[Random.Shared.Next(lots.Length)];
     }
 }
