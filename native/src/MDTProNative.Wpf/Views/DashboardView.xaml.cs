@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Net;
 using System.Windows;
 using System.Windows.Controls;
@@ -13,14 +14,29 @@ public partial class DashboardView : UserControl, IMdtBoundView
     MdtConnectionManager? _connection;
     bool _layoutPersistWired;
     JArray? _lastCallouts;
-    readonly System.Collections.ObjectModel.ObservableCollection<string> _lines = new();
+    readonly ObservableCollection<CalloutListRow> _rows = new();
 
     public DashboardView()
     {
         InitializeComponent();
         Loaded += OnDashboardLoaded;
-        CalloutList.ItemsSource = _lines;
-        _lines.Add("— Not connected —");
+        CalloutList.ItemsSource = _rows;
+        InitCadPresets();
+        RefreshActionButtons();
+    }
+
+    void InitCadPresets()
+    {
+        CadPresetCombo.Items.Clear();
+        void Add(string label, string value) =>
+            CadPresetCombo.Items.Add(new ComboBoxItem { Content = label, Tag = value });
+        Add("10-8 — Available", "10-8 | Available");
+        Add("10-97 — En route", "10-97 | En route");
+        Add("10-23 — On scene", "10-23 | On scene");
+        Add("10-95 — Traffic stop", "10-95 | Traffic stop");
+        Add("10-7 — Out of service / meal", "10-7 | Out of service");
+        Add("10-6 — Busy (other)", "10-6 | Busy");
+        CadPresetCombo.SelectedIndex = 0;
     }
 
     void OnDashboardLoaded(object sender, RoutedEventArgs e)
@@ -40,43 +56,168 @@ public partial class DashboardView : UserControl, IMdtBoundView
         if (_connection?.Http == null)
         {
             _lastCallouts = null;
-            _lines.Clear();
-            _lines.Add("— Not connected —");
+            _rows.Clear();
             DetailText.Text = "";
+            CadStatusReadout.Text = "—";
+            RefreshActionButtons();
         }
     }
 
-    void OnCalloutsUpdated(JArray? list, int count)
+    void OnCalloutsUpdated(JArray? list, int count, string? cadUnitStatus)
     {
+        CadStatusReadout.Text = string.IsNullOrWhiteSpace(cadUnitStatus) ? "—" : cadUnitStatus;
         _lastCallouts = list;
-        _lines.Clear();
+        _rows.Clear();
         if (list == null || count == 0)
         {
-            _lines.Add("— No active callouts —");
             DetailText.Text = "No active callouts.";
+            RefreshActionButtons();
             return;
         }
         foreach (var item in list)
         {
-            var name = item["Name"]?.ToString() ?? item["name"]?.ToString() ?? "(callout)";
-            var locTok = item["Location"] ?? item["location"];
-            var loc = locTok != null ? JTokenDisplay.FormatLocation(locTok) : "";
-            _lines.Add(string.IsNullOrEmpty(loc) ? name : $"{name}  @  {loc}");
+            var row = CalloutListRow.TryFromToken(item);
+            if (row != null)
+                _rows.Add(row);
         }
-        if (CalloutList.SelectedIndex < 0 || CalloutList.SelectedIndex >= _lines.Count)
+        if (_rows.Count == 0)
+        {
+            DetailText.Text = "Callouts are present but missing Id fields. Deploy the updated MDT Pro plugin.";
+            RefreshActionButtons();
+            return;
+        }
+        if (CalloutList.SelectedItem == null || CalloutList.SelectedIndex < 0 || CalloutList.SelectedIndex >= _rows.Count)
             CalloutList.SelectedIndex = 0;
         UpdateDetail();
+        RefreshActionButtons();
     }
 
-    void CalloutList_OnSelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateDetail();
+    void CalloutList_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdateDetail();
+        RefreshActionButtons();
+    }
 
     void UpdateDetail()
     {
-        if (_lastCallouts == null || _lastCallouts.Count == 0) return;
-        var i = CalloutList.SelectedIndex;
-        if (i < 0 || i >= _lastCallouts.Count) return;
-        var sel = _lastCallouts[i];
-        DetailText.Text = sel is JObject jo ? JTokenDisplay.FormatCalloutDetail(jo) : JTokenDisplay.ForDataCell(sel);
+        if (CalloutList.SelectedItem is CalloutListRow row)
+            DetailText.Text = JTokenDisplay.FormatCalloutDetail(row.Source);
+        else
+            DetailText.Text = _rows.Count == 0 ? "No active callouts." : "Select a callout.";
+    }
+
+    void RefreshActionButtons()
+    {
+        if (CalloutList.SelectedItem is not CalloutListRow row)
+        {
+            BtnAccept.IsEnabled = false;
+            BtnEnRoute.IsEnabled = false;
+            BtnGps.IsEnabled = false;
+            BtnSendCi.IsEnabled = false;
+            return;
+        }
+        BtnAccept.IsEnabled = row.AcceptanceState == 0;
+        BtnEnRoute.IsEnabled = row.AcceptanceState == 1;
+        BtnGps.IsEnabled = true;
+        BtnSendCi.IsEnabled = true;
+    }
+
+    CalloutListRow? SelectedRow() => CalloutList.SelectedItem as CalloutListRow;
+
+    async void SetCadStatus_Click(object sender, RoutedEventArgs e)
+    {
+        var http = _connection?.Http;
+        if (http == null)
+        {
+            MdtShellEvents.LogCad("CAD status: connect to MDT Pro first.");
+            return;
+        }
+        var custom = CadCustomStatus.Text?.Trim() ?? "";
+        string status;
+        if (!string.IsNullOrEmpty(custom))
+            status = custom;
+        else if (CadPresetCombo.SelectedItem is ComboBoxItem cbi && cbi.Tag is string tag && !string.IsNullOrWhiteSpace(tag))
+            status = tag;
+        else
+        {
+            MdtShellEvents.LogCad("CAD status: choose a preset or enter a custom line.");
+            return;
+        }
+        try
+        {
+            var body = JsonConvert.SerializeObject(new { status });
+            var (code, text) = await http.PostActionAsync("cadUnitStatus", body);
+            if (code == HttpStatusCode.OK)
+                MdtShellEvents.LogCad("CAD unit status updated.");
+            else
+                MdtShellEvents.LogCad("CAD status: " + text);
+        }
+        catch (Exception ex) { MdtShellEvents.LogCad("CAD status error: " + ex.Message); }
+    }
+
+    async void Accept_Click(object sender, RoutedEventArgs e) => await RunCalloutAction("accept");
+
+    async void EnRoute_Click(object sender, RoutedEventArgs e) => await RunCalloutAction("enroute");
+
+    async Task RunCalloutAction(string action)
+    {
+        var http = _connection?.Http;
+        var row = SelectedRow();
+        if (http == null || row == null)
+        {
+            MdtShellEvents.LogCad("Callout action: connect and select a call.");
+            return;
+        }
+        try
+        {
+            var body = JsonConvert.SerializeObject(new { action, calloutId = row.Id });
+            var (_, text) = await http.PostActionAsync("calloutAction", body);
+            var jo = ParseJsonLoose(text);
+            var ok = jo?["success"]?.Value<bool>() == true;
+            if (ok)
+                MdtShellEvents.LogCad(action + ": OK.");
+            else
+                MdtShellEvents.LogCad(action + ": " + (jo?["error"]?.ToString() ?? text));
+        }
+        catch (Exception ex) { MdtShellEvents.LogCad(action + " error: " + ex.Message); }
+    }
+
+    async void SendToCalloutInterface_Click(object sender, RoutedEventArgs e)
+    {
+        var http = _connection?.Http;
+        var row = SelectedRow();
+        var msg = CalloutMessageDraft.Text?.Trim() ?? "";
+        if (http == null || row == null)
+        {
+            MdtShellEvents.LogCad("Send to CI: connect and select a callout.");
+            return;
+        }
+        if (string.IsNullOrEmpty(msg))
+        {
+            MdtShellEvents.LogCad("Send to CI: enter a message.");
+            return;
+        }
+        try
+        {
+            var body = JsonConvert.SerializeObject(new { action = "sendMessage", calloutId = row.Id, message = msg });
+            var (_, text) = await http.PostActionAsync("calloutAction", body);
+            var jo = ParseJsonLoose(text);
+            var ok = jo?["success"]?.Value<bool>() == true;
+            if (ok)
+            {
+                MdtShellEvents.LogCad("Message sent to Callout Interface.");
+                CalloutMessageDraft.Clear();
+            }
+            else
+                MdtShellEvents.LogCad("Send to CI: " + (jo?["error"]?.ToString() ?? text));
+        }
+        catch (Exception ex) { MdtShellEvents.LogCad("Send to CI error: " + ex.Message); }
+    }
+
+    static JObject? ParseJsonLoose(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        try { return JObject.Parse(text); } catch { return null; }
     }
 
     async void SetWaypoint_Click(object sender, RoutedEventArgs e)
@@ -90,8 +231,7 @@ public partial class DashboardView : UserControl, IMdtBoundView
         try
         {
             var body = "{}";
-            var i = CalloutList.SelectedIndex;
-            if (_lastCallouts != null && i >= 0 && i < _lastCallouts.Count && _lastCallouts[i] is JObject co)
+            if (SelectedRow()?.Source is { } co)
             {
                 var coords = co["Coords"] as JArray;
                 if (coords != null && coords.Count >= 2 && coords[0].Type != JTokenType.Null && coords[1].Type != JTokenType.Null)

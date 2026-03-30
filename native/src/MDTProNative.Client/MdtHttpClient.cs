@@ -21,6 +21,25 @@ public sealed class MdtHttpClient : IDisposable
 
     public void Dispose() => _http.Dispose();
 
+    /// <summary>GET binary asset when present (e.g. <c>image/peds/mp_m_freemode_01.webp</c>); returns null on 404 or failure.</summary>
+    public async Task<byte[]?> GetOptionalBytesAsync(string relativePath, CancellationToken cancellationToken = default)
+    {
+        var rel = relativePath.Trim().Replace('\\', '/').TrimStart('/');
+        if (rel.Length == 0 || rel.Contains("..", StringComparison.Ordinal))
+            return null;
+        try
+        {
+            using var response = await _http.GetAsync(rel, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+                return null;
+            return await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     /// <summary>Game time string; server returns <b>text/plain</b> (not JSON).</summary>
     public async Task<string?> GetCurrentTimePlainAsync(CancellationToken cancellationToken = default)
     {
@@ -89,6 +108,23 @@ public sealed class MdtHttpClient : IDisposable
         if (string.IsNullOrWhiteSpace(text)) return null;
         var t = JToken.Parse(text);
         return t as JArray;
+    }
+
+    /// <summary>Plugin static image (e.g. <c>DepartmentStyling/image/lssd-badge.png</c>).</summary>
+    public async Task<byte[]?> GetPluginImageBytesAsync(string pluginId, string imageFileName, CancellationToken cancellationToken = default)
+    {
+        var name = (imageFileName ?? "").Trim().Replace("\\", "/");
+        if (name.Length == 0 || name.Contains("..", StringComparison.Ordinal))
+            return null;
+        if (!name.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+            && !name.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+            && !name.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+            name += ".png";
+        var rel = "plugin/" + pluginId.Trim('/') + "/image/" + name;
+        using var response = await _http.GetAsync(rel, cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+            return null;
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<JToken?> GetDataJsonAsync(string dataPath, CancellationToken cancellationToken = default)

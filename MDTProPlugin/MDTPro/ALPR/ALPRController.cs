@@ -1,5 +1,8 @@
+using CalloutInterfaceAPI;
+using CalloutInterfaceAPI.Records;
 using CommonDataFramework.Modules.VehicleDatabase;
 using MDTPro.Data;
+using MDTPro.ServerAPI;
 using MDTPro.Setup;
 using MDTPro.Utility;
 using Rage;
@@ -162,39 +165,8 @@ namespace MDTPro.ALPR {
 
                         string plateKey = plate.ToUpperInvariant();
                         try {
-                            MDTProVehicleData vd = new MDTProVehicleData(toScan);
-                            MDTProVehicleData dbVehicle = DataController.GetVehicleByLicensePlate(plate);
-                            List<string> flags;
-                            string owner;
-                            string modelDisplayName;
-
-                            if (vd.CDFVehicleData?.Owner != null) {
-                                flags = BuildFlagsFromLiveCdfVehicle(vd, dbVehicle);
-                                modelDisplayName = vd.ModelDisplayName ?? vd.ModelName ?? "";
-                                // Prefer MDT DB owner over CDF for re-encounters: CDF assigns a fresh persona per spawn,
-                                // but our DB has the persistent identity (correct owner) from prior stops.
-                                owner = (dbVehicle != null && !string.IsNullOrEmpty(dbVehicle.Owner))
-                                    ? dbVehicle.Owner
-                                    : (vd.Owner ?? "");
-                            } else {
-                                // No CDF data: use MDT database (stolen/expired from prior stops or saved data)
-                                if (dbVehicle != null) {
-                                    flags = BuildFlagsPersistedVehicleOnly(dbVehicle);
-                                    owner = dbVehicle.Owner ?? "—";
-                                    modelDisplayName = dbVehicle.ModelDisplayName ?? dbVehicle.ModelName ?? "";
-                                } else {
-                                    flags = new List<string> { "Not in database" };
-                                    owner = "—";
-                                    modelDisplayName = "";
-                                }
-                                if (string.IsNullOrEmpty(modelDisplayName))
-                                    modelDisplayName = GetModelDisplayName(toScan);
-                            }
-
-                            if (string.IsNullOrEmpty(modelDisplayName))
-                                modelDisplayName = GetModelDisplayName(toScan);
-
-                            string vehicleColor = GetVehicleColorDisplay(vd, dbVehicle);
+                            ALPRHit hit = BuildAlprHitForWebFromVehicle(toScan);
+                            if (hit == null) continue;
 
                             bool shouldAlert;
                             lock (Lock) {
@@ -205,15 +177,6 @@ namespace MDTPro.ALPR {
                                 }
                             }
 
-                            var hit = new ALPRHit {
-                                Plate = vd.LicensePlate ?? plate,
-                                Owner = owner,
-                                ModelDisplayName = modelDisplayName,
-                                VehicleColor = vehicleColor,
-                                Flags = flags,
-                                TimeScanned = DateTime.Now
-                            };
-
                             // Only show full vehicle info when there is at least one alert flag (stolen, no insurance, etc.). Otherwise HUD shows "Scanning".
                             if (HasAlertFlags(hit) && ShouldReplaceDisplayedHit(hit)) {
                                 SetDisplayedHit(hit);
@@ -222,11 +185,8 @@ namespace MDTPro.ALPR {
                             }
                             processed++;
 
-                            if (shouldAlert) {
-                                var hitCopy = hit;
-                                System.Threading.ThreadPool.QueueUserWorkItem(_ =>
-                                    ServerAPI.WebSocketHandler.BroadcastALPRHit(hitCopy));
-                            }
+                            if (shouldAlert)
+                                TryEnqueueWebToastFromScanner(hit);
                         } catch (Exception ex) {
                             Log($"ALPR scan skip vehicle {plate}: {ex.Message}", false, LogSeverity.Warning);
                         }
@@ -238,6 +198,145 @@ namespace MDTPro.ALPR {
                 loopCount++;
                 GameFiber.Sleep(intervalMs);
             }
+        }
+
+        /// <summary>Builds an <see cref="ALPRHit"/> from a live vehicle using the same CDF/MDT flag rules as the scan loop (for web toasts / Callout Interface bridge).</summary>
+        internal static ALPRHit BuildAlprHitForWebFromVehicle(Vehicle toScan) {
+            if (toScan == null || !toScan.Exists()) return null;
+            string plate = toScan.LicensePlate?.Trim();
+            if (string.IsNullOrEmpty(plate)) return null;
+
+            MDTProVehicleData vd = new MDTProVehicleData(toScan);
+            MDTProVehicleData dbVehicle = DataController.GetVehicleByLicensePlate(plate);
+            List<string> flags;
+            string owner;
+            string modelDisplayName;
+
+            if (vd.CDFVehicleData?.Owner != null) {
+                flags = BuildFlagsFromLiveCdfVehicle(vd, dbVehicle);
+                modelDisplayName = vd.ModelDisplayName ?? vd.ModelName ?? "";
+                owner = (dbVehicle != null && !string.IsNullOrEmpty(dbVehicle.Owner))
+                    ? dbVehicle.Owner
+                    : (vd.Owner ?? "");
+            } else {
+                if (dbVehicle != null) {
+                    flags = BuildFlagsPersistedVehicleOnly(dbVehicle);
+                    owner = dbVehicle.Owner ?? "—";
+                    modelDisplayName = dbVehicle.ModelDisplayName ?? dbVehicle.ModelName ?? "";
+                } else {
+                    flags = new List<string> { "Not in database" };
+                    owner = "—";
+                    modelDisplayName = "";
+                }
+                if (string.IsNullOrEmpty(modelDisplayName))
+                    modelDisplayName = GetModelDisplayName(toScan);
+            }
+
+            if (string.IsNullOrEmpty(modelDisplayName))
+                modelDisplayName = GetModelDisplayName(toScan);
+
+            string vehicleColor = GetVehicleColorDisplay(vd, dbVehicle);
+
+            return new ALPRHit {
+                Plate = vd.LicensePlate ?? plate,
+                Owner = owner,
+                ModelDisplayName = modelDisplayName,
+                VehicleColor = vehicleColor,
+                Flags = flags,
+                TimeScanned = DateTime.Now
+            };
+        }
+
+        /// <summary>Queues a web ALPR toast from the built-in scanner when <see cref="Config.alprWebToastsFromScanner"/> is enabled.</summary>
+        internal static void TryEnqueueWebToastFromScanner(ALPRHit hit) {
+            if (hit == null) return;
+            var cfg = GetConfig();
+            if (cfg == null || !cfg.alprWebToastsFromScanner) return;
+            var copy = hit;
+            System.Threading.ThreadPool.QueueUserWorkItem(_ => WebSocketHandler.BroadcastALPRHit(copy));
+        }
+
+        /// <summary>Queues a web ALPR toast from Callout Interface plate checks; shares plate cooldown with the scanner.</summary>
+        internal static void TryEnqueueWebToastFromCalloutInterface(ALPRHit hit) {
+            if (hit == null) return;
+            var cfg = GetConfig();
+            if (cfg == null || !cfg.alprWebToastsFromCalloutInterface) return;
+            if (!HasAlertFlags(hit)) return;
+
+            string plateKey = (hit.Plate ?? "").Trim().ToUpperInvariant();
+            if (string.IsNullOrEmpty(plateKey)) return;
+
+            bool shouldWeb;
+            lock (Lock) {
+                shouldWeb = !AlertedPlates.Contains(plateKey);
+                if (shouldWeb) {
+                    AlertedPlates.Add(plateKey);
+                    PlateCooldown[plateKey] = DateTime.UtcNow.AddSeconds(CooldownSeconds);
+                }
+            }
+            if (!shouldWeb) return;
+
+            var copy = hit;
+            System.Threading.ThreadPool.QueueUserWorkItem(_ => WebSocketHandler.BroadcastALPRHit(copy));
+        }
+
+        /// <summary>Builds an <see cref="ALPRHit"/> from a Callout Interface <see cref="VehicleRecord"/> when the entity is missing or unusable (same flag labels as the scanner).</summary>
+        internal static ALPRHit BuildAlprHitFromCalloutInterfaceVehicleRecord(VehicleRecord record) {
+            if (record == null) return null;
+            string plate = record.LicensePlate?.Trim();
+            if (string.IsNullOrEmpty(plate) || string.Equals(plate, "Unknown", StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            MDTProVehicleData dbVehicle = DataController.GetVehicleByLicensePlate(plate);
+            var flags = new List<string>();
+            if (dbVehicle != null)
+                flags.AddRange(BuildFlagsPersistedVehicleOnly(dbVehicle));
+            else
+                flags.Add("Not in database");
+
+            AppendCalloutInterfaceDocumentFlags(flags, record.RegistrationStatus, record.InsuranceStatus);
+
+            try {
+                if (record.OwnerPersona != null && record.OwnerPersona.Wanted && !flags.Contains("Owner wanted"))
+                    flags.Add("Owner wanted");
+            } catch {
+                /* Persona API differences */
+            }
+
+            string owner = "—";
+            if (dbVehicle != null && !string.IsNullOrEmpty(dbVehicle.Owner))
+                owner = dbVehicle.Owner;
+            else if (!string.IsNullOrEmpty(record.OwnerName) && !string.Equals(record.OwnerName, "Unknown", StringComparison.OrdinalIgnoreCase))
+                owner = record.OwnerName;
+
+            string modelDisplayName = $"{record.Make} {record.Model}".Trim();
+            if (string.IsNullOrEmpty(modelDisplayName)
+                || string.Equals(modelDisplayName, "Unknown Unknown", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(modelDisplayName, "Unknown", StringComparison.OrdinalIgnoreCase))
+                modelDisplayName = dbVehicle != null ? (dbVehicle.ModelDisplayName ?? dbVehicle.ModelName ?? "") : "";
+
+            string vehicleColor = null;
+            if (!string.IsNullOrEmpty(record.Color) && !string.Equals(record.Color, "Unknown", StringComparison.OrdinalIgnoreCase))
+                vehicleColor = record.Color.Trim();
+            if (string.IsNullOrEmpty(vehicleColor))
+                vehicleColor = GetVehicleColorDisplay(null, dbVehicle);
+
+            return new ALPRHit {
+                Plate = plate,
+                Owner = owner,
+                ModelDisplayName = modelDisplayName ?? "",
+                VehicleColor = vehicleColor,
+                Flags = flags,
+                TimeScanned = DateTime.Now
+            };
+        }
+
+        private static void AppendCalloutInterfaceDocumentFlags(List<string> flags, VehicleDocumentStatus registration, VehicleDocumentStatus insurance) {
+            if (flags == null) return;
+            if (registration == VehicleDocumentStatus.Expired) flags.Add("Registration expired");
+            else if (registration == VehicleDocumentStatus.None) flags.Add("No registration");
+            if (insurance == VehicleDocumentStatus.Expired) flags.Add("Insurance expired");
+            else if (insurance == VehicleDocumentStatus.None) flags.Add("No insurance");
         }
 
         /// <summary>True if the hit has at least one real alert flag (stolen, no insurance, etc.), not just "Not in database".</summary>

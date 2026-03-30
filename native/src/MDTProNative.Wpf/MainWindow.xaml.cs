@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
+using MDTProNative.Wpf.Helpers;
 using MDTProNative.Wpf.Services;
 using MDTProNative.Wpf.Views;
 using MDTProNative.Wpf.Windows;
@@ -26,6 +27,9 @@ public partial class MainWindow : Window
     bool _cadLogCollapsed;
     bool _suppressNavFadeOnce = true;
     int _lastCalloutCount = -1;
+    int _rightRailTabIndex;
+    JArray? _lastCalloutsRightRail;
+    readonly ObservableCollection<string> _rightRailCalloutLines = new();
     Storyboard? _connLampPulse;
 
     public MainWindow() : this(new TerminalSessionConfig("Operator", "127.0.0.1", 9000)) { }
@@ -37,19 +41,24 @@ public partial class MainWindow : Window
         _connection = new MdtConnectionManager(Dispatcher);
         _connection.TimeUpdated += s => StatusTime.Text = s;
         _connection.LocationUpdated += OnLocationUpdated;
-        _connection.CalloutsUpdated += (_, count) =>
+        _connection.CalloutsUpdated += (list, count, _) =>
         {
             if (_connection.IsConnected && count > _lastCalloutCount && _lastCalloutCount >= 0)
                 CadCalloutSound.TryPlay();
             _lastCalloutCount = count;
             StatusCallouts.Text = count == 0 && !_connection.IsConnected ? "—" : count.ToString();
-            if (RightRailActivityTab != null)
-                RightRailActivityTab.Text = _connection.IsConnected ? $"CALLOUTS ({count})" : "CALLOUTS (—)";
+            if (RightRailTabCallouts != null)
+                RightRailTabCallouts.Content = _connection.IsConnected ? $"CALLOUTS ({count})" : "CALLOUTS (—)";
+            UpdateRightRailCallouts(list, count);
             RefreshFooterSummary();
         };
         _connection.Log += OnConnectionLog;
 
         MessageLog.ItemsSource = _logLines;
+        RightRailMessageLog.ItemsSource = _logLines;
+        RightRailCalloutList.ItemsSource = _rightRailCalloutLines;
+        _rightRailCalloutLines.Add("— Not connected —");
+        SetRightRailTab(0);
         ApplyPersistedShellLayout();
         MainLeftRailSplitter.DragCompleted += (_, _) => SaveShellLayout();
         MainRightRailSplitter.DragCompleted += (_, _) => SaveShellLayout();
@@ -74,6 +83,7 @@ public partial class MainWindow : Window
         MdtShellEvents.CadMessageLogged += OnCadMessageLogged;
         MdtShellEvents.NavigateToPersonSearchRequested += OnNavigateToPersonSearchRequested;
         MdtShellEvents.NavigateToReportRequested += OnNavigateToReportRequested;
+        MdtShellEvents.NavigateToNewReportFromPersonSearchRequested += OnNavigateToNewReportFromPersonSearchRequested;
         SetQuickActionsEnabled(false);
 
         ApplyTerminalChrome();
@@ -90,6 +100,7 @@ public partial class MainWindow : Window
             MdtShellEvents.CadMessageLogged -= OnCadMessageLogged;
             MdtShellEvents.NavigateToPersonSearchRequested -= OnNavigateToPersonSearchRequested;
             MdtShellEvents.NavigateToReportRequested -= OnNavigateToReportRequested;
+            MdtShellEvents.NavigateToNewReportFromPersonSearchRequested -= OnNavigateToNewReportFromPersonSearchRequested;
             if (ContentHost.Content is IMdtBoundView b) b.Bind(null);
             await _connection.DisposeAsync();
         };
@@ -192,6 +203,13 @@ public partial class MainWindow : Window
     void OnNavigateToReportRequested(string reportId, string? reportTypeKey)
     {
         ReportsView.PendingOpenReport = (reportId, reportTypeKey);
+        if (_nav.FirstOrDefault(x => x.Id == "reports") is { } item)
+            NavList.SelectedItem = item;
+    }
+
+    void OnNavigateToNewReportFromPersonSearchRequested(string reportTypeKey, string pedName, string? vehicleLicensePlate)
+    {
+        ReportsView.PendingNewReportFromPersonSearch = new(reportTypeKey, pedName, vehicleLicensePlate);
         if (_nav.FirstOrDefault(x => x.Id == "reports") is { } item)
             NavList.SelectedItem = item;
     }
@@ -433,8 +451,9 @@ public partial class MainWindow : Window
         StatusLocation.ToolTip = null;
         StatusUnit.Text = "—";
         StatusCallouts.Text = "—";
-        if (RightRailActivityTab != null)
-            RightRailActivityTab.Text = "CALLOUTS (—)";
+        if (RightRailTabCallouts != null)
+            RightRailTabCallouts.Content = "CALLOUTS (—)";
+        UpdateRightRailCallouts(null, 0);
         ClearOfficerStrip();
         SetQuickActionsEnabled(false);
         if (ContentHost.Content is IMdtBoundView b) b.Bind(null);
@@ -541,6 +560,80 @@ public partial class MainWindow : Window
         _logLines.Insert(0, $"[{stamp}] {line}");
         while (_logLines.Count > 400)
             _logLines.RemoveAt(_logLines.Count - 1);
+    }
+
+    void RightRailTab_Click(object sender, RoutedEventArgs e)
+    {
+        var i = sender == RightRailTabRelated ? 0 : sender == RightRailTabCadLog ? 1 : 2;
+        SetRightRailTab(i);
+    }
+
+    void SetRightRailTab(int index)
+    {
+        if (index is < 0 or > 2) index = 0;
+        _rightRailTabIndex = index;
+        RightRailRelatedPanel.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
+        RightRailCadLogPanel.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
+        RightRailCalloutsPanel.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
+        ApplyRightRailTabChrome();
+    }
+
+    void ApplyRightRailTabChrome()
+    {
+        var activeBg = (Brush)FindResource("CadSubTabActiveBg");
+        var activeFg = (Brush)FindResource("CadSubTabActiveText");
+        var idleFg = new SolidColorBrush(Color.FromRgb(0x7A, 0x8A, 0x9E));
+        void Paint(Button b, bool on)
+        {
+            b.Background = on ? activeBg : Brushes.Transparent;
+            b.Foreground = on ? activeFg : idleFg;
+        }
+        Paint(RightRailTabRelated, _rightRailTabIndex == 0);
+        Paint(RightRailTabCadLog, _rightRailTabIndex == 1);
+        Paint(RightRailTabCallouts, _rightRailTabIndex == 2);
+    }
+
+    void UpdateRightRailCallouts(JArray? list, int count)
+    {
+        _lastCalloutsRightRail = list;
+        _rightRailCalloutLines.Clear();
+        if (!_connection.IsConnected)
+        {
+            _rightRailCalloutLines.Add("— Not connected —");
+            RightRailCalloutDetail.Text = "";
+            return;
+        }
+        if (list == null || count == 0)
+        {
+            _rightRailCalloutLines.Add("— No active callouts —");
+            RightRailCalloutDetail.Text = "No active callouts.";
+            return;
+        }
+        foreach (var item in list)
+        {
+            var name = item["Name"]?.ToString() ?? item["name"]?.ToString() ?? "(callout)";
+            var locTok = item["Location"] ?? item["location"];
+            var loc = locTok != null ? JTokenDisplay.FormatLocation(locTok) : "";
+            _rightRailCalloutLines.Add(string.IsNullOrEmpty(loc) ? name : $"{name}  @  {loc}");
+        }
+        if (RightRailCalloutList.SelectedIndex < 0 || RightRailCalloutList.SelectedIndex >= _rightRailCalloutLines.Count)
+            RightRailCalloutList.SelectedIndex = 0;
+        UpdateRightRailCalloutDetail();
+    }
+
+    void RightRailCalloutList_OnSelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateRightRailCalloutDetail();
+
+    void UpdateRightRailCalloutDetail()
+    {
+        if (_lastCalloutsRightRail == null || _lastCalloutsRightRail.Count == 0)
+        {
+            RightRailCalloutDetail.Text = "";
+            return;
+        }
+        var i = RightRailCalloutList.SelectedIndex;
+        if (i < 0 || i >= _lastCalloutsRightRail.Count) return;
+        var sel = _lastCalloutsRightRail[i];
+        RightRailCalloutDetail.Text = sel is JObject jo ? JTokenDisplay.FormatCalloutDetail(jo) : JTokenDisplay.ForDataCell(sel);
     }
 
     sealed record NavItem(string Id, string Title);

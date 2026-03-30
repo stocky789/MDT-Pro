@@ -9,13 +9,16 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <StackPanel x:Name="ReportEditorToolbar" Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-            <Button x:Name="ExportPdfBtn" Content="EXPORT PDF…" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
-            <TextBlock x:Name="BrandingTemplateHint"
-                       VerticalAlignment="Center"
-                       Foreground="{StaticResource CadMuted}"
-                       FontSize="11"
-                       Text="" />
+        <StackPanel x:Name="ReportEditorToolbar" Grid.Row="0" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal">
+                <Button x:Name="ExportPdfBtn" Content="EXPORT PDF…" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
+                <TextBlock x:Name="BrandingTemplateHint"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource CadMuted}"
+                           FontSize="11"
+                           Text="" />
+            </StackPanel>
+            <reports:ReportNearbyVehicleBar x:Name="NearbyVehicleBar" Margin="0,8,0,0" />
         </StackPanel>
 
         <ScrollViewer x:Name="DocumentBodyScroll"
@@ -45,8 +48,21 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Report ID" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
-                        <TextBox x:Name="IdBox" Grid.Row="0" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,6" />
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Report ID" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" VerticalAlignment="Center" />
+                        <Grid Grid.Row="0" Grid.Column="1" Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="IdBox" Grid.Column="0" Style="{StaticResource ReportDocTextBox}" Margin="0,0,8,0" />
+                            <Button x:Name="CopyReportIdBtn"
+                                    Grid.Column="1"
+                                    Content="COPY"
+                                    Style="{StaticResource CadRailOutlineButton}"
+                                    Padding="10,4"
+                                    VerticalAlignment="Center"
+                                    ToolTip="Copy report ID to clipboard" />
+                        </Grid>
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Short year" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
                         <TextBox x:Name="ShortYearBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,6" />
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Date / time" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" VerticalAlignment="Top" />
@@ -119,20 +135,46 @@
 
                     <TextBlock Text="Violator &amp; court" Style="{StaticResource ReportDocSectionTitle}" />
                     <TextBlock Text="Offender (ped name)" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,4" />
-                    <TextBox x:Name="OffenderPedBox" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,10" />
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="OffenderPedBox" Grid.Column="0" Style="{StaticResource ReportDocTextBox}" Margin="0,0,8,0" />
+                        <Button x:Name="CopyOffenderPedBtn"
+                                Grid.Column="1"
+                                Content="COPY"
+                                Style="{StaticResource CadRailOutlineButton}"
+                                Padding="10,4"
+                                VerticalAlignment="Center"
+                                ToolTip="Copy ped name to clipboard" />
+                    </Grid>
                     <TextBlock Text="Offender vehicle plate" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,4" />
-                    <TextBox x:Name="OffenderPlateBox" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,10" />
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="OffenderPlateBox" Grid.Column="0" Style="{StaticResource ReportDocTextBox}" Margin="0,0,8,0" />
+                        <Button x:Name="CopyOffenderPlateBtn"
+                                Grid.Column="1"
+                                Content="COPY"
+                                Style="{StaticResource CadRailOutlineButton}"
+                                Padding="10,4"
+                                VerticalAlignment="Center"
+                                ToolTip="Copy plate to clipboard" />
+                    </Grid>
                     <TextBlock Text="Court case # (optional)" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,4" />
                     <TextBox x:Name="CourtCaseBox" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,10" />
 
-                    <TextBlock Text="Charges / violations" Style="{StaticResource ReportDocSectionTitle}" Margin="0,4,0,4" />
+                    <TextBlock Text="Fines / violations" Style="{StaticResource ReportDocSectionTitle}" Margin="0,4,0,4" />
                     <TextBlock TextWrapping="Wrap"
                                FontSize="11"
                                Foreground="#444"
                                Margin="0,0,0,8"
-                               Text="Use the same charge list as the browser MDT (/citationOptions). Pick to auto-fill fines and flags, or type a custom violation." />
+                               Text="Use the same violation list as the browser MDT (/citationOptions). Pick an entry to auto-fill fine ranges and flags, or type a custom violation." />
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <Button x:Name="AddChargeBtn" Content="ADD CHARGE" Style="{StaticResource CadButton}" Padding="12,4" />
+                        <Button x:Name="AddChargeBtn" Content="ADD VIOLATION" Style="{StaticResource CadButton}" Padding="12,4" />
                         <Button x:Name="RemoveChargeBtn" Content="REMOVE SELECTED" Style="{StaticResource CadRailOutlineButton}" Margin="8,0,0,0" Padding="12,4" />
                     </StackPanel>
                     <DataGrid x:Name="ChargesGrid"
@@ -147,8 +189,18 @@
                               BorderBrush="{StaticResource ReportDocInkBrush}"
                               GridLinesVisibility="Horizontal"
                               RowHeight="28">
+                        <DataGrid.Resources>
+                            <Style TargetType="DataGridRow">
+                                <Setter Property="Background" Value="{StaticResource ReportDocFieldFill}" />
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="#C8DDF5" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.Resources>
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Header="CHARGE" Width="2*">
+                            <DataGridTemplateColumn Header="VIOLATION" Width="2*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <ComboBox IsEditable="True"
@@ -160,8 +212,38 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="MIN FINE" Binding="{Binding MinFine, UpdateSourceTrigger=PropertyChanged}" Width="*" />
-                            <DataGridTextColumn Header="MAX FINE" Binding="{Binding MaxFine, UpdateSourceTrigger=PropertyChanged}" Width="*" />
+                            <DataGridTextColumn Header="MIN FINE" Binding="{Binding MinFine, UpdateSourceTrigger=PropertyChanged}" Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+                                        <Setter Property="VerticalAlignment" Value="Center" />
+                                        <Setter Property="Padding" Value="6,2" />
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                                <DataGridTextColumn.EditingElementStyle>
+                                    <Style TargetType="TextBox">
+                                        <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+                                        <Setter Property="Background" Value="#FFFFFF" />
+                                        <Setter Property="CaretBrush" Value="{StaticResource ReportDocInkBrush}" />
+                                    </Style>
+                                </DataGridTextColumn.EditingElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="MAX FINE" Binding="{Binding MaxFine, UpdateSourceTrigger=PropertyChanged}" Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+                                        <Setter Property="VerticalAlignment" Value="Center" />
+                                        <Setter Property="Padding" Value="6,2" />
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                                <DataGridTextColumn.EditingElementStyle>
+                                    <Style TargetType="TextBox">
+                                        <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+                                        <Setter Property="Background" Value="#FFFFFF" />
+                                        <Setter Property="CaretBrush" Value="{StaticResource ReportDocInkBrush}" />
+                                    </Style>
+                                </DataGridTextColumn.EditingElementStyle>
+                            </DataGridTextColumn>
                             <DataGridCheckBoxColumn Header="REV. LIC." Binding="{Binding CanRevokeLicense, UpdateSourceTrigger=PropertyChanged}" Width="80" />
                             <DataGridCheckBoxColumn Header="ARREST" Binding="{Binding IsArrestable, UpdateSourceTrigger=PropertyChanged}" Width="70" />
                         </DataGrid.Columns>

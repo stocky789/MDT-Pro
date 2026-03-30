@@ -14,6 +14,31 @@
 
         WindowStartupLocation="CenterScreen">
 
+    <Window.Resources>
+        <Style x:Key="CadRightRailSubTabButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="VerticalAlignment" Value="Bottom" />
+            <Setter Property="FontFamily" Value="{StaticResource CadFontCondensed}" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="2,2,0,0"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
     <DockPanel LastChildFill="True">
 
         <!-- CAD footer: dispatch-style status + link lamp -->
@@ -578,83 +603,59 @@
 
                         Padding="10,10,10,10">
 
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <DockPanel LastChildFill="True">
 
-                        <StackPanel>
+                        <Border DockPanel.Dock="Top"
 
-                            <Border Background="#FF0A1018"
+                                Background="#FF0A1018"
 
-                                    BorderBrush="{StaticResource CadBorder}"
+                                BorderBrush="{StaticResource CadBorder}"
 
-                                    BorderThickness="0,0,0,1"
+                                BorderThickness="0,0,0,1"
 
-                                    Padding="0,0,0,0"
+                                Padding="0,0,0,0"
 
-                                    Margin="0,0,0,10">
+                                Margin="0,0,0,10">
 
-                                <StackPanel Orientation="Horizontal">
+                            <StackPanel Orientation="Horizontal">
 
-                                    <Border Background="{StaticResource CadSubTabActiveBg}"
+                                <Button x:Name="RightRailTabRelated"
 
-                                            CornerRadius="2,2,0,0"
+                                        Style="{StaticResource CadRightRailSubTabButton}"
 
-                                            Padding="10,7"
+                                        Content="RELATED DATA"
 
-                                            VerticalAlignment="Bottom">
+                                        Click="RightRailTab_Click" />
 
-                                        <TextBlock Text="RELATED DATA"
+                                <Button x:Name="RightRailTabCadLog"
 
-                                                   Foreground="{StaticResource CadSubTabActiveText}"
+                                        Style="{StaticResource CadRightRailSubTabButton}"
 
-                                                   FontFamily="{StaticResource CadFontCondensed}"
+                                        Content="CAD LOG"
 
-                                                   FontSize="10"
+                                        Margin="4,0,0,0"
 
-                                                   FontWeight="Bold"
+                                        Click="RightRailTab_Click" />
 
-                                                   VerticalAlignment="Center" />
+                                <Button x:Name="RightRailTabCallouts"
 
-                                    </Border>
+                                        Style="{StaticResource CadRightRailSubTabButton}"
 
-                                    <TextBlock Text="CAD LOG"
+                                        Content="CALLOUTS (0)"
 
-                                               Foreground="#FF7A8A9E"
+                                        Margin="4,0,0,0"
 
-                                               FontFamily="{StaticResource CadFontCondensed}"
+                                        Click="RightRailTab_Click" />
 
-                                               FontSize="10"
+                            </StackPanel>
 
-                                               FontWeight="Bold"
+                        </Border>
 
-                                               Margin="14,0,0,0"
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
 
-                                               VerticalAlignment="Center"
+                            <Grid>
 
-                                               Padding="0,7,0,7" />
-
-                                    <TextBlock x:Name="RightRailActivityTab"
-
-                                               Text="CALLOUTS (0)"
-
-                                               Foreground="#FF7A8A9E"
-
-                                               FontFamily="{StaticResource CadFontCondensed}"
-
-                                               FontSize="10"
-
-                                               FontWeight="Bold"
-
-                                               Margin="14,0,0,0"
-
-                                               VerticalAlignment="Center"
-
-                                               Padding="0,7,0,7" />
-
-                                </StackPanel>
-
-                            </Border>
-
-
+                                <StackPanel x:Name="RightRailRelatedPanel">
 
                             <TextBlock Text="ASSOCIATED OFFICER" Style="{StaticResource CadSectionTitle}" />
 
@@ -794,9 +795,77 @@
 
                             </Border>
 
-                        </StackPanel>
+                                </StackPanel>
 
-                    </ScrollViewer>
+                                <StackPanel x:Name="RightRailCadLogPanel" Visibility="Collapsed">
+
+                                    <TextBlock Text="CAD MESSAGE LOG" Style="{StaticResource CadSectionTitle}" />
+
+                                    <Border Style="{StaticResource CadSectionBorder}" Padding="8,8">
+
+                                        <ListBox x:Name="RightRailMessageLog"
+
+                                                 Style="{StaticResource CadListBox}"
+
+                                                 FontFamily="{StaticResource CadFontMono}"
+
+                                                 FontSize="11"
+
+                                                 Height="320"
+
+                                                 ItemContainerStyle="{StaticResource CadLogListBoxItem}" />
+
+                                    </Border>
+
+                                </StackPanel>
+
+                                <StackPanel x:Name="RightRailCalloutsPanel" Visibility="Collapsed">
+
+                                    <TextBlock Text="ACTIVE CALLOUTS" Style="{StaticResource CadSectionTitle}" />
+
+                                    <Border Style="{StaticResource CadSectionBorder}" Padding="8,8">
+
+                                        <DockPanel LastChildFill="True">
+
+                                            <TextBlock x:Name="RightRailCalloutDetail"
+
+                                                       DockPanel.Dock="Bottom"
+
+                                                       Style="{StaticResource CadLabelMuted}"
+
+                                                       TextWrapping="Wrap"
+
+                                                       FontSize="11"
+
+                                                       Margin="0,8,0,0" />
+
+                                            <ListBox x:Name="RightRailCalloutList"
+
+                                                     Style="{StaticResource CadListBox}"
+
+                                                     FontFamily="{StaticResource CadFontMono}"
+
+                                                     FontSize="12"
+
+                                                     MinHeight="160"
+
+                                                     MaxHeight="280"
+
+                                                     SelectionChanged="RightRailCalloutList_OnSelectionChanged"
+
+                                                     ItemContainerStyle="{StaticResource CadLogListBoxItem}" />
+
+                                        </DockPanel>
+
+                                    </Border>
+
+                                </StackPanel>
+
+                            </Grid>
+
+                        </ScrollViewer>
+
+                    </DockPanel>
 
                 </Border>
 

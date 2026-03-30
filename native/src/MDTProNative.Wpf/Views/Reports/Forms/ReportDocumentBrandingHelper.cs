@@ -50,19 +50,24 @@ public static class ReportDocumentBrandingHelper
             var tok = await connection.Http.GetDataJsonAsync("reportBranding?reportType=" + Uri.EscapeDataString(reportTypeForQuery)).ConfigureAwait(false);
             if (tok is not JObject root)
             {
+                var fb = ReportBrandingFallback.ActiveTemplate;
                 await dispatcher.InvokeAsync(() =>
-                    ApplyChrome(ReportBrandingFallback.ActiveTemplate, titleJsonProperty, defaultTitle, header, templateHint, "fallback", footerBlock));
+                    ApplyChrome(fb, titleJsonProperty, defaultTitle, header, templateHint, "fallback", footerBlock));
+                await header.TryLoadSealAsync(connection.Http, fb).ConfigureAwait(false);
                 return;
             }
 
             var active = root["activeTemplate"] as JObject ?? ReportBrandingFallback.ActiveTemplate;
             var id = root["activeTemplateId"]?.ToString() ?? "regional_crime_lab";
             await dispatcher.InvokeAsync(() => ApplyChrome(active, titleJsonProperty, defaultTitle, header, templateHint, id, footerBlock));
+            await header.TryLoadSealAsync(connection.Http, active).ConfigureAwait(false);
         }
         catch
         {
+            var fb = ReportBrandingFallback.ActiveTemplate;
             await dispatcher.InvokeAsync(() =>
-                ApplyChrome(ReportBrandingFallback.ActiveTemplate, titleJsonProperty, defaultTitle, header, templateHint, "fallback", footerBlock));
+                ApplyChrome(fb, titleJsonProperty, defaultTitle, header, templateHint, "fallback", footerBlock));
+            await header.TryLoadSealAsync(connection.Http, fb).ConfigureAwait(false);
         }
     }
 

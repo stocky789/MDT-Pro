@@ -1,5 +1,6 @@
 using MDTPro.Data;
 using MDTPro.Data.Reports;
+using MDTPro.EventListeners;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -47,22 +48,64 @@ namespace MDTPro.ServerAPI {
             if (path.Equals("calloutAction", StringComparison.OrdinalIgnoreCase)) {
                 string bodyCallout = Helper.GetRequestPostData(req);
                 string action = null;
+                string calloutId = null;
+                string sendMessage = null;
                 if (!string.IsNullOrEmpty(bodyCallout)) {
                     try {
-                        var data = Newtonsoft.Json.JsonConvert.DeserializeAnonymousType(bodyCallout, new { action = (string)null });
+                        var data = JsonConvert.DeserializeAnonymousType(bodyCallout, new { action = (string)null, calloutId = (string)null, message = (string)null });
                         action = data?.action?.Trim().ToLowerInvariant();
+                        calloutId = data?.calloutId?.Trim();
+                        sendMessage = data?.message;
                     } catch { }
                 }
-                if (action != "accept" && action != "enroute") {
-                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "action must be 'accept' or 'enRoute'." }));
+                if (string.IsNullOrEmpty(calloutId)) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "calloutId is required (from the active callout list)." }));
                     contentType = "application/json";
                     status = 400;
                     return;
                 }
-                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new {
-                    success = false,
-                    error = "CalloutInterface and LSPDFR do not expose an API to accept callouts or set status (En Route) programmatically. Use the in-game Callout Interface to accept and respond to callouts."
-                }));
+                var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "accept", "enroute", "en_route", "sendmessage", "send_message" };
+                if (string.IsNullOrEmpty(action) || !allowed.Contains(action)) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "action must be 'accept', 'enRoute', or 'sendMessage' (optional message)." }));
+                    contentType = "application/json";
+                    status = 400;
+                    return;
+                }
+                var outcome = CalloutActionHelper.RunOnGameThread(action, calloutId, sendMessage);
+                bool ok = outcome.Result == CalloutActionHelper.CalloutActionResult.Ok;
+                int httpStatus = outcome.Result switch {
+                    CalloutActionHelper.CalloutActionResult.Ok => 200,
+                    CalloutActionHelper.CalloutActionResult.NotFound => 404,
+                    CalloutActionHelper.CalloutActionResult.BadState => 409,
+                    _ => 500
+                };
+                buffer = Encoding.UTF8.GetBytes(ok
+                    ? JsonConvert.SerializeObject(new { success = true })
+                    : JsonConvert.SerializeObject(new { success = false, error = outcome.Message }));
+                contentType = "application/json";
+                status = httpStatus;
+                return;
+            }
+
+            if (path.Equals("cadUnitStatus", StringComparison.OrdinalIgnoreCase)) {
+                string bodyCad = Helper.GetRequestPostData(req);
+                string statusText = null;
+                if (!string.IsNullOrEmpty(bodyCad)) {
+                    try {
+                        var data = JsonConvert.DeserializeAnonymousType(bodyCad, new { status = (string)null });
+                        statusText = data?.status?.Trim();
+                    } catch { }
+                }
+                if (string.IsNullOrEmpty(statusText)) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "status is required (e.g. 10-8, 10-97, Traffic stop)." }));
+                    contentType = "application/json";
+                    status = 400;
+                    return;
+                }
+                CalloutEvents.CadUnitStatus = statusText;
+                CalloutInterfaceAPI.Functions.PublishCadUnitStatus(statusText);
+                WebSocketHandler.BroadcastCalloutPayload();
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = true }));
                 contentType = "application/json";
                 status = 200;
                 return;

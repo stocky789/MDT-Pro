@@ -103,9 +103,10 @@ public static class NativeReportDraftFactory
             };
         }
 
-        // Match reports.js fakeReport Status defaults
+        // Match reports.js for arrest/incident; citation defaults to Open so "close report" is a deliberate transition
+        // (plugin issues in-game handoff when a citation becomes closed with charges and FinalAmount is not yet set).
         var status = reportType.Equals("arrest", StringComparison.OrdinalIgnoreCase) ? 3
-            : reportType.Equals("citation", StringComparison.OrdinalIgnoreCase) ? 0
+            : reportType.Equals("citation", StringComparison.OrdinalIgnoreCase) ? 1
             : 1;
 
         var root = new JObject

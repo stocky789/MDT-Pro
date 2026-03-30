@@ -47,7 +47,14 @@
     leftCol.className = 'report-doc-header-left'
     const seal = document.createElement('div')
     seal.className = 'report-doc-seal'
-    seal.textContent = 'SARL'
+    const sealImg = document.createElement('img')
+    sealImg.className = 'report-doc-seal-img'
+    sealImg.alt = ''
+    const sealFallback = document.createElement('span')
+    sealFallback.className = 'report-doc-seal-fallback'
+    sealFallback.textContent = 'SARL'
+    seal.appendChild(sealImg)
+    seal.appendChild(sealFallback)
     const rightCol = document.createElement('div')
     rightCol.className = 'report-doc-header-right'
     const mainTitle = document.createElement('div')
@@ -81,7 +88,17 @@
         const t = j && j.activeTemplate
         if (!t) return
         leftCol.textContent = (t.leftColumn || '').replace(/\r\n/g, '\n')
-        seal.textContent = String(t.centerTitle || 'LAB').trim().slice(0, 12)
+        sealFallback.textContent = String(t.centerTitle || 'LAB').trim().slice(0, 12)
+        const badge = t.sealBadgeFile
+        if (badge && !/\.svg$/i.test(String(badge))) {
+          sealImg.src = '/plugin/DepartmentStyling/image/' + String(badge).trim() + '?v=1'
+          sealImg.style.display = 'block'
+          sealFallback.style.display = 'none'
+        } else {
+          sealImg.removeAttribute('src')
+          sealImg.style.display = 'none'
+          sealFallback.style.display = 'flex'
+        }
         rightTitle.textContent = (t.rightTitle || '').replace(/\r\n/g, '\n')
         footer.textContent = t.footer || ''
         const docTitle = t[tKey]

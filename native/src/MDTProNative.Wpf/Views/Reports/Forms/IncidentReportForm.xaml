@@ -8,13 +8,16 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <StackPanel x:Name="ReportEditorToolbar" Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-            <Button x:Name="ExportPdfBtn" Content="EXPORT PDF…" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
-            <TextBlock x:Name="BrandingTemplateHint"
-                       VerticalAlignment="Center"
-                       Foreground="{StaticResource CadMuted}"
-                       FontSize="11"
-                       Text="" />
+        <StackPanel x:Name="ReportEditorToolbar" Grid.Row="0" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal">
+                <Button x:Name="ExportPdfBtn" Content="EXPORT PDF…" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
+                <TextBlock x:Name="BrandingTemplateHint"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource CadMuted}"
+                           FontSize="11"
+                           Text="" />
+            </StackPanel>
+            <reports:ReportNearbyVehicleBar x:Name="NearbyVehicleBar" Margin="0,8,0,0" />
         </StackPanel>
 
         <ScrollViewer x:Name="DocumentBodyScroll"
@@ -44,8 +47,21 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Report ID" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
-                        <TextBox x:Name="IdBox" Grid.Row="0" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,6" />
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Report ID" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" VerticalAlignment="Center" />
+                        <Grid Grid.Row="0" Grid.Column="1" Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="IdBox" Grid.Column="0" Style="{StaticResource ReportDocTextBox}" Margin="0,0,8,0" />
+                            <Button x:Name="CopyReportIdBtn"
+                                    Grid.Column="1"
+                                    Content="COPY"
+                                    Style="{StaticResource CadRailOutlineButton}"
+                                    Padding="10,4"
+                                    VerticalAlignment="Center"
+                                    ToolTip="Copy report ID to clipboard" />
+                        </Grid>
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Short year" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
                         <TextBox x:Name="ShortYearBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,6" />
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Date / time" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" VerticalAlignment="Top" />
@@ -125,21 +141,51 @@
 
                     <TextBlock Text="Persons involved" Style="{StaticResource ReportDocSectionTitle}" />
                     <TextBlock Text="Offender / suspect (one name per line)" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,4" />
-                    <TextBox x:Name="OffenderNamesBox"
-                             AcceptsReturn="True"
-                             TextWrapping="Wrap"
-                             MinHeight="80"
-                             VerticalScrollBarVisibility="Auto"
-                             Style="{StaticResource ReportDocTextBox}"
-                             Margin="0,0,0,10" />
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="OffenderNamesBox"
+                                 Grid.Column="0"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 MinHeight="80"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Style="{StaticResource ReportDocTextBox}"
+                                 Margin="0,0,8,0" />
+                        <Button x:Name="CopyOffenderNamesBtn"
+                                Grid.Column="1"
+                                Content="COPY"
+                                Style="{StaticResource CadRailOutlineButton}"
+                                Padding="10,4"
+                                VerticalAlignment="Top"
+                                Margin="0,4,0,0"
+                                ToolTip="Copy offender / suspect lines to clipboard" />
+                    </Grid>
                     <TextBlock Text="Witnesses (one per line)" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,4" />
-                    <TextBox x:Name="WitnessNamesBox"
-                             AcceptsReturn="True"
-                             TextWrapping="Wrap"
-                             MinHeight="80"
-                             VerticalScrollBarVisibility="Auto"
-                             Style="{StaticResource ReportDocTextBox}"
-                             Margin="0,0,0,8" />
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="WitnessNamesBox"
+                                 Grid.Column="0"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 MinHeight="80"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Style="{StaticResource ReportDocTextBox}"
+                                 Margin="0,0,8,0" />
+                        <Button x:Name="CopyWitnessNamesBtn"
+                                Grid.Column="1"
+                                Content="COPY"
+                                Style="{StaticResource CadRailOutlineButton}"
+                                Padding="10,4"
+                                VerticalAlignment="Top"
+                                Margin="0,4,0,0"
+                                ToolTip="Copy witness lines to clipboard" />
+                    </Grid>
 
                     <Button x:Name="ClearFormBtn"
                             Content="CLEAR FORM"

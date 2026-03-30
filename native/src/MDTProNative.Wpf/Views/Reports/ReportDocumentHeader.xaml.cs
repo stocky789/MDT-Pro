@@ -1,5 +1,7 @@
 using System;
+using System.Threading.Tasks;
 using System.Windows.Controls;
+using MDTProNative.Client;
 using MDTProNative.Wpf.Helpers;
 using Newtonsoft.Json.Linq;
 
@@ -17,5 +19,9 @@ public partial class ReportDocumentHeader : UserControl
         BrandingRightTitle.Text = (active["rightTitle"]?.ToString() ?? "").Replace("\n", Environment.NewLine);
         var t = active[titleJsonProperty]?.ToString();
         DocumentTitleBlock.Text = string.IsNullOrWhiteSpace(t) ? defaultTitle : t.Trim();
+        ReportDocumentSealImages.ClearSeal(SealImage, BrandingCenterTitle);
     }
+
+    public Task TryLoadSealAsync(MdtHttpClient? http, JObject? active) =>
+        ReportDocumentSealImages.TryLoadDepartmentBadgeAsync(SealImage, BrandingCenterTitle, http, active, Dispatcher);
 }

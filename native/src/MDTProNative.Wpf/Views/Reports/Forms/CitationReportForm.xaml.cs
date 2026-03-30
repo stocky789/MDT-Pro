@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using MDTProNative.Client;
+using MDTProNative.Wpf.Helpers;
 using MDTProNative.Wpf.Services;
 using MDTProNative.Wpf.Views.Reports;
 using Newtonsoft.Json;
@@ -45,11 +46,25 @@ public partial class CitationReportForm : UserControl, IReportFormPane
             ReportDocumentBrandingHelper.PrintToPdf(DocumentBodyScroll, DocumentPrintRoot,
                 "MDT Citation " + (IdBox.Text.Trim().Length > 0 ? IdBox.Text.Trim() : "report"));
         ReportDocumentBrandingHelper.ApplyChrome(null, TitleKey, DefaultDocTitle, DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
+        NearbyVehicleBar.VehicleDetailReady += (_, vehicle) => ApplyVehicleSnapshot(vehicle);
+        ReportFormCopyButtons.Wire(CopyReportIdBtn, IdBox);
+        ReportFormCopyButtons.Wire(CopyOffenderPedBtn, OffenderPedBox);
+        ReportFormCopyButtons.Wire(CopyOffenderPlateBtn, OffenderPlateBox);
+    }
+
+    void ApplyVehicleSnapshot(JObject vehicle)
+    {
+        var s = ReportMdtVehicleSnapshot.FromVehicleJson(vehicle);
+        if (s == null) return;
+        if (!string.IsNullOrEmpty(s.Plate)) OffenderPlateBox.Text = s.Plate;
+        if (string.IsNullOrWhiteSpace(OffenderPedBox.Text) && !string.IsNullOrEmpty(s.Owner))
+            OffenderPedBox.Text = s.Owner;
     }
 
     public void Bind(MdtConnectionManager? connection)
     {
         _connection = connection;
+        NearbyVehicleBar.Bind(connection);
         if (connection?.Http == null)
         {
             _citationChargePickList.Clear();
@@ -169,6 +184,14 @@ public partial class CitationReportForm : UserControl, IReportFormPane
             o["CourtCaseNumber"] = string.IsNullOrEmpty(ccTrim) ? JValue.CreateNull() : ccTrim;
             o["Charges"] = charges;
         });
+    }
+
+    public void ApplyPersonSearchPrefill(string pedName, string? vehicleLicensePlate)
+    {
+        if (!string.IsNullOrWhiteSpace(pedName))
+            OffenderPedBox.Text = pedName.Trim();
+        if (!string.IsNullOrWhiteSpace(vehicleLicensePlate))
+            OffenderPlateBox.Text = vehicleLicensePlate.Trim();
     }
 
     public void Clear()

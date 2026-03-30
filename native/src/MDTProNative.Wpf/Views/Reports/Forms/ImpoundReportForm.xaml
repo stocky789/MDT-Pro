@@ -8,13 +8,16 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <StackPanel x:Name="ReportEditorToolbar" Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-            <Button x:Name="ExportPdfBtn" Content="EXPORT PDF…" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
-            <TextBlock x:Name="BrandingTemplateHint"
-                       VerticalAlignment="Center"
-                       Foreground="{StaticResource CadMuted}"
-                       FontSize="11"
-                       Text="" />
+        <StackPanel x:Name="ReportEditorToolbar" Grid.Row="0" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal">
+                <Button x:Name="ExportPdfBtn" Content="EXPORT PDF…" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
+                <TextBlock x:Name="BrandingTemplateHint"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource CadMuted}"
+                           FontSize="11"
+                           Text="" />
+            </StackPanel>
+            <reports:ReportNearbyVehicleBar x:Name="NearbyVehicleBar" Margin="0,8,0,0" />
         </StackPanel>
 
         <ScrollViewer x:Name="DocumentBodyScroll"
@@ -35,7 +38,20 @@
                     <UniformGrid Columns="2" Margin="0,0,0,10">
                         <StackPanel Margin="0,0,8,6">
                             <TextBlock Text="Report ID" Style="{StaticResource ReportDocLabel}" />
-                            <TextBox x:Name="IdBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="IdBox" Grid.Column="0" Style="{StaticResource ReportDocTextBox}" Margin="0,0,8,0" />
+                                <Button x:Name="CopyReportIdBtn"
+                                        Grid.Column="1"
+                                        Content="COPY"
+                                        Style="{StaticResource CadRailOutlineButton}"
+                                        Padding="10,4"
+                                        VerticalAlignment="Center"
+                                        ToolTip="Copy report ID to clipboard" />
+                            </Grid>
                         </StackPanel>
                         <StackPanel Margin="0,0,0,6">
                             <TextBlock Text="Short year" Style="{StaticResource ReportDocLabel}" />
@@ -109,7 +125,20 @@
                     <UniformGrid Columns="2" Margin="0,0,0,10">
                         <StackPanel Margin="0,0,8,6">
                             <TextBlock Text="License plate" Style="{StaticResource ReportDocLabel}" />
-                            <TextBox x:Name="LicensePlateBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="LicensePlateBox" Grid.Column="0" Style="{StaticResource ReportDocTextBox}" Margin="0,0,8,0" />
+                                <Button x:Name="CopyLicensePlateBtn"
+                                        Grid.Column="1"
+                                        Content="COPY"
+                                        Style="{StaticResource CadRailOutlineButton}"
+                                        Padding="10,4"
+                                        VerticalAlignment="Center"
+                                        ToolTip="Copy plate to clipboard" />
+                            </Grid>
                         </StackPanel>
                         <StackPanel Margin="0,0,0,6">
                             <TextBlock Text="Vehicle model" Style="{StaticResource ReportDocLabel}" />

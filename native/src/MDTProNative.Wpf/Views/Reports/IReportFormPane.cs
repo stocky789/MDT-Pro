@@ -17,4 +17,7 @@ public interface IReportFormPane
 
     /// <summary>Closes any secondary surface detached from <c>FormHost</c> before clearing the host or disposing panes.</summary>
     void CloseDetachSurfaces() { }
+
+    /// <summary>Optional: after a new draft load, prefill offender / injured party from person search navigation.</summary>
+    void ApplyPersonSearchPrefill(string pedName, string? vehicleLicensePlate) { }
 }

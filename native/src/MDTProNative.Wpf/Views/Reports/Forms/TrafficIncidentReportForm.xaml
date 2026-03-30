@@ -8,13 +8,16 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <StackPanel x:Name="ReportEditorToolbar" Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-            <Button x:Name="ExportPdfBtn" Content="EXPORT PDF…" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
-            <TextBlock x:Name="BrandingTemplateHint"
-                       VerticalAlignment="Center"
-                       Foreground="{StaticResource CadMuted}"
-                       FontSize="11"
-                       Text="" />
+        <StackPanel x:Name="ReportEditorToolbar" Grid.Row="0" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal">
+                <Button x:Name="ExportPdfBtn" Content="EXPORT PDF…" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
+                <TextBlock x:Name="BrandingTemplateHint"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource CadMuted}"
+                           FontSize="11"
+                           Text="" />
+            </StackPanel>
+            <reports:ReportNearbyVehicleBar x:Name="NearbyVehicleBar" Margin="0,8,0,0" />
         </StackPanel>
 
         <ScrollViewer x:Name="DocumentBodyScroll"
@@ -44,8 +47,21 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Report ID" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
-                        <TextBox x:Name="GeneralIdBox" Grid.Row="0" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,6" />
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Report ID" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" VerticalAlignment="Center" />
+                        <Grid Grid.Row="0" Grid.Column="1" Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="GeneralIdBox" Grid.Column="0" Style="{StaticResource ReportDocTextBox}" Margin="0,0,8,0" />
+                            <Button x:Name="CopyReportIdBtn"
+                                    Grid.Column="1"
+                                    Content="COPY"
+                                    Style="{StaticResource CadRailOutlineButton}"
+                                    Padding="10,4"
+                                    VerticalAlignment="Center"
+                                    ToolTip="Copy report ID to clipboard" />
+                        </Grid>
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Short year" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
                         <TextBox x:Name="GeneralShortYearBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,6" />
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Date" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
@@ -119,12 +135,27 @@
 
                     <TextBlock Text="Traffic incident" Style="{StaticResource ReportDocSectionTitle}" />
                     <TextBlock Text="Drivers (one per line)" Style="{StaticResource ReportDocLabel}" />
-                    <TextBox x:Name="DriverNamesBox"
-                             Style="{StaticResource ReportDocTextBox}"
-                             MinHeight="64"
-                             AcceptsReturn="True"
-                             TextWrapping="Wrap"
-                             Margin="0,4,0,8" />
+                    <Grid Margin="0,4,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="DriverNamesBox"
+                                 Grid.Column="0"
+                                 Style="{StaticResource ReportDocTextBox}"
+                                 MinHeight="64"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 Margin="0,0,8,0" />
+                        <Button x:Name="CopyDriverNamesBtn"
+                                Grid.Column="1"
+                                Content="COPY"
+                                Style="{StaticResource CadRailOutlineButton}"
+                                Padding="10,4"
+                                VerticalAlignment="Top"
+                                Margin="0,4,0,0"
+                                ToolTip="Copy driver names to clipboard" />
+                    </Grid>
                     <TextBlock Text="Passengers (one per line)" Style="{StaticResource ReportDocLabel}" />
                     <TextBox x:Name="PassengerNamesBox"
                              Style="{StaticResource ReportDocTextBox}"
@@ -140,12 +171,27 @@
                              TextWrapping="Wrap"
                              Margin="0,4,0,8" />
                     <TextBlock Text="Vehicle plates (one per line)" Style="{StaticResource ReportDocLabel}" />
-                    <TextBox x:Name="VehiclePlatesBox"
-                             Style="{StaticResource ReportDocTextBox}"
-                             MinHeight="64"
-                             AcceptsReturn="True"
-                             TextWrapping="Wrap"
-                             Margin="0,4,0,8" />
+                    <Grid Margin="0,4,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="VehiclePlatesBox"
+                                 Grid.Column="0"
+                                 Style="{StaticResource ReportDocTextBox}"
+                                 MinHeight="64"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 Margin="0,0,8,0" />
+                        <Button x:Name="CopyVehiclePlatesBtn"
+                                Grid.Column="1"
+                                Content="COPY"
+                                Style="{StaticResource CadRailOutlineButton}"
+                                Padding="10,4"
+                                VerticalAlignment="Top"
+                                Margin="0,4,0,0"
+                                ToolTip="Copy vehicle plates to clipboard" />
+                    </Grid>
                     <TextBlock Text="Vehicle models (one per line)" Style="{StaticResource ReportDocLabel}" />
                     <TextBox x:Name="VehicleModelsBox"
                              Style="{StaticResource ReportDocTextBox}"

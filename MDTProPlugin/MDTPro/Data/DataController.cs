@@ -1330,10 +1330,16 @@ namespace MDTPro.Data {
 
                 int index = citationReports.FindIndex(x => x.Id == citationReport.Id);
                 CitationReport existingCitation = index >= 0 ? citationReports[index] as CitationReport : null;
-                bool wasAlreadyClosed = existingCitation?.Status == ReportStatus.Closed;
-                bool newlyClosed = citationReport.Status == ReportStatus.Closed && citationReport.Charges != null && citationReport.Charges.Count > 0 && !wasAlreadyClosed;
+                // Issue handoff when closing with charges and a final amount has not been recorded yet.
+                // Covers: Open→Closed, first save, and "saved closed before charges were added" (wasAlreadyClosed but FinalAmount still null).
+                bool closedWithCharges = citationReport.Status == ReportStatus.Closed
+                    && citationReport.Charges != null
+                    && citationReport.Charges.Count > 0;
+                bool handoutNotYetFinalized = !citationReport.FinalAmount.HasValue
+                    && (existingCitation == null || !existingCitation.FinalAmount.HasValue);
+                bool shouldIssueCitationHandoff = closedWithCharges && handoutNotYetFinalized;
 
-                if (newlyClosed) {
+                if (shouldIssueCitationHandoff) {
                     // Set FinalAmount once when the citation becomes closed; do not recalculate on later saves.
                     var chargesToHand = (citationReport.Charges ?? Enumerable.Empty<CitationReport.Charge>())
                         .Where(charge => charge != null)

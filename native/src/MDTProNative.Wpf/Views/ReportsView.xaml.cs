@@ -23,12 +23,18 @@ public partial class ReportsView : UserControl, IMdtBoundView
     /// <summary>Set by shell navigation (e.g. Court report link) before the view is created/bound.</summary>
     internal static (string Id, string? TypeKey)? PendingOpenReport;
 
+    /// <summary>Set by shell navigation from Person search: new draft + prefill offender / injured party.</summary>
+    internal sealed record PendingPersonSearchReport(string TypeKey, string PedName, string? VehicleLicensePlate);
+
+    internal static PendingPersonSearchReport? PendingNewReportFromPersonSearch;
+
     const string FormsClrNamespace = "MDTProNative.Wpf.Views.Reports.Forms";
 
     MdtConnectionManager? _connection;
     string? _selectedType;
     bool _loadingList;
     bool _suppressSelection;
+    bool _suppressCategoryReload;
     bool _layoutPersistWired;
 
     readonly Dictionary<string, IReportFormPane> _formPanes = new(StringComparer.Ordinal);
@@ -55,7 +61,11 @@ public partial class ReportsView : UserControl, IMdtBoundView
         RefreshBtn.Click += async (_, _) => await ReloadListAsync();
         NewBtn.Click += async (_, _) => await NewDraftAsync();
         SaveBtn.Click += async (_, _) => await SaveAsync();
-        CategoryCombo.SelectionChanged += async (_, _) => await ReloadListAsync();
+        CategoryCombo.SelectionChanged += async (_, _) =>
+        {
+            if (_suppressCategoryReload) return;
+            await ReloadListAsync();
+        };
         ReportList.SelectionChanged += (_, _) => OnReportSelected();
     }
 
@@ -106,6 +116,11 @@ public partial class ReportsView : UserControl, IMdtBoundView
             {
                 PendingOpenReport = null;
                 _ = OpenReportFromNavigationAsync(po);
+            }
+            else if (PendingNewReportFromPersonSearch is { } pn)
+            {
+                PendingNewReportFromPersonSearch = null;
+                _ = OpenNewReportFromPersonSearchAsync(pn);
             }
             else
                 _ = ReloadListAsync();
@@ -315,7 +330,7 @@ public partial class ReportsView : UserControl, IMdtBoundView
         }
     }
 
-    async Task ReloadListCoreAsync(string? typeKeyOverride = null)
+    async Task ReloadListCoreAsync(string? typeKeyOverride = null, bool preserveOpenEditor = false)
     {
         var http = _connection?.Http;
         if (http == null) return;
@@ -346,14 +361,26 @@ public partial class ReportsView : UserControl, IMdtBoundView
 
             await Dispatcher.InvokeAsync(() =>
             {
-                if (typeKeyOverride != null)
-                    CategoryCombo.SelectedValue = typeKeyOverride;
+                _suppressCategoryReload = true;
+                try
+                {
+                    if (typeKeyOverride != null)
+                        CategoryCombo.SelectedValue = typeKeyOverride;
+                }
+                finally
+                {
+                    _suppressCategoryReload = false;
+                }
+
                 _suppressSelection = true;
                 ReportList.ItemsSource = rows;
                 ReportList.SelectedItem = null;
                 _suppressSelection = false;
-                ClearReportEditorSurface();
-                SetIdleEditorHint();
+                if (!preserveOpenEditor)
+                {
+                    ClearReportEditorSurface();
+                    SetIdleEditorHint();
+                }
             });
         }
         catch (Exception ex)
@@ -362,7 +389,8 @@ public partial class ReportsView : UserControl, IMdtBoundView
             await Dispatcher.InvokeAsync(() =>
             {
                 ReportList.ItemsSource = Array.Empty<ReportRow>();
-                ClearReportEditorSurface();
+                if (!preserveOpenEditor)
+                    ClearReportEditorSurface();
                 EditorHint.Text = "Could not load report list: " + ex.Message;
             });
         }
@@ -423,6 +451,71 @@ public partial class ReportsView : UserControl, IMdtBoundView
         catch (Exception ex)
         {
             MessageBox.Show("Could not build draft.\n\n" + ex.Message, "Reports", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    async Task OpenNewReportFromPersonSearchAsync(PendingPersonSearchReport pr)
+    {
+        var http = _connection?.Http;
+        if (http == null)
+        {
+            await Dispatcher.InvokeAsync(() =>
+                MessageBox.Show("Connect to MDT Pro first.", "Reports", MessageBoxButton.OK, MessageBoxImage.Information));
+            return;
+        }
+
+        if (NativeReportDraftFactory.DataPathFor(pr.TypeKey) == null)
+        {
+            await Dispatcher.InvokeAsync(() =>
+                MessageBox.Show($"Unknown report type “{pr.TypeKey}”.", "Reports", MessageBoxButton.OK, MessageBoxImage.Warning));
+            await Dispatcher.InvokeAsync(() => _ = ReloadListAsync());
+            return;
+        }
+
+        try
+        {
+            await MdtBusyUi.RunAsync(ModuleBusy, "REPORTS", "New report from person search…", async () =>
+            {
+                var draft = await NativeReportDraftFactory.CreateDraftAsync(http, pr.TypeKey).ConfigureAwait(false);
+                if (draft == null)
+                {
+                    await Dispatcher.InvokeAsync(() =>
+                        MessageBox.Show("Could not create draft for this report type.", "Reports", MessageBoxButton.OK, MessageBoxImage.Warning));
+                    return;
+                }
+
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    _suppressCategoryReload = true;
+                    try
+                    {
+                        CategoryCombo.SelectedValue = pr.TypeKey;
+                    }
+                    finally
+                    {
+                        _suppressCategoryReload = false;
+                    }
+
+                    _suppressSelection = true;
+                    ReportList.SelectedItem = null;
+                    _suppressSelection = false;
+                    AttachFormHost(pr.TypeKey);
+                    var pane = GetOrCreateFormPane(pr.TypeKey);
+                    pane?.LoadFromReport((JObject)draft.DeepClone());
+                    pane?.ApplyPersonSearchPrefill(pr.PedName, pr.VehicleLicensePlate);
+                    EditorHint.Text =
+                        $"New draft — subject “{pr.PedName}” prefilled from person search. Complete the form, then SAVE TO MDT.";
+                    MdtShellEvents.LogCad("Reports: new draft from person search " + pr.TypeKey + " · " + pr.PedName);
+                    UpdateFormScrollVisibility();
+                    UpdateSaveEnabled();
+                });
+
+                await ReloadListCoreAsync(null, preserveOpenEditor: true).ConfigureAwait(false);
+            }, minimumVisibleMs: 480);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Could not open new report from person search.\n\n" + ex.Message, "Reports", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

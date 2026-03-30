@@ -41,7 +41,7 @@ namespace MDTPro.Setup {
             public string model = "Model";
             public string openVehicleLookup = "Open Vehicle Lookup";
             public string clearAlpr = "Clear ALPR";
-            public string inGameNotEnabled = "In-game ALPR is not enabled.";
+            public string inGameNotEnabled = "In-game ALPR is off; enable it in the MDT Pro menu (F7) for browser hits from the built-in scanner.";
         }
 
         public class InGame {
@@ -869,7 +869,6 @@ namespace MDTPro.Setup {
 
         public class Callout {
             public string defaultPriority = "Code 2";
-            public string noActiveCall = "No active callout";
             public Static @static = new Static();
             public CalloutInfo calloutInfo = new CalloutInfo();
             public Actions actions = new Actions();
@@ -881,6 +880,9 @@ namespace MDTPro.Setup {
                 public string accept = "Accept";
                 public string success = "Status updated.";
                 public string error = "Action failed.";
+                public string sendToCi = "Send to Callout Interface";
+                public string sendToCiSuccess = "Message sent to Callout Interface.";
+                public string sendToCiPlaceholder = "Message for the in-game CI log (no color codes; newlines OK)";
             }
 
             public class Status {
@@ -894,10 +896,22 @@ namespace MDTPro.Setup {
 
             public class Static {
                 public string title = "Callout";
+                public string noActiveCall = "No active callout";
                 public string address = "Address";
                 public string area = "Area";
                 public string county = "County";
                 public string priority = "Priority";
+                public Cad cad = new Cad();
+
+                public class Cad {
+                    public string unitStatusTitle = "Unit / CAD status";
+                    public string unitStatusHint =
+                        "Broadcast to this MDT channel (browser + native). Does not change LSPDFR on-duty state.";
+                    public string presetLabel = "Quick preset";
+                    public string customPlaceholder = "Custom status (overrides preset when filled)";
+                    public string setStatus = "Set status";
+                    public string statusUpdated = "Unit status updated.";
+                }
             }
 
             public class CalloutInfo {

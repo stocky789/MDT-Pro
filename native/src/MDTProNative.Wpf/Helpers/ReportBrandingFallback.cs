@@ -22,6 +22,7 @@ public static class ReportBrandingFallback
         ["arrestTitle"] = "Arrest & Booking Report",
         ["impoundTitle"] = "Vehicle Tow / Impound Report",
         ["trafficIncidentTitle"] = "Traffic Collision Report (TCR)",
-        ["injuryTitle"] = "Injury / Medical Incident Report"
+        ["injuryTitle"] = "Injury / Medical Incident Report",
+        ["sealBadgeFile"] = "sagov-badge.png"
     };
 }

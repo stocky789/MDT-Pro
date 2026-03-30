@@ -26,7 +26,7 @@ public partial class NarcoticsCheatsheetWindow : Window
             new[] { "IV", "Low abuse potential", "Xanax, Valium, Ativan, Tramadol, Ambien, Soma, Rohypnol" },
             new[] { "V", "Lowest — cough/antidiarrheal", "Lyrica, Lomotil, limited-codeine syrups" }
         }));
-        BodyStack.Children.Add(Note("* Cannabis scheduling vs retail rules vary by jurisdiction; treat as controlled for illicit sale/possession per your RP server."));
+        BodyStack.Children.Add(Note("* Cannabis scheduling vs retail rules vary by jurisdiction; treat as controlled for illicit sale/possession per applicable local rules."));
 
         AddHeading("Quick: drug → schedule");
         BodyStack.Children.Add(MakeQuickScheduleGrid(
@@ -52,7 +52,7 @@ public partial class NarcoticsCheatsheetWindow : Window
 
         AddHeading("Sale vs personal use (general)");
         BodyStack.Children.Add(BulletList(
-            "Marijuana: under ~28.5g often personal; larger amounts + packaging may support sale (jurisdiction-dependent in RP).",
+            "Marijuana: under ~28.5g often personal; larger amounts + packaging may support sale (jurisdiction-dependent).",
             "Cocaine / heroin / meth: quantity, baggies, scales, cash, multiple doses → sale / trafficking indicators.",
             "Pills: large counts without prescription.",
             "Scales, baggies, divided portions, large cash → possession for sale."));

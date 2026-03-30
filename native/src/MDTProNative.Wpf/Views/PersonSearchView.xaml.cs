@@ -305,6 +305,55 @@ public partial class PersonSearchView : UserControl, IMdtBoundView
         });
     }
 
+    FrameworkElement BuildPersonSearchReportActions(string pedName)
+    {
+        var sp = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+        sp.Children.Add(new TextBlock
+        {
+            Text = "CREATE REPORT FROM SUBJECT",
+            Style = (Style)FindResource("CadSectionTitle"),
+            Margin = new Thickness(0, 0, 0, 6)
+        });
+        sp.Children.Add(new TextBlock
+        {
+            Text = "Opens Reports with a new draft and this person prefilled (same workflow as the browser MDT person search).",
+            Foreground = R("CadMuted"),
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 8)
+        });
+        var row = new WrapPanel();
+        void AddBtn(string label, string reportTypeKey)
+        {
+            var b = new Button
+            {
+                Content = label,
+                Style = (Style)FindResource("CadRailOutlineButton"),
+                Margin = new Thickness(0, 0, 8, 6),
+                Padding = new Thickness(12, 6, 12, 6)
+            };
+            var name = pedName;
+            var rk = reportTypeKey;
+            b.Click += (_, _) =>
+            {
+                if (_connection?.Http == null)
+                {
+                    MessageBox.Show("Connect to MDT Pro first.", "Person search", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                MdtShellEvents.RequestNavigateToNewReportFromPersonSearch(rk, name, null);
+            };
+            row.Children.Add(b);
+        }
+
+        AddBtn("NEW CITATION", "citation");
+        AddBtn("NEW ARREST", "arrest");
+        AddBtn("NEW INJURY", "injury");
+        sp.Children.Add(row);
+        return sp;
+    }
+
     void RenderPed(JObject p)
     {
         DetailPanel.Children.Clear();
@@ -319,6 +368,13 @@ public partial class PersonSearchView : UserControl, IMdtBoundView
                 Style = (Style)FindResource("CadEventBandTitle")
             });
         }
+
+        var pedPhotoGen = _searchGen;
+        DetailPanel.Children.Add(CreatePedCataloguePhotoChrome(p["ModelName"]?.ToString(), pedPhotoGen));
+
+        var pedForNewReports = p["Name"]?.ToString()?.Trim() ?? "";
+        if (pedForNewReports.Length > 0)
+            DetailPanel.Children.Add(BuildPersonSearchReportActions(pedForNewReports));
 
         DetailPanel.Children.Add(SectionTitle("Subject"));
         DetailPanel.Children.Add(FieldGrid(new (string, string)[]
@@ -393,6 +449,93 @@ public partial class PersonSearchView : UserControl, IMdtBoundView
         PersonDetailTabs.SelectedIndex = 0;
 
         DetailScroller.ScrollToVerticalOffset(0);
+    }
+
+    Border CreatePedCataloguePhotoChrome(string? modelName, int gen)
+    {
+        var outer = new Border
+        {
+            Width = 118,
+            Height = 148,
+            Margin = new Thickness(0, 0, 0, 10),
+            Background = R("CadElevated"),
+            BorderBrush = R("CadBorder"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(2),
+            ClipToBounds = true
+        };
+        var img = new Image
+        {
+            Stretch = Stretch.UniformToFill,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Collapsed
+        };
+        var ph = new TextBlock
+        {
+            Text = "Loading catalogue still…",
+            TextWrapping = TextWrapping.Wrap,
+            TextAlignment = TextAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Foreground = R("CadMuted"),
+            FontSize = 10,
+            Margin = new Thickness(6),
+            Visibility = Visibility.Visible
+        };
+        if (!NativeCatalogueImageLoader.IsPedPortraitModelSuitable(modelName))
+            ph.Text = "No ID catalogue photo\n(model not in portrait set)";
+
+        var grid = new Grid();
+        grid.Children.Add(img);
+        grid.Children.Add(ph);
+        outer.Child = grid;
+
+        var http = _connection?.Http;
+        _ = ApplyPedCataloguePhotoAsync(img, ph, http, modelName, gen);
+        return outer;
+    }
+
+    async Task ApplyPedCataloguePhotoAsync(Image img, TextBlock ph, MdtHttpClient? http, string? modelName, int gen)
+    {
+        if (!NativeCatalogueImageLoader.IsPedPortraitModelSuitable(modelName))
+        {
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (gen != _searchGen) return;
+                ph.Visibility = Visibility.Visible;
+                ph.Text = "No ID catalogue photo\n(animal / prop model or unknown)";
+                img.Visibility = Visibility.Collapsed;
+            });
+            return;
+        }
+
+        System.Windows.Media.Imaging.BitmapImage? bmp = null;
+        try
+        {
+            bmp = await NativeCatalogueImageLoader.LoadPedIdPhotoAsync(http, modelName).ConfigureAwait(false);
+        }
+        catch
+        {
+            /* same as browser: hide failures */
+        }
+
+        await Dispatcher.InvokeAsync(() =>
+        {
+            if (gen != _searchGen) return;
+            if (bmp != null)
+            {
+                img.Source = bmp;
+                img.Visibility = Visibility.Visible;
+                ph.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                ph.Visibility = Visibility.Visible;
+                ph.Text = "No ID catalogue photo\n(not in MDT bundle or FiveM docs)";
+                img.Visibility = Visibility.Collapsed;
+            }
+        });
     }
 
     void ClearAuxiliaryPersonTabs()

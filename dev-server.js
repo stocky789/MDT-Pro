@@ -113,6 +113,7 @@ function getMockReportBranding(reportType) {
       centerTitle: 'SARL',
       rightTitle: 'San Andreas Regional Crime Laboratory\nEvidence Receipt',
       footer: 'Regional lab intake — dev server mock.',
+      sealBadgeFile: 'sagov-badge.png',
       ...titles,
     },
     lssd_coroner: {
@@ -121,6 +122,25 @@ function getMockReportBranding(reportType) {
       centerTitle: 'CORONER',
       rightTitle: 'County of Los Santos\nForensic Evidence Receipt',
       footer: 'Coroner / ME-adjacent — dev mock.',
+      sealBadgeFile: 'lssd-badge.png',
+      ...titles,
+    },
+    lssd_patrol: {
+      id: 'lssd_patrol',
+      leftColumn: "Los Santos County Sheriff's Department\nPatrol Operations\nLos Santos County, San Andreas",
+      centerTitle: 'LSSD',
+      rightTitle: "Los Santos County Sheriff's Department\nOfficial Report",
+      footer: 'Sheriff patrol — dev mock.',
+      sealBadgeFile: 'lssd-badge.png',
+      ...titles,
+    },
+    bcso_patrol: {
+      id: 'bcso_patrol',
+      leftColumn: "Blaine County Sheriff's Office\nPatrol Division\nBlaine County, San Andreas",
+      centerTitle: 'BCSO',
+      rightTitle: "Blaine County Sheriff's Office\nOfficial Report",
+      footer: 'BCSO patrol — dev mock.',
+      sealBadgeFile: 'bcso-badge.png',
       ...titles,
     },
     lspd_submission: {
@@ -129,6 +149,7 @@ function getMockReportBranding(reportType) {
       centerTitle: 'LSPD',
       rightTitle: 'LSPD Evidence Submission Cover\n(Regional lab testing)',
       footer: 'LSPD submitting agency — dev mock.',
+      sealBadgeFile: 'lspd-badge.png',
       ...titles,
     },
     fib_adjacent: {
@@ -137,6 +158,7 @@ function getMockReportBranding(reportType) {
       centerTitle: 'FIB',
       rightTitle: 'Federal Evidence Receipt\n(Controlled routing)',
       footer: 'Federal-adjacent — dev mock.',
+      sealBadgeFile: 'fib-badge.png',
       ...titles,
     },
     humane_adjacent: {
@@ -145,6 +167,7 @@ function getMockReportBranding(reportType) {
       centerTitle: 'HLR',
       rightTitle: 'Specialized Technical Evidence Receipt',
       footer: 'Humane-adjacent — dev mock.',
+      sealBadgeFile: 'sagov-badge.png',
       ...titles,
     },
   };
