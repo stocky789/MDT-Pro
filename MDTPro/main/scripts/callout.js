@@ -1,10 +1,86 @@
 ;(async function () {
   const config = await getConfig()
   if (config.updateDomWithLanguageOnLoad) await updateDomWithLanguage('callout')
+  await applyCalloutCadPlaceholders()
 })()
 
 const calloutEventWs = new WebSocket(`ws://${location.host}/ws`)
 calloutEventWs.onopen = () => calloutEventWs.send('calloutEvent')
+
+const CAD_PRESETS = [
+  { value: '10-8 | Available', label: '10-8 — Available' },
+  { value: '10-97 | En route', label: '10-97 — En route' },
+  { value: '10-23 | On scene', label: '10-23 — On scene' },
+  { value: '10-95 | Traffic stop', label: '10-95 — Traffic stop' },
+  { value: '10-7 | Out of service', label: '10-7 — Out of service' },
+  { value: '10-6 | Busy', label: '10-6 — Busy' },
+]
+
+function escapeHtmlAttr(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+function updateCadUnitReadout(text) {
+  const el = document.getElementById('cadUnitStatusReadout')
+  if (!el) return
+  const t = text != null ? String(text).trim() : ''
+  el.textContent = t.length ? t : '—'
+}
+
+async function applyCalloutCadPlaceholders() {
+  const language = await getLanguage()
+  const input = document.getElementById('cadUnitCustomInput')
+  if (input)
+    input.placeholder =
+      language.callout?.static?.cad?.customPlaceholder || 'Custom status (overrides preset when filled)'
+}
+
+function wireCalloutCadPanel() {
+  const btn = document.getElementById('cadUnitSetStatusBtn')
+  const sel = document.getElementById('cadUnitPresetSelect')
+  if (!btn || !sel || btn.dataset.wired === '1') return
+  btn.dataset.wired = '1'
+  sel.innerHTML = CAD_PRESETS.map(
+    (p) => `<option value="${escapeHtmlAttr(p.value)}">${escapeHtmlAttr(p.label)}</option>`,
+  ).join('')
+
+  btn.addEventListener('click', async () => {
+    const language = await getLanguage()
+    const input = document.getElementById('cadUnitCustomInput')
+    const custom = input?.value?.trim() ?? ''
+    const status = custom || sel.value
+    if (!status) {
+      if (typeof showNotification === 'function') {
+        showNotification(language.callout?.actions?.error || 'Action failed.', 'warning')
+      }
+      return
+    }
+    try {
+      const res = await fetch('/post/cadUnitStatus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (json.success && typeof showNotification === 'function') {
+        showNotification(
+          language.callout?.static?.cad?.statusUpdated || 'Unit status updated.',
+          'checkMark',
+        )
+      } else if (typeof showNotification === 'function') {
+        showNotification(json.error || `HTTP ${res.status}`, 'warning')
+      }
+    } catch (e) {
+      if (typeof showNotification === 'function') showNotification(String(e.message || e), 'warning')
+    }
+  })
+}
+
+wireCalloutCadPanel()
 
 function getCalloutStatusLabel(state, language) {
   const statusLabels = language.callout?.status || {}
@@ -19,6 +95,21 @@ function renderCalloutCard(data, index, language, config) {
   const state = data.AcceptanceState
   const statusLabel = getCalloutStatusLabel(state, language)
   const address = `${(data.Location?.Postal || '').trim()} ${(data.Location?.Street || '').trim()}`.trim() || '—'
+  const hasId = !!data.Id
+  const ciLabel = language.callout?.actions?.sendToCi || 'Send to Callout Interface'
+  const ciPh =
+    language.callout?.actions?.sendToCiPlaceholder ||
+    'Message for the in-game CI log (no color codes; newlines OK)'
+  const ciBlock = hasId
+    ? `
+        <div class="calloutCiSend">
+          <span class="calloutCiSendLabel">${ciLabel.replace(/</g, '&lt;')}</span>
+          <textarea class="calloutCiTextarea" aria-label="${escapeHtmlAttr(ciLabel)}" placeholder="${escapeHtmlAttr(ciPh)}"></textarea>
+          <div class="calloutCiActions">
+            <button type="button" class="calloutActionBtn calloutSendCiBtn" data-action="sendCi">${ciLabel.replace(/</g, '&lt;')}</button>
+          </div>
+        </div>`
+    : ''
   return `
     <div class="calloutCard ${index === 0 ? 'calloutCard-expanded' : ''}" data-index="${index}">
       <button type="button" class="calloutCardHeader" aria-expanded="${index === 0}">
@@ -63,15 +154,37 @@ function renderCalloutCard(data, index, language, config) {
           ${state === 0 ? `<button type="button" class="calloutActionBtn calloutAcceptBtn" data-action="accept">${language.callout?.actions?.accept || 'Accept'}</button>` : ''}
           ${state === 1 ? `<button type="button" class="calloutActionBtn calloutEnRouteBtn" data-action="enRoute">${language.callout?.status?.enRoute || 'En Route'}</button>` : ''}
         </div>
+        ${ciBlock}
       </div>
     </div>
   `
+}
+
+async function postCalloutAction(body, language) {
+  const res = await fetch('/post/calloutAction', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  let json = {}
+  try {
+    json = await res.json()
+  } catch {
+    json = {}
+  }
+  if (json.success && typeof showNotification === 'function') {
+    showNotification(language.callout?.actions?.success || 'Status updated.', 'checkMark')
+  } else if (typeof showNotification === 'function') {
+    showNotification(json.error || `Request failed (${res.status})`, 'warning')
+  }
 }
 
 calloutEventWs.onmessage = async (event) => {
   const language = await getLanguage()
   const config = await getConfig()
   const payload = JSON.parse(event.data).response
+  updateCadUnitReadout(payload?.cadUnitStatus)
+
   const callouts = payload?.callouts ?? (payload?.Location ? [payload] : [])
   const emptyEl = document.getElementById('calloutEmpty')
   const containerEl = document.getElementById('calloutCardsContainer')
@@ -140,7 +253,7 @@ calloutEventWs.onmessage = async (event) => {
     if (data.FinishedTime) {
       metaParts.push(`${language.callout?.calloutInfo?.finishedTime || 'Finished'}: ${new Date(data.FinishedTime).toLocaleString()}`)
     }
-    card.querySelector('.calloutMetaVal').innerHTML = metaParts.map(p => `<div class="calloutMetaRow">${p}</div>`).join('') || ''
+    card.querySelector('.calloutMetaVal').innerHTML = metaParts.map((p) => `<div class="calloutMetaRow">${p}</div>`).join('') || ''
   }
 
   containerEl.querySelectorAll('.calloutCardHeader').forEach((btn) => {
@@ -163,10 +276,13 @@ calloutEventWs.onmessage = async (event) => {
       const res = await fetch('/post/setGpsWaypoint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x: data.Coords[0], y: data.Coords[1] })
+        body: JSON.stringify({ x: data.Coords[0], y: data.Coords[1] }),
       })
       if (res.ok && typeof showNotification === 'function') {
         showNotification(language.callout?.actions?.gpsSuccess || 'GPS set to callout.', 'checkMark')
+      } else if (typeof showNotification === 'function') {
+        const t = await res.text().catch(() => '')
+        showNotification(t || `GPS failed (${res.status})`, 'warning')
       }
     })
   })
@@ -174,16 +290,56 @@ calloutEventWs.onmessage = async (event) => {
   containerEl.querySelectorAll('.calloutAcceptBtn, .calloutEnRouteBtn').forEach((btn) => {
     btn.addEventListener('click', async function () {
       const action = this.dataset.action
+      const card = this.closest('.calloutCard')
+      const idx = parseInt(card?.dataset?.index ?? '-1', 10)
+      const data = callouts[idx]
+      const calloutId = data?.Id
+      if (!calloutId) {
+        if (typeof showNotification === 'function') {
+          showNotification('Callout id missing — update MDT Pro plugin / refresh.', 'warning')
+        }
+        return
+      }
+      await postCalloutAction({ action, calloutId }, language)
+    })
+  })
+
+  containerEl.querySelectorAll('.calloutSendCiBtn').forEach((btn) => {
+    btn.addEventListener('click', async function () {
+      const card = this.closest('.calloutCard')
+      const idx = parseInt(card?.dataset?.index ?? '-1', 10)
+      const data = callouts[idx]
+      const calloutId = data?.Id
+      const ta = card?.querySelector('.calloutCiTextarea')
+      const message = ta?.value?.trim() ?? ''
+      if (!calloutId) {
+        if (typeof showNotification === 'function') {
+          showNotification('Callout id missing — update MDT Pro plugin / refresh.', 'warning')
+        }
+        return
+      }
+      if (!message) {
+        if (typeof showNotification === 'function') {
+          showNotification(language.callout?.actions?.error || 'Enter a message.', 'warning')
+        }
+        return
+      }
       const res = await fetch('/post/calloutAction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action })
+        body: JSON.stringify({ action: 'sendMessage', calloutId, message }),
       })
-      const json = await res.json().catch(() => ({}))
+      let json = {}
+      try {
+        json = await res.json()
+      } catch {
+        json = {}
+      }
       if (json.success && typeof showNotification === 'function') {
-        showNotification(language.callout?.actions?.success || 'Status updated.', 'checkMark')
-      } else if (json?.error && typeof showNotification === 'function') {
-        showNotification(json.error, 'warning')
+        showNotification(language.callout?.actions?.sendToCiSuccess || 'Message sent.', 'checkMark')
+        if (ta) ta.value = ''
+      } else if (typeof showNotification === 'function') {
+        showNotification(json.error || `Send failed (${res.status})`, 'warning')
       }
     })
   })

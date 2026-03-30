@@ -51,14 +51,23 @@
                                 Background="#E8F4FC"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Top"
-                                Margin="4,0">
-                            <TextBlock x:Name="BrandingCenterTitle"
-                                       TextAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       FontWeight="Bold"
-                                       FontSize="11"
-                                       TextWrapping="Wrap"
-                                       Margin="4" />
+                                Margin="4,0"
+                                ClipToBounds="True">
+                            <Grid>
+                                <Image x:Name="PropertySealImage"
+                                       Stretch="Uniform"
+                                       Margin="6"
+                                       RenderOptions.BitmapScalingMode="HighQuality"
+                                       Visibility="Collapsed" />
+                                <TextBlock x:Name="BrandingCenterTitle"
+                                           TextAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           FontWeight="Bold"
+                                           FontSize="11"
+                                           TextWrapping="Wrap"
+                                           Margin="4" />
+                            </Grid>
                         </Border>
                         <StackPanel Grid.Column="2" Margin="8,0,0,0">
                             <TextBlock x:Name="DocumentTitleBlock"
@@ -75,9 +84,17 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="Agency case #" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                <TextBox x:Name="GeneralIdBox" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" />
+                                <TextBox x:Name="GeneralIdBox" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" Margin="0,0,8,0" />
+                                <Button x:Name="CopyAgencyCaseIdBtn"
+                                        Grid.Column="2"
+                                        Content="COPY"
+                                        Style="{StaticResource CadRailOutlineButton}"
+                                        Padding="10,4"
+                                        VerticalAlignment="Center"
+                                        ToolTip="Copy agency case # to clipboard" />
                             </Grid>
                         </StackPanel>
                     </Grid>
@@ -169,7 +186,7 @@
 
                     <Border Background="{StaticResource ReportDocAuthBarBrush}" BorderBrush="{StaticResource ReportDocInkBrush}" BorderThickness="1" Padding="8" Margin="0,0,0,10">
                         <TextBlock TextWrapping="Wrap" Style="{StaticResource ReportDocLabel}"
-                                   Text="Authorization (roleplay): I authorize the prosecuting attorney to receive a copy of the related lab report. Signature: ________________________________  Date: __________" />
+                                   Text="Authorization: I authorize the prosecuting attorney to receive a copy of the related lab report. Signature: ________________________________  Date: __________" />
                     </Border>
 
                     <TextBlock Text="Subjects (from whom seized)" Style="{StaticResource ReportDocLabel}" FontWeight="Bold" Margin="0,0,0,2" />

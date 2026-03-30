@@ -47,11 +47,25 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
             ReportDocumentBrandingHelper.PrintToPdf(DocumentBodyScroll, DocumentPrintRoot,
                 "MDT Arrest " + (IdBox.Text.Trim().Length > 0 ? IdBox.Text.Trim() : "report"));
         ReportDocumentBrandingHelper.ApplyChrome(null, "arrestTitle", "Arrest & Booking Report", DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
+        NearbyVehicleBar.VehicleDetailReady += (_, vehicle) => ApplyVehicleSnapshot(vehicle);
+        ReportFormCopyButtons.Wire(CopyReportIdBtn, IdBox);
+        ReportFormCopyButtons.Wire(CopySubjectNameBtn, OffenderPedNameBox);
+        ReportFormCopyButtons.Wire(CopyVehiclePlateBtn, OffenderPlateBox);
+    }
+
+    void ApplyVehicleSnapshot(JObject vehicle)
+    {
+        var s = ReportMdtVehicleSnapshot.FromVehicleJson(vehicle);
+        if (s == null) return;
+        if (!string.IsNullOrEmpty(s.Plate)) OffenderPlateBox.Text = s.Plate;
+        if (string.IsNullOrWhiteSpace(OffenderPedNameBox.Text) && !string.IsNullOrEmpty(s.Owner))
+            OffenderPedNameBox.Text = s.Owner;
     }
 
     public void Bind(MdtConnectionManager? connection)
     {
         _connection = connection;
+        NearbyVehicleBar.Bind(connection);
         if (connection?.Http == null)
         {
             _arrestChargePickList.Clear();
@@ -291,6 +305,14 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
         }
 
         return root;
+    }
+
+    public void ApplyPersonSearchPrefill(string pedName, string? vehicleLicensePlate)
+    {
+        if (!string.IsNullOrWhiteSpace(pedName))
+            OffenderPedNameBox.Text = pedName.Trim();
+        if (!string.IsNullOrWhiteSpace(vehicleLicensePlate))
+            OffenderPlateBox.Text = vehicleLicensePlate.Trim();
     }
 
     public void Clear()

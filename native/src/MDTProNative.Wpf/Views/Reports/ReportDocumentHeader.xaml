@@ -12,7 +12,8 @@
                    Style="{StaticResource ReportDocLabel}"
                    TextWrapping="Wrap"
                    LineHeight="16" />
-        <Border Grid.Column="1"
+        <Border x:Name="SealBorder"
+                Grid.Column="1"
                 Width="72"
                 Height="72"
                 CornerRadius="36"
@@ -21,14 +22,23 @@
                 Background="#E8F4FC"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Top"
-                Margin="4,0">
-            <TextBlock x:Name="BrandingCenterTitle"
-                       TextAlignment="Center"
-                       VerticalAlignment="Center"
-                       FontWeight="Bold"
-                       FontSize="11"
-                       TextWrapping="Wrap"
-                       Margin="4" />
+                Margin="4,0"
+                ClipToBounds="True">
+            <Grid>
+                <Image x:Name="SealImage"
+                       Stretch="Uniform"
+                       Margin="6"
+                       RenderOptions.BitmapScalingMode="HighQuality"
+                       Visibility="Collapsed" />
+                <TextBlock x:Name="BrandingCenterTitle"
+                           TextAlignment="Center"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center"
+                           FontWeight="Bold"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Margin="4" />
+            </Grid>
         </Border>
         <StackPanel Grid.Column="2" Margin="8,0,0,0">
             <TextBlock x:Name="DocumentTitleBlock"

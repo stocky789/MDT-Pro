@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using MDTProNative.Client;
 using MDTProNative.Wpf.Helpers;
 using MDTProNative.Wpf.Services;
 using MDTProNative.Wpf.Views.Controls;
@@ -293,6 +295,9 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
             DetailPanel.Children.Add(band);
         }
 
+        var vehPhotoGen = _searchGen;
+        DetailPanel.Children.Add(CreateVehicleCataloguePhotoChrome(v["ModelName"]?.ToString(), vehPhotoGen));
+
         DetailPanel.Children.Add(SectionTitle("Registration"));
         var text = R("CadText");
         var ok = R("CadSemanticSuccess");
@@ -386,6 +391,89 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
         VehicleDetailTabs.SelectedIndex = 0;
 
         DetailScroller.ScrollToVerticalOffset(0);
+    }
+
+    Border CreateVehicleCataloguePhotoChrome(string? modelName, int gen)
+    {
+        var outer = new Border
+        {
+            Width = 200,
+            Height = 112,
+            Margin = new Thickness(0, 0, 0, 10),
+            Background = R("CadElevated"),
+            BorderBrush = R("CadBorder"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(2),
+            ClipToBounds = true
+        };
+        var img = new Image
+        {
+            Stretch = Stretch.Uniform,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Collapsed
+        };
+        var ph = new TextBlock
+        {
+            Text = string.IsNullOrWhiteSpace(modelName) ? "No model name — catalogue photo unavailable" : "Loading catalogue still…",
+            TextWrapping = TextWrapping.Wrap,
+            TextAlignment = TextAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Foreground = R("CadMuted"),
+            FontSize = 10,
+            Margin = new Thickness(6),
+            Visibility = Visibility.Visible
+        };
+        var grid = new Grid();
+        grid.Children.Add(img);
+        grid.Children.Add(ph);
+        outer.Child = grid;
+
+        _ = ApplyVehicleCataloguePhotoAsync(img, ph, modelName, gen);
+        return outer;
+    }
+
+    async Task ApplyVehicleCataloguePhotoAsync(Image img, TextBlock ph, string? modelName, int gen)
+    {
+        if (string.IsNullOrWhiteSpace(modelName))
+        {
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (gen != _searchGen) return;
+                ph.Visibility = Visibility.Visible;
+                ph.Text = "No catalogue photo\n(no vehicle model name)";
+                img.Visibility = Visibility.Collapsed;
+            });
+            return;
+        }
+
+        System.Windows.Media.Imaging.BitmapImage? bmp = null;
+        try
+        {
+            bmp = await NativeCatalogueImageLoader.LoadVehicleCataloguePhotoAsync(modelName).ConfigureAwait(false);
+        }
+        catch
+        {
+            /* ignore */
+        }
+
+        await Dispatcher.InvokeAsync(() =>
+        {
+            if (gen != _searchGen) return;
+            if (bmp != null)
+            {
+                img.Source = bmp;
+                img.Visibility = Visibility.Visible;
+                ph.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                ph.Visibility = Visibility.Visible;
+                ph.Text = "No catalogue photo\n(not on FiveM docs CDN)";
+                img.Visibility = Visibility.Collapsed;
+            }
+        });
     }
 
     void ClearVehicleForm()

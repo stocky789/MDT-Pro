@@ -28,10 +28,26 @@ public partial class ImpoundReportForm : UserControl, IReportFormPane
             ReportDocumentBrandingHelper.PrintToPdf(DocumentBodyScroll, DocumentPrintRoot,
                 "MDT Impound " + (IdBox.Text.Trim().Length > 0 ? IdBox.Text.Trim() : "report"));
         ReportDocumentBrandingHelper.ApplyChrome(null, "impoundTitle", "Vehicle Tow / Impound Report", DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
+        NearbyVehicleBar.VehicleDetailReady += (_, vehicle) => ApplyVehicleSnapshot(vehicle);
+        ReportFormCopyButtons.Wire(CopyReportIdBtn, IdBox);
+        ReportFormCopyButtons.Wire(CopyLicensePlateBtn, LicensePlateBox);
+    }
+
+    void ApplyVehicleSnapshot(JObject vehicle)
+    {
+        var s = ReportMdtVehicleSnapshot.FromVehicleJson(vehicle);
+        if (s == null) return;
+        if (!string.IsNullOrEmpty(s.Plate)) LicensePlateBox.Text = s.Plate;
+        if (!string.IsNullOrEmpty(s.ModelDisplayName)) VehicleModelBox.Text = s.ModelDisplayName;
+        if (!string.IsNullOrEmpty(s.Owner)) OwnerBox.Text = s.Owner;
+        if (!string.IsNullOrEmpty(s.Vin)) VinBox.Text = s.Vin;
+        if (string.IsNullOrWhiteSpace(PersonAtFaultNameBox.Text) && !string.IsNullOrEmpty(s.Owner))
+            PersonAtFaultNameBox.Text = s.Owner;
     }
 
     public void Bind(MdtConnectionManager? connection)
     {
+        NearbyVehicleBar.Bind(connection);
         if (connection?.Http == null)
         {
             ReportDocumentBrandingHelper.ApplyChrome(null, "impoundTitle", "Vehicle Tow / Impound Report", DocHeader, BrandingTemplateHint, "offline", BrandingFooter);

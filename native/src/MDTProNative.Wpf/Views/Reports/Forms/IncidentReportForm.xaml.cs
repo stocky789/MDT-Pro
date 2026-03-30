@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using MDTProNative.Wpf.Helpers;
 using MDTProNative.Wpf.Services;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -30,10 +31,27 @@ public partial class IncidentReportForm : UserControl, IReportFormPane
             ReportDocumentBrandingHelper.PrintToPdf(DocumentBodyScroll, DocumentPrintRoot,
                 "MDT Incident " + (IdBox.Text.Trim().Length > 0 ? IdBox.Text.Trim() : "report"));
         ReportDocumentBrandingHelper.ApplyChrome(null, TitleKey, DefaultDocTitle, DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
+        NearbyVehicleBar.VehicleDetailReady += (_, vehicle) => ApplyVehicleSnapshot(vehicle);
+        ReportFormCopyButtons.Wire(CopyReportIdBtn, IdBox);
+        ReportFormCopyButtons.Wire(CopyOffenderNamesBtn, OffenderNamesBox);
+        ReportFormCopyButtons.Wire(CopyWitnessNamesBtn, WitnessNamesBox);
+    }
+
+    void ApplyVehicleSnapshot(JObject vehicle)
+    {
+        var s = ReportMdtVehicleSnapshot.FromVehicleJson(vehicle);
+        if (s == null) return;
+        if (!string.IsNullOrEmpty(s.Owner) && !string.IsNullOrEmpty(s.Plate))
+            ReportFormMultilineMerge.AppendLineIfMissing(OffenderNamesBox, $"{s.Owner} (vehicle {s.Plate})");
+        else if (!string.IsNullOrEmpty(s.Owner))
+            ReportFormMultilineMerge.AppendLineIfMissing(OffenderNamesBox, s.Owner);
+        else if (!string.IsNullOrEmpty(s.Plate))
+            ReportFormMultilineMerge.AppendLineIfMissing(OffenderNamesBox, $"Vehicle — plate {s.Plate}");
     }
 
     public void Bind(MdtConnectionManager? connection)
     {
+        NearbyVehicleBar.Bind(connection);
         if (connection?.Http == null)
         {
             ReportDocumentBrandingHelper.ApplyChrome(null, TitleKey, DefaultDocTitle, DocHeader, BrandingTemplateHint, "offline", BrandingFooter);

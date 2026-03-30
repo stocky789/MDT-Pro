@@ -34,7 +34,14 @@ async function getPropertyEvidenceSection (data = {}, isList = false) {
     leftCol.className = 'report-doc-header-left'
     const seal = document.createElement('div')
     seal.className = 'report-doc-seal'
-    seal.textContent = 'SARL'
+    const sealImg = document.createElement('img')
+    sealImg.className = 'report-doc-seal-img'
+    sealImg.alt = ''
+    const sealFallback = document.createElement('span')
+    sealFallback.className = 'report-doc-seal-fallback'
+    sealFallback.textContent = 'SARL'
+    seal.appendChild(sealImg)
+    seal.appendChild(sealFallback)
     const rightCol = document.createElement('div')
     rightCol.className = 'report-doc-header-right'
     const mainTitle = document.createElement('div')
@@ -353,7 +360,7 @@ async function getPropertyEvidenceSection (data = {}, isList = false) {
     docRoot.appendChild(section)
     const authBar = document.createElement('div')
     authBar.className = 'report-doc-auth-bar'
-    authBar.textContent = labels.authorizationBlurb || 'Authorization (roleplay): I authorize the prosecuting attorney to receive a copy of the related lab report. Signature: ________________  Date: __________'
+    authBar.textContent = labels.authorizationBlurb || 'Authorization: I authorize the prosecuting attorney to receive a copy of the related lab report. Signature: ________________  Date: __________'
     docRoot.appendChild(authBar)
     const footer = document.createElement('div')
     footer.className = 'report-doc-footer'
@@ -366,10 +373,24 @@ async function getPropertyEvidenceSection (data = {}, isList = false) {
         if (!t) return
         const leftEl = docRoot.querySelector('.report-doc-header-left')
         const sealEl = docRoot.querySelector('.report-doc-seal')
+        const sealImgEl = sealEl && sealEl.querySelector('.report-doc-seal-img')
+        const sealFbEl = sealEl && sealEl.querySelector('.report-doc-seal-fallback')
         const rightTitleEl = docRoot.querySelector('.report-doc-right-title')
         const mainTitleEl = docRoot.querySelector('.report-doc-main-title')
         if (leftEl) leftEl.textContent = (t.leftColumn || '').replace(/\r\n/g, '\n')
-        if (sealEl) sealEl.textContent = (t.centerTitle || 'LAB').trim().slice(0, 12)
+        if (sealFbEl) sealFbEl.textContent = String(t.centerTitle || 'LAB').trim().slice(0, 12)
+        if (sealImgEl && sealFbEl) {
+          const badge = t.sealBadgeFile
+          if (badge && !/\.svg$/i.test(String(badge))) {
+            sealImgEl.src = '/plugin/DepartmentStyling/image/' + String(badge).trim() + '?v=1'
+            sealImgEl.style.display = 'block'
+            sealFbEl.style.display = 'none'
+          } else {
+            sealImgEl.removeAttribute('src')
+            sealImgEl.style.display = 'none'
+            sealFbEl.style.display = 'flex'
+          }
+        }
         if (rightTitleEl) rightTitleEl.textContent = (t.rightTitle || '').replace(/\r\n/g, '\n')
         footer.textContent = t.footer || ''
         if (mainTitleEl && t.propertyEvidenceTitle) mainTitleEl.textContent = t.propertyEvidenceTitle

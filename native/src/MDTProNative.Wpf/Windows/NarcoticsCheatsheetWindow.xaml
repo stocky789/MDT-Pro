@@ -10,7 +10,7 @@
         Foreground="{StaticResource CadText}">
     <DockPanel Margin="14">
         <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="{StaticResource CadMuted}" FontSize="11" Margin="0,0,0,10"
-                   Text="RP reference aligned with the web MDT cheat sheet — not legal or medical advice." />
+                   Text="Field reference aligned with the web MDT cheat sheet — not legal or medical advice." />
         <Button DockPanel.Dock="Bottom" Content="Close" Style="{StaticResource CadButton}" HorizontalAlignment="Right" Click="Close_Click" Margin="0,10,0,0" MinWidth="88" />
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel x:Name="BodyStack" />

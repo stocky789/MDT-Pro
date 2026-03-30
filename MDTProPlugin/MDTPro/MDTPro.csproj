@@ -39,15 +39,7 @@
     <LangVersion>8.0</LangVersion>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="CalloutInterface, Version=1.4.1.3, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\References\CalloutInterface.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="CalloutInterfaceAPI">
-      <HintPath>..\..\References\CalloutInterfaceAPI.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
+    <ProjectReference Include="..\..\CalloutInterfaceAPI\CalloutInterfaceAPI.csproj" />
     <Reference Include="CommonDataFramework, Version=1.0.0.8, Culture=neutral, processorArchitecture=AMD64">
       <HintPath>..\packages\CommonDataFramework.1.0.0.8\lib\net48\CommonDataFramework.dll</HintPath>
       <Private>False</Private>
@@ -130,8 +122,11 @@
     <Compile Include="Utility\StpReflectionHelper.cs" />
     <Compile Include="Utility\ModIntegration.cs" />
     <Compile Include="Utility\DependencyCheck.cs" />
+    <Compile Include="Utility\LspdfrCalloutFromHandle.cs" />
+    <Compile Include="Utility\CalloutHandleResolver.cs" />
     <Compile Include="EventListeners\CDFEvents.cs" />
     <Compile Include="EventListeners\CalloutEvents.cs" />
+    <Compile Include="EventListeners\CalloutActionHelper.cs" />
     <Compile Include="EventListeners\LSPDFREvents.cs" />
     <Compile Include="EventListeners\PREvents.cs" />
     <Compile Include="EventListeners\STPEvents.cs" />
@@ -168,6 +163,7 @@
     <Compile Include="Utility\PlayerCoords.cs" />
     <Compile Include="ALPR\ALPRController.cs" />
     <Compile Include="ALPR\ALPRHUD.cs" />
+    <Compile Include="ALPR\CiAlprWebToastBridge.cs" />
     <Compile Include="Utility\PRHelper.cs" />
     <Compile Include="Utility\StpCitationHandoffQueue.cs" />
     <Compile Include="Utility\StpCitationHelper.cs" />

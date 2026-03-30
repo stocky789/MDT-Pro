@@ -9,12 +9,37 @@
   </head>
   <body>
     <div class="calloutPage">
+      <section class="calloutCadPanel" id="calloutCadPanel" aria-label="Unit status">
+        <div class="calloutCadPanelInner">
+          <div class="calloutCadReadoutBlock">
+            <h2 class="calloutCadTitle" data-language="cad.unitStatusTitle">Unit / CAD status</h2>
+            <p class="calloutCadReadout" id="cadUnitStatusReadout">—</p>
+            <p class="calloutCadHint" data-language="cad.unitStatusHint"></p>
+          </div>
+          <div class="calloutCadControls">
+            <label class="calloutCadLabel" for="cadUnitPresetSelect" data-language="cad.presetLabel">Quick preset</label>
+            <select id="cadUnitPresetSelect" class="calloutSelect" aria-describedby="cadUnitHint"></select>
+            <input
+              type="text"
+              id="cadUnitCustomInput"
+              class="calloutTextInput"
+              autocomplete="off"
+              maxlength="120"
+              aria-label="Custom status"
+            />
+            <button type="button" class="calloutPrimaryBtn" id="cadUnitSetStatusBtn" data-language="cad.setStatus">
+              Set status
+            </button>
+          </div>
+        </div>
+      </section>
+
       <div class="calloutStatusBar" id="calloutStatusBar">
         <span class="calloutTimeline" id="calloutTimeline"></span>
       </div>
       <div class="calloutList" id="calloutList">
         <div class="calloutEmpty" id="calloutEmpty">
-          <span data-language="callout.noActiveCall">No active callout</span>
+          <span data-language="noActiveCall">No active callout</span>
         </div>
         <div class="calloutCardsContainer hidden" id="calloutCardsContainer"></div>
       </div>

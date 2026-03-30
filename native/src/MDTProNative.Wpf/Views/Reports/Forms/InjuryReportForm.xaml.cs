@@ -1,4 +1,5 @@
 using System.Windows.Controls;
+using MDTProNative.Wpf.Helpers;
 using MDTProNative.Wpf.Services;
 using MDTProNative.Wpf.Views.Reports;
 using Newtonsoft.Json;
@@ -15,6 +16,9 @@ public partial class InjuryReportForm : UserControl, IReportFormPane
             ReportDocumentBrandingHelper.PrintToPdf(DocumentBodyScroll, DocumentPrintRoot,
                 "MDT Injury " + (GeneralIdBox.Text.Trim().Length > 0 ? GeneralIdBox.Text.Trim() : "report"));
         ReportDocumentBrandingHelper.ApplyChrome(null, "injuryTitle", "Injury / Medical Incident Report", DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
+        ReportFormCopyButtons.Wire(CopyReportIdBtn, GeneralIdBox);
+        ReportFormCopyButtons.Wire(CopyInjuredPartyBtn, InjuredPartyNameBox);
+        ReportFormCopyButtons.Wire(CopyLinkedReportIdBtn, LinkedReportIdBox);
     }
 
     ReportFormBaseControls BaseControls => new()
@@ -97,6 +101,12 @@ public partial class InjuryReportForm : UserControl, IReportFormPane
         }
 
         return root;
+    }
+
+    public void ApplyPersonSearchPrefill(string pedName, string? vehicleLicensePlate)
+    {
+        if (!string.IsNullOrWhiteSpace(pedName))
+            InjuredPartyNameBox.Text = pedName.Trim();
     }
 
     static JToken NullIfEmpty(string s)

@@ -11,6 +11,7 @@ using MDTProNative.Wpf.Helpers;
 using MDTProNative.Wpf.Services;
 using MDTProNative.Wpf.Views;
 using MDTProNative.Wpf.Views.Reports;
+using ReportSeal = MDTProNative.Wpf.Views.Reports.ReportDocumentSealImages;
 using Newtonsoft.Json.Linq;
 
 namespace MDTProNative.Wpf.Views.Reports.Forms;
@@ -117,6 +118,7 @@ public partial class PropertyEvidenceReportForm : UserControl, IReportFormPane
         ExportPdfBtn.Click += (_, _) => ExportPdf();
         PopoutBtn.Click += (_, _) => TogglePopout();
         ApplyBrandingToChrome(ReportBrandingFallback.ActiveTemplate, "regional_crime_lab (offline)");
+        ReportFormCopyButtons.Wire(CopyAgencyCaseIdBtn, GeneralIdBox);
     }
 
     ReportFormBaseControls BaseControls => new()
@@ -161,19 +163,22 @@ public partial class PropertyEvidenceReportForm : UserControl, IReportFormPane
             var tok = await http.GetDataJsonAsync("reportBranding?reportType=propertyEvidence").ConfigureAwait(false);
             if (tok is not JObject root)
             {
-                await Dispatcher.InvokeAsync(() =>
-                    ApplyBrandingToChrome(ReportBrandingFallback.ActiveTemplate, "regional_crime_lab (fallback)"));
+                var fb = ReportBrandingFallback.ActiveTemplate;
+                await Dispatcher.InvokeAsync(() => ApplyBrandingToChrome(fb, "regional_crime_lab (fallback)"));
+                await ReportSeal.TryLoadDepartmentBadgeAsync(PropertySealImage, BrandingCenterTitle, http, fb, Dispatcher).ConfigureAwait(false);
                 return;
             }
 
             var active = root["activeTemplate"] as JObject ?? ReportBrandingFallback.ActiveTemplate;
             var id = root["activeTemplateId"]?.ToString() ?? "regional_crime_lab";
             await Dispatcher.InvokeAsync(() => ApplyBrandingToChrome(active, id));
+            await ReportSeal.TryLoadDepartmentBadgeAsync(PropertySealImage, BrandingCenterTitle, http, active, Dispatcher).ConfigureAwait(false);
         }
         catch
         {
-            await Dispatcher.InvokeAsync(() =>
-                ApplyBrandingToChrome(ReportBrandingFallback.ActiveTemplate, "regional_crime_lab (fallback)"));
+            var fb = ReportBrandingFallback.ActiveTemplate;
+            await Dispatcher.InvokeAsync(() => ApplyBrandingToChrome(fb, "regional_crime_lab (fallback)"));
+            await ReportSeal.TryLoadDepartmentBadgeAsync(PropertySealImage, BrandingCenterTitle, http, fb, Dispatcher).ConfigureAwait(false);
         }
     }
 
@@ -186,6 +191,7 @@ public partial class PropertyEvidenceReportForm : UserControl, IReportFormPane
         BrandingFooter.Text = active["footer"]?.ToString() ?? "";
         DocumentTitleBlock.Text = active["propertyEvidenceTitle"]?.ToString() ?? "Property & Evidence Receipt";
         BrandingTemplateHint.Text = $"Branding: {templateIdHint}";
+        ReportSeal.ClearSeal(PropertySealImage, BrandingCenterTitle);
     }
 
     async Task OpenRecentIdsAsync()

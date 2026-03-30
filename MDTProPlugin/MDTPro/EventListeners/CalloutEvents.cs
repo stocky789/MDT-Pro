@@ -9,15 +9,20 @@ using LSPD_First_Response.Mod.Callouts;
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using LspdFunc = LSPD_First_Response.Mod.API.Functions;
 
 namespace MDTPro.EventListeners {
     public class CalloutEvents {
         internal static CalloutInformation CalloutInfo;
         internal static List<CalloutInformation> CalloutList = new List<CalloutInformation>();
+        /// <summary>Optional unit / availability line shown on MDT clients (set via <c>POST /post/cadUnitStatus</c>).</summary>
+        internal static string CadUnitStatus = "";
         private static readonly object CalloutListLock = new object();
-        private static readonly List<(object handle, CalloutInformation info)> CalloutsByHandle = new List<(object, CalloutInformation)>();
+        private static readonly List<(LHandle handle, CalloutInformation info)> CalloutsByHandle = new List<(LHandle, CalloutInformation)>();
 
         public class CalloutInformation {
+            /// <summary>Stable id for MDT / native clients (POST <c>calloutAction</c>).</summary>
+            public string Id;
             public string Name;
             public string Description;
             public string Message;
@@ -34,6 +39,7 @@ namespace MDTPro.EventListeners {
             public List<string> AdditionalMessages = new List<string>();
 
             internal CalloutInformation(Callout callout) {
+                Id = Guid.NewGuid().ToString("N");
                 Name = callout.FriendlyName;
                 Agency = Helper.GetAgencyNameFromScriptName(LSPD_First_Response.Mod.API.Functions.GetCurrentAgencyScriptName()) ?? LSPD_First_Response.Mod.API.Functions.GetCurrentAgencyScriptName();
                 // thank you opus49
@@ -62,28 +68,33 @@ namespace MDTPro.EventListeners {
         internal static event CalloutEventHandler OnCalloutEvent;
 
         private const int MaxCalloutsInList = 20;
-        private static bool _calloutCiHandlersRegistered;
+        private static bool _calloutHandlersRegistered;
 
-        internal static void AddCalloutEventWithCI() {
-            if (_calloutCiHandlersRegistered) return;
-            _calloutCiHandlersRegistered = true;
+        /// <summary>Subscribe to LSPDFR callout events (always — uses LSPDFR to resolve handles; CI is optional for metadata / sendMessage).</summary>
+        internal static void AddCalloutEventHandlers() {
+            if (_calloutHandlersRegistered) return;
+            _calloutHandlersRegistered = true;
             LSPD_First_Response.Mod.API.Events.OnCalloutDisplayed += OnCalloutDisplayedForCi;
             LSPD_First_Response.Mod.API.Events.OnCalloutFinished += OnCalloutFinishedForCi;
             LSPD_First_Response.Mod.API.Events.OnCalloutAccepted += OnCalloutAcceptedForCi;
         }
 
-        /// <summary>Detach LSPDFR callout handlers on plugin unload (same delegate instances as <see cref="AddCalloutEventWithCI"/>).</summary>
-        internal static void RemoveCalloutCiHandlers() {
-            if (!_calloutCiHandlersRegistered) return;
+        /// <summary>Detach LSPDFR callout handlers on plugin unload (same delegate instances as <see cref="AddCalloutEventHandlers"/>).</summary>
+        internal static void RemoveCalloutEventHandlers() {
+            if (!_calloutHandlersRegistered) return;
             LSPD_First_Response.Mod.API.Events.OnCalloutDisplayed -= OnCalloutDisplayedForCi;
             LSPD_First_Response.Mod.API.Events.OnCalloutFinished -= OnCalloutFinishedForCi;
             LSPD_First_Response.Mod.API.Events.OnCalloutAccepted -= OnCalloutAcceptedForCi;
-            _calloutCiHandlersRegistered = false;
+            _calloutHandlersRegistered = false;
         }
 
         private static void OnCalloutDisplayedForCi(LHandle handle) {
             if (handle == null) return;
-            Callout callout = CalloutInterface.API.Functions.GetCalloutFromHandle(handle);
+            Callout callout = CalloutHandleResolver.TryGetCallout(handle);
+            if (callout == null) {
+                Helper.Log("MDT Pro: OnCalloutDisplayed — could not resolve Callout from handle (LSPDFR + CalloutInterface). Active Call list will miss this dispatch.", true, Helper.LogSeverity.Warning);
+                return;
+            }
             var info = new CalloutInformation(callout);
 
             lock (CalloutListLock) {
@@ -106,14 +117,14 @@ namespace MDTPro.EventListeners {
 
         private static void OnCalloutAcceptedForCi(LHandle handle) {
             if (handle == null) return;
-            Callout callout = CalloutInterface.API.Functions.GetCalloutFromHandle(handle);
+            var callout = CalloutHandleResolver.TryGetCallout(handle);
             CalloutInformation info = null;
             lock (CalloutListLock) {
                 foreach (var (h, i) in CalloutsByHandle) {
                     if (object.ReferenceEquals(h, handle)) { info = i; break; }
                 }
                 if (info == null) return;
-                info.AcceptanceState = callout.AcceptanceState;
+                info.AcceptanceState = callout != null ? callout.AcceptanceState : LspdFunc.GetCalloutAcceptanceState(handle);
                 info.AcceptedTime = DateTime.Now;
             }
             OnCalloutEvent?.Invoke(info);
@@ -121,14 +132,14 @@ namespace MDTPro.EventListeners {
 
         private static void OnCalloutFinishedForCi(LHandle handle) {
             if (handle == null) return;
-            Callout callout = CalloutInterface.API.Functions.GetCalloutFromHandle(handle);
+            var callout = CalloutHandleResolver.TryGetCallout(handle);
             CalloutInformation info = null;
             lock (CalloutListLock) {
                 foreach (var (h, i) in CalloutsByHandle) {
                     if (object.ReferenceEquals(h, handle)) { info = i; break; }
                 }
                 if (info == null) return;
-                info.AcceptanceState = callout.AcceptanceState;
+                info.AcceptanceState = callout != null ? callout.AcceptanceState : LspdFunc.GetCalloutAcceptanceState(handle);
                 info.FinishedTime = DateTime.Now;
             }
             OnCalloutEvent?.Invoke(info);
@@ -142,6 +153,21 @@ namespace MDTPro.EventListeners {
             new Regex(@"identified as\s+([A-Za-z]+\s+[A-Za-z]+)", RegexOptions.IgnoreCase),
             new Regex(@"suspect\s+([A-Za-z]+\s+[A-Za-z]+)", RegexOptions.IgnoreCase),
         };
+
+        /// <summary>Resolve the LSPDFR handle for a callout id from the active list (for game-thread actions).</summary>
+        internal static bool TryGetHandleForCalloutId(string calloutId, out LHandle handle) {
+            handle = null;
+            if (string.IsNullOrWhiteSpace(calloutId)) return false;
+            lock (CalloutListLock) {
+                foreach (var (h, info) in CalloutsByHandle) {
+                    if (info?.Id != null && string.Equals(info.Id, calloutId.Trim(), StringComparison.OrdinalIgnoreCase)) {
+                        handle = h;
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
 
         internal static void SendAdditionalMessage(string message) {
             if (CalloutInfo != null) {

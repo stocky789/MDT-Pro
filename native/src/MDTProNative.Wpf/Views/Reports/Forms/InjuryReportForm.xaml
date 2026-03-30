@@ -44,8 +44,21 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Report ID" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
-                        <TextBox x:Name="GeneralIdBox" Grid.Row="0" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,6" />
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Report ID" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" VerticalAlignment="Center" />
+                        <Grid Grid.Row="0" Grid.Column="1" Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="GeneralIdBox" Grid.Column="0" Style="{StaticResource ReportDocTextBox}" Margin="0,0,8,0" />
+                            <Button x:Name="CopyReportIdBtn"
+                                    Grid.Column="1"
+                                    Content="COPY"
+                                    Style="{StaticResource CadRailOutlineButton}"
+                                    Padding="10,4"
+                                    VerticalAlignment="Center"
+                                    ToolTip="Copy report ID to clipboard" />
+                        </Grid>
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Short year" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
                         <TextBox x:Name="GeneralShortYearBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,6" />
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Date" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
@@ -119,7 +132,20 @@
 
                     <TextBlock Text="Injury" Style="{StaticResource ReportDocSectionTitle}" />
                     <TextBlock Text="Injured party" Style="{StaticResource ReportDocLabel}" />
-                    <TextBox x:Name="InjuredPartyNameBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,8" />
+                    <Grid Margin="0,4,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="InjuredPartyNameBox" Grid.Column="0" Style="{StaticResource ReportDocTextBox}" Margin="0,0,8,0" />
+                        <Button x:Name="CopyInjuredPartyBtn"
+                                Grid.Column="1"
+                                Content="COPY"
+                                Style="{StaticResource CadRailOutlineButton}"
+                                Padding="10,4"
+                                VerticalAlignment="Center"
+                                ToolTip="Copy injured party name to clipboard" />
+                    </Grid>
                     <TextBlock Text="Injury type" Style="{StaticResource ReportDocLabel}" />
                     <TextBox x:Name="InjuryTypeBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,8" />
                     <TextBlock Text="Severity" Style="{StaticResource ReportDocLabel}" />
@@ -134,7 +160,20 @@
                              TextWrapping="Wrap"
                              Margin="0,4,0,8" />
                     <TextBlock Text="Linked report ID" Style="{StaticResource ReportDocLabel}" />
-                    <TextBox x:Name="LinkedReportIdBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,8" />
+                    <Grid Margin="0,4,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="LinkedReportIdBox" Grid.Column="0" Style="{StaticResource ReportDocTextBox}" Margin="0,0,8,0" />
+                        <Button x:Name="CopyLinkedReportIdBtn"
+                                Grid.Column="1"
+                                Content="COPY"
+                                Style="{StaticResource CadRailOutlineButton}"
+                                Padding="10,4"
+                                VerticalAlignment="Center"
+                                ToolTip="Copy linked report ID to clipboard" />
+                    </Grid>
                     <TextBlock Text="Attached injury / telemetry notes (optional)" Style="{StaticResource ReportDocLabel}" TextWrapping="Wrap" />
                     <TextBlock TextWrapping="Wrap"
                                FontSize="11"

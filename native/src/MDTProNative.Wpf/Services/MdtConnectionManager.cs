@@ -24,7 +24,8 @@ public sealed class MdtConnectionManager : IAsyncDisposable
 
     public event Action<string>? TimeUpdated;
     public event Action<string>? LocationUpdated;
-    public event Action<JArray?, int>? CalloutsUpdated;
+    /// <param name="cadUnitStatus">CAD / unit line from plugin (<c>cadUnitStatus</c> on WebSocket payload).</param>
+    public event Action<JArray?, int, string?>? CalloutsUpdated;
     public event Action<string>? Log;
 
     public async Task ConnectAsync(string host, int port, CancellationToken cancellationToken = default)
@@ -73,7 +74,9 @@ public sealed class MdtConnectionManager : IAsyncDisposable
         if (request != "calloutEvent" || response is not JObject root) return;
         var list = root["callouts"] as JArray;
         var count = list?.Count ?? 0;
-        _dispatcher.BeginInvoke(() => CalloutsUpdated?.Invoke(list, count));
+        var cad = root["cadUnitStatus"]?.ToString();
+        if (string.IsNullOrWhiteSpace(cad)) cad = null;
+        _dispatcher.BeginInvoke(() => CalloutsUpdated?.Invoke(list, count, cad));
         EmitLog($"calloutEvent: {count} active");
     }
 
@@ -91,7 +94,7 @@ public sealed class MdtConnectionManager : IAsyncDisposable
         {
             TimeUpdated?.Invoke("—");
             LocationUpdated?.Invoke("—");
-            CalloutsUpdated?.Invoke(null, 0);
+            CalloutsUpdated?.Invoke(null, 0, null);
         });
     }
 

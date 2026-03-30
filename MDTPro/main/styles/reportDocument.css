@@ -78,6 +78,7 @@
 }
 
 .report-doc-seal {
+  position: relative;
   width: 72px;
   height: 72px;
   border-radius: 50%;
@@ -90,6 +91,26 @@
   font-size: 11px;
   text-align: center;
   margin: 0 auto;
+  overflow: hidden;
+}
+
+.report-doc-seal-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 6px;
+  display: none;
+  box-sizing: border-box;
+}
+
+.report-doc-seal-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  line-height: 1.15;
 }
 
 .report-doc-header-right {

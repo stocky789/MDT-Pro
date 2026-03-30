@@ -14,6 +14,9 @@ public static class MdtShellEvents
     /// <summary>Switch to Reports and open the report with optional API type key (e.g. <c>arrest</c>, <c>incident</c>).</summary>
     public static event Action<string, string?>? NavigateToReportRequested;
 
+    /// <summary>Switch to Reports, create a new draft of <paramref name="reportTypeKey"/>, and prefill from person search.</summary>
+    public static event Action<string, string, string?>? NavigateToNewReportFromPersonSearchRequested;
+
     public static void RequestOfficerStripRefresh() => OfficerStripRefreshRequested?.Invoke();
 
     public static void LogCad(string line) => CadMessageLogged?.Invoke(line);
@@ -31,5 +34,14 @@ public static class MdtShellEvents
         if (string.IsNullOrEmpty(id)) return;
         var tk = string.IsNullOrWhiteSpace(reportTypeKey) ? null : reportTypeKey.Trim();
         NavigateToReportRequested?.Invoke(id, tk);
+    }
+
+    public static void RequestNavigateToNewReportFromPersonSearch(string? reportTypeKey, string? pedName, string? vehicleLicensePlate = null)
+    {
+        var rk = reportTypeKey?.Trim() ?? "";
+        var pn = pedName?.Trim() ?? "";
+        if (rk.Length == 0 || pn.Length == 0) return;
+        var plate = string.IsNullOrWhiteSpace(vehicleLicensePlate) ? null : vehicleLicensePlate.Trim();
+        NavigateToNewReportFromPersonSearchRequested?.Invoke(rk, pn, plate);
     }
 }
