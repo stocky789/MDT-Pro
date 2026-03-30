@@ -192,10 +192,6 @@ const CONFIG_SECTIONS = [
       'citationPostHandoffViolenceDrunkBonus',
     ],
   },
-  {
-    title: 'Debugging (MDTPro.log)',
-    keys: ['vehicleSearchDebugLogging'],
-  },
 ]
 
 const PRESET_CUSTOM = { label: 'Custom...', value: '__custom__' }
@@ -590,11 +586,6 @@ const CONFIG_FIELD_META = {
       { label: 'Ultimate Backup', value: 'UltimateBackup' },
       PRESET_CUSTOM,
     ],
-  },
-  vehicleSearchDebugLogging: {
-    label: 'Vehicle Search debug logging',
-    tooltip:
-      'When on, writes detailed lines to MDTPro/MDTPro.log for the Nearby Vehicles list: each HTTP refresh, game-fiber wait time, GetNearbyVehicles array length, world-scan stats, how many vehicles had blank plates vs native plate read, and a sample of plates returned. Use to diagnose an empty list; turn off afterward to keep the log small.',
   },
   citationStpAppendMdtBrowserLink: {
     label: 'Add MDT link to StopThePed citation notes',

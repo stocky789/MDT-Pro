@@ -72,16 +72,6 @@ namespace MDTPro.Utility {
             Log($"[ArrestCourt] {message}", false, LogSeverity.Info);
         }
 
-        /// <summary>Writes to MDTPro.log only when <see cref="Setup.Config.vehicleSearchDebugLogging"/> is true.</summary>
-        internal static void LogVehicleSearchVerbose(string message) {
-            try {
-                if (!Setup.SetupController.GetConfig().vehicleSearchDebugLogging) return;
-            } catch {
-                return;
-            }
-            Log($"[VehicleSearch] {message}", false, LogSeverity.Info);
-        }
-
         /// <summary>If logFileMaxSizeKb is set, shorten the file when it grows past the limit (keeps the newest half).</summary>
         private static void MaybeTrimLogFile(string logPath) {
             if (++_logWritesForTrimCheck % 32 != 0) return;

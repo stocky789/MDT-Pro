@@ -32,10 +32,8 @@ namespace MDTPro.ServerAPI {
                 if (limit < 1) limit = 1;
                 if (limit > 20) limit = 20;
 
-                Helper.LogVehicleSearchVerbose($"HTTP POST /data/nearbyVehicles requested limit={limit}");
                 DataController.RefreshCachedNearbyVehiclesOnGameFiberBlocking();
                 var cached = DataController.GetCachedNearbyVehicles(limit);
-                Helper.LogVehicleSearchVerbose($"HTTP POST /data/nearbyVehicles returning {cached.Count} row(s) after refresh (limit={limit})");
                 var nearbyVehicles = cached.Select(x => new {
                     x.LicensePlate,
                     x.ModelDisplayName,
