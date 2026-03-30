@@ -52,7 +52,7 @@
 
                    Margin="0,0,0,8"
 
-                   Text="Stay ONLINE. Choose TYPE → NEW REPORT → edit FORM (or JSON) → SAVE TO MDT. Select a list row to load an existing report." />
+                   Text="Stay ONLINE. Choose TYPE → NEW REPORT → edit the form → SAVE TO MDT. Select a list row to load an existing report." />
 
         <Grid>
 
@@ -98,67 +98,19 @@
 
                                Text="Select a report or create a new draft." />
 
-                    <TabControl x:Name="ReportEditorTabs"
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
 
-                                Background="{StaticResource CadPanel}"
+                                  HorizontalScrollBarVisibility="Disabled"
 
-                                BorderBrush="{StaticResource CadAccentDim}"
+                                  Margin="0,8,0,0"
 
-                                Margin="0,0,0,0">
+                                  MinHeight="240"
 
-                        <TabControl.Resources>
+                                  Background="{StaticResource CadPanel}">
 
-                            <Style TargetType="TabItem" BasedOn="{StaticResource CadSubTabItem}" />
+                        <ContentControl x:Name="FormHost" MinHeight="200" />
 
-                        </TabControl.Resources>
-
-                        <TabItem Header="FORM">
-
-                            <ScrollViewer VerticalScrollBarVisibility="Auto"
-
-                                          HorizontalScrollBarVisibility="Disabled"
-
-                                          Margin="0,8,0,0"
-
-                                          MinHeight="240">
-
-                                <ContentControl x:Name="FormHost" MinHeight="200" />
-
-                            </ScrollViewer>
-
-                        </TabItem>
-
-                        <TabItem Header="JSON">
-
-                            <TextBox x:Name="JsonEditor"
-
-                                     Margin="0,8,0,0"
-
-                                     AcceptsReturn="True"
-
-                                     AcceptsTab="True"
-
-                                     VerticalScrollBarVisibility="Auto"
-
-                                     HorizontalScrollBarVisibility="Auto"
-
-                                     TextWrapping="Wrap"
-
-                                     FontFamily="Consolas"
-
-                                     FontSize="12"
-
-                                     Foreground="{StaticResource CadText}"
-
-                                     Background="{StaticResource CadElevated}"
-
-                                     BorderBrush="{StaticResource CadAccentDim}"
-
-                                     Padding="8" />
-
-                        </TabItem>
-
-                    </TabControl>
+                    </ScrollViewer>
 
                 </DockPanel>
 

@@ -34,6 +34,8 @@ public partial class OfficerView : UserControl, IMdtBoundView
             ClearShiftUi();
             ClearMetrics();
         }
+
+        ShiftHistory.Bind(connection);
     }
 
     void ClearShiftUi()
@@ -142,6 +144,7 @@ public partial class OfficerView : UserControl, IMdtBoundView
             if (status == HttpStatusCode.OK && text == "OK")
             {
                 await ApplyShiftFromServerAsync();
+                Dispatcher.Invoke(ShiftHistory.RequestReload);
             }
             else
                 MdtShellEvents.LogCad("Shift: " + text);

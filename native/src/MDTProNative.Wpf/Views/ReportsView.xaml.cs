@@ -50,7 +50,6 @@ public partial class ReportsView : UserControl, IMdtBoundView
         var online = connection?.Http != null;
         RefreshBtn.IsEnabled = NewBtn.IsEnabled = SaveBtn.IsEnabled = CategoryCombo.IsEnabled = online;
         ReportList.ItemsSource = null;
-        JsonEditor.Text = "";
         FormHost.Content = null;
         if (!online)
             _formPanes.Clear();
@@ -61,7 +60,7 @@ public partial class ReportsView : UserControl, IMdtBoundView
         }
 
         EditorHint.Text = online
-            ? "Choose TYPE, then NEW REPORT or select a saved report. Use FORM or JSON, then SAVE TO MDT."
+            ? "Choose TYPE, then NEW REPORT or select a saved report. Edit the form, then SAVE TO MDT."
             : "Connect (host/port + Connect) before you can load, create, or save reports.";
         if (online)
             _ = ReloadListAsync();
@@ -123,7 +122,7 @@ public partial class ReportsView : UserControl, IMdtBoundView
             TextWrapping = TextWrapping.Wrap,
             Foreground = (Brush)FindResource("CadMuted"),
             FontSize = 12,
-            Text = "Could not load the structured form for this type. Use the JSON tab or reconnect.",
+            Text = "Could not load the structured form for this type. Reconnect or open the browser MDT for this report type.",
             Margin = new Thickness(0, 8, 0, 0)
         };
     }
@@ -170,7 +169,6 @@ public partial class ReportsView : UserControl, IMdtBoundView
                 _suppressSelection = true;
                 ReportList.ItemsSource = rows;
                 _suppressSelection = false;
-                JsonEditor.Text = "";
                 AttachFormHost(_selectedType);
                 GetOrCreateFormPane(_selectedType)?.Clear();
                 EditorHint.Text = rows.Count == 0 ? "No reports yet for this type. Use New report to start." : $"{rows.Count} report(s). Select one to edit.";
@@ -182,7 +180,6 @@ public partial class ReportsView : UserControl, IMdtBoundView
             await Dispatcher.InvokeAsync(() =>
             {
                 ReportList.ItemsSource = Array.Empty<ReportRow>();
-                JsonEditor.Text = "";
                 AttachFormHost(_selectedType);
                 GetOrCreateFormPane(_selectedType)?.Clear();
                 EditorHint.Text = "Could not load report list: " + ex.Message;
@@ -199,8 +196,6 @@ public partial class ReportsView : UserControl, IMdtBoundView
         if (_suppressSelection || _loadingList) return;
         if (ReportList.SelectedItem is ReportRow row)
         {
-            ReportEditorTabs.SelectedIndex = 0;
-            JsonEditor.Text = row.Body.ToString(Formatting.Indented);
             AttachFormHost(_selectedType);
             GetOrCreateFormPane(_selectedType)?.LoadFromReport((JObject)row.Body.DeepClone());
         }
@@ -232,11 +227,9 @@ public partial class ReportsView : UserControl, IMdtBoundView
                 _suppressSelection = true;
                 ReportList.SelectedItem = null;
                 _suppressSelection = false;
-                ReportEditorTabs.SelectedIndex = 0;
-                JsonEditor.Text = draft.ToString(Formatting.Indented);
                 AttachFormHost(type);
                 GetOrCreateFormPane(type)?.LoadFromReport((JObject)draft.DeepClone());
-                EditorHint.Text = "New draft — edit FORM or JSON, then SAVE TO MDT. Arrest saves can take up to ~45s (game thread).";
+                EditorHint.Text = "New draft — complete the form, then SAVE TO MDT. Arrest saves can take up to ~45s (game thread).";
                 MdtShellEvents.LogCad("Reports: new draft " + (draft["Id"]?.ToString() ?? "?"));
             });
         }
@@ -266,29 +259,25 @@ public partial class ReportsView : UserControl, IMdtBoundView
         JObject body;
         try
         {
-            var formTab = ReportEditorTabs.SelectedIndex == 0;
-            if (formTab)
+            var pane = GetOrCreateFormPane(type);
+            if (pane == null)
             {
-                var pane = GetOrCreateFormPane(type);
-                if (pane != null)
-                    body = pane.BuildReport();
-                else
-                    body = JObject.Parse(JsonEditor.Text);
+                MessageBox.Show("Could not load the structured form for this report type.", "Reports", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
             }
-            else
-                body = JObject.Parse(JsonEditor.Text);
+
+            body = pane.BuildReport();
         }
         catch (Exception ex)
         {
-            var src = ReportEditorTabs.SelectedIndex == 0 ? "form" : "JSON";
-            MessageBox.Show($"Could not build report from {src}.\n\n" + ex.Message, "Reports", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("Could not build report from the form.\n\n" + ex.Message, "Reports", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
         var id = body["Id"]?.ToString()?.Trim();
         if (string.IsNullOrEmpty(id))
         {
-            MessageBox.Show("Report Id is empty. Use NEW REPORT or paste JSON with an Id.", "Reports", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("Report Id is empty. Use NEW REPORT to create a draft.", "Reports", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 

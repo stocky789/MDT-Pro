@@ -47,7 +47,7 @@ public partial class MainWindow : Window
         _nav.Add(new NavItem("firearms", "FIREARMS"));
         _nav.Add(new NavItem("bolo", "BOLO"));
         _nav.Add(new NavItem("reports", "REPORTS"));
-        _nav.Add(new NavItem("shiftcourt", "SHIFT / COURT"));
+        _nav.Add(new NavItem("court", "COURT"));
         _nav.Add(new NavItem("map", "MAP"));
         _nav.Add(new NavItem("officer", "OFFICER"));
         NavList.ItemsSource = _nav;
@@ -178,7 +178,7 @@ public partial class MainWindow : Window
         "firearms" => new FirearmsView(),
         "bolo" => new BoloView(),
         "reports" => new ReportsView(),
-        "shiftcourt" => new ShiftCourtView(),
+        "court" => new NativeCourtView { Margin = new Thickness(8) },
         "map" => new MapView(),
         "officer" => new OfficerView(),
         _ => new DashboardView()

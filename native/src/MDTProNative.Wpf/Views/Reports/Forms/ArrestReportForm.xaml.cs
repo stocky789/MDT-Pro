@@ -1,8 +1,9 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Linq;
 using System.Windows.Controls;
 using MDTProNative.Wpf.Services;
 using MDTProNative.Wpf.Views.Reports;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace MDTProNative.Wpf.Views.Reports.Forms;
@@ -11,9 +12,19 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
 {
     sealed record StatusPick(int Value, string Label);
 
+    readonly ObservableCollection<ArrestChargeRow> _charges = new();
+
     public ArrestReportForm()
     {
         InitializeComponent();
+        ArrestChargesGrid.ItemsSource = _charges;
+        AddArrestChargeBtn.Click += (_, _) => _charges.Add(new ArrestChargeRow { AddedByReportInEdit = true });
+        RemoveArrestChargeBtn.Click += (_, _) =>
+        {
+            if (ArrestChargesGrid.SelectedItem is ArrestChargeRow r)
+                _charges.Remove(r);
+        };
+
         StatusCombo.ItemsSource = new StatusPick[]
         {
             new(0, "Closed"),
@@ -24,6 +35,7 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
         StatusCombo.DisplayMemberPath = nameof(StatusPick.Label);
         StatusCombo.SelectedValuePath = nameof(StatusPick.Value);
         StatusCombo.SelectedValue = 3;
+        UofTypeCombo.SelectedIndex = 0;
     }
 
     public void Bind(MdtConnectionManager? connection) => _ = connection;
@@ -91,15 +103,51 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
         else
             AttachedReportIdsBox.Text = "";
 
-        if (report["Charges"] is JArray ch)
-            ChargesJsonBox.Text = ch.ToString(Formatting.Indented);
-        else
-            ChargesJsonBox.Text = "[]";
+        _charges.Clear();
+        foreach (var row in ArrestChargeRow.CollectionFromCharges(report["Charges"]))
+            _charges.Add(row);
 
-        if (report["UseOfForce"] is JObject uof && uof.Properties().Any())
-            UseOfForceJsonBox.Text = uof.ToString(Formatting.Indented);
-        else
-            UseOfForceJsonBox.Text = "";
+        LoadUseOfForce(report["UseOfForce"] as JObject);
+    }
+
+    void LoadUseOfForce(JObject? uof)
+    {
+        UofTypeCombo.SelectedIndex = 0;
+        UofTypeOtherBox.Text = "";
+        UofJustificationBox.Text = "";
+        UofInjurySuspectCheck.IsChecked = false;
+        UofInjuryOfficerCheck.IsChecked = false;
+        UofWitnessesBox.Text = "";
+
+        if (uof == null || !uof.Properties().Any()) return;
+
+        var typ = uof["Type"]?.ToString() ?? "";
+        SelectUofByType(typ);
+        UofTypeOtherBox.Text = uof["TypeOther"]?.ToString() ?? "";
+        UofJustificationBox.Text = uof["Justification"]?.ToString() ?? "";
+        UofInjurySuspectCheck.IsChecked = uof["InjuryToSuspect"]?.Value<bool>() == true;
+        UofInjuryOfficerCheck.IsChecked = uof["InjuryToOfficer"]?.Value<bool>() == true;
+        UofWitnessesBox.Text = uof["Witnesses"]?.ToString() ?? "";
+    }
+
+    void SelectUofByType(string? type)
+    {
+        if (string.IsNullOrWhiteSpace(type))
+        {
+            UofTypeCombo.SelectedIndex = 0;
+            return;
+        }
+
+        foreach (var item in UofTypeCombo.Items.OfType<ComboBoxItem>())
+        {
+            if (string.Equals(item.Tag?.ToString(), type.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                UofTypeCombo.SelectedItem = item;
+                return;
+            }
+        }
+
+        UofTypeCombo.SelectedIndex = 0;
     }
 
     public JObject BuildReport()
@@ -123,17 +171,6 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
 
         var status = StatusCombo.SelectedValue is int si ? si : 3;
 
-        JArray charges;
-        try
-        {
-            var parsed = JToken.Parse(string.IsNullOrWhiteSpace(ChargesJsonBox.Text) ? "[]" : ChargesJsonBox.Text);
-            charges = parsed is JArray a ? a : new JArray(parsed);
-        }
-        catch
-        {
-            charges = new JArray();
-        }
-
         var attached = new JArray();
         foreach (var line in AttachedReportIdsBox.Text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
         {
@@ -141,6 +178,8 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
             if (id.Length > 0)
                 attached.Add(id);
         }
+
+        var charges = ArrestChargeRow.ToJArray(_charges);
 
         var root = new JObject
         {
@@ -174,19 +213,18 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
             ["DocumentedFirearms"] = DocumentedFirearmsCheck.IsChecked == true,
         };
 
-        var uofRaw = UseOfForceJsonBox.Text.Trim();
-        if (uofRaw.Length > 0)
+        var uofTag = (UofTypeCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "";
+        if (!string.IsNullOrEmpty(uofTag))
         {
-            try
+            root["UseOfForce"] = new JObject
             {
-                var tok = JToken.Parse(uofRaw);
-                if (tok is JObject uofObj)
-                    root["UseOfForce"] = uofObj;
-            }
-            catch
-            {
-                // omit invalid UseOfForce
-            }
+                ["Type"] = uofTag,
+                ["TypeOther"] = uofTag == "Other" ? UofTypeOtherBox.Text.Trim() : "",
+                ["Justification"] = UofJustificationBox.Text.Trim(),
+                ["InjuryToSuspect"] = UofInjurySuspectCheck.IsChecked == true,
+                ["InjuryToOfficer"] = UofInjuryOfficerCheck.IsChecked == true,
+                ["Witnesses"] = UofWitnessesBox.Text.Trim(),
+            };
         }
 
         return root;
@@ -205,7 +243,7 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
         DocumentedDrugsCheck.IsChecked = false;
         DocumentedFirearmsCheck.IsChecked = false;
         AttachedReportIdsBox.Text = "";
-        ChargesJsonBox.Text = "[]";
-        UseOfForceJsonBox.Text = "";
+        _charges.Clear();
+        LoadUseOfForce(null);
     }
 }

@@ -116,16 +116,36 @@
                     <TextBox x:Name="OffenderPlateBox" Style="{StaticResource CadTextBoxCadField}" Margin="0,0,0,10" />
                     <TextBlock Text="COURT CASE # (optional)" Style="{StaticResource CadFieldLabel}" Margin="0,0,0,4" />
                     <TextBox x:Name="CourtCaseBox" Style="{StaticResource CadTextBoxCadField}" Margin="0,0,0,10" />
-                    <TextBlock Text="CHARGES (JSON array or empty)" Style="{StaticResource CadFieldLabel}" Margin="0,0,0,4" />
-                    <TextBox x:Name="ChargesBox"
-                             AcceptsReturn="True"
-                             AcceptsTab="True"
-                             TextWrapping="Wrap"
-                             MinHeight="140"
-                             FontFamily="Consolas"
-                             FontSize="12"
-                             VerticalScrollBarVisibility="Auto"
-                             Style="{StaticResource CadTextBoxCadField}" />
+                    <TextBlock Text="CHARGES" Style="{StaticResource CadSectionTitle}" Margin="0,4,0,4" />
+                    <TextBlock TextWrapping="Wrap"
+                               Foreground="{StaticResource CadMuted}"
+                               FontSize="11"
+                               Margin="0,0,0,8"
+                               Text="Enter each violation, fine range, and flags. Matches the same charge records as the browser MDT." />
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button x:Name="AddChargeBtn" Content="ADD CHARGE" Style="{StaticResource CadButton}" Padding="12,4" />
+                        <Button x:Name="RemoveChargeBtn" Content="REMOVE SELECTED" Style="{StaticResource CadRailOutlineButton}" Margin="8,0,0,0" Padding="12,4" />
+                    </StackPanel>
+                    <DataGrid x:Name="ChargesGrid"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              HeadersVisibility="Column"
+                              SelectionMode="Single"
+                              MinHeight="140"
+                              MaxHeight="280"
+                              Background="{StaticResource CadPanel}"
+                              Foreground="{StaticResource CadText}"
+                              BorderBrush="{StaticResource CadBorder}"
+                              GridLinesVisibility="Horizontal"
+                              RowHeight="28">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="CHARGE" Binding="{Binding ChargeName, UpdateSourceTrigger=PropertyChanged}" Width="2*" />
+                            <DataGridTextColumn Header="MIN FINE" Binding="{Binding MinFine, UpdateSourceTrigger=PropertyChanged}" Width="*" />
+                            <DataGridTextColumn Header="MAX FINE" Binding="{Binding MaxFine, UpdateSourceTrigger=PropertyChanged}" Width="*" />
+                            <DataGridCheckBoxColumn Header="REV. LIC." Binding="{Binding CanRevokeLicense, UpdateSourceTrigger=PropertyChanged}" Width="80" />
+                            <DataGridCheckBoxColumn Header="ARREST" Binding="{Binding IsArrestable, UpdateSourceTrigger=PropertyChanged}" Width="70" />
+                        </DataGrid.Columns>
+                    </DataGrid>
                 </StackPanel>
             </Border>
 

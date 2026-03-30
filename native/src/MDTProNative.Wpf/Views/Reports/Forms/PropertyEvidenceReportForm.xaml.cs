@@ -1,16 +1,32 @@
+using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows.Controls;
 using MDTProNative.Wpf.Services;
 using MDTProNative.Wpf.Views.Reports;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace MDTProNative.Wpf.Views.Reports.Forms;
 
+public sealed class SeizedDrugRow
+{
+    public string DrugType { get; set; } = "";
+    public string Quantity { get; set; } = "";
+}
+
 public partial class PropertyEvidenceReportForm : UserControl, IReportFormPane
 {
+    readonly ObservableCollection<SeizedDrugRow> _drugs = new();
+
     public PropertyEvidenceReportForm()
     {
         InitializeComponent();
+        SeizedDrugsGrid.ItemsSource = _drugs;
+        AddDrugRowBtn.Click += (_, _) => _drugs.Add(new SeizedDrugRow());
+        RemoveDrugRowBtn.Click += (_, _) =>
+        {
+            if (SeizedDrugsGrid.SelectedItem is SeizedDrugRow r)
+                _drugs.Remove(r);
+        };
     }
 
     ReportFormBaseControls BaseControls => new()
@@ -46,14 +62,23 @@ public partial class PropertyEvidenceReportForm : UserControl, IReportFormPane
                 SubjectPedNamesBox.Text = legacy;
         }
 
-        var drugsTok = report["SeizedDrugs"];
-        if (drugsTok is JArray drugArr && drugArr.Count > 0)
-            SeizedDrugsJsonBox.Text = drugArr.ToString(Formatting.Indented);
-        else
-            SeizedDrugsJsonBox.Text = "[]";
+        LoadDrugsIntoCollection(report["SeizedDrugs"], _drugs);
 
         SeizedFirearmTypesBox.Text = ReportFormPaneFields.StringArrayToLines(report["SeizedFirearmTypes"]);
         OtherContrabandNotesBox.Text = report["OtherContrabandNotes"]?.ToString() ?? "";
+    }
+
+    static void LoadDrugsIntoCollection(JToken? tok, ObservableCollection<SeizedDrugRow> col)
+    {
+        col.Clear();
+        if (tok is not JArray arr) return;
+        foreach (var item in arr.OfType<JObject>())
+        {
+            var dt = item["DrugType"]?.ToString() ?? item["drugType"]?.ToString() ?? "";
+            var q = item["Quantity"]?.ToString() ?? item["quantity"]?.ToString() ?? "";
+            if (string.IsNullOrWhiteSpace(dt) && string.IsNullOrWhiteSpace(q)) continue;
+            col.Add(new SeizedDrugRow { DrugType = dt, Quantity = q });
+        }
     }
 
     public JObject BuildReport()
@@ -65,7 +90,7 @@ public partial class PropertyEvidenceReportForm : UserControl, IReportFormPane
         root["SubjectPedNames"] = subjectNames;
         root["SubjectPedName"] = subjectNames.Count > 0 ? subjectNames[0] : JValue.CreateNull();
 
-        var drugs = ParseSeizedDrugsJson(SeizedDrugsJsonBox.Text);
+        var drugs = DrugsToJArray(_drugs);
         root["SeizedDrugs"] = drugs;
         var types = new JArray();
         foreach (var o in drugs.OfType<JObject>())
@@ -83,39 +108,27 @@ public partial class PropertyEvidenceReportForm : UserControl, IReportFormPane
         return root;
     }
 
-    static JArray ParseSeizedDrugsJson(string? text)
+    static JArray DrugsToJArray(IEnumerable<SeizedDrugRow> rows)
     {
-        if (string.IsNullOrWhiteSpace(text)) return new JArray();
-        try
+        var a = new JArray();
+        foreach (var r in rows)
         {
-            var tok = JToken.Parse(text.Trim());
-            if (tok is not JArray arr) return new JArray();
-            var outArr = new JArray();
-            foreach (var item in arr)
+            var dt = r.DrugType?.Trim() ?? "";
+            if (string.IsNullOrEmpty(dt)) continue;
+            a.Add(new JObject
             {
-                if (item is not JObject src) continue;
-                var drugType = src["DrugType"]?.ToString() ?? src["drugType"]?.ToString() ?? "";
-                if (string.IsNullOrWhiteSpace(drugType)) continue;
-                var qty = src["Quantity"]?.ToString() ?? src["quantity"]?.ToString() ?? "";
-                outArr.Add(new JObject
-                {
-                    ["DrugType"] = drugType.Trim(),
-                    ["Quantity"] = qty.Trim()
-                });
-            }
-            return outArr;
+                ["DrugType"] = dt,
+                ["Quantity"] = r.Quantity?.Trim() ?? ""
+            });
         }
-        catch
-        {
-            return new JArray();
-        }
+        return a;
     }
 
     public void Clear()
     {
         ReportFormPaneFields.ClearBase(BaseControls, 1);
         SubjectPedNamesBox.Text = "";
-        SeizedDrugsJsonBox.Text = "[]";
+        _drugs.Clear();
         SeizedFirearmTypesBox.Text = "";
         OtherContrabandNotesBox.Text = "";
     }

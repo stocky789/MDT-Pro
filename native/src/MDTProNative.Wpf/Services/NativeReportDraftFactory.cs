@@ -36,7 +36,7 @@ public static class NativeReportDraftFactory
         }
         catch
         {
-            // Still build a draft (new ID) if the list endpoint fails; user can save from JSON tab if needed.
+            // Still build a draft (new ID) if the list endpoint fails.
             reports = new JArray();
         }
 

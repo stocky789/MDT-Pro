@@ -1,6 +1,7 @@
 <UserControl x:Class="MDTProNative.Wpf.Views.OfficerView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:MDTProNative.Wpf.Views">
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
         <StackPanel>
             <TextBlock Text="OFFICER PROFILE" FontFamily="{StaticResource CadFontMono}" FontSize="13" Foreground="{StaticResource CadAccent}" Margin="0,0,0,12" />
@@ -33,7 +34,7 @@
                         <TextBox x:Name="Agency" Grid.Row="2" Grid.Column="3" Style="{StaticResource CadTextBox}" />
                     </Grid>
                     <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                        <Button Content="Fill from game" Style="{StaticResource CadButton}" Click="FillFromGame_Click" Margin="0,0,8,0" ToolTip="Uses live /data/officerInformation then saves to officer profile JSON (same as web)." />
+                        <Button Content="Fill from game" Style="{StaticResource CadButton}" Click="FillFromGame_Click" Margin="0,0,8,0" ToolTip="Loads live officer data from the game session into this profile (same as the browser MDT)." />
                         <Button Content="Save" Style="{StaticResource CadAccentButton}" Click="Save_Click" />
                     </StackPanel>
                 </StackPanel>
@@ -50,6 +51,8 @@
                     </StackPanel>
                 </StackPanel>
             </Border>
+
+            <views:ShiftHistoryView x:Name="ShiftHistory" Margin="0,0,0,12" />
 
             <Border Style="{StaticResource CadSectionBorder}" Padding="14">
                 <StackPanel>

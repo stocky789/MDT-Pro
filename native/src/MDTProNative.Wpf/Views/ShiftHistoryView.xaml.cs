@@ -6,12 +6,12 @@ using Newtonsoft.Json.Linq;
 
 namespace MDTProNative.Wpf.Views;
 
-public partial class ShiftCourtView : UserControl, IMdtBoundView
+public partial class ShiftHistoryView : UserControl, IMdtBoundView
 {
     MdtConnectionManager? _connection;
     List<ShiftRow> _shifts = [];
 
-    public ShiftCourtView()
+    public ShiftHistoryView()
     {
         InitializeComponent();
         ShiftList.DisplayMemberPath = nameof(ShiftRow.Display);
@@ -21,11 +21,16 @@ public partial class ShiftCourtView : UserControl, IMdtBoundView
     public void Bind(MdtConnectionManager? connection)
     {
         _connection = connection;
-        CourtNative.Bind(connection);
         ShiftList.ItemsSource = null;
         ShiftDetailText.Text = "";
         if (connection?.Http == null) return;
         _ = LoadShiftsAsync();
+    }
+
+    public void RequestReload()
+    {
+        if (_connection?.Http != null)
+            _ = LoadShiftsAsync();
     }
 
     async Task LoadShiftsAsync()

@@ -24,9 +24,6 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
     MdtConnectionManager? _connection;
     int _searchGen;
     JObject? _currentVehicle;
-    /// <summary>Scrubbed clone for JSON editing (no <c>CanModifyBOLOs</c> or other UI-only top-level keys).</summary>
-    JObject? _vehicleEditJson;
-
     public VehicleSearchView()
     {
         InitializeComponent();
@@ -50,7 +47,6 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
             if (HistoryList.SelectedItem is HistoryRow h)
                 await SearchAsync(h.PlateQuery);
         };
-        SaveVehicleBtn.Click += async (_, _) => await SaveVehicleJsonAsync();
         SaveVehicleFormBtn.Click += async (_, _) => await SaveVehicleFromFormAsync();
         ClearVehHistoryBtn.Click += async (_, _) => await ClearVehicleHistoryAsync();
     }
@@ -61,9 +57,6 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
     {
         _connection = connection;
         _currentVehicle = null;
-        _vehicleEditJson = null;
-        VehicleJsonEditor.Text = "";
-        VehicleJsonExpander.IsExpanded = false;
         ClearVehicleForm();
         VehicleDetailTabs.SelectedIndex = 0;
         DetailPanel.Children.Clear();
@@ -367,11 +360,6 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
             }
         }
 
-        _vehicleEditJson = (JObject)v.DeepClone();
-        _vehicleEditJson.Remove("CanModifyBOLOs");
-        KeepOnlyVehicleModelProperties(_vehicleEditJson);
-        VehicleJsonEditor.Text = _vehicleEditJson.ToString(Formatting.Indented);
-        VehicleJsonExpander.IsExpanded = false;
         LoadVehicleFormFromCurrent();
         VehicleDetailTabs.SelectedIndex = 0;
 
@@ -502,19 +490,6 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
         {
             if (!VehicleDataPropertyNames.Contains(p.Name))
                 p.Remove();
-        }
-    }
-
-    async Task SaveVehicleJsonAsync()
-    {
-        try
-        {
-            var jo = JObject.Parse(VehicleJsonEditor.Text);
-            await PostUpdateVehicleAsync(jo).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show("Invalid JSON or request failed.\n\n" + ex.Message, "Vehicle search", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

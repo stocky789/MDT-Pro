@@ -34,7 +34,7 @@
             <TabItem Header="Config &amp; plugins">
                 <DockPanel Margin="0,8,0,0">
                     <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="{StaticResource CadMuted}" FontSize="11" Margin="0,0,0,8"
-                               Text="Same customization editor as the browser MDT (config JSON merge, plugin toggles). Requires an active connection." />
+                               Text="Same customization editor as the browser MDT (agency settings, plugin toggles). Requires an active connection." />
                     <views:MdtWebPageView x:Name="CustomizationHost" PageName="customization" ShowToolbar="True" />
                 </DockPanel>
             </TabItem>

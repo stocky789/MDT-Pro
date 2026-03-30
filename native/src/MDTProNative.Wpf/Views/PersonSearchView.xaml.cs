@@ -13,7 +13,7 @@ public partial class PersonSearchView : UserControl, IMdtBoundView
 {
     MdtConnectionManager? _connection;
     int _searchGen;
-    /// <summary>Last loaded ped (full API object); form/JSON saves merge from this for arrays and unknown keys.</summary>
+    /// <summary>Last loaded ped (full API object); form saves merge from this for arrays and unknown keys.</summary>
     JObject? _pedBaseForSave;
 
     public PersonSearchView()
@@ -39,7 +39,6 @@ public partial class PersonSearchView : UserControl, IMdtBoundView
             if (HistoryList.SelectedItem is HistoryRow h)
                 await SearchNamedAsync(h.ResultName);
         };
-        SavePedBtn.Click += async (_, _) => await SavePedJsonAsync();
         SavePedFormBtn.Click += async (_, _) => await SavePedFromFormAsync();
         ClearPedHistoryBtn.Click += async (_, _) => await ClearPedHistoryAsync();
     }
@@ -52,8 +51,6 @@ public partial class PersonSearchView : UserControl, IMdtBoundView
         DetailPanel.Children.Clear();
         DetailPanel.Children.Add(DetailPlaceholder);
         DetailPlaceholder.Visibility = Visibility.Visible;
-        PedJsonEditor.Text = "";
-        PedJsonExpander.IsExpanded = false;
         _pedBaseForSave = null;
         ClearPedForm();
         PersonDetailTabs.SelectedIndex = 0;
@@ -278,10 +275,6 @@ public partial class PersonSearchView : UserControl, IMdtBoundView
         }
 
         _pedBaseForSave = (JObject)p.DeepClone();
-        var forJson = (JObject)_pedBaseForSave.DeepClone();
-        forJson.Remove("CourtCases");
-        PedJsonEditor.Text = forJson.ToString(Formatting.Indented);
-        PedJsonExpander.IsExpanded = false;
         LoadPedFormFromBase();
         PersonDetailTabs.SelectedIndex = 0;
 
@@ -425,26 +418,6 @@ public partial class PersonSearchView : UserControl, IMdtBoundView
 
             MessageBox.Show($"Save failed ({(int)status}).\n\n{text}", "Person search", MessageBoxButton.OK, MessageBoxImage.Warning);
         });
-    }
-
-    async Task SavePedJsonAsync()
-    {
-        var http = _connection?.Http;
-        if (http == null)
-        {
-            MessageBox.Show("Connect to MDT Pro first.", "Person search", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        try
-        {
-            var jo = JObject.Parse(PedJsonEditor.Text);
-            await PostUpdatePedAsync(jo).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show("Invalid JSON or request failed.\n\n" + ex.Message, "Person search", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
     }
 
     TextBlock SectionTitle(string s) => new()

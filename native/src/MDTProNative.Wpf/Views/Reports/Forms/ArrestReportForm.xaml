@@ -5,23 +5,23 @@
         <StackPanel>
             <TextBlock Text="BASE REPORT" Style="{StaticResource CadSectionTitle}" />
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Id" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="REPORT ID" />
                 <TextBox x:Name="IdBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="ShortYear" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="SHORT YEAR" />
                 <TextBox x:Name="ShortYearBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="TimeStamp" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="DATE/TIME" />
                 <TextBox x:Name="TimeStampBox" Style="{StaticResource CadTextBoxCadField}"
                          ToolTip="ISO or local date/time (e.g. 2026-03-29T14:30:00)" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Status" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="STATUS" />
                 <ComboBox x:Name="StatusCombo" Style="{StaticResource CadComboBox}" />
             </DockPanel>
-            <TextBlock Text="Notes" Style="{StaticResource CadFieldLabel}" Margin="0,4,0,2" />
+            <TextBlock Text="NOTES" Style="{StaticResource CadFieldLabel}" Margin="0,4,0,2" />
             <TextBox x:Name="NotesBox"
                      MinHeight="56"
                      AcceptsReturn="True"
@@ -29,100 +29,144 @@
                      TextWrapping="Wrap"
                      VerticalScrollBarVisibility="Auto" />
 
-            <TextBlock Text="OFFICER (officerInformation shape)" Style="{StaticResource CadSectionTitle}" Margin="0,14,0,0" />
+            <TextBlock Text="OFFICER INFORMATION" Style="{StaticResource CadSectionTitle}" Margin="0,14,0,0" />
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="firstName" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="FIRST NAME" />
                 <TextBox x:Name="OfficerFirstBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="lastName" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="LAST NAME" />
                 <TextBox x:Name="OfficerLastBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="rank" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="RANK" />
                 <TextBox x:Name="OfficerRankBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="callSign" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="CALL SIGN" />
                 <TextBox x:Name="OfficerCallSignBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="agency" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="AGENCY" />
                 <TextBox x:Name="OfficerAgencyBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="badgeNumber" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="BADGE #" />
                 <TextBox x:Name="OfficerBadgeBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
 
             <TextBlock Text="LOCATION" Style="{StaticResource CadSectionTitle}" Margin="0,14,0,0" />
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Area" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="AREA" />
                 <TextBox x:Name="LocAreaBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Street" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="STREET" />
                 <TextBox x:Name="LocStreetBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="County" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="COUNTY" />
                 <TextBox x:Name="LocCountyBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Postal" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="POSTAL" />
                 <TextBox x:Name="LocPostalBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
 
             <TextBlock Text="ARREST" Style="{StaticResource CadSectionTitle}" Margin="0,14,0,0" />
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="OffenderPedName" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="SUBJECT NAME" />
                 <TextBox x:Name="OffenderPedNameBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="OffenderVehicleLicensePlate" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="VEHICLE PLATE" />
                 <TextBox x:Name="OffenderPlateBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="CourtCaseNumber" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="COURT CASE #" />
                 <TextBox x:Name="CourtCaseNumberBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
-            <CheckBox x:Name="DocumentedDrugsCheck" Margin="0,6,0,4" Content="DocumentedDrugs" Foreground="{StaticResource CadText}" />
-            <CheckBox x:Name="DocumentedFirearmsCheck" Margin="0,0,0,8" Content="DocumentedFirearms" Foreground="{StaticResource CadText}" />
+            <CheckBox x:Name="DocumentedDrugsCheck" Margin="0,6,0,4" Content="Drugs documented on scene" Foreground="{StaticResource CadText}" />
+            <CheckBox x:Name="DocumentedFirearmsCheck" Margin="0,0,0,8" Content="Firearms documented on scene" Foreground="{StaticResource CadText}" />
 
-            <TextBlock Text="AttachedReportIds (one ID per line)" Style="{StaticResource CadFieldLabel}" Margin="0,0,0,2" />
+            <TextBlock Text="ATTACHED REPORT IDS (one per line)" Style="{StaticResource CadFieldLabel}" Margin="0,0,0,2" />
             <TextBox x:Name="AttachedReportIdsBox"
                      MinHeight="64"
                      AcceptsReturn="True"
                      Style="{StaticResource CadTextBoxCadField}"
-                     FontFamily="Consolas"
-                     FontSize="11"
                      TextWrapping="Wrap"
                      VerticalScrollBarVisibility="Auto" />
 
-            <TextBlock Text="Charges (JSON array)" Style="{StaticResource CadFieldLabel}" Margin="0,10,0,2" />
-            <TextBox x:Name="ChargesJsonBox"
-                     MinHeight="120"
-                     AcceptsReturn="True"
-                     AcceptsTab="True"
-                     Style="{StaticResource CadTextBoxCadField}"
-                     FontFamily="Consolas"
-                     FontSize="11"
-                     TextWrapping="Wrap"
-                     VerticalScrollBarVisibility="Auto" />
-
-            <TextBlock Text="UseOfForce (JSON object, optional)" Style="{StaticResource CadFieldLabel}" Margin="0,10,0,2" />
+            <TextBlock Text="CHARGES" Style="{StaticResource CadSectionTitle}" Margin="0,12,0,4" />
             <TextBlock TextWrapping="Wrap"
                        Foreground="{StaticResource CadMuted}"
-                       FontSize="10"
-                       Margin="0,0,0,4"
-                       Text="Keys: Type, TypeOther, Justification, InjuryToSuspect, InjuryToOfficer, Witnesses. Leave empty to omit." />
-            <TextBox x:Name="UseOfForceJsonBox"
-                     MinHeight="88"
+                       FontSize="11"
+                       Margin="0,0,0,8"
+                       Text="Booking charges including fine range, custody days, and statutory flags." />
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <Button x:Name="AddArrestChargeBtn" Content="ADD CHARGE" Style="{StaticResource CadButton}" Padding="12,4" />
+                <Button x:Name="RemoveArrestChargeBtn" Content="REMOVE SELECTED" Style="{StaticResource CadRailOutlineButton}" Margin="8,0,0,0" Padding="12,4" />
+            </StackPanel>
+            <DataGrid x:Name="ArrestChargesGrid"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      HeadersVisibility="Column"
+                      SelectionMode="Single"
+                      MinHeight="160"
+                      MaxHeight="320"
+                      Background="{StaticResource CadPanel}"
+                      Foreground="{StaticResource CadText}"
+                      BorderBrush="{StaticResource CadBorder}"
+                      GridLinesVisibility="Horizontal"
+                      RowHeight="28"
+                      HorizontalScrollBarVisibility="Auto">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="CHARGE" Binding="{Binding ChargeName, UpdateSourceTrigger=PropertyChanged}" Width="2*" />
+                    <DataGridTextColumn Header="MIN FINE" Binding="{Binding MinFine, UpdateSourceTrigger=PropertyChanged}" Width="70" />
+                    <DataGridTextColumn Header="MAX FINE" Binding="{Binding MaxFine, UpdateSourceTrigger=PropertyChanged}" Width="70" />
+                    <DataGridTextColumn Header="MIN DAYS" Binding="{Binding MinDays, UpdateSourceTrigger=PropertyChanged}" Width="70" />
+                    <DataGridTextColumn Header="MAX DAYS" Binding="{Binding MaxDaysText, UpdateSourceTrigger=PropertyChanged}" Width="80" />
+                    <DataGridTextColumn Header="PROB." Binding="{Binding Probation, UpdateSourceTrigger=PropertyChanged}" Width="55" />
+                    <DataGridCheckBoxColumn Header="REV. LIC." Binding="{Binding CanRevokeLicense, UpdateSourceTrigger=PropertyChanged}" Width="72" />
+                    <DataGridCheckBoxColumn Header="ARREST" Binding="{Binding IsArrestable, UpdateSourceTrigger=PropertyChanged}" Width="68" />
+                    <DataGridCheckBoxColumn Header="WARRANT" Binding="{Binding CanBeWarrant, UpdateSourceTrigger=PropertyChanged}" Width="72" />
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <TextBlock Text="USE OF FORCE" Style="{StaticResource CadSectionTitle}" Margin="0,14,0,4" />
+            <TextBlock TextWrapping="Wrap" Foreground="{StaticResource CadMuted}" FontSize="11" Margin="0,0,0,8"
+                       Text="Complete only if force was used. Leave type as not applicable if none." />
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="FORCE TYPE" />
+                <ComboBox x:Name="UofTypeCombo" Style="{StaticResource CadComboBox}">
+                    <ComboBoxItem Content="(not applicable)" Tag="" />
+                    <ComboBoxItem Content="Taser" Tag="Taser" />
+                    <ComboBoxItem Content="Baton" Tag="Baton" />
+                    <ComboBoxItem Content="Fist / hands" Tag="Fist" />
+                    <ComboBoxItem Content="Firearm" Tag="Firearm" />
+                    <ComboBoxItem Content="Other" Tag="Other" />
+                </ComboBox>
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="OTHER (SPECIFY)" />
+                <TextBox x:Name="UofTypeOtherBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <TextBlock Text="JUSTIFICATION" Style="{StaticResource CadFieldLabel}" Margin="0,4,0,2" />
+            <TextBox x:Name="UofJustificationBox"
+                     MinHeight="56"
                      AcceptsReturn="True"
-                     AcceptsTab="True"
                      Style="{StaticResource CadTextBoxCadField}"
-                     FontFamily="Consolas"
-                     FontSize="11"
+                     TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto" />
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,4">
+                <CheckBox x:Name="UofInjurySuspectCheck" Content="Injury to subject" Margin="0,0,16,0" Foreground="{StaticResource CadText}" />
+                <CheckBox x:Name="UofInjuryOfficerCheck" Content="Injury to officer" Foreground="{StaticResource CadText}" />
+            </StackPanel>
+            <TextBlock Text="WITNESSES" Style="{StaticResource CadFieldLabel}" Margin="0,4,0,2" />
+            <TextBox x:Name="UofWitnessesBox"
+                     MinHeight="44"
+                     AcceptsReturn="True"
+                     Style="{StaticResource CadTextBoxCadField}"
                      TextWrapping="Wrap"
                      VerticalScrollBarVisibility="Auto" />
         </StackPanel>

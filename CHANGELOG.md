@@ -8,12 +8,16 @@ All notable changes to MDT Pro are documented here.
 
 ## Native Windows client (`native/` folder)
 
-Optional **WPF** companion app (not bundled in the LSPDFR OIV). Uses the same `http://host:port/` and `ws://host:port/ws` endpoints as the browser MDT. **Reports** are edited only in **native** structured forms plus a JSON tab (same `/post/create*Report` contracts as the web UI — no embedded reports WebView).
+Optional **WPF** companion app (not bundled in the LSPDFR OIV). Uses the same `http://host:port/` and `ws://host:port/ws` endpoints as the browser MDT. **Reports** are edited only in **native** structured forms (same `/post/create*Report` contracts as the web UI — no embedded reports WebView, no raw JSON editors in the UI).
 
 ### Added — 2026-03-29
 
-- **Shell**: CAD-style navigation — Dashboard (callouts, set GPS waypoint), Person search, Vehicle search (incl. nearby), Firearms, BOLO (add/remove, optional auto-refresh), **Reports** (native FORM + JSON for all types, same save APIs as web), Shift/Court, **Map** (native tactical position readout), Officer profile (load/save via `officerInformationData`).
+- **Shell**: CAD-style navigation — Dashboard (callouts, set GPS waypoint), Person search, Vehicle search (incl. nearby), Firearms, BOLO (add/remove, optional auto-refresh), **Reports** (native structured forms for all types, same save APIs as web), Shift/Court, **Map** (native tactical position readout), Officer profile (load/save via `officerInformationData`).
 - **Client library**: `MdtHttpClient` POST helpers for `/data/*` and `/post/*`; `MdtConnectionManager` centralizes WebSocket streams.
+
+### Changed — 2026-03-30
+
+- **Native MDT (WPF)** — Citation and arrest **charges** are edited in a grid (add/remove rows) instead of a JSON text area. Arrest **use of force** uses labeled fields (type, justification, injuries, witnesses). Property/evidence **seized substances** use a grid (type + quantity). Dashboard **callout detail** uses dispatch-style labels (CALL, LOCATION, GRID REF, NARRATIVE) instead of a monospace property dump. Traffic incident party/plate lists use standard field typography (not code-style mono). Officer/settings copy no longer refers to “JSON” in the UI.
 
 ---
 

@@ -22,9 +22,9 @@
             <DockPanel LastChildFill="True">
                 <TextBlock DockPanel.Dock="Top" Text="CALLOUT DETAIL" Style="{StaticResource CadSectionTitle}" Margin="0,0,0,8" />
                 <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="{StaticResource CadMuted}" FontSize="11" Margin="0,0,0,8"
-                           Text="Native readout of the selected callout payload. Accept / en route and other callout-interface actions remain in-game (no programmatic API)." />
+                           Text="Structured readout for the selected call. Accept, en route, and scene actions stay in-game (no API)." />
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <TextBlock x:Name="DetailText" TextWrapping="Wrap" FontFamily="{StaticResource CadFontMono}" FontSize="12" Foreground="{StaticResource CadText}" />
+                    <TextBlock x:Name="DetailText" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource CadText}" />
                 </ScrollViewer>
             </DockPanel>
         </Border>
