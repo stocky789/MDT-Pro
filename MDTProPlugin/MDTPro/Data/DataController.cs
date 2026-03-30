@@ -606,15 +606,12 @@ namespace MDTPro.Data {
                 Helper.Log("Failed to get nearby vehicles; Invalid player", true, Helper.LogSeverity.Error);
                 return;
             }
-            Vehicle[] nearbyVehicles = Main.Player.GetNearbyVehicles(SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles);
-            bool haveNearbyScan = nearbyVehicles != null && nearbyVehicles.Length > 0;
             lock (_vehicleDbLock) {
                 int limit = SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles * SetupController.GetConfig().databaseLimitMultiplier;
-                // Do not evict when the scan is empty (common when alt-tabbed); we'd drop live rows with no replacements.
-                if (haveNearbyScan && vehicleDatabase.Count > limit) {
+                if (vehicleDatabase.Count > limit) {
                     List<MDTProVehicleData> keysToRemove = vehicleDatabase.Take(SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles).ToList();
                     foreach (MDTProVehicleData key in keysToRemove) {
-                        if (keepInVehicleDatabase.Any(x => string.Equals(x.LicensePlate, key.LicensePlate, StringComparison.OrdinalIgnoreCase))) continue;
+                        if (keepInVehicleDatabase.Any(x => x.LicensePlate == key.LicensePlate)) continue;
                         vehicleDatabase.Remove(key);
                     }
                 }
@@ -628,14 +625,14 @@ namespace MDTPro.Data {
                     if (mdtProVehicleData == null || string.IsNullOrWhiteSpace(mdtProVehicleData.LicensePlate)) continue;
                     bool exists;
                     lock (_vehicleDbLock) {
-                        exists = vehicleDatabase.Any(x => string.Equals(x.LicensePlate, mdtProVehicleData.LicensePlate, StringComparison.OrdinalIgnoreCase));
+                        exists = vehicleDatabase.Any(x => x.LicensePlate == mdtProVehicleData.LicensePlate);
                     }
                     if (exists) continue;
                     bool persistVehicleReEncounterSql = !ModIntegration.SubscribedStopThePedStopEvents;
                     TryApplyReEncounterVehicleProfile(mdtProVehicleData, v, persistVehicleReEncounterSql);
                     MergeBOLOsFromStubByPlate(mdtProVehicleData);
                     lock (_vehicleDbLock) {
-                        if (vehicleDatabase.Any(x => string.Equals(x.LicensePlate, mdtProVehicleData.LicensePlate, StringComparison.OrdinalIgnoreCase))) continue;
+                        if (vehicleDatabase.Any(x => x.LicensePlate == mdtProVehicleData.LicensePlate)) continue;
                         vehicleDatabase.Add(mdtProVehicleData);
                     }
                 } catch (Exception ex) {
@@ -789,12 +786,14 @@ namespace MDTPro.Data {
         internal static MDTProVehicleData GetVehicleByPlateOrVin(string plateOrVin) {
             if (string.IsNullOrWhiteSpace(plateOrVin)) return null;
             string key = plateOrVin.Trim();
-            string normPlate = NormalizeVehiclePlateKey(key);
-            string normVin = NormalizeVinKey(key);
             lock (_vehicleDbLock) {
-                var v = vehicleDatabase.FirstOrDefault(x => VehicleMatchesPlateOrVin(x, key, normPlate, normVin));
+                var v = vehicleDatabase.FirstOrDefault(x =>
+                    string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(x.VehicleIdentificationNumber, key, StringComparison.OrdinalIgnoreCase));
                 if (v != null) return v;
-                return keepInVehicleDatabase.FirstOrDefault(x => VehicleMatchesPlateOrVin(x, key, normPlate, normVin));
+                return keepInVehicleDatabase.FirstOrDefault(x =>
+                    string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(x.VehicleIdentificationNumber, key, StringComparison.OrdinalIgnoreCase));
             }
         }
 

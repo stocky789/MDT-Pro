@@ -101,8 +101,6 @@ namespace MDTPro.ServerAPI {
                 string licensePlateOrVin = Helper.GetRequestBodyAsString(req);
                 if (!string.IsNullOrEmpty(licensePlateOrVin)) licensePlateOrVin = licensePlateOrVin.Trim();
 
-                DataController.PrepareVehicleLookupForHttpBlocking();
-
                 MDTProVehicleData vehicleData = null;
                 bool wantContextOnly = string.Equals(licensePlateOrVin, "context", StringComparison.OrdinalIgnoreCase)
                     || licensePlateOrVin == "%context"
