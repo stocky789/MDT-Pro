@@ -295,6 +295,8 @@ namespace MDTPro.Data {
         /// <summary>Cached on game thread for /data/nearbyVehicles so the HTTP handler never touches game entities.</summary>
         internal static List<CachedNearbyVehicleEntry> CachedNearbyVehicles = new List<CachedNearbyVehicleEntry>();
         private static readonly object _cachedNearbyLock = new object();
+        /// <summary>Serializes HTTP <c>/data/nearbyVehicles</c> refreshes so concurrent native/browser requests do not interleave Populate/Update on overlapping game fibers.</summary>
+        private static readonly object _httpNearbyRefreshLock = new object();
         internal struct CachedNearbyVehicleEntry {
             public string LicensePlate;
             public string ModelDisplayName;
@@ -348,11 +350,13 @@ namespace MDTPro.Data {
         }
 
         /// <summary>HTTP <c>/data/nearbyVehicles</c>: rescan world vehicles and rebuild distance cache on the game fiber so native/browser lists are not stuck on a stale 1s/10s tick.</summary>
-        internal static void PrepareNearbyVehiclesForHttpBlocking(int timeoutMs = 2000) {
-            RunShortGameFiberBlocking(() => {
-                PopulateVehicleDatabase();
-                UpdateCachedNearbyVehicles();
-            }, timeoutMs, "mdtpro-http-nearby");
+        internal static void PrepareNearbyVehiclesForHttpBlocking(int timeoutMs = 5000) {
+            lock (_httpNearbyRefreshLock) {
+                RunShortGameFiberBlocking(() => {
+                    PopulateVehicleDatabase();
+                    UpdateCachedNearbyVehicles();
+                }, timeoutMs, "mdtpro-http-nearby");
+            }
         }
 
         /// <summary>HTTP <c>/data/specificVehicle</c>: rescan nearby world vehicles before lookup so plates not yet in <see cref="vehicleDatabase"/> (10s tick) still resolve.</summary>
@@ -362,6 +366,7 @@ namespace MDTPro.Data {
 
         private static void UpdateCachedNearbyVehicles() {
             var list = new List<CachedNearbyVehicleEntry>();
+            int withDist = 0;
             if (Main.Player != null && Main.Player.Exists()) {
                 lock (_vehicleDbLock) {
                     foreach (var v in vehicleDatabase) {
@@ -371,6 +376,7 @@ namespace MDTPro.Data {
                             if (v.Holder != null && v.Holder.Exists())
                                 dist = (float?)Math.Round(Main.Player.DistanceTo(v.Holder), 1);
                         } catch { }
+                        if (dist != null) withDist++;
                         list.Add(new CachedNearbyVehicleEntry {
                             LicensePlate = v.LicensePlate,
                             ModelDisplayName = v.ModelDisplayName,
@@ -382,6 +388,10 @@ namespace MDTPro.Data {
                 list.Sort((a, b) => (a.Distance ?? float.MaxValue).CompareTo(b.Distance ?? float.MaxValue));
             }
             lock (_cachedNearbyLock) {
+                // When the game is unfocused/paused, entity reads often yield no distances; every row ties at MaxValue
+                // and Take(N) becomes arbitrary — keep the last good snapshot instead of flashing stale/random plates.
+                if (withDist == 0 && list.Count > 0 && CachedNearbyVehicles != null && CachedNearbyVehicles.Count > 0)
+                    return;
                 CachedNearbyVehicles = list;
             }
         }
@@ -417,17 +427,21 @@ namespace MDTPro.Data {
                 Helper.Log("Failed to get nearby vehicles; Invalid player", true, Helper.LogSeverity.Error);
                 return;
             }
+            Vehicle[] nearbyVehicles = Main.Player.GetNearbyVehicles(SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles);
+            bool haveNearbyScan = nearbyVehicles != null && nearbyVehicles.Length > 0;
             lock (_vehicleDbLock) {
                 int limit = SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles * SetupController.GetConfig().databaseLimitMultiplier;
-                if (vehicleDatabase.Count > limit) {
+                // Do not evict when the scan is empty (common when alt-tabbed); we'd drop live rows with no replacements.
+                if (haveNearbyScan && vehicleDatabase.Count > limit) {
                     List<MDTProVehicleData> keysToRemove = vehicleDatabase.Take(SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles).ToList();
                     foreach (MDTProVehicleData key in keysToRemove) {
-                        if (keepInVehicleDatabase.Any(x => x.LicensePlate == key.LicensePlate)) continue;
+                        if (keepInVehicleDatabase.Any(x => string.Equals(x.LicensePlate, key.LicensePlate, StringComparison.OrdinalIgnoreCase))) continue;
                         vehicleDatabase.Remove(key);
                     }
                 }
             }
-            Vehicle[] nearbyVehicles = Main.Player.GetNearbyVehicles(SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles);
+            if (!haveNearbyScan)
+                return;
             for (int i = 0; i < nearbyVehicles.Length; i++) {
                 Vehicle v = nearbyVehicles[i];
                 if (v == null || !v.Exists()) continue;
@@ -436,13 +450,13 @@ namespace MDTPro.Data {
                     if (mdtProVehicleData == null || mdtProVehicleData.LicensePlate == null) continue;
                     bool exists;
                     lock (_vehicleDbLock) {
-                        exists = vehicleDatabase.Any(x => x.LicensePlate == mdtProVehicleData.LicensePlate);
+                        exists = vehicleDatabase.Any(x => string.Equals(x.LicensePlate, mdtProVehicleData.LicensePlate, StringComparison.OrdinalIgnoreCase));
                     }
                     if (exists) continue;
                     TryApplyReEncounterVehicleProfile(mdtProVehicleData, v);
                     MergeBOLOsFromStubByPlate(mdtProVehicleData);
                     lock (_vehicleDbLock) {
-                        if (vehicleDatabase.Any(x => x.LicensePlate == mdtProVehicleData.LicensePlate)) continue;
+                        if (vehicleDatabase.Any(x => string.Equals(x.LicensePlate, mdtProVehicleData.LicensePlate, StringComparison.OrdinalIgnoreCase))) continue;
                         vehicleDatabase.Add(mdtProVehicleData);
                     }
                 } catch (Exception ex) {
@@ -552,15 +566,6 @@ namespace MDTPro.Data {
         }
 
         private static void SetVehicleDatabase() {
-            lock (_vehicleDbLock) {
-                if (vehicleDatabase.Count > SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles * SetupController.GetConfig().databaseLimitMultiplier) {
-                    List<MDTProVehicleData> keysToRemove = vehicleDatabase.Take(SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles).ToList();
-                    foreach (MDTProVehicleData key in keysToRemove) {
-                        if (keepInVehicleDatabase.Any(x => x.LicensePlate == key.LicensePlate)) continue;
-                        vehicleDatabase.Remove(key);
-                    }
-                }
-            }
             PopulateVehicleDatabase();
         }
 
@@ -6318,8 +6323,16 @@ namespace MDTPro.Data {
         private static OfficerInformationData GetOfficerInformation() {
             LSPD_First_Response.Engine.Scripting.Entities.Persona persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(Main.Player);
 
+            string scriptName = null;
+            try {
+                scriptName = LSPD_First_Response.Mod.API.Functions.GetCurrentAgencyScriptName();
+            } catch {
+                /* ignore */
+            }
+
             OfficerInformationData result = new OfficerInformationData {
-                agency = Helper.GetAgencyNameFromScriptName(LSPD_First_Response.Mod.API.Functions.GetCurrentAgencyScriptName()) ?? LSPD_First_Response.Mod.API.Functions.GetCurrentAgencyScriptName(),
+                agency = Helper.GetAgencyNameFromScriptName(scriptName) ?? scriptName,
+                agencyScriptName = scriptName,
                 firstName = persona.Forename,
                 lastName = persona.Surname,
                 callSign = DependencyCheck.IsIPTCommonAvailable() ? Helper.GetCallSignFromIPTCommon() : null

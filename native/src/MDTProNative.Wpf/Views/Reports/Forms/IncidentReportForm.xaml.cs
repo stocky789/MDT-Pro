@@ -1,7 +1,7 @@
 using System.Globalization;
+using System.Windows;
 using System.Windows.Controls;
 using MDTProNative.Wpf.Services;
-using MDTProNative.Wpf.Views.Reports;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -9,8 +9,10 @@ namespace MDTProNative.Wpf.Views.Reports.Forms;
 
 public partial class IncidentReportForm : UserControl, IReportFormPane
 {
+    const string TitleKey = "incidentTitle";
+    const string DefaultDocTitle = "General Incident Report (IR)";
+
     JObject? _source;
-    MdtConnectionManager? _connection;
 
     public IncidentReportForm()
     {
@@ -24,9 +26,22 @@ public partial class IncidentReportForm : UserControl, IReportFormPane
         };
         StatusCombo.SelectedIndex = 1;
         ClearFormBtn.Click += (_, _) => Clear();
+        ExportPdfBtn.Click += (_, _) =>
+            ReportDocumentBrandingHelper.PrintToPdf(DocumentBodyScroll, DocumentPrintRoot,
+                "MDT Incident " + (IdBox.Text.Trim().Length > 0 ? IdBox.Text.Trim() : "report"));
+        ReportDocumentBrandingHelper.ApplyChrome(null, TitleKey, DefaultDocTitle, DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
     }
 
-    public void Bind(MdtConnectionManager? connection) => _connection = connection;
+    public void Bind(MdtConnectionManager? connection)
+    {
+        if (connection?.Http == null)
+        {
+            ReportDocumentBrandingHelper.ApplyChrome(null, TitleKey, DefaultDocTitle, DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
+            return;
+        }
+
+        _ = ReportDocumentBrandingHelper.LoadBrandingAsync(connection, "incident", TitleKey, DefaultDocTitle, DocHeader, BrandingTemplateHint, Dispatcher, BrandingFooter);
+    }
 
     public void LoadFromReport(JObject report)
     {
@@ -75,7 +90,7 @@ public partial class IncidentReportForm : UserControl, IReportFormPane
             if (int.TryParse(ShortYearBox.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var sy))
                 o["ShortYear"] = sy;
             else
-                o["ShortYear"] = 0;
+                o["ShortYear"] = combined.Year % 100;
             o["TimeStamp"] = combined;
             o["Status"] = statusIdx;
             o["Notes"] = NotesBox.Text ?? "";

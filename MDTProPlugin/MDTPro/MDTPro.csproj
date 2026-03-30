@@ -108,6 +108,7 @@
     <Compile Include="Data\DrugRecord.cs" />
     <Compile Include="Data\FirearmRecord.cs" />
     <Compile Include="Data\MDTProVehicleData.cs" />
+    <Compile Include="Utility\GtaVVehicleMakeModelCatalog.cs" />
     <Compile Include="Data\OfficerInformationData.cs" />
     <Compile Include="Data\Reports\ArrestReport.cs" />
     <Compile Include="Data\Reports\CitationReport.cs" />
@@ -141,6 +142,7 @@
     <Compile Include="ServerAPI\StyleAPIResponse.cs" />
     <Compile Include="ServerAPI\WebSocketHandler.cs" />
     <Compile Include="Utility\Helper.cs" />
+    <Compile Include="Utility\ReportBrandingResolver.cs" />
     <Compile Include="Utility\RageNotification.cs" />
     <Compile Include="Utility\UpdateChecker.cs" />
     <Compile Include="Main.cs" />
@@ -177,6 +179,7 @@
     <Compile Include="UI\SettingsMenu.cs" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Data\GtaVVehicleMakeModel.json" />
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

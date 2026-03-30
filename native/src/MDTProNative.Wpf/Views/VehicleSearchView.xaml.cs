@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using MDTProNative.Wpf.Helpers;
 using MDTProNative.Wpf.Services;
+using MDTProNative.Wpf.Views.Controls;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -22,11 +23,13 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
     };
 
     MdtConnectionManager? _connection;
+    bool _layoutPersistWired;
     int _searchGen;
     JObject? _currentVehicle;
     public VehicleSearchView()
     {
         InitializeComponent();
+        Loaded += OnVehicleSearchLoaded;
         NearbyList.DisplayMemberPath = nameof(NearbyRow.Display);
         HistoryList.DisplayMemberPath = nameof(HistoryRow.Display);
         SearchBtn.Click += async (_, _) => await SearchAsync(QueryBox.Text);
@@ -51,6 +54,13 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
         ClearVehHistoryBtn.Click += async (_, _) => await ClearVehicleHistoryAsync();
     }
 
+    void OnVehicleSearchLoaded(object sender, RoutedEventArgs e)
+    {
+        if (_layoutPersistWired) return;
+        _layoutPersistWired = true;
+        UiLayoutHooks.WireVehicleSearch(this);
+    }
+
     Brush R(string key) => (Brush)FindResource(key);
 
     public void Bind(MdtConnectionManager? connection)
@@ -70,8 +80,11 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
 
     async Task LoadSidebarsAsync()
     {
-        await LoadNearbyAsync();
-        await LoadHistoryAsync();
+        await MdtBusyUi.RunAsync(ModuleBusy, "VEHICLE MDC", "Scanning nearby units and search history…", async () =>
+        {
+            await LoadNearbyAsync();
+            await LoadHistoryAsync();
+        });
     }
 
     async Task LoadNearbyAsync()
@@ -186,76 +199,79 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
             return;
         }
 
-        var gen = ++_searchGen;
-        JObject? veh = null;
-        try
+        await MdtBusyUi.RunAsync(ModuleBusy, "TRAFFIC / DMV QUERY", "Accessing motor vehicle records…", async () =>
         {
-            // Match browser MDT: vehicleSearch.js posts the raw plate/VIN string.
-            var (status, text) = await http.PostAsync("data/specificVehicle", query).ConfigureAwait(false);
-            if (gen != _searchGen) return;
-            if (status != HttpStatusCode.OK)
+            var gen = ++_searchGen;
+            JObject? veh = null;
+            try
+            {
+                // Match browser MDT: vehicleSearch.js posts the raw plate/VIN string.
+                var (status, text) = await http.PostAsync("data/specificVehicle", query).ConfigureAwait(false);
+                if (gen != _searchGen) return;
+                if (status != HttpStatusCode.OK)
+                {
+                    await Dispatcher.InvokeAsync(() =>
+                        MessageBox.Show(
+                            $"Vehicle search failed ({(int)status}).\n\n{text}",
+                            "Vehicle search",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning));
+                    return;
+                }
+
+                var t = (text ?? "").Trim();
+                if (string.IsNullOrEmpty(t) || t.Equals("null", StringComparison.OrdinalIgnoreCase))
+                    veh = null;
+                else
+                    veh = JToken.Parse(t) as JObject;
+            }
+            catch (Exception ex)
             {
                 await Dispatcher.InvokeAsync(() =>
                     MessageBox.Show(
-                        $"Vehicle search failed ({(int)status}).\n\n{text}",
+                        "Could not read vehicle search response.\n\n" + ex.Message,
                         "Vehicle search",
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning));
                 return;
             }
 
-            var t = (text ?? "").Trim();
-            if (string.IsNullOrEmpty(t) || t.Equals("null", StringComparison.OrdinalIgnoreCase))
-                veh = null;
-            else
-                veh = JToken.Parse(t) as JObject;
-        }
-        catch (Exception ex)
-        {
-            await Dispatcher.InvokeAsync(() =>
-                MessageBox.Show(
-                    "Could not read vehicle search response.\n\n" + ex.Message,
-                    "Vehicle search",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning));
-            return;
-        }
+            if (gen != _searchGen) return;
 
-        if (gen != _searchGen) return;
-
-        if (veh == null)
-        {
-            await Dispatcher.InvokeAsync(() =>
-                MessageBox.Show("Vehicle not found.", "Vehicle search", MessageBoxButton.OK, MessageBoxImage.Information));
-            return;
-        }
-
-        var plate = veh["LicensePlate"]?.ToString()?.Trim() ?? "";
-        JArray? searchRec = null;
-        JArray? impound = null;
-        if (!string.IsNullOrWhiteSpace(plate))
-        {
-            try
+            if (veh == null)
             {
-                var (_, sr) = await http.PostAsync("data/vehicleSearchByPlate", JsonConvert.SerializeObject(plate)).ConfigureAwait(false);
-                if (gen != _searchGen) return;
-                if (!string.IsNullOrWhiteSpace(sr) && sr.TrimStart().StartsWith('['))
-                    searchRec = JArray.Parse(sr);
+                await Dispatcher.InvokeAsync(() =>
+                    MessageBox.Show("Vehicle not found.", "Vehicle search", MessageBoxButton.OK, MessageBoxImage.Information));
+                return;
             }
-            catch { /* optional */ }
 
-            try
+            var plate = veh["LicensePlate"]?.ToString()?.Trim() ?? "";
+            JArray? searchRec = null;
+            JArray? impound = null;
+            if (!string.IsNullOrWhiteSpace(plate))
             {
-                var (_, ir) = await http.PostAsync("data/impoundReportsByPlate", JsonConvert.SerializeObject(plate)).ConfigureAwait(false);
-                if (gen != _searchGen) return;
-                if (!string.IsNullOrWhiteSpace(ir) && ir.TrimStart().StartsWith('['))
-                    impound = JArray.Parse(ir);
-            }
-            catch { /* optional */ }
-        }
+                try
+                {
+                    var (_, sr) = await http.PostAsync("data/vehicleSearchByPlate", JsonConvert.SerializeObject(plate)).ConfigureAwait(false);
+                    if (gen != _searchGen) return;
+                    if (!string.IsNullOrWhiteSpace(sr) && sr.TrimStart().StartsWith('['))
+                        searchRec = JArray.Parse(sr);
+                }
+                catch { /* optional */ }
 
-        if (gen != _searchGen) return;
-        await Dispatcher.InvokeAsync(() => RenderVehicle(veh, searchRec, impound));
+                try
+                {
+                    var (_, ir) = await http.PostAsync("data/impoundReportsByPlate", JsonConvert.SerializeObject(plate)).ConfigureAwait(false);
+                    if (gen != _searchGen) return;
+                    if (!string.IsNullOrWhiteSpace(ir) && ir.TrimStart().StartsWith('['))
+                        impound = JArray.Parse(ir);
+                }
+                catch { /* optional */ }
+            }
+
+            if (gen != _searchGen) return;
+            await Dispatcher.InvokeAsync(() => RenderVehicle(veh, searchRec, impound));
+        });
     }
 
     void RenderVehicle(JObject v, JArray? searchRecords, JArray? impoundRows)
@@ -278,22 +294,28 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
         }
 
         DetailPanel.Children.Add(SectionTitle("Registration"));
-        DetailPanel.Children.Add(FieldGrid(new (string, string)[]
+        var text = R("CadText");
+        var ok = R("CadSemanticSuccess");
+        var warn = R("CadSemanticWarning");
+        var bad = R("CadSemanticDanger");
+        DetailPanel.Children.Add(FieldGrid(new (string label, string value, Brush valueBrush)[]
         {
-            ("Plate", NativeMdtFormat.Text(v["LicensePlate"])),
-            ("VIN", NativeMdtFormat.Text(v["VehicleIdentificationNumber"])),
-            ("VIN status", NativeMdtFormat.Text(v["VinStatus"])),
-            ("Model", NativeMdtFormat.Text(v["ModelDisplayName"])),
-            ("Make / model", JoinMakeModel(v)),
-            ("Color", NativeMdtFormat.Text(v["Color"])),
-            ("Primary", NativeMdtFormat.Text(v["PrimaryColor"])),
-            ("Secondary", NativeMdtFormat.Text(v["SecondaryColor"])),
-            ("Owner", NativeMdtFormat.Text(v["Owner"])),
-            ("Stolen", NativeMdtFormat.YesNo(v["IsStolen"])),
-            ("Registration", NativeMdtFormat.Text(v["RegistrationStatus"])),
-            ("Reg. expires", NativeMdtFormat.IsoDate(v["RegistrationExpiration"])),
-            ("Insurance", NativeMdtFormat.Text(v["InsuranceStatus"])),
-            ("Ins. expires", NativeMdtFormat.IsoDate(v["InsuranceExpiration"])),
+            ("Plate", NativeMdtFormat.Text(v["LicensePlate"]), text),
+            ("VIN", NativeMdtFormat.Text(v["VehicleIdentificationNumber"]), text),
+            ("VIN status", NativeMdtFormat.Text(v["VinStatus"]), NativeVehicleSearchBrushes.ForVinStatus(v["VinStatus"], text, ok, warn, bad)),
+            ("Model", NativeMdtFormat.Text(v["ModelDisplayName"]), text),
+            ("Make / model", JoinMakeModel(v), text),
+            ("Color", NativeMdtFormat.Text(v["Color"]), text),
+            ("Primary", NativeMdtFormat.Text(v["PrimaryColor"]), text),
+            ("Secondary", NativeMdtFormat.Text(v["SecondaryColor"]), text),
+            ("Owner", NativeMdtFormat.Text(v["Owner"]), text),
+            ("Stolen", NativeMdtFormat.YesNo(v["IsStolen"]), NativeVehicleSearchBrushes.ForVehicleField(v["IsStolen"], text, ok, warn, bad)),
+            ("Registration", NativeMdtFormat.Text(v["RegistrationStatus"]), NativeVehicleSearchBrushes.ForVehicleField(v["RegistrationStatus"], text, ok, warn, bad)),
+            ("Reg. expires", NativeMdtFormat.IsoDate(v["RegistrationExpiration"]),
+                NativeVehicleSearchBrushes.ForExpirationWithPairedStatus(v["RegistrationExpiration"], v["RegistrationStatus"], text, warn, bad)),
+            ("Insurance", NativeMdtFormat.Text(v["InsuranceStatus"]), NativeVehicleSearchBrushes.ForVehicleField(v["InsuranceStatus"], text, ok, warn, bad)),
+            ("Ins. expires", NativeMdtFormat.IsoDate(v["InsuranceExpiration"]),
+                NativeVehicleSearchBrushes.ForExpirationWithPairedStatus(v["InsuranceExpiration"], v["InsuranceStatus"], text, warn, bad)),
         }));
 
         if (v["BOLOs"] is JArray bolos && bolos.Count > 0)
@@ -461,27 +483,31 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
         jo.Remove("CanModifyBOLOs");
         KeepOnlyVehicleModelProperties(jo);
         var json = jo.ToString(Formatting.None);
-        var (status, text) = await http.PostActionAsync("updateVehicleData", json).ConfigureAwait(false);
-        await Dispatcher.InvokeAsync(() =>
+        await MdtBusyUi.RunAsync(ModuleBusy, "VEHICLE RECORD", "Committing update to MDC host…", async () =>
         {
-            if (status == HttpStatusCode.OK && string.Equals(text?.Trim(), "OK", StringComparison.Ordinal))
+            var (status, text) = await http.PostActionAsync("updateVehicleData", json).ConfigureAwait(false);
+            await Dispatcher.InvokeAsync(() =>
             {
-                MessageBox.Show("Vehicle record saved.", "Vehicle search", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
+                if (status == HttpStatusCode.OK && string.Equals(text?.Trim(), "OK", StringComparison.Ordinal))
+                {
+                    CadSaveSound.TryPlay();
+                    MessageBox.Show("Vehicle record saved.", "Vehicle search", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
 
-            if (status == HttpStatusCode.NotFound)
-            {
-                MessageBox.Show(
-                    "The server could not apply this vehicle (vehicle must be in the world near you for HTTP updates, same as in-game MDT).\n\n" + text,
-                    "Vehicle search",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                return;
-            }
+                if (status == HttpStatusCode.NotFound)
+                {
+                    MessageBox.Show(
+                        "The server could not apply this vehicle (vehicle must be in the world near you for HTTP updates, same as in-game MDT).\n\n" + text,
+                        "Vehicle search",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
 
-            MessageBox.Show($"Save failed ({(int)status}).\n\n{text}", "Vehicle search", MessageBoxButton.OK, MessageBoxImage.Warning);
-        });
+                MessageBox.Show($"Save failed ({(int)status}).\n\n{text}", "Vehicle search", MessageBoxButton.OK, MessageBoxImage.Warning);
+            });
+        }, minimumVisibleMs: 720);
     }
 
     static void KeepOnlyVehicleModelProperties(JObject o)
@@ -523,38 +549,46 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
             ModelDisplayName = string.IsNullOrWhiteSpace(modelDisplay) || modelDisplay == "—" ? null : modelDisplay
         });
 
+        string? refreshPlate = null;
         try
         {
-            var (status, text) = await http.PostActionAsync("addBOLO", body).ConfigureAwait(false);
-            await Dispatcher.InvokeAsync(() =>
+            await MdtBusyUi.RunAsync(ModuleBusy, "BOLO NETWORK", "Transmitting BOLO request…", async () =>
             {
-                if (status == HttpStatusCode.OK)
+                var (status, text) = await http.PostActionAsync("addBOLO", body).ConfigureAwait(false);
+                await Dispatcher.InvokeAsync(() =>
                 {
-                    try
+                    if (status == HttpStatusCode.OK)
                     {
-                        var jo = JObject.Parse(text);
-                        if (jo.Value<bool?>("success") == true)
+                        try
                         {
-                            MdtShellEvents.LogCad("BOLO added.");
-                            _ = SearchAsync(plate);
-                            return;
-                        }
+                            var jo = JObject.Parse(text);
+                            if (jo.Value<bool?>("success") == true)
+                            {
+                                CadSaveSound.TryPlay();
+                                MdtShellEvents.LogCad("BOLO added.");
+                                refreshPlate = plate;
+                                return;
+                            }
 
-                        MessageBox.Show(jo["error"]?.ToString() ?? text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            MessageBox.Show(jo["error"]?.ToString() ?? text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        }
+                        catch
+                        {
+                            MdtShellEvents.LogCad("BOLO: " + text);
+                        }
                     }
-                    catch
-                    {
-                        MdtShellEvents.LogCad("BOLO: " + text);
-                    }
-                }
-                else
-                    MessageBox.Show(text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
-            });
+                    else
+                        MessageBox.Show(text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
+                });
+            }, minimumVisibleMs: 420);
         }
         catch (Exception ex)
         {
             await Dispatcher.InvokeAsync(() => MessageBox.Show(ex.Message, "BOLO", MessageBoxButton.OK, MessageBoxImage.Error));
         }
+
+        if (!string.IsNullOrEmpty(refreshPlate))
+            await SearchAsync(refreshPlate);
     }
 
     async Task TryRemoveBoloAsync(string plate, string reason)
@@ -562,38 +596,45 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
         var http = _connection?.Http;
         if (http == null) return;
         var body = JsonConvert.SerializeObject(new { LicensePlate = plate.Trim(), Reason = reason });
+        string? refreshPlate = null;
         try
         {
-            var (status, text) = await http.PostActionAsync("removeBOLO", body).ConfigureAwait(false);
-            await Dispatcher.InvokeAsync(() =>
+            await MdtBusyUi.RunAsync(ModuleBusy, "BOLO NETWORK", "Clearing BOLO entry…", async () =>
             {
-                if (status == HttpStatusCode.OK)
+                var (status, text) = await http.PostActionAsync("removeBOLO", body).ConfigureAwait(false);
+                await Dispatcher.InvokeAsync(() =>
                 {
-                    try
+                    if (status == HttpStatusCode.OK)
                     {
-                        var jo = JObject.Parse(text);
-                        if (jo.Value<bool?>("success") == true)
+                        try
                         {
-                            MdtShellEvents.LogCad("BOLO removed.");
-                            _ = SearchAsync(plate);
-                            return;
-                        }
+                            var jo = JObject.Parse(text);
+                            if (jo.Value<bool?>("success") == true)
+                            {
+                                MdtShellEvents.LogCad("BOLO removed.");
+                                refreshPlate = plate;
+                                return;
+                            }
 
-                        MessageBox.Show(jo["error"]?.ToString() ?? text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            MessageBox.Show(jo["error"]?.ToString() ?? text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        }
+                        catch
+                        {
+                            MdtShellEvents.LogCad("BOLO remove: " + text);
+                        }
                     }
-                    catch
-                    {
-                        MdtShellEvents.LogCad("BOLO remove: " + text);
-                    }
-                }
-                else
-                    MessageBox.Show(text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
-            });
+                    else
+                        MessageBox.Show(text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
+                });
+            }, minimumVisibleMs: 420);
         }
         catch (Exception ex)
         {
             await Dispatcher.InvokeAsync(() => MessageBox.Show(ex.Message, "BOLO", MessageBoxButton.OK, MessageBoxImage.Error));
         }
+
+        if (!string.IsNullOrEmpty(refreshPlate))
+            await SearchAsync(refreshPlate);
     }
 
     Border BoloRow(JObject b)
@@ -658,10 +699,18 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
 
     Grid FieldGrid((string label, string value)[] rows)
     {
+        var t = R("CadText");
+        var withBrush = new (string label, string value, Brush valueBrush)[rows.Length];
+        for (var i = 0; i < rows.Length; i++)
+            withBrush[i] = (rows[i].label, rows[i].value, t);
+        return FieldGrid(withBrush);
+    }
+
+    Grid FieldGrid((string label, string value, Brush valueBrush)[] rows)
+    {
         var g = new Grid { Margin = new Thickness(0, 0, 0, 8) };
         g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
         g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        var text = R("CadText");
         var r = 0;
         foreach (var row in rows)
         {
@@ -677,7 +726,7 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
             var val = new TextBlock
             {
                 Text = row.value,
-                Foreground = text,
+                Foreground = row.valueBrush,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 3, 0, 3)
             };

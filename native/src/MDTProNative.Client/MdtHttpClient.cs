@@ -60,6 +60,37 @@ public sealed class MdtHttpClient : IDisposable
         return string.IsNullOrWhiteSpace(text) ? null : JObject.Parse(text);
     }
 
+    /// <summary>Property/evidence receipt dropdowns (drug types, quantities, firearm types); same payload as browser <c>/seizureOptions</c>.</summary>
+    public async Task<JObject?> GetSeizureOptionsJsonAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _http.GetAsync("seizureOptions", cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) return null;
+        var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        return string.IsNullOrWhiteSpace(text) ? null : JObject.Parse(text);
+    }
+
+    /// <summary>Arrest report charge groups (same root array as browser <c>/arrestOptions</c>).</summary>
+    public async Task<JArray?> GetArrestOptionsJsonAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _http.GetAsync("arrestOptions", cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) return null;
+        var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var t = JToken.Parse(text);
+        return t as JArray;
+    }
+
+    /// <summary>Citation report charge groups (same root array as browser <c>/citationOptions</c>).</summary>
+    public async Task<JArray?> GetCitationOptionsJsonAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _http.GetAsync("citationOptions", cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) return null;
+        var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var t = JToken.Parse(text);
+        return t as JArray;
+    }
+
     public async Task<JToken?> GetDataJsonAsync(string dataPath, CancellationToken cancellationToken = default)
     {
         var rel = "data/" + dataPath.TrimStart('/');

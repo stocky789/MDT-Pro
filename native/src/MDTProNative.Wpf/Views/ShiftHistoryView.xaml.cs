@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using MDTProNative.Wpf.Helpers;
 using MDTProNative.Wpf.Services;
+using MDTProNative.Wpf.Views.Controls;
 using Newtonsoft.Json.Linq;
 
 namespace MDTProNative.Wpf.Views;
@@ -9,13 +11,22 @@ namespace MDTProNative.Wpf.Views;
 public partial class ShiftHistoryView : UserControl, IMdtBoundView
 {
     MdtConnectionManager? _connection;
+    bool _layoutPersistWired;
     List<ShiftRow> _shifts = [];
 
     public ShiftHistoryView()
     {
         InitializeComponent();
+        Loaded += OnShiftHistoryLoaded;
         ShiftList.DisplayMemberPath = nameof(ShiftRow.Display);
         RefreshShiftsBtn.Click += async (_, _) => await LoadShiftsAsync();
+    }
+
+    void OnShiftHistoryLoaded(object sender, RoutedEventArgs e)
+    {
+        if (_layoutPersistWired) return;
+        _layoutPersistWired = true;
+        UiLayoutHooks.WireShiftHistory(this);
     }
 
     public void Bind(MdtConnectionManager? connection)
@@ -37,6 +48,8 @@ public partial class ShiftHistoryView : UserControl, IMdtBoundView
     {
         var http = _connection?.Http;
         if (http == null) return;
+        await MdtBusyUi.RunAsync(ModuleBusy, "SHIFT HISTORY", "Retrieving past duty records…", async () =>
+        {
         try
         {
             var tok = await http.GetDataJsonAsync("shiftHistory").ConfigureAwait(false);
@@ -72,6 +85,7 @@ public partial class ShiftHistoryView : UserControl, IMdtBoundView
                 ShiftDetailText.Text = "Could not load shift history.";
             });
         }
+        });
     }
 
     static DateTime? ParseTime(JToken? t)
@@ -119,8 +133,8 @@ public partial class ShiftHistoryView : UserControl, IMdtBoundView
         {
             get
             {
-                var a = Start?.ToString("g", CultureInfo.CurrentCulture) ?? "—";
-                var b = End?.ToString("g", CultureInfo.CurrentCulture) ?? "open";
+                var a = Start.HasValue ? NativeMdtFormat.FormatDateTimeDisplay(Start.Value) : "—";
+                var b = End.HasValue ? NativeMdtFormat.FormatDateTimeDisplay(End.Value) : "open";
                 return $"{a}  →  {b}  ·  {ReportIds.Count} rpt";
             }
         }

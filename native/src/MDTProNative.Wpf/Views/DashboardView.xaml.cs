@@ -11,14 +11,23 @@ namespace MDTProNative.Wpf.Views;
 public partial class DashboardView : UserControl, IMdtBoundView
 {
     MdtConnectionManager? _connection;
+    bool _layoutPersistWired;
     JArray? _lastCallouts;
     readonly System.Collections.ObjectModel.ObservableCollection<string> _lines = new();
 
     public DashboardView()
     {
         InitializeComponent();
+        Loaded += OnDashboardLoaded;
         CalloutList.ItemsSource = _lines;
         _lines.Add("— Not connected —");
+    }
+
+    void OnDashboardLoaded(object sender, RoutedEventArgs e)
+    {
+        if (_layoutPersistWired) return;
+        _layoutPersistWired = true;
+        UiLayoutHooks.WireDashboard(this);
     }
 
     public void Bind(MdtConnectionManager? connection)

@@ -1,7 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
+using MDTProNative.Client;
+using MDTProNative.Wpf.Helpers;
 using MDTProNative.Wpf.Services;
 using MDTProNative.Wpf.Views.Reports;
 using Newtonsoft.Json.Linq;
@@ -13,6 +17,9 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
     sealed record StatusPick(int Value, string Label);
 
     readonly ObservableCollection<ArrestChargeRow> _charges = new();
+    readonly List<ArrestChargePickerOption> _arrestChargePickList = new();
+    MdtConnectionManager? _connection;
+    bool _suppressArrestChargePick;
 
     public ArrestReportForm()
     {
@@ -36,9 +43,67 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
         StatusCombo.SelectedValuePath = nameof(StatusPick.Value);
         StatusCombo.SelectedValue = 3;
         UofTypeCombo.SelectedIndex = 0;
+        ExportPdfBtn.Click += (_, _) =>
+            ReportDocumentBrandingHelper.PrintToPdf(DocumentBodyScroll, DocumentPrintRoot,
+                "MDT Arrest " + (IdBox.Text.Trim().Length > 0 ? IdBox.Text.Trim() : "report"));
+        ReportDocumentBrandingHelper.ApplyChrome(null, "arrestTitle", "Arrest & Booking Report", DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
     }
 
-    public void Bind(MdtConnectionManager? connection) => _ = connection;
+    public void Bind(MdtConnectionManager? connection)
+    {
+        _connection = connection;
+        if (connection?.Http == null)
+        {
+            _arrestChargePickList.Clear();
+            ReportDocumentBrandingHelper.ApplyChrome(null, "arrestTitle", "Arrest & Booking Report", DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
+            return;
+        }
+
+        _ = ReportDocumentBrandingHelper.LoadBrandingAsync(connection, "arrest", "arrestTitle", "Arrest & Booking Report", DocHeader, BrandingTemplateHint, Dispatcher, BrandingFooter);
+        _ = LoadArrestChargePickListAsync(connection.Http);
+    }
+
+    async Task LoadArrestChargePickListAsync(MdtHttpClient http)
+    {
+        try
+        {
+            var arr = await http.GetArrestOptionsJsonAsync().ConfigureAwait(false);
+            var list = ArrestChargePickerOption.ParseGroups(arr);
+            await Dispatcher.InvokeAsync(() =>
+            {
+                _arrestChargePickList.Clear();
+                _arrestChargePickList.AddRange(list);
+                CollectionViewSource.GetDefaultView(_charges).Refresh();
+            });
+        }
+        catch
+        {
+            /* keep list empty; combo remains editable for charge name */
+        }
+    }
+
+    void ArrestChargeCombo_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is ComboBox cb)
+            cb.ItemsSource = _arrestChargePickList;
+    }
+
+    void ArrestChargeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressArrestChargePick) return;
+        if (sender is not ComboBox cb || cb.DataContext is not ArrestChargeRow row) return;
+        if (cb.SelectedItem is not ArrestChargePickerOption opt) return;
+        opt.ApplyTo(row);
+        _suppressArrestChargePick = true;
+        try
+        {
+            cb.SelectedItem = null;
+        }
+        finally
+        {
+            _suppressArrestChargePick = false;
+        }
+    }
 
     public void LoadFromReport(JObject report)
     {
@@ -49,12 +114,14 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
         if (ts == null || ts.Type == JTokenType.Null)
             TimeStampBox.Text = "";
         else if (ts.Type == JTokenType.Date)
-        {
-            var dt = ts.Value<DateTime>();
-            TimeStampBox.Text = dt.ToString("O", CultureInfo.InvariantCulture);
-        }
+            TimeStampBox.Text = NativeMdtFormat.FormatDateTimeDisplay(ts.Value<DateTime>());
         else
-            TimeStampBox.Text = ts.ToString();
+        {
+            var s = ts.ToString();
+            TimeStampBox.Text = NativeMdtFormat.TryParseMdtDateTime(s, out var parsed)
+                ? NativeMdtFormat.FormatDateTimeDisplay(parsed)
+                : s;
+        }
 
         var st = report["Status"]?.Value<int?>();
         if (st is >= 0 and <= 3)
@@ -156,13 +223,9 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
             shortYear = DateTime.Now.Year % 100;
 
         var tsText = TimeStampBox.Text.Trim();
-        DateTime timeStamp;
-        if (string.IsNullOrEmpty(tsText)
-            || !DateTime.TryParse(tsText, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out timeStamp))
-        {
-            if (!DateTime.TryParse(tsText, out timeStamp))
-                timeStamp = DateTime.Now;
-        }
+        var timeStamp = string.IsNullOrEmpty(tsText) || !NativeMdtFormat.TryParseMdtDateTime(tsText, out var parsedTs)
+            ? DateTime.Now
+            : parsedTs;
 
         int? badge = null;
         var badgeTxt = OfficerBadgeBox.Text.Trim();
@@ -233,7 +296,7 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
     public void Clear()
     {
         IdBox.Text = ShortYearBox.Text = "";
-        TimeStampBox.Text = DateTime.Now.ToString("O", CultureInfo.InvariantCulture);
+        TimeStampBox.Text = NativeMdtFormat.FormatDateTimeDisplay(DateTime.Now);
         StatusCombo.SelectedValue = 3;
         NotesBox.Text = "";
         OfficerFirstBox.Text = OfficerLastBox.Text = OfficerRankBox.Text = "";

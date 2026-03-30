@@ -1,7 +1,7 @@
 <Window x:Class="MDTProNative.Wpf.Windows.ConnectSessionWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="MDT Pro — Connect"
+        Title="MDTPro — Connect"
         Icon="{StaticResource MdtProLogoImage}"
         Width="520" Height="560"
         MinWidth="440" MinHeight="480"

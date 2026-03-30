@@ -3,6 +3,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using MDTProNative.Wpf.Services;
+using MDTProNative.Wpf.Views.Controls;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace MDTProNative.Wpf.Views;
@@ -54,8 +56,11 @@ public partial class OfficerView : UserControl, IMdtBoundView
 
     async Task LoadAllAsync()
     {
-        await LoadOfficerFieldsAsync();
-        await ApplyShiftFromServerAsync();
+        await MdtBusyUi.RunAsync(ModuleBusy, "OFFICER MODULE", "Synchronizing profile and shift status…", async () =>
+        {
+            await LoadOfficerFieldsAsync();
+            await ApplyShiftFromServerAsync();
+        });
         await LoadMetricsAsync();
     }
 
@@ -138,18 +143,24 @@ public partial class OfficerView : UserControl, IMdtBoundView
     {
         var http = _connection?.Http;
         if (http == null) return;
-        try
+        var detail = string.Equals(startOrEnd, "start", StringComparison.OrdinalIgnoreCase)
+            ? "Starting duty shift…"
+            : "Ending duty shift…";
+        await MdtBusyUi.RunAsync(ModuleBusy, "SHIFT CONTROL", detail, async () =>
         {
-            var (status, text) = await http.PostActionAsync("modifyCurrentShift", startOrEnd);
-            if (status == HttpStatusCode.OK && text == "OK")
+            try
             {
-                await ApplyShiftFromServerAsync();
-                Dispatcher.Invoke(ShiftHistory.RequestReload);
+                var (status, text) = await http.PostActionAsync("modifyCurrentShift", startOrEnd);
+                if (status == HttpStatusCode.OK && text == "OK")
+                {
+                    await ApplyShiftFromServerAsync();
+                    Dispatcher.Invoke(ShiftHistory.RequestReload);
+                }
+                else
+                    MdtShellEvents.LogCad("Shift: " + text);
             }
-            else
-                MdtShellEvents.LogCad("Shift: " + text);
-        }
-        catch (Exception ex) { MdtShellEvents.LogCad("Shift error: " + ex.Message); }
+            catch (Exception ex) { MdtShellEvents.LogCad("Shift error: " + ex.Message); }
+        }, minimumVisibleMs: 520);
     }
 
     async void StartShift_Click(object sender, RoutedEventArgs e) => await ModifyShiftAsync("start");
@@ -162,9 +173,12 @@ public partial class OfficerView : UserControl, IMdtBoundView
         if (http == null) return;
         try
         {
-            var live = await http.GetDataJsonAsync("officerInformation") as JObject;
-            ApplyOfficerJson(live);
-            await SaveOfficerInternalAsync();
+            await MdtBusyUi.RunAsync(ModuleBusy, "OFFICER PROFILE", "Pulling live data from session…", async () =>
+            {
+                var live = await http.GetDataJsonAsync("officerInformation") as JObject;
+                await Dispatcher.InvokeAsync(() => ApplyOfficerJson(live));
+                await SaveOfficerCoreAsync();
+            }, minimumVisibleMs: 640);
             MdtShellEvents.RequestOfficerStripRefresh();
         }
         catch (Exception ex) { MdtShellEvents.LogCad("Officer fill error: " + ex.Message); }
@@ -178,49 +192,86 @@ public partial class OfficerView : UserControl, IMdtBoundView
 
     async Task SaveOfficerInternalAsync()
     {
-        var http = _connection?.Http;
-        if (http == null) return;
-        int? badge = int.TryParse(Badge.Text.Trim(), out var b) ? b : null;
-        var o = new JObject
+        if (_connection?.Http == null) return;
+        var ok = false;
+        await MdtBusyUi.RunAsync(ModuleBusy, "OFFICER PROFILE", "Writing personnel record…", async () =>
         {
-            ["firstName"] = string.IsNullOrWhiteSpace(First.Text) ? null : First.Text.Trim(),
-            ["lastName"] = string.IsNullOrWhiteSpace(Last.Text) ? null : Last.Text.Trim(),
-            ["rank"] = string.IsNullOrWhiteSpace(Rank.Text) ? null : Rank.Text.Trim(),
-            ["callSign"] = string.IsNullOrWhiteSpace(CallSign.Text) ? null : CallSign.Text.Trim(),
-            ["agency"] = string.IsNullOrWhiteSpace(Agency.Text) ? null : Agency.Text.Trim(),
-            ["badgeNumber"] = badge.HasValue ? JToken.FromObject(badge.Value) : JValue.CreateNull()
-        };
+            ok = await SaveOfficerCoreAsync();
+        }, minimumVisibleMs: 620);
+        if (ok)
+            await Dispatcher.InvokeAsync(() => CadSaveSound.TryPlay());
+    }
+
+    async Task<bool> SaveOfficerCoreAsync()
+    {
+        var http = _connection?.Http;
+        if (http == null) return false;
+        var json = await Dispatcher.InvokeAsync(() =>
+        {
+            int? badge = int.TryParse(Badge.Text.Trim(), out var b) ? b : null;
+            var o = new JObject
+            {
+                ["firstName"] = string.IsNullOrWhiteSpace(First.Text) ? null : First.Text.Trim(),
+                ["lastName"] = string.IsNullOrWhiteSpace(Last.Text) ? null : Last.Text.Trim(),
+                ["rank"] = string.IsNullOrWhiteSpace(Rank.Text) ? null : Rank.Text.Trim(),
+                ["callSign"] = string.IsNullOrWhiteSpace(CallSign.Text) ? null : CallSign.Text.Trim(),
+                ["agency"] = string.IsNullOrWhiteSpace(Agency.Text) ? null : Agency.Text.Trim(),
+                ["badgeNumber"] = badge.HasValue ? JToken.FromObject(badge.Value) : JValue.CreateNull()
+            };
+            return o.ToString(Formatting.None);
+        });
         try
         {
-            var (status, text) = await http.PostActionAsync("updateOfficerInformationData", o.ToString(Newtonsoft.Json.Formatting.None));
+            var (status, text) = await http.PostActionAsync("updateOfficerInformationData", json);
             if (status != HttpStatusCode.OK || text != "OK")
+            {
                 MdtShellEvents.LogCad("Officer save: " + text);
-            else
-                MdtShellEvents.LogCad("Officer profile saved.");
+                return false;
+            }
+
+            MdtShellEvents.LogCad("Officer profile saved.");
+            return true;
         }
-        catch (Exception ex) { MdtShellEvents.LogCad("Officer save error: " + ex.Message); }
+        catch (Exception ex)
+        {
+            MdtShellEvents.LogCad("Officer save error: " + ex.Message);
+            return false;
+        }
     }
 
     async void RefreshMetrics_Click(object sender, RoutedEventArgs e) => await LoadMetricsAsync();
 
     async Task LoadMetricsAsync()
     {
+        await MdtBusyUi.RunAsync(ModuleBusy, "CAREER STATS", "Loading officer metrics…", LoadMetricsCoreAsync);
+    }
+
+    async Task LoadMetricsCoreAsync()
+    {
         var http = _connection?.Http;
-        if (http == null) { ClearMetrics(); return; }
+        if (http == null)
+        {
+            await Dispatcher.InvokeAsync(ClearMetrics);
+            return;
+        }
+
         try
         {
             var j = await http.GetDataJsonAsync("officerMetrics") as JObject;
             if (j == null) return;
             var avgMs = j["averageShiftDurationMs"]?.Value<double>() ?? 0;
             var avg = TimeSpan.FromMilliseconds(avgMs);
-            MShifts.Text = j["totalShifts"]?.ToString() ?? "0";
-            MAvgDur.Text = avg.TotalHours >= 1 ? $"{(int)avg.TotalHours}h {avg.Minutes}m" : $"{avg.Minutes}m {avg.Seconds}s";
-            MInc.Text = j["totalIncidentReports"]?.ToString();
-            MCit.Text = j["totalCitationReports"]?.ToString();
-            MArr.Text = j["totalArrestReports"]?.ToString();
-            MTot.Text = j["totalReports"]?.ToString();
-            MPer.Text = j["reportsPerShift"]?.ToString();
+            await Dispatcher.InvokeAsync(() =>
+            {
+                MShifts.Text = j["totalShifts"]?.ToString() ?? "0";
+                MAvgDur.Text = avg.TotalHours >= 1 ? $"{(int)avg.TotalHours}h {avg.Minutes}m" : $"{avg.Minutes}m {avg.Seconds}s";
+                MInc.Text = j["totalIncidentReports"]?.ToString();
+                MCit.Text = j["totalCitationReports"]?.ToString();
+                MArr.Text = j["totalArrestReports"]?.ToString();
+                MTot.Text = j["totalReports"]?.ToString();
+                MPer.Text = j["reportsPerShift"]?.ToString();
+            });
         }
-        catch { ClearMetrics(); }
+        catch { await Dispatcher.InvokeAsync(ClearMetrics); }
     }
 }

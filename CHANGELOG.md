@@ -17,7 +17,10 @@ Optional **WPF** companion app (not bundled in the LSPDFR OIV). Uses the same `h
 
 ### Changed — 2026-03-30
 
+- **Reports — Property / evidence (document style)** — **Plugin**: `GET /data/reportBranding` (optional `?reportType=propertyEvidence`) returns built-in GTA lore–adjacent lab templates and an `activeTemplate` resolved from LSPDFR agency script name + agency display string (default **`regional_crime_lab`**). Officer payload includes **`agencyScriptName`**. **Native WPF**: Property/evidence form uses a paper-style layout (standalone XAML, no WebView), live branding header, **Recent IDs** picker, **Export PDF…** (system Print to PDF on `DocumentPrintRoot`), and **Pop out** (detach/reattach from the report host). **Browser MDT**: `reportDocument.css`, document shell + branding fetch, print toolbar, **Recent IDs** modal (`propertyEvidenceSection.js`).
+
 - **Native MDT (WPF)** — Citation and arrest **charges** are edited in a grid (add/remove rows) instead of a JSON text area. Arrest **use of force** uses labeled fields (type, justification, injuries, witnesses). Property/evidence **seized substances** use a grid (type + quantity). Dashboard **callout detail** uses dispatch-style labels (CALL, LOCATION, GRID REF, NARRATIVE) instead of a monospace property dump. Traffic incident party/plate lists use standard field typography (not code-style mono). Officer/settings copy no longer refers to “JSON” in the UI.
+- **Native MDT — Person edit form** — Driver license state and hunting/fishing/weapon permit **status** use dropdowns aligned with CDF (`EDocumentStatus` for permits; `ELicenseState`-style values for driver license). Weapon **type** uses CDF `EWeaponPermitType` (CCW / FFL). See [Policing Redefined — CDF ped permits](https://policing-redefined.netlify.app/docs/developer-docs/cdf/peds/permits) and the [CDF developer category](https://policing-redefined.netlify.app/docs/category/common-data-framework). Unknown legacy strings still appear as an extra list entry so saves stay lossless.
 
 ---
 

@@ -10,6 +10,10 @@ public partial class TrafficIncidentReportForm : UserControl, IReportFormPane
     public TrafficIncidentReportForm()
     {
         InitializeComponent();
+        ExportPdfBtn.Click += (_, _) =>
+            ReportDocumentBrandingHelper.PrintToPdf(DocumentBodyScroll, DocumentPrintRoot,
+                "MDT Traffic " + (GeneralIdBox.Text.Trim().Length > 0 ? GeneralIdBox.Text.Trim() : "report"));
+        ReportDocumentBrandingHelper.ApplyChrome(null, "trafficIncidentTitle", "Traffic Collision Report (TCR)", DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
     }
 
     ReportFormBaseControls BaseControls => new()
@@ -32,7 +36,16 @@ public partial class TrafficIncidentReportForm : UserControl, IReportFormPane
         LocPostal = LocPostalBox
     };
 
-    public void Bind(MdtConnectionManager? connection) { }
+    public void Bind(MdtConnectionManager? connection)
+    {
+        if (connection?.Http == null)
+        {
+            ReportDocumentBrandingHelper.ApplyChrome(null, "trafficIncidentTitle", "Traffic Collision Report (TCR)", DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
+            return;
+        }
+
+        _ = ReportDocumentBrandingHelper.LoadBrandingAsync(connection, "trafficIncident", "trafficIncidentTitle", "Traffic Collision Report (TCR)", DocHeader, BrandingTemplateHint, Dispatcher, BrandingFooter);
+    }
 
     public void LoadFromReport(JObject report)
     {

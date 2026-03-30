@@ -1,9 +1,12 @@
+using System.Collections;
+using System.Linq;
 using System.Net;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using MDTProNative.Wpf.Helpers;
 using MDTProNative.Wpf.Services;
+using MDTProNative.Wpf.Views.Controls;
 using MDTProNative.Wpf.Views.Reports;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -12,12 +15,21 @@ namespace MDTProNative.Wpf.Views
 {
 public partial class ReportsView : UserControl, IMdtBoundView
 {
+    /// <summary>Raised when a report pane may start/stop being the logical editor while <see cref="FormHost"/> is empty (e.g. property form pop-out).</summary>
+    internal static event Action? SaveEnableStateMayHaveChanged;
+
+    internal static void RaiseSaveEnableStateMayHaveChanged() => SaveEnableStateMayHaveChanged?.Invoke();
+
+    /// <summary>Set by shell navigation (e.g. Court report link) before the view is created/bound.</summary>
+    internal static (string Id, string? TypeKey)? PendingOpenReport;
+
     const string FormsClrNamespace = "MDTProNative.Wpf.Views.Reports.Forms";
 
     MdtConnectionManager? _connection;
     string? _selectedType;
     bool _loadingList;
     bool _suppressSelection;
+    bool _layoutPersistWired;
 
     readonly Dictionary<string, IReportFormPane> _formPanes = new(StringComparer.Ordinal);
 
@@ -35,6 +47,9 @@ public partial class ReportsView : UserControl, IMdtBoundView
     public ReportsView()
     {
         InitializeComponent();
+        Loaded += OnReportsLoaded;
+        Unloaded += (_, _) => SaveEnableStateMayHaveChanged -= OnSaveEnableStateMayHaveChanged;
+        SaveEnableStateMayHaveChanged += OnSaveEnableStateMayHaveChanged;
         CategoryCombo.ItemsSource = Categories;
         CategoryCombo.SelectedIndex = 0;
         RefreshBtn.Click += async (_, _) => await ReloadListAsync();
@@ -44,12 +59,33 @@ public partial class ReportsView : UserControl, IMdtBoundView
         ReportList.SelectionChanged += (_, _) => OnReportSelected();
     }
 
+    void OnSaveEnableStateMayHaveChanged()
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            _ = Dispatcher.BeginInvoke(new Action(OnSaveEnableStateMayHaveChanged));
+            return;
+        }
+
+        UpdateSaveEnabled();
+    }
+
+    void OnReportsLoaded(object sender, RoutedEventArgs e)
+    {
+        if (_layoutPersistWired) return;
+        _layoutPersistWired = true;
+        UiLayoutHooks.WireReports(this);
+    }
+
     public void Bind(MdtConnectionManager? connection)
     {
         _connection = connection;
         var online = connection?.Http != null;
-        RefreshBtn.IsEnabled = NewBtn.IsEnabled = SaveBtn.IsEnabled = CategoryCombo.IsEnabled = online;
+        RefreshBtn.IsEnabled = NewBtn.IsEnabled = CategoryCombo.IsEnabled = online;
+        SaveBtn.IsEnabled = false;
         ReportList.ItemsSource = null;
+        foreach (var p in _formPanes.Values)
+            p.CloseDetachSurfaces();
         FormHost.Content = null;
         if (!online)
             _formPanes.Clear();
@@ -62,10 +98,77 @@ public partial class ReportsView : UserControl, IMdtBoundView
         EditorHint.Text = online
             ? "Choose TYPE, then NEW REPORT or select a saved report. Edit the form, then SAVE TO MDT."
             : "Connect (host/port + Connect) before you can load, create, or save reports.";
+        UpdateFormScrollVisibility();
+        UpdateSaveEnabled();
         if (online)
-            _ = ReloadListAsync();
+        {
+            if (PendingOpenReport is { } po)
+            {
+                PendingOpenReport = null;
+                _ = OpenReportFromNavigationAsync(po);
+            }
+            else
+                _ = ReloadListAsync();
+        }
         else
             _ = Dispatcher.InvokeAsync(ShowFormPlaceholder);
+    }
+
+    async Task OpenReportFromNavigationAsync((string Id, string? TypeKey) target)
+    {
+        await MdtBusyUi.RunAsync(ModuleBusy, "REPORTS", "Opening report…", async () =>
+        {
+            var opened = await TryOpenReportByIdAsync(target.Id, target.TypeKey).ConfigureAwait(false);
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (!opened)
+                    MessageBox.Show(
+                        $"Could not find report “{target.Id}” in any saved list for this terminal.\n\nIf it exists under another TYPE, pick the correct category and use REFRESH LIST.",
+                        "Reports",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+            });
+        }, minimumVisibleMs: 320);
+    }
+
+    /// <summary>Loads lists until <paramref name="reportId"/> is found; returns false if not in any category.</summary>
+    async Task<bool> TryOpenReportByIdAsync(string reportId, string? preferredTypeKey)
+    {
+        static bool CategoryExists(string? key) =>
+            !string.IsNullOrEmpty(key) && Categories.Any(c => string.Equals(c.TypeKey, key, StringComparison.Ordinal));
+
+        var order = new List<string>();
+        if (CategoryExists(preferredTypeKey))
+            order.Add(preferredTypeKey!);
+        foreach (var c in Categories)
+        {
+            if (!order.Contains(c.TypeKey, StringComparer.Ordinal))
+                order.Add(c.TypeKey);
+        }
+
+        foreach (var typeKey in order)
+        {
+            await ReloadListCoreAsync(typeKey).ConfigureAwait(false);
+            var hit = await Dispatcher.InvokeAsync(() =>
+            {
+                foreach (var item in ReportList.Items)
+                {
+                    if (item is ReportRow row && string.Equals(row.Id, reportId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _suppressSelection = true;
+                        ReportList.SelectedItem = row;
+                        _suppressSelection = false;
+                        OnReportSelected();
+                        return true;
+                    }
+                }
+
+                return false;
+            });
+            if (hit) return true;
+        }
+
+        return false;
     }
 
     static string? FormTypeNameFor(string typeKey) => typeKey switch
@@ -115,6 +218,38 @@ public partial class ReportsView : UserControl, IMdtBoundView
         return inst;
     }
 
+    void UpdateFormScrollVisibility()
+    {
+        FormScrollViewer.Visibility = FormHost.Content != null ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    void UpdateSaveEnabled()
+    {
+        var online = _connection?.Http != null;
+        if (!online)
+        {
+            SaveBtn.IsEnabled = false;
+            return;
+        }
+
+        if (FormHost.Content is UserControl ucPane && ucPane is IReportFormPane)
+        {
+            SaveBtn.IsEnabled = true;
+            return;
+        }
+
+        var typeKey = CategoryCombo.SelectedValue as string;
+        if (!string.IsNullOrEmpty(typeKey)
+            && _formPanes.TryGetValue(typeKey, out var detached)
+            && detached.IsDetachedFromHost)
+        {
+            SaveBtn.IsEnabled = true;
+            return;
+        }
+
+        SaveBtn.IsEnabled = false;
+    }
+
     void ShowFormPlaceholder()
     {
         FormHost.Content = new TextBlock
@@ -125,6 +260,8 @@ public partial class ReportsView : UserControl, IMdtBoundView
             Text = "Could not load the structured form for this type. Reconnect or open the browser MDT for this report type.",
             Margin = new Thickness(0, 8, 0, 0)
         };
+        UpdateFormScrollVisibility();
+        UpdateSaveEnabled();
     }
 
     void AttachFormHost(string? typeKey)
@@ -133,21 +270,64 @@ public partial class ReportsView : UserControl, IMdtBoundView
         if (pane is UserControl uc)
         {
             FormHost.Content = uc;
+            UpdateFormScrollVisibility();
+            UpdateSaveEnabled();
             return;
         }
 
         ShowFormPlaceholder();
     }
 
+    void ClearReportEditorSurface()
+    {
+        foreach (var p in _formPanes.Values)
+            p.CloseDetachSurfaces();
+        FormHost.Content = null;
+        UpdateFormScrollVisibility();
+        UpdateSaveEnabled();
+    }
+
+    void SetIdleEditorHint()
+    {
+        var n = 0;
+        if (ReportList.ItemsSource is IEnumerable e)
+        {
+            foreach (var _ in e) n++;
+        }
+
+        EditorHint.Text = n == 0
+            ? "No reports yet for this type. Click NEW REPORT to create a draft with a new ID."
+            : $"{n} report(s). Select one to edit, or click NEW REPORT for a new draft.";
+    }
+
     async Task ReloadListAsync()
     {
         var http = _connection?.Http;
         if (http == null) return;
-        _selectedType = CategoryCombo.SelectedValue as string;
+        _loadingList = true;
+        try
+        {
+            await MdtBusyUi.RunAsync(ModuleBusy, "REPORTS", "Loading saved reports…", async () => await ReloadListCoreAsync());
+        }
+        finally
+        {
+            _loadingList = false;
+        }
+    }
+
+    async Task ReloadListCoreAsync(string? typeKeyOverride = null)
+    {
+        var http = _connection?.Http;
+        if (http == null) return;
+        string? sel = typeKeyOverride;
+        if (string.IsNullOrEmpty(sel))
+        {
+            await Dispatcher.InvokeAsync(() => { sel = CategoryCombo.SelectedValue as string; });
+        }
+        _selectedType = sel;
         var dataPath = _selectedType != null ? NativeReportDraftFactory.DataPathFor(_selectedType) : null;
         if (string.IsNullOrEmpty(dataPath)) return;
 
-        _loadingList = true;
         try
         {
             var tok = await http.GetDataJsonAsync(dataPath).ConfigureAwait(false);
@@ -166,12 +346,14 @@ public partial class ReportsView : UserControl, IMdtBoundView
 
             await Dispatcher.InvokeAsync(() =>
             {
+                if (typeKeyOverride != null)
+                    CategoryCombo.SelectedValue = typeKeyOverride;
                 _suppressSelection = true;
                 ReportList.ItemsSource = rows;
+                ReportList.SelectedItem = null;
                 _suppressSelection = false;
-                AttachFormHost(_selectedType);
-                GetOrCreateFormPane(_selectedType)?.Clear();
-                EditorHint.Text = rows.Count == 0 ? "No reports yet for this type. Use New report to start." : $"{rows.Count} report(s). Select one to edit.";
+                ClearReportEditorSurface();
+                SetIdleEditorHint();
             });
         }
         catch (Exception ex)
@@ -180,14 +362,9 @@ public partial class ReportsView : UserControl, IMdtBoundView
             await Dispatcher.InvokeAsync(() =>
             {
                 ReportList.ItemsSource = Array.Empty<ReportRow>();
-                AttachFormHost(_selectedType);
-                GetOrCreateFormPane(_selectedType)?.Clear();
+                ClearReportEditorSurface();
                 EditorHint.Text = "Could not load report list: " + ex.Message;
             });
-        }
-        finally
-        {
-            _loadingList = false;
         }
     }
 
@@ -198,6 +375,12 @@ public partial class ReportsView : UserControl, IMdtBoundView
         {
             AttachFormHost(_selectedType);
             GetOrCreateFormPane(_selectedType)?.LoadFromReport((JObject)row.Body.DeepClone());
+            EditorHint.Text = "Editing selected report — change fields as needed, then SAVE TO MDT.";
+        }
+        else
+        {
+            ClearReportEditorSurface();
+            SetIdleEditorHint();
         }
     }
 
@@ -215,23 +398,27 @@ public partial class ReportsView : UserControl, IMdtBoundView
 
         try
         {
-            var draft = await NativeReportDraftFactory.CreateDraftAsync(http, type).ConfigureAwait(false);
-            if (draft == null)
+            await MdtBusyUi.RunAsync(ModuleBusy, "REPORTS", "Allocating new report draft…", async () =>
             {
-                MessageBox.Show("Unknown report type.", "Reports", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
+                var draft = await NativeReportDraftFactory.CreateDraftAsync(http, type).ConfigureAwait(false);
+                if (draft == null)
+                {
+                    await Dispatcher.InvokeAsync(() =>
+                        MessageBox.Show("Unknown report type.", "Reports", MessageBoxButton.OK, MessageBoxImage.Warning));
+                    return;
+                }
 
-            await Dispatcher.InvokeAsync(() =>
-            {
-                _suppressSelection = true;
-                ReportList.SelectedItem = null;
-                _suppressSelection = false;
-                AttachFormHost(type);
-                GetOrCreateFormPane(type)?.LoadFromReport((JObject)draft.DeepClone());
-                EditorHint.Text = "New draft — complete the form, then SAVE TO MDT. Arrest saves can take up to ~45s (game thread).";
-                MdtShellEvents.LogCad("Reports: new draft " + (draft["Id"]?.ToString() ?? "?"));
-            });
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    _suppressSelection = true;
+                    ReportList.SelectedItem = null;
+                    _suppressSelection = false;
+                    AttachFormHost(type);
+                    GetOrCreateFormPane(type)?.LoadFromReport((JObject)draft.DeepClone());
+                    EditorHint.Text = "New draft — complete the form, then SAVE TO MDT. Arrest saves can take up to ~45s (game thread).";
+                    MdtShellEvents.LogCad("Reports: new draft " + (draft["Id"]?.ToString() ?? "?"));
+                });
+            }, minimumVisibleMs: 480);
         }
         catch (Exception ex)
         {
@@ -284,47 +471,54 @@ public partial class ReportsView : UserControl, IMdtBoundView
         var json = body.ToString(Formatting.None);
         try
         {
-            MdtShellEvents.LogCad("Reports: saving " + id + " → /post/" + postPath);
-            var (status, text) = await http.PostActionAsync(postPath, json).ConfigureAwait(false);
-            var trimmed = text?.Trim() ?? "";
-            if (status == HttpStatusCode.OK && (string.IsNullOrEmpty(trimmed) || trimmed == "OK"))
+            await MdtBusyUi.RunAsync(ModuleBusy, "REPORTS", "Transmitting report to MDT host…", async () =>
             {
-                MdtShellEvents.LogCad("Reports: saved " + id);
-                await Dispatcher.InvokeAsync(() =>
-                    MessageBox.Show("Report saved.", "Reports", MessageBoxButton.OK, MessageBoxImage.Information));
-                await ReloadListAsync();
-                var savedId = body["Id"]?.ToString();
-                if (!string.IsNullOrEmpty(savedId))
+                MdtShellEvents.LogCad("Reports: saving " + id + " → /post/" + postPath);
+                var (status, text) = await http.PostActionAsync(postPath, json).ConfigureAwait(false);
+                var trimmed = text?.Trim() ?? "";
+                if (status == HttpStatusCode.OK && (string.IsNullOrEmpty(trimmed) || trimmed == "OK"))
                 {
+                    MdtShellEvents.LogCad("Reports: saved " + id);
                     await Dispatcher.InvokeAsync(() =>
                     {
-                        foreach (var item in ReportList.Items)
-                        {
-                            if (item is ReportRow row && string.Equals(row.Id, savedId, StringComparison.Ordinal))
-                            {
-                                ReportList.SelectedItem = row;
-                                break;
-                            }
-                        }
+                        CadSaveSound.TryPlay();
+                        MessageBox.Show("Report saved.", "Reports", MessageBoxButton.OK, MessageBoxImage.Information);
                     });
+                    await ReloadListCoreAsync();
+                    var savedId = body["Id"]?.ToString();
+                    if (!string.IsNullOrEmpty(savedId))
+                    {
+                        await Dispatcher.InvokeAsync(() =>
+                        {
+                            foreach (var item in ReportList.Items)
+                            {
+                                if (item is ReportRow row && string.Equals(row.Id, savedId, StringComparison.Ordinal))
+                                {
+                                    ReportList.SelectedItem = row;
+                                    break;
+                                }
+                            }
+                        });
+                    }
+
+                    return;
                 }
 
-                return;
-            }
+                string userMsg = trimmed;
+                try
+                {
+                    var jo = JObject.Parse(trimmed);
+                    if (jo["error"] != null)
+                        userMsg = jo["error"]!.ToString();
+                    else if (jo["success"]?.Value<bool>() == false && jo["error"] != null)
+                        userMsg = jo["error"]!.ToString();
+                }
+                catch { /* plain text */ }
 
-            string userMsg = trimmed;
-            try
-            {
-                var jo = JObject.Parse(trimmed);
-                if (jo["error"] != null)
-                    userMsg = jo["error"]!.ToString();
-                else if (jo["success"]?.Value<bool>() == false && jo["error"] != null)
-                    userMsg = jo["error"]!.ToString();
-            }
-            catch { /* plain text */ }
-
-            MdtShellEvents.LogCad("Reports: save failed " + id + " HTTP " + (int)status + " — " + userMsg);
-            MessageBox.Show($"Save failed ({(int)status}).\n\n{userMsg}", "Reports", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MdtShellEvents.LogCad("Reports: save failed " + id + " HTTP " + (int)status + " — " + userMsg);
+                await Dispatcher.InvokeAsync(() =>
+                    MessageBox.Show($"Save failed ({(int)status}).\n\n{userMsg}", "Reports", MessageBoxButton.OK, MessageBoxImage.Warning));
+            }, minimumVisibleMs: 520);
         }
         catch (Exception ex)
         {

@@ -5,6 +5,8 @@ namespace MDTPro.Data {
         public string rank;
         public string callSign;
         public string agency;
+        /// <summary>LSPDFR agency script name (e.g. LSPD, LSSD) for report branding / mapping.</summary>
+        public string agencyScriptName;
         public int? badgeNumber;
     }
 }

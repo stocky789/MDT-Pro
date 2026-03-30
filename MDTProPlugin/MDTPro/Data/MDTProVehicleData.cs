@@ -1,4 +1,5 @@
 using CommonDataFramework.Modules.VehicleDatabase;
+using MDTPro.Utility;
 using Rage;
 using System.Drawing;
 
@@ -85,6 +86,8 @@ namespace MDTPro.Data {
             string unlocalizedModelDisplayName = Rage.Native.NativeFunction.Natives.GET_DISPLAY_NAME_FROM_VEHICLE_MODEL<string>(Holder.Model.Hash);
 
             ModelDisplayName = Game.GetLocalizedString(unlocalizedModelDisplayName);
+
+            GtaVVehicleMakeModelCatalog.TryEnrichFromSpawnName(ModelName, this);
 
             BOLOs = CDFVehicleData.GetAllBOLOs();
         }

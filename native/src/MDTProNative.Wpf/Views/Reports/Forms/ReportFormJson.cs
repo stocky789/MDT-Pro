@@ -1,4 +1,5 @@
 using System.Globalization;
+using MDTProNative.Wpf.Helpers;
 using Newtonsoft.Json.Linq;
 
 namespace MDTProNative.Wpf.Views.Reports.Forms;
@@ -36,10 +37,15 @@ internal static class ReportFormJson
     public static DateTime ParseTimestampToken(JToken? t)
     {
         if (t == null || t.Type == JTokenType.Null) return DateTime.Now;
-        var s = t.ToString();
-        if (DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dt))
+        if (t.Type == JTokenType.Date)
+        {
+            var dt = t.Value<DateTime>();
             return dt.Kind == DateTimeKind.Utc ? dt.ToLocalTime() : dt;
-        return DateTime.Now;
+        }
+
+        var s = t.ToString();
+        if (!NativeMdtFormat.TryParseMdtDateTime(s, out var parsed)) return DateTime.Now;
+        return parsed.Kind == DateTimeKind.Utc ? parsed.ToLocalTime() : DateTime.SpecifyKind(parsed, DateTimeKind.Local);
     }
 
     public static JObject BuildOfficerInformation(string first, string last, string rank, string call, string agency, string badgeText)

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Windows.Controls;
+using MDTProNative.Wpf.Helpers;
 using MDTProNative.Wpf.Services;
 using MDTProNative.Wpf.Views.Reports;
 using Newtonsoft.Json.Linq;
@@ -23,9 +24,22 @@ public partial class ImpoundReportForm : UserControl, IReportFormPane
         StatusCombo.DisplayMemberPath = nameof(StatusPick.Label);
         StatusCombo.SelectedValuePath = nameof(StatusPick.Value);
         StatusCombo.SelectedValue = 1;
+        ExportPdfBtn.Click += (_, _) =>
+            ReportDocumentBrandingHelper.PrintToPdf(DocumentBodyScroll, DocumentPrintRoot,
+                "MDT Impound " + (IdBox.Text.Trim().Length > 0 ? IdBox.Text.Trim() : "report"));
+        ReportDocumentBrandingHelper.ApplyChrome(null, "impoundTitle", "Vehicle Tow / Impound Report", DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
     }
 
-    public void Bind(MdtConnectionManager? connection) => _ = connection;
+    public void Bind(MdtConnectionManager? connection)
+    {
+        if (connection?.Http == null)
+        {
+            ReportDocumentBrandingHelper.ApplyChrome(null, "impoundTitle", "Vehicle Tow / Impound Report", DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
+            return;
+        }
+
+        _ = ReportDocumentBrandingHelper.LoadBrandingAsync(connection, "impound", "impoundTitle", "Vehicle Tow / Impound Report", DocHeader, BrandingTemplateHint, Dispatcher, BrandingFooter);
+    }
 
     public void LoadFromReport(JObject report)
     {
@@ -36,12 +50,14 @@ public partial class ImpoundReportForm : UserControl, IReportFormPane
         if (ts == null || ts.Type == JTokenType.Null)
             TimeStampBox.Text = "";
         else if (ts.Type == JTokenType.Date)
-        {
-            var dt = ts.Value<DateTime>();
-            TimeStampBox.Text = dt.ToString("O", CultureInfo.InvariantCulture);
-        }
+            TimeStampBox.Text = NativeMdtFormat.FormatDateTimeDisplay(ts.Value<DateTime>());
         else
-            TimeStampBox.Text = ts.ToString();
+        {
+            var s = ts.ToString();
+            TimeStampBox.Text = NativeMdtFormat.TryParseMdtDateTime(s, out var parsed)
+                ? NativeMdtFormat.FormatDateTimeDisplay(parsed)
+                : s;
+        }
 
         var st = report["Status"]?.Value<int?>();
         if (st is >= 0 and <= 3)
@@ -94,13 +110,9 @@ public partial class ImpoundReportForm : UserControl, IReportFormPane
             shortYear = DateTime.Now.Year % 100;
 
         var tsText = TimeStampBox.Text.Trim();
-        DateTime timeStamp;
-        if (string.IsNullOrEmpty(tsText)
-            || !DateTime.TryParse(tsText, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out timeStamp))
-        {
-            if (!DateTime.TryParse(tsText, out timeStamp))
-                timeStamp = DateTime.Now;
-        }
+        var timeStamp = string.IsNullOrEmpty(tsText) || !NativeMdtFormat.TryParseMdtDateTime(tsText, out var parsedTs)
+            ? DateTime.Now
+            : parsedTs;
 
         int? badge = null;
         var badgeTxt = OfficerBadgeBox.Text.Trim();
@@ -151,7 +163,7 @@ public partial class ImpoundReportForm : UserControl, IReportFormPane
     public void Clear()
     {
         IdBox.Text = ShortYearBox.Text = "";
-        TimeStampBox.Text = DateTime.Now.ToString("O", CultureInfo.InvariantCulture);
+        TimeStampBox.Text = NativeMdtFormat.FormatDateTimeDisplay(DateTime.Now);
         StatusCombo.SelectedValue = 1;
         NotesBox.Text = "";
         OfficerFirstBox.Text = OfficerLastBox.Text = OfficerRankBox.Text = "";

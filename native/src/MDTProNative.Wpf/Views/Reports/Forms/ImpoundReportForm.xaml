@@ -1,111 +1,153 @@
 <UserControl x:Class="MDTProNative.Wpf.Views.Reports.Forms.ImpoundReportForm"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,8,0">
-        <StackPanel>
-            <TextBlock Text="BASE REPORT" Style="{StaticResource CadSectionTitle}" />
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Id" />
-                <TextBox x:Name="IdBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="ShortYear" />
-                <TextBox x:Name="ShortYearBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="TimeStamp" />
-                <TextBox x:Name="TimeStampBox" Style="{StaticResource CadTextBoxCadField}"
-                         ToolTip="ISO or local date/time (e.g. 2026-03-29T14:30:00)" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Status" />
-                <ComboBox x:Name="StatusCombo" Style="{StaticResource CadComboBox}" />
-            </DockPanel>
-            <TextBlock Text="Notes" Style="{StaticResource CadFieldLabel}" Margin="0,4,0,2" />
-            <TextBox x:Name="NotesBox"
-                     MinHeight="56"
-                     AcceptsReturn="True"
-                     Style="{StaticResource CadTextBoxCadField}"
-                     TextWrapping="Wrap"
-                     VerticalScrollBarVisibility="Auto" />
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:reports="clr-namespace:MDTProNative.Wpf.Views.Reports">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-            <TextBlock Text="OFFICER INFORMATION" Style="{StaticResource CadSectionTitle}" Margin="0,14,0,0" />
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="FIRST NAME" />
-                <TextBox x:Name="OfficerFirstBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="LAST NAME" />
-                <TextBox x:Name="OfficerLastBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="RANK" />
-                <TextBox x:Name="OfficerRankBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="CALL SIGN" />
-                <TextBox x:Name="OfficerCallSignBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="AGENCY" />
-                <TextBox x:Name="OfficerAgencyBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="BADGE #" />
-                <TextBox x:Name="OfficerBadgeBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-
-            <TextBlock Text="LOCATION" Style="{StaticResource CadSectionTitle}" Margin="0,14,0,0" />
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Area" />
-                <TextBox x:Name="LocAreaBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Street" />
-                <TextBox x:Name="LocStreetBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="County" />
-                <TextBox x:Name="LocCountyBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Postal" />
-                <TextBox x:Name="LocPostalBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-
-            <TextBlock Text="IMPOUND" Style="{StaticResource CadSectionTitle}" Margin="0,14,0,0" />
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="LicensePlate" />
-                <TextBox x:Name="LicensePlateBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="VehicleModel" />
-                <TextBox x:Name="VehicleModelBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Owner" />
-                <TextBox x:Name="OwnerBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="PersonAtFaultName" />
-                <TextBox x:Name="PersonAtFaultNameBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Vin" />
-                <TextBox x:Name="VinBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="ImpoundReason" />
-                <TextBox x:Name="ImpoundReasonBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="TowCompany" />
-                <TextBox x:Name="TowCompanyBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="ImpoundLot" />
-                <TextBox x:Name="ImpoundLotBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
+        <StackPanel x:Name="ReportEditorToolbar" Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+            <Button x:Name="ExportPdfBtn" Content="EXPORT PDF…" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
+            <TextBlock x:Name="BrandingTemplateHint"
+                       VerticalAlignment="Center"
+                       Foreground="{StaticResource CadMuted}"
+                       FontSize="11"
+                       Text="" />
         </StackPanel>
-    </ScrollViewer>
+
+        <ScrollViewer x:Name="DocumentBodyScroll"
+                      Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <Border x:Name="DocumentPrintRoot"
+                    Background="{StaticResource ReportDocPaperBrush}"
+                    BorderBrush="{StaticResource ReportDocInkBrush}"
+                    BorderThickness="1"
+                    Padding="18"
+                    MaxWidth="920"
+                    HorizontalAlignment="Left">
+                <StackPanel>
+                    <reports:ReportDocumentHeader x:Name="DocHeader" />
+
+                    <TextBlock Text="Base report" Style="{StaticResource ReportDocSectionTitle}" />
+                    <UniformGrid Columns="2" Margin="0,0,0,10">
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="Report ID" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="IdBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Short year" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="ShortYearBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </UniformGrid>
+                    <TextBlock Text="Timestamp" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,4" />
+                    <TextBox x:Name="TimeStampBox"
+                             Style="{StaticResource ReportDocTextBox}"
+                             Margin="0,0,0,8"
+                             ToolTip="dd/MM/yyyy HH:mm (local), or ISO" />
+                    <TextBlock Text="Status" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,4" />
+                    <ComboBox x:Name="StatusCombo" Style="{StaticResource ReportDocCombo}" Margin="0,0,0,8" />
+                    <TextBlock Text="Notes" Style="{StaticResource ReportDocLabel}" Margin="0,4,0,2" />
+                    <TextBox x:Name="NotesBox"
+                             MinHeight="56"
+                             AcceptsReturn="True"
+                             Style="{StaticResource ReportDocTextBox}"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto" />
+
+                    <TextBlock Text="Officer" Style="{StaticResource ReportDocSectionTitle}" />
+                    <UniformGrid Columns="2" Margin="0,0,0,10">
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="First name" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OfficerFirstBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Last name" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OfficerLastBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="Rank" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OfficerRankBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Call sign" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OfficerCallSignBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="Agency" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OfficerAgencyBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Badge #" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OfficerBadgeBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </UniformGrid>
+
+                    <TextBlock Text="Location" Style="{StaticResource ReportDocSectionTitle}" />
+                    <UniformGrid Columns="2" Margin="0,0,0,10">
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="Area" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="LocAreaBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Street" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="LocStreetBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="County" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="LocCountyBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Postal" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="LocPostalBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </UniformGrid>
+
+                    <TextBlock Text="Impound / tow" Style="{StaticResource ReportDocSectionTitle}" />
+                    <UniformGrid Columns="2" Margin="0,0,0,10">
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="License plate" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="LicensePlateBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Vehicle model" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="VehicleModelBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="Owner" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OwnerBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Person at fault" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="PersonAtFaultNameBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="VIN" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="VinBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Impound reason" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="ImpoundReasonBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="Tow company" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="TowCompanyBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Impound lot" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="ImpoundLotBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </UniformGrid>
+
+                    <TextBlock x:Name="BrandingFooter"
+                               TextWrapping="Wrap"
+                               FontSize="10"
+                               Foreground="#444"
+                               Margin="0,8,0,0" />
+                </StackPanel>
+            </Border>
+        </ScrollViewer>
+    </Grid>
 </UserControl>
