@@ -1,23 +1,36 @@
-# MDT Pro — builds the full mod into Release\ (plugin DLL + MDTPro web + dependencies).
+# MDT Pro — builds the full mod into Release\ (plugin DLL + MDTPro web + dependencies),
+# then mirrors that drop into Native Release\ and publishes the Windows MDC desktop app there.
 # Run from repo root: .\build.ps1
 #
 # Options:
-#   .\build.ps1                    Clean rebuild (wipes Release, full build)
+#   .\build.ps1                    Clean rebuild (wipes Release, full build; Native Release\ rebuilt at end)
 #   .\build.ps1 -Incremental       Faster build (no wipe, incremental)
+#   .\build.ps1 -SkipWindowsApp    Build mod only; skip native WPF publish (still mirrors Release → Native Release)
 #   .\build.ps1 -Deploy            Build then copy to GTA V (use -GamePath if not default)
 #   .\build.ps1 -Deploy -GamePath "D:\Games\GTA V"
 #   GamePath is also used to copy DamageTrackingFramework.dll into Release (required for injury reports; or use References\DamageTrackingFramework.dll).
-#   OpenIV packages (install + uninstall) are always created in Release\
+#   OpenIV packages (install + uninstall) are always created in Release\ (and copied to Native Release\).
+#
+# Native Release\ layout:
+#   Same contents as Release\ (game mod, .oiv, README, LICENSE) plus MDTProNative\ (win-x64 published desktop app).
 
 param(
     [switch]$Incremental,
     [switch]$Deploy,
+    [switch]$SkipWindowsApp,
     [string]$GamePath = 'C:\Program Files\Rockstar Games\Grand Theft Auto V'
 )
 
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
+# Always run from repo root (works even if you invoked the script from another directory).
+Set-Location -LiteralPath $root
+
 $release = Join-Path $root 'Release'
+$nativeReleaseDir = Join-Path $root 'Native Release'
+$legacyReleasesDir = Join-Path $root 'Releases'
+$nativeWpfProj = Join-Path $root 'native\src\MDTProNative.Wpf\MDTProNative.Wpf.csproj'
+$nativePublishDir = Join-Path $nativeReleaseDir 'MDTProNative'
 $dllDestDir = Join-Path $release 'plugins\lspdfr'
 $dllDest = Join-Path $dllDestDir 'MDTPro.dll'
 $mdtSource = Join-Path $root 'MDTPro'
@@ -472,8 +485,74 @@ if (Test-Path $licenseSrc) {
     Write-Host "  -> $licenseDest (EPL-2.0)"
 }
 
+# 9) Mirror Release → Native Release (distribution folder) + Windows MDC app
+Write-Host "Staging Native Release\ (mirror of Release + native desktop)..."
+if (Test-Path $legacyReleasesDir) {
+    Write-Host "  Removing legacy Releases\ (output is now Native Release\ only)..."
+    Remove-Item -Path $legacyReleasesDir -Recurse -Force
+}
+if (Test-Path $nativeReleaseDir) {
+    Remove-Item -Path $nativeReleaseDir -Recurse -Force
+}
+New-Item -ItemType Directory -Path $nativeReleaseDir -Force | Out-Null
+Get-ChildItem -Path $release -Force | ForEach-Object {
+    Copy-Item -Path $_.FullName -Destination (Join-Path $nativeReleaseDir $_.Name) -Recurse -Force
+}
+Write-Host "  -> $nativeReleaseDir\ (game mod + OpenIV packages + README)"
+
+if (-not $SkipWindowsApp) {
+    if (-not (Test-Path $nativeWpfProj)) {
+        Write-Error "Native WPF project not found: $nativeWpfProj"
+        exit 1
+    }
+    Write-Host "Publishing MDT Pro Native (Windows MDC)..."
+    if (Test-Path $nativePublishDir) {
+        Remove-Item -Path $nativePublishDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $nativePublishDir -Force | Out-Null
+    $publishArgs = @(
+        'publish', $nativeWpfProj,
+        '-c', 'Release',
+        '-r', 'win-x64',
+        '--self-contained', 'true',
+        '-p:PublishSingleFile=false',
+        '-o', $nativePublishDir,
+        '-v', 'minimal'
+    )
+    dotnet @publishArgs
+    if ($LASTEXITCODE -ne 0) { Write-Error "Native WPF publish failed."; exit $LASTEXITCODE }
+    Write-Host "  -> $nativePublishDir (win-x64, self-contained)"
+
+    $nativeReadme = Join-Path $nativePublishDir 'README.txt'
+    @"
+MDT Pro — Native MDC (Windows desktop)
+========================================
+
+This folder is the published Windows desktop MDC terminal. It talks to the same HTTP/WebSocket
+API as the in-game browser MDT (your LSPDFR plugin must be running and on duty).
+
+  1. Start GTA V, go on duty; note the MDT URL/port (default http://127.0.0.1:9000).
+  2. Run MDTProNative.Wpf.exe.
+  3. Enter the same host and port, then Connect.
+
+Requires the WebView2 Runtime for Settings → embedded customization page (usually already installed with Edge). Reports and most modules are native WPF.
+
+The game mod, OpenIV packages, and full install notes are in the parent Native Release\ folder next to this folder.
+
+License: EPL-2.0 — see LICENSE in Native Release\.
+"@ | Out-File -FilePath $nativeReadme -Encoding UTF8
+    Write-Host "  -> $nativeReadme"
+}
+else {
+    Write-Host "  (skipped native desktop: -SkipWindowsApp)"
+}
+
 Write-Host "Done. Full mod release: $release"
 Write-Host "  Release\plugins\lspdfr\MDTPro.dll"
 Write-Host "  Release\System.Data.SQLite.dll (GTA V root)"
 Write-Host "  Release\x64\SQLite.Interop.dll (GTA V root\x64)"
 Write-Host "  Release\MDTPro\"
+Write-Host "Distribution copy (mod + desktop): $nativeReleaseDir"
+if (-not $SkipWindowsApp) {
+    Write-Host "  Native Release\MDTProNative\MDTProNative.Wpf.exe"
+}

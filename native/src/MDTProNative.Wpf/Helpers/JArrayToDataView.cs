@@ -7,7 +7,8 @@ public static class JArrayToDataView
 {
     public static DataView? Convert(JToken? token)
     {
-        if (token is not JArray arr || arr.Count == 0) return null;
+        if (token is not JArray arr) return null;
+        if (arr.Count == 0) return new DataTable().DefaultView;
         if (arr[0] is not JObject first) return null;
 
         var table = new DataTable();
@@ -19,7 +20,7 @@ public static class JArrayToDataView
             if (item is not JObject jo) continue;
             var row = table.NewRow();
             foreach (DataColumn col in table.Columns)
-                row[col.ColumnName] = jo[col.ColumnName]?.ToString() ?? "";
+                row[col.ColumnName] = JTokenDisplay.ForDataCell(jo[col.ColumnName]);
             table.Rows.Add(row);
         }
 

@@ -1,13 +1,27 @@
-﻿using System.Configuration;
-using System.Data;
 using System.Windows;
+using MDTProNative.Wpf.Windows;
 
 namespace MDTProNative.Wpf;
 
-/// <summary>
-/// Interaction logic for App.xaml
-/// </summary>
 public partial class App : Application
 {
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+        // Default OnLastWindowClose shuts the process when the login dialog closes (no other window yet).
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        var dlg = new ConnectSessionWindow();
+        if (dlg.ShowDialog() != true || dlg.ResultConfig == null)
+        {
+            Shutdown();
+            return;
+        }
+
+        var main = new MainWindow(dlg.ResultConfig);
+        MainWindow = main;
+        main.Show();
+        ShutdownMode = ShutdownMode.OnMainWindowClose;
+    }
 }
 

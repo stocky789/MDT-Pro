@@ -1,38 +1,87 @@
 <UserControl x:Class="MDTProNative.Wpf.Views.BoloView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <DockPanel Margin="8">
-        <Border DockPanel.Dock="Bottom" Background="{StaticResource CadPanel}" BorderBrush="{StaticResource CadBorder}" BorderThickness="1" Padding="8" Margin="0,8,0,0">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="120" />
-                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="100" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="Plate" Style="{StaticResource CadLabelMuted}" Margin="0,0,6,6" VerticalAlignment="Center" />
-                <TextBox x:Name="AddPlate" Grid.Row="0" Grid.Column="1" Style="{StaticResource CadTextBox}" Margin="0,0,12,6" />
-                <TextBlock Grid.Row="0" Grid.Column="2" Text="Reason" Style="{StaticResource CadLabelMuted}" Margin="0,0,6,6" VerticalAlignment="Center" />
-                <TextBox x:Name="AddReason" Grid.Row="0" Grid.Column="3" Style="{StaticResource CadTextBox}" Margin="0,0,12,6" />
-                <TextBlock Grid.Row="0" Grid.Column="4" Text="Agency" Style="{StaticResource CadLabelMuted}" Margin="0,0,6,6" VerticalAlignment="Center" />
-                <TextBox x:Name="AddAgency" Grid.Row="0" Grid.Column="5" Text="LSPD" Style="{StaticResource CadTextBox}" Margin="0,0,12,6" />
-                <Button Grid.Row="0" Grid.Column="6" Content="Add BOLO" Style="{StaticResource CadAccentButton}" Click="Add_Click" Margin="0,0,8,6" />
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="Remove plate" Style="{StaticResource CadLabelMuted}" Margin="0,0,6,0" VerticalAlignment="Center" />
-                <TextBox x:Name="RemPlate" Grid.Row="1" Grid.Column="1" Style="{StaticResource CadTextBox}" Margin="0,0,12,0" />
-                <TextBlock Grid.Row="1" Grid.Column="2" Text="Reason (opt)" Style="{StaticResource CadLabelMuted}" Margin="0,0,6,0" VerticalAlignment="Center" />
-                <TextBox x:Name="RemReason" Grid.Row="1" Grid.Column="3" Style="{StaticResource CadTextBox}" Margin="0,0,12,0" />
-                <Button Grid.Row="1" Grid.Column="6" Content="Remove" Style="{StaticResource CadButton}" Click="Remove_Click" />
-            </Grid>
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Border Grid.Row="0" Style="{StaticResource CadModuleChromeBorder}" Padding="10" Margin="0,0,0,8">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button x:Name="RefreshBtn" Content="REFRESH" Style="{StaticResource CadPrimaryActionButton}" Margin="8,0,0,0" />
+                    <Button x:Name="AddBoloBtn" Content="ADD BOLO" Style="{StaticResource CadAccentButton}" Margin="8,0,0,0" />
+                </StackPanel>
+                <TextBlock TextWrapping="Wrap" Foreground="{StaticResource CadMuted}" FontSize="11"
+                           Text="Active vehicle BOLOs from the live database. Add/remove requires the vehicle in the world when the plugin allows modification." />
+            </DockPanel>
         </Border>
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
-            <Button Content="Refresh" Style="{StaticResource CadAccentButton}" Click="Refresh_Click" />
-            <CheckBox x:Name="AutoRefresh" Content="Auto every 4s" Margin="12,0,0,0" Foreground="{StaticResource CadText}" VerticalAlignment="Center" Checked="Auto_Changed" Unchecked="Auto_Changed" />
-        </StackPanel>
-        <DataGrid x:Name="BoloGrid" AutoGenerateColumns="True" IsReadOnly="True"
-                  Background="{StaticResource CadPanel}" Foreground="{StaticResource CadText}"
-                  BorderBrush="{StaticResource CadBorder}" SelectionChanged="BoloGrid_OnSelectionChanged" />
-    </DockPanel>
+        <Border Grid.Row="1" Style="{StaticResource CadSectionBorder}" Padding="10" Margin="0,0,0,8">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="PLATE" Style="{StaticResource CadFieldLabel}" Margin="0,0,0,4" />
+                        <TextBox x:Name="NewPlateBox" Style="{StaticResource CadTextBox}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="REASON" Style="{StaticResource CadFieldLabel}" Margin="0,0,0,4" />
+                        <TextBox x:Name="NewReasonBox" Style="{StaticResource CadTextBox}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="4" VerticalAlignment="Bottom">
+                        <TextBlock Text="MODEL (opt.)" Style="{StaticResource CadFieldLabel}" Margin="0,0,0,4" />
+                        <TextBox x:Name="NewModelBox" Style="{StaticResource CadTextBox}" MinWidth="140" />
+                    </StackPanel>
+                </Grid>
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="200" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="ISSUED BY" Style="{StaticResource CadFieldLabel}" Margin="0,0,0,4" />
+                        <TextBox x:Name="IssuedByBox" Style="{StaticResource CadTextBox}" Text="MDC" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="EXPIRES (local)" Style="{StaticResource CadFieldLabel}" Margin="0,0,0,4" />
+                        <DatePicker x:Name="ExpiresPicker" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="320" MinWidth="260" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <DockPanel Grid.Column="0" LastChildFill="True">
+                <TextBlock DockPanel.Dock="Top" Text="VEHICLES WITH ACTIVE BOLO" Style="{StaticResource CadSectionTitle}" Margin="0,0,0,6" />
+                <ListBox x:Name="VehicleList"
+                         Style="{StaticResource CadListBox}"
+                         ItemContainerStyle="{StaticResource CadSidebarListBoxItem}"
+                         SelectionChanged="VehicleList_OnSelectionChanged" />
+            </DockPanel>
+            <Border Grid.Column="2" Style="{StaticResource CadModuleChromeBorder}" Padding="12">
+                <DockPanel LastChildFill="True">
+                    <TextBlock DockPanel.Dock="Top" Text="BOLO LINES" Style="{StaticResource CadSectionTitle}" Margin="0,0,0,8" />
+                    <ItemsControl x:Name="BoloLinesPanel">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </Grid>
 </UserControl>

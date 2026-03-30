@@ -1,11 +1,12 @@
 # MDT Pro — Native desktop client (WPF)
 
-This folder is a **separate .NET solution** that implements a **native Windows** front end for the same MDT Pro plugin endpoints used by the **existing browser MDT**. The web UI and plugin layout under `MDTPro/` are **not replaced**; dispatchers can run this app against `http://<officer-pc>:<port>/` while officers keep the browser MDT.
+This folder is a **separate .NET solution** that implements a **native Windows** shell for the same MDT Pro plugin endpoints used by the **browser MDT**. **Reports** are **native WPF** only (structured FORM + JSON editors per type, same `/post` save routes as the web UI). **WebView2** is used only where explicitly listed below (e.g. settings customization), not for reports.
 
 ## Requirements
 
-- Windows with .NET **10** SDK (template default) and WPF workload.
+- Windows with .NET **10** SDK and WPF workload.
 - MDT Pro plugin running in-game (default port **9000**).
+- **[WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)** for Settings → embedded customization only (not for reports or core searches).
 
 ## Build
 
@@ -20,27 +21,22 @@ Run the WPF app:
 dotnet run --project src/MDTProNative.Wpf -c Release
 ```
 
-## Current scope
+## Feature parity (vs browser MDT)
 
-- **Navigation**: Dashboard, Person search, Vehicle search, Firearms, BOLO (add/remove + auto-refresh), Reports (all major list endpoints), Shift/Court, **Map** (WebView2 loads the same `page/map.html` as the web MDT), Officer profile (load/save).
-- **CAD-style** theme: status strip (time, location, unit, callout count), message log, monospace readouts.
-- **WebSocket** (same protocol as browser): `interval/time`, `interval/playerLocation`, `calloutEvent`.
-- **HTTP**: wraps the same `/data/*` and `/post/*` routes the web UI uses (POST bodies match browser MDT where required).
+| Area | Native behavior |
+|------|-----------------|
+| Reports | Native FORM + JSON per report type; same `/post` create/save APIs as the web MDT (no WebView). |
+| Shift history | Native list + **Court** native docket (`Shift/Court` tab). |
+| Court (cases, resolve, attach reports) | Native `NativeCourtView` (pending-case actions). |
+| Person / vehicle / firearms / BOLO | Native WPF views (same `/data` + `/post` as web). |
+| Map | Native tactical position readout (same data the plugin exposes to the web map). |
+| Active Call | Native Dashboard (WebSocket callouts + GPS post). |
+| Config & plugins | Settings → embedded `page/customization` |
+| Officer profile, shift start/end | Native WPF (same `/post` routes as web) |
+| Panic, backup menu, ALPR clear | Native quick actions |
+| Callouts list + GPS from overview | Native WebSocket + `setGpsWaypoint` |
 
-### Not in this client (use web MDT)
-
-- Full **report composer** (all sections / drafts / autosave) — large; keep using the browser for creating/editing complex reports unless we add a dedicated native form later.
-- **Plugins** (Calendar, ALPR popups, Department Styling) — web-only for now.
-- **True multi-user live co-editing** — still requires additive plugin work; see `docs/COLLABORATION_ROADMAP.md`.
-
-### Requirements
-
-- **[WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)** for the Map screen.
-
-## Next work (optional)
-
-- **Real-time push** for lists (reports, BOLO) without polling timers — plugin WebSocket fan-out.
-- **macOS**: .NET MAUI or SwiftUI using the same HTTP/WS contract.
+**Plugin-only or extra windows:** use **Settings → About → Open web home (full desktop) in browser** (`page/index`). That is the same desktop as opening the MDT in Chrome/Edge, including `/plugin/.../page/...` windows.
 
 ## Projects
 
@@ -48,4 +44,9 @@ dotnet run --project src/MDTProNative.Wpf -c Release
 |---------|------|
 | `MDTProNative.Core` | Shared types (`MdtServerEndpoint`). |
 | `MDTProNative.Client` | HTTP + WebSocket client for the plugin. |
-| `MDTProNative.Wpf` | WPF UI. |
+| `MDTProNative.Wpf` | WPF UI + `MdtWebPageView` host. |
+
+## Optional next work
+
+- Real-time push for lists without polling — plugin WebSocket fan-out.
+- **macOS**: .NET MAUI or SwiftUI using the same HTTP/WS contract.

@@ -1,0 +1,24 @@
+<Window x:Class="MDTProNative.Wpf.Windows.BackupMenuWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MDC — Backup request"
+        Icon="{StaticResource MdtProLogoImage}"
+        Width="460" Height="720"
+        MinWidth="400" MinHeight="420"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource CadBg}"
+        Foreground="{StaticResource CadText}">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top"
+                   x:Name="ProviderNote"
+                   TextWrapping="Wrap"
+                   Foreground="{StaticResource CadMuted}"
+                   FontSize="11"
+                   Margin="0,0,0,10"
+                   Visibility="Visible" />
+        <Button DockPanel.Dock="Bottom" Content="Close" Style="{StaticResource CadButton}" HorizontalAlignment="Right" Click="Close_Click" Margin="0,10,0,0" MinWidth="88" />
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="RootStack" />
+        </ScrollViewer>
+    </DockPanel>
+</Window>

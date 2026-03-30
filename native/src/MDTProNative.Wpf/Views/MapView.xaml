@@ -1,10 +1,31 @@
 <UserControl x:Class="MDTProNative.Wpf.Views.MapView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf">
-    <DockPanel Margin="8">
-        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{StaticResource CadMuted}" FontSize="11"
-                   Text="Embedded browser map (same page as web MDT). Requires WebView2 Runtime. Uses live WebSocket from the page." />
-        <wv2:WebView2 x:Name="Web" />
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel Margin="8" LastChildFill="True">
+        <Border DockPanel.Dock="Top" Style="{StaticResource CadModuleChromeBorder}" Padding="10" Margin="0,0,0,8">
+            <DockPanel LastChildFill="True">
+                <Button x:Name="RefreshBtn" DockPanel.Dock="Right" Content="REFRESH FIX" Style="{StaticResource CadPrimaryActionButton}" Margin="8,0,0,0" />
+                <TextBlock TextWrapping="Wrap" Foreground="{StaticResource CadMuted}" FontSize="11"
+                           Text="Tactical position fix (no embedded map). Uses the same player / stop location the plugin exposes to the browser MDT." />
+            </DockPanel>
+        </Border>
+        <Border Style="{StaticResource CadModuleChromeBorder}" Padding="12">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
+                    <TextBlock Text="LOCATION" Style="{StaticResource CadSectionTitle}" Margin="0,0,0,8" />
+                    <TextBlock x:Name="LocationText"
+                               TextWrapping="Wrap"
+                               FontFamily="{StaticResource CadFontMono}"
+                               FontSize="12"
+                               Foreground="{StaticResource CadText}" />
+                    <TextBlock Text="POSTAL SET" Style="{StaticResource CadSectionTitle}" Margin="0,16,0,8" />
+                    <TextBlock x:Name="PostalText"
+                               TextWrapping="Wrap"
+                               FontFamily="{StaticResource CadFontMono}"
+                               FontSize="11"
+                               Foreground="{StaticResource CadSubTabActiveText}" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
     </DockPanel>
 </UserControl>

@@ -2,6 +2,7 @@ using System.Net.Http;
 using System.Windows.Threading;
 using MDTProNative.Client;
 using MDTProNative.Core;
+using MDTProNative.Wpf.Helpers;
 using Newtonsoft.Json.Linq;
 
 namespace MDTProNative.Wpf.Services;
@@ -62,7 +63,8 @@ public sealed class MdtConnectionManager : IAsyncDisposable
     void OnLocationMessage(string request, JToken? response)
     {
         if (request != "playerLocation") return;
-        var line = response?.ToString(Newtonsoft.Json.Formatting.None) ?? "—";
+        var line = response != null ? JTokenDisplay.FormatLocation(response) : "—";
+        if (string.IsNullOrWhiteSpace(line)) line = "—";
         _dispatcher.BeginInvoke(() => LocationUpdated?.Invoke(line));
     }
 
