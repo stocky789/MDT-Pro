@@ -301,9 +301,17 @@ namespace MDTPro.Setup {
 
                 public class Labels {
                     public string licensePlate = "License Plate";
+                    public string modelDisplayName = "Display name";
+                    public string model = "Model (CDF)";
+                    public string make = "Make";
                     public string owner = "Owner";
                     public string isStolen = "Stolen";
                     public string color = "Color";
+                    public string primaryColor = "Primary color";
+                    public string secondaryColor = "Secondary color";
+                    public string primaryColorGta = "Primary (GTA)";
+                    public string secondaryColorGta = "Secondary (GTA)";
+                    public string vinStatus = "VIN status";
                     public string vehicleModel = "Vehicle Model";
                     public string registrationStatus = "Registration Status";
                     public string registrationExpiration = "Registration Expiration";

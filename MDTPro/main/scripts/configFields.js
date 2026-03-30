@@ -227,8 +227,8 @@ const CONFIG_FIELD_META = {
     label: 'Database sync interval (ms)',
     tooltip: 'How often the MDT syncs data with the game database. Higher values reduce CPU usage.',
     presets: [
-      { label: '5000 ms', value: 5000 },
-      { label: '10000 ms (default)', value: 10000 },
+      { label: '5000 ms (default)', value: 5000 },
+      { label: '10000 ms', value: 10000 },
       { label: '15000 ms', value: 15000 },
       { label: '30000 ms', value: 30000 },
       PRESET_CUSTOM,

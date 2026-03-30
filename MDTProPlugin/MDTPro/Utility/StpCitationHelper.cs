@@ -1,4 +1,4 @@
-// StopThePed: reflect public static citation & ticket APIs (References/StopThePed decompile + runtime discovery).
+// StopThePed: heuristic reflection for citation/ticket handoff (no stable public ticket API on STP/StopThePed.dll — see STP/StopThePed.API.cs).
 using MDTPro.Data;
 using MDTPro.Setup;
 using Rage;
