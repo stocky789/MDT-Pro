@@ -102,7 +102,7 @@ async function loadNearbyVehicles() {
     await fetch('/data/nearbyVehicles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: '5',
+      body: '8',
     })
   ).json()
 

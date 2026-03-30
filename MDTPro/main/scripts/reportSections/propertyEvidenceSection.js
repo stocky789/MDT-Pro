@@ -4,68 +4,66 @@ async function getPropertyEvidenceSection (data = {}, isList = false) {
   const labels = language.reports?.sections?.propertyEvidence || {}
   const section = document.createElement('div')
   section.classList.add('section', 'propertyEvidenceSection')
-  if (isList) section.classList.add('searchResponseWrapper')
 
-  let shell = null
-  let docRoot = null
+  const shell = document.createElement('div')
+  shell.className = 'propertyEvidenceDocumentShell'
+  if (isList) shell.classList.add('mdtpro-property-evidence-shell--view')
+  const toolbar = document.createElement('div')
+  toolbar.className = 'report-doc-toolbar'
+  const printBtn = document.createElement('button')
+  printBtn.type = 'button'
+  printBtn.className = 'reportDocToolbarButton'
+  printBtn.textContent = labels.printOrPdf || 'Print / Save as PDF…'
+  printBtn.addEventListener('click', () => window.print())
+  toolbar.appendChild(printBtn)
   if (!isList) {
-    shell = document.createElement('div')
-    shell.className = 'propertyEvidenceDocumentShell'
-    const toolbar = document.createElement('div')
-    toolbar.className = 'report-doc-toolbar'
-    const printBtn = document.createElement('button')
-    printBtn.type = 'button'
-    printBtn.className = 'reportDocToolbarButton'
-    printBtn.textContent = labels.printOrPdf || 'Print / Save as PDF…'
-    printBtn.addEventListener('click', () => window.print())
     const recentModalBtn = document.createElement('button')
     recentModalBtn.type = 'button'
     recentModalBtn.className = 'reportDocToolbarButton'
     recentModalBtn.textContent = labels.recentIdsModal || 'Recent IDs…'
     recentModalBtn.addEventListener('click', () => openPropertyEvidenceRecentIdsModal(section, labels))
-    toolbar.appendChild(printBtn)
     toolbar.appendChild(recentModalBtn)
-    shell.appendChild(toolbar)
-    docRoot = document.createElement('div')
-    docRoot.className = 'report-document'
-    const header = document.createElement('div')
-    header.className = 'report-doc-header'
-    const leftCol = document.createElement('div')
-    leftCol.className = 'report-doc-header-left'
-    const seal = document.createElement('div')
-    seal.className = 'report-doc-seal'
-    const sealImg = document.createElement('img')
-    sealImg.className = 'report-doc-seal-img'
-    sealImg.alt = ''
-    const sealFallback = document.createElement('span')
-    sealFallback.className = 'report-doc-seal-fallback'
-    sealFallback.textContent = 'SARL'
-    seal.appendChild(sealImg)
-    seal.appendChild(sealFallback)
-    const rightCol = document.createElement('div')
-    rightCol.className = 'report-doc-header-right'
-    const mainTitle = document.createElement('div')
-    mainTitle.className = 'report-doc-main-title'
-    mainTitle.textContent = labels.title || 'Property & Evidence Receipt'
-    const rightTitle = document.createElement('div')
-    rightTitle.className = 'report-doc-right-title'
-    rightCol.appendChild(mainTitle)
-    rightCol.appendChild(rightTitle)
-    header.appendChild(leftCol)
-    header.appendChild(seal)
-    header.appendChild(rightCol)
-    docRoot.appendChild(header)
-    shell.appendChild(docRoot)
   }
+  shell.appendChild(toolbar)
+  const docRoot = document.createElement('div')
+  docRoot.className = 'report-document'
+  const header = document.createElement('div')
+  header.className = 'report-doc-header'
+  const leftCol = document.createElement('div')
+  leftCol.className = 'report-doc-header-left'
+  const seal = document.createElement('div')
+  seal.className = 'report-doc-seal'
+  const sealImg = document.createElement('img')
+  sealImg.className = 'report-doc-seal-img'
+  sealImg.alt = ''
+  const sealFallback = document.createElement('span')
+  sealFallback.className = 'report-doc-seal-fallback'
+  sealFallback.textContent = 'SARL'
+  seal.appendChild(sealImg)
+  seal.appendChild(sealFallback)
+  const rightCol = document.createElement('div')
+  rightCol.className = 'report-doc-header-right'
+  const mainTitle = document.createElement('div')
+  mainTitle.className = 'report-doc-main-title'
+  mainTitle.textContent = labels.title || 'Property & Evidence Receipt'
+  const rightTitle = document.createElement('div')
+  rightTitle.className = 'report-doc-right-title'
+  rightCol.appendChild(mainTitle)
+  rightCol.appendChild(rightTitle)
+  header.appendChild(leftCol)
+  header.appendChild(seal)
+  header.appendChild(rightCol)
+  docRoot.appendChild(header)
+  shell.appendChild(docRoot)
 
   const title = document.createElement('div')
-  title.classList.add(isList ? 'searchResponseSectionTitle' : 'title')
+  title.classList.add('title')
   title.innerHTML = labels.sectionDetailsTitle || 'Details'
   section.appendChild(title)
 
   // --- Subjects (multiple, with Recent IDs) ---
   const subjectsLabel = document.createElement('div')
-  subjectsLabel.classList.add(isList ? 'searchResponseSectionTitle' : 'title')
+  subjectsLabel.classList.add('title')
   subjectsLabel.style.marginTop = '12px'
   subjectsLabel.style.fontSize = '14px'
   subjectsLabel.textContent = labels.subjectsTitle || 'Subjects (persons from whom seized)'
@@ -356,50 +354,46 @@ async function getPropertyEvidenceSection (data = {}, isList = false) {
   otherCell.appendChild(otherInput)
   section.appendChild(otherCell)
 
-  if (shell != null && docRoot != null) {
-    docRoot.appendChild(section)
-    const authBar = document.createElement('div')
-    authBar.className = 'report-doc-auth-bar'
-    authBar.textContent = labels.authorizationBlurb || 'Authorization: I authorize the prosecuting attorney to receive a copy of the related lab report. Signature: ________________  Date: __________'
-    docRoot.appendChild(authBar)
-    const footer = document.createElement('div')
-    footer.className = 'report-doc-footer'
-    docRoot.appendChild(footer)
-    ;(async function applyBranding () {
-      try {
-        const res = await fetch('/data/reportBranding?reportType=propertyEvidence')
-        const j = res.ok ? await res.json() : null
-        const t = j && j.activeTemplate
-        if (!t) return
-        const leftEl = docRoot.querySelector('.report-doc-header-left')
-        const sealEl = docRoot.querySelector('.report-doc-seal')
-        const sealImgEl = sealEl && sealEl.querySelector('.report-doc-seal-img')
-        const sealFbEl = sealEl && sealEl.querySelector('.report-doc-seal-fallback')
-        const rightTitleEl = docRoot.querySelector('.report-doc-right-title')
-        const mainTitleEl = docRoot.querySelector('.report-doc-main-title')
-        if (leftEl) leftEl.textContent = (t.leftColumn || '').replace(/\r\n/g, '\n')
-        if (sealFbEl) sealFbEl.textContent = String(t.centerTitle || 'LAB').trim().slice(0, 12)
-        if (sealImgEl && sealFbEl) {
-          const badge = t.sealBadgeFile
-          if (badge && !/\.svg$/i.test(String(badge))) {
-            sealImgEl.src = '/plugin/DepartmentStyling/image/' + String(badge).trim() + '?v=1'
-            sealImgEl.style.display = 'block'
-            sealFbEl.style.display = 'none'
-          } else {
-            sealImgEl.removeAttribute('src')
-            sealImgEl.style.display = 'none'
-            sealFbEl.style.display = 'flex'
-          }
+  docRoot.appendChild(section)
+  const authBar = document.createElement('div')
+  authBar.className = 'report-doc-auth-bar'
+  authBar.textContent = labels.authorizationBlurb || 'Authorization: I authorize the prosecuting attorney to receive a copy of the related lab report. Signature: ________________  Date: __________'
+  docRoot.appendChild(authBar)
+  const footer = document.createElement('div')
+  footer.className = 'report-doc-footer'
+  docRoot.appendChild(footer)
+  ;(async function applyBranding () {
+    try {
+      const res = await fetch('/data/reportBranding?reportType=propertyEvidence')
+      const j = res.ok ? await res.json() : null
+      const t = j && j.activeTemplate
+      if (!t) return
+      const leftEl = docRoot.querySelector('.report-doc-header-left')
+      const sealEl = docRoot.querySelector('.report-doc-seal')
+      const sealImgEl = sealEl && sealEl.querySelector('.report-doc-seal-img')
+      const sealFbEl = sealEl && sealEl.querySelector('.report-doc-seal-fallback')
+      const rightTitleEl = docRoot.querySelector('.report-doc-right-title')
+      const mainTitleEl = docRoot.querySelector('.report-doc-main-title')
+      if (leftEl) leftEl.textContent = (t.leftColumn || '').replace(/\r\n/g, '\n')
+      if (sealFbEl) sealFbEl.textContent = String(t.centerTitle || 'LAB').trim().slice(0, 12)
+      if (sealImgEl && sealFbEl) {
+        const badge = t.sealBadgeFile
+        if (badge && !/\.svg$/i.test(String(badge))) {
+          sealImgEl.src = '/plugin/DepartmentStyling/image/' + String(badge).trim() + '?v=1'
+          sealImgEl.style.display = 'block'
+          sealFbEl.style.display = 'none'
+        } else {
+          sealImgEl.removeAttribute('src')
+          sealImgEl.style.display = 'none'
+          sealFbEl.style.display = 'flex'
         }
-        if (rightTitleEl) rightTitleEl.textContent = (t.rightTitle || '').replace(/\r\n/g, '\n')
-        footer.textContent = t.footer || ''
-        if (mainTitleEl && t.propertyEvidenceTitle) mainTitleEl.textContent = t.propertyEvidenceTitle
-      } catch (_) {}
-    })()
-    return shell
-  }
-
-  return section
+      }
+      if (rightTitleEl) rightTitleEl.textContent = (t.rightTitle || '').replace(/\r\n/g, '\n')
+      footer.textContent = t.footer || ''
+      if (mainTitleEl && t.propertyEvidenceTitle) mainTitleEl.textContent = t.propertyEvidenceTitle
+    } catch (_) {}
+  })()
+  return shell
 }
 
 function openPropertyEvidenceRecentIdsModal (section, labels) {

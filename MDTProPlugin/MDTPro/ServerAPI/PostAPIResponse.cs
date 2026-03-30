@@ -7,6 +7,8 @@ using System.Linq;
 using MDTPro.Setup;
 using MDTPro.Utility;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Threading;
@@ -103,7 +105,7 @@ namespace MDTPro.ServerAPI {
                     return;
                 }
                 CalloutEvents.CadUnitStatus = statusText;
-                CalloutInterfaceAPI.Functions.PublishCadUnitStatus(statusText);
+                CalloutInterfaceCadPublisher.TryPublishCadUnitStatus(statusText);
                 WebSocketHandler.BroadcastCalloutPayload();
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = true }));
                 contentType = "application/json";
@@ -186,13 +188,27 @@ namespace MDTPro.ServerAPI {
                 contentType = "text/plain";
                 status = 200;
             } else if (path == "updateOfficerInformationData") {
-                DataController.OfficerInformationData = JsonConvert.DeserializeObject<OfficerInformationData>(body);
-
-                Database.SaveOfficerInformation(DataController.OfficerInformationData);
-
-                buffer = Encoding.UTF8.GetBytes("OK");
-                contentType = "text/plain";
-                status = 200;
+                try {
+                    OfficerInformationData parsed = ParseOfficerInformationPostBody(body);
+                    if (parsed == null) {
+                        buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid officer information JSON." }));
+                        contentType = "application/json";
+                        status = 400;
+                        return;
+                    }
+                    DataController.OfficerInformationData = parsed;
+                    Database.SaveOfficerInformation(parsed);
+                    buffer = Encoding.UTF8.GetBytes("OK");
+                    contentType = "text/plain";
+                    status = 200;
+                } catch (Exception ex) {
+                    Utility.Helper.Log($"[updateOfficerInformationData] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
+                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] updateOfficerInformationData:\n{Helper.SanitizeExceptionForLog(ex)}"); } catch { }
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
+                    contentType = "application/json";
+                    status = 500;
+                    return;
+                }
             } else if (path == "modifyCurrentShift") {
                 if (body == "start") {
                     DataController.StartCurrentShift();
@@ -799,6 +815,57 @@ namespace MDTPro.ServerAPI {
                     status = 400;
                 }
             }
+        }
+
+        /// <summary>Parses POST JSON from browser/native MDT; tolerates empty strings and numeric badge variants; keeps <see cref="OfficerInformationData.agencyScriptName"/> when the client omits it.</summary>
+        private static OfficerInformationData ParseOfficerInformationPostBody(string body) {
+            if (string.IsNullOrWhiteSpace(body)) return null;
+            JObject jo;
+            try {
+                jo = JObject.Parse(body);
+            } catch {
+                return null;
+            }
+
+            string prevScript = DataController.OfficerInformationData?.agencyScriptName;
+
+            static string OptionalString(JToken t) {
+                if (t == null || t.Type == JTokenType.Null) return null;
+                string s = t.Type == JTokenType.String ? t.Value<string>() : t.ToString();
+                return string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+            }
+
+            static int? OptionalBadge(JToken t) {
+                if (t == null || t.Type == JTokenType.Null) return null;
+                if (t.Type == JTokenType.Integer) return t.Value<int>();
+                if (t.Type == JTokenType.Float) {
+                    double d = t.Value<double>();
+                    if (double.IsNaN(d) || double.IsInfinity(d)) return null;
+                    long r = (long)Math.Round(d);
+                    if (r < int.MinValue || r > int.MaxValue) return null;
+                    return (int)r;
+                }
+                if (t.Type == JTokenType.String) {
+                    string s = t.Value<string>()?.Trim();
+                    if (string.IsNullOrEmpty(s)) return null;
+                    return int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out int v) ? v : (int?)null;
+                }
+                return null;
+            }
+
+            string agencyScriptName = prevScript;
+            if (jo.TryGetValue("agencyScriptName", StringComparison.OrdinalIgnoreCase, out JToken scriptTok))
+                agencyScriptName = OptionalString(scriptTok);
+
+            return new OfficerInformationData {
+                firstName = OptionalString(jo["firstName"]),
+                lastName = OptionalString(jo["lastName"]),
+                rank = OptionalString(jo["rank"]),
+                callSign = OptionalString(jo["callSign"]),
+                agency = OptionalString(jo["agency"]),
+                agencyScriptName = agencyScriptName,
+                badgeNumber = OptionalBadge(jo["badgeNumber"]),
+            };
         }
 
         /// <summary>True if reportId exists and is an incident, injury, citation, traffic incident, or impound report (attachable as evidence).</summary>

@@ -36,7 +36,7 @@ namespace MDTPro.ALPR {
             try {
                 var cfg = GetConfig();
                 if (cfg == null || !cfg.alprWebToastsFromCalloutInterface) return;
-                if (!CalloutInterfaceAPI.Functions.IsCalloutInterfaceAvailable) return;
+                // OnPlateCheck is raised by Callout Interface; no need to gate on IsCalloutInterfaceAvailable (avoids rare API/version mismatches dropping events).
 
                 ALPRHit hit = null;
                 if (record?.Entity != null && record.Entity.Exists())
@@ -44,6 +44,9 @@ namespace MDTPro.ALPR {
                 if (hit == null)
                     hit = ALPRController.BuildAlprHitFromCalloutInterfaceVehicleRecord(record);
                 if (hit == null) return;
+
+                // Always apply CI plate-check registration/insurance/owner-wanted; entity-only build ignores VehicleRecord.*.
+                ALPRController.MergeCalloutInterfacePlateCheckIntoHit(hit, record);
 
                 ALPRController.TryEnqueueWebToastFromCalloutInterface(hit);
             } catch (Exception ex) {

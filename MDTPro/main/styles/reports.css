@@ -1002,3 +1002,68 @@ body {
 .arrestSection .arrestNarcoticScheduleFilter {
   display: none !important;
 }
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  html,
+  body {
+    overflow: visible !important;
+    height: auto !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  .listPage,
+  .createPage {
+    padding: 0 !important;
+    background: #fff !important;
+    overflow: visible !important;
+  }
+
+  .listWrapper {
+    display: block !important;
+    grid-template-columns: none !important;
+    gap: 0 !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  .listPage > .buttonWrapper,
+  .listPage .typeSelector,
+  .listPage .reportsList,
+  .listPage .reportsList .listElement,
+  .listPage .reportsList .filter {
+    display: none !important;
+  }
+
+  .listPage .listWrapper .reportInformation,
+  .createPage .listWrapper .reportInformation {
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  .listPage .listWrapper .reportInformation.hidden {
+    display: none !important;
+  }
+
+  .createPage.hidden {
+    display: none !important;
+  }
+}

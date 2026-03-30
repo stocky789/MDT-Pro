@@ -491,7 +491,6 @@ namespace MDTPro.Data {
                     var bestByPlate = new Dictionary<string, CachedNearbyVehicleEntry>(StringComparer.OrdinalIgnoreCase);
                     NearbyVehicleScanStats stNearby = default;
                     NearbyVehicleScanStats stWorld = default;
-                    int worldIterations = 0;
 
                     Vehicle[] nearby = Main.Player.GetNearbyVehicles(scanCount);
                     if (nearby != null) {
@@ -500,11 +499,12 @@ namespace MDTPro.Data {
                     }
 
                     if (fullWorldScan) {
+                        // Scan the full streamed vehicle pool (no early break). A cap on iteration count
+                        // skipped cars that were "later" in enumeration order, so the closest N plates were
+                        // wrong once Take(limit) ran — e.g. nothing within ~15m while farther cars appeared.
                         const float maxWorldScanMeters = 95f;
                         try {
                             foreach (Vehicle v in World.GetAllVehicles()) {
-                                worldIterations++;
-                                if (worldIterations > 2048) break;
                                 if (v == null || !v.Exists()) continue;
                                 float d;
                                 try { d = Main.Player.DistanceTo(v); } catch { continue; }
@@ -516,14 +516,17 @@ namespace MDTPro.Data {
                         }
                     }
 
-                    list = bestByPlate.Values.OrderBy(x => x.Distance ?? float.MaxValue).ToList();
+                    list = bestByPlate.Values
+                        .OrderBy(x => x.Distance ?? float.MaxValue)
+                        .ThenBy(x => x.LicensePlate ?? "", StringComparer.OrdinalIgnoreCase)
+                        .ToList();
                 } catch (Exception ex) {
                     Helper.Log($"UpdateCachedNearbyVehicles: {ex.Message}", false, Helper.LogSeverity.Warning);
                 }
             }
+            withDist = list.Count(e => e.Distance.HasValue);
             lock (_cachedNearbyLock) {
-                // When the game is unfocused/paused, entity reads often yield no distances; every row ties at MaxValue
-                // and Take(N) becomes arbitrary — keep the last good snapshot instead of flashing stale/random plates.
+                // When reads yield rows but no usable distances (e.g. paused/unfocused), keep the last good snapshot.
                 if (withDist == 0 && list.Count > 0 && CachedNearbyVehicles != null && CachedNearbyVehicles.Count > 0)
                     return;
                 CachedNearbyVehicles = list;
@@ -552,11 +555,8 @@ namespace MDTPro.Data {
             }
 
             const float maxWorldScanMeters = 95f;
-            int worldIterations = 0;
             try {
                 foreach (Vehicle v in World.GetAllVehicles()) {
-                    worldIterations++;
-                    if (worldIterations > 2048) break;
                     if (v == null || !v.Exists()) continue;
                     float d;
                     try { d = Main.Player.DistanceTo(v); } catch { continue; }
@@ -2142,9 +2142,7 @@ namespace MDTPro.Data {
             } catch { /* entity disposed */ }
             if (live == null) {
                 try {
-                    int n = 0;
                     foreach (Vehicle v in World.GetAllVehicles()) {
-                        if (++n > 2048) break;
                         if (v == null || !v.Exists()) continue;
                         string plate = TryResolveLiveVehiclePlate(v, out _);
                         if (string.IsNullOrEmpty(plate) || NormalizeVehiclePlateKey(plate) != want) continue;

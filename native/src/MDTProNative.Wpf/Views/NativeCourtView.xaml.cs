@@ -507,7 +507,7 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
         {
             foreach (var t in chg.OfType<JObject>())
             {
-                var nm = t["Name"]?.ToString() ?? "—";
+                var nm = ChargeDisplayName(t);
                 var arrest = t.Value<bool?>("IsArrestable");
                 var tag = arrest == true ? "ARRESTABLE" : arrest == false ? "CIVIL" : "—";
                 content.Children.Add(EvidenceRow($"{nm}: {tag}", false));
@@ -752,9 +752,20 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
         return $"{cts} citation(s), {arr} arrest(s)";
     }
 
+    static string ChargeDisplayName(JObject ch)
+    {
+        foreach (var key in new[] { "Name", "name", "ChargeName", "chargeName", "Title", "title" })
+        {
+            var s = ch[key]?.ToString();
+            if (!string.IsNullOrWhiteSpace(s))
+                return s.Trim();
+        }
+        return "—";
+    }
+
     Border ChargeCard(JObject ch, int caseStatus)
     {
-        var name = ch["Name"]?.ToString() ?? "—";
+        var name = ChargeDisplayName(ch);
         var line = NativeCourtFormatting.ChargeDetailLine(ch, caseStatus, out _);
         var outcome = ch["Outcome"];
         var oc = outcome?.Value<int?>();

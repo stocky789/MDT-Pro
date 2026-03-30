@@ -4,11 +4,7 @@ async function getCitationArrestSection(type, isList = false, list = []) {
     type == 'citation' ? await getCitationOptions() : await getArrestOptions()
 
   const title = document.createElement('div')
-  if (isList) {
-    title.classList.add('searchResponseSectionTitle')
-  } else {
-    title.classList.add('title')
-  }
+  title.classList.add('title')
   title.innerHTML = language.reports.sections[type].title
   title.style.borderBottom = 'none'
   title.style.paddingBottom = '0'
@@ -16,7 +12,6 @@ async function getCitationArrestSection(type, isList = false, list = []) {
   const sectionWrapper = document.createElement('div')
   sectionWrapper.classList.add('section')
   sectionWrapper.classList.add(`${type}Section`)
-  if (isList) sectionWrapper.classList.add('searchResponseWrapper')
 
   const additionalWrapper = document.createElement('div')
   const canEdit = !isList

@@ -70,13 +70,27 @@ internal static class ReportFormJson
     public static void ReadOfficer(JToken? tok, out string first, out string last, out string rank, out string call, out string agency, out string badge)
     {
         var o = tok as JObject;
-        first = o?["firstName"]?.ToString() ?? "";
-        last = o?["lastName"]?.ToString() ?? "";
-        rank = o?["rank"]?.ToString() ?? "";
-        call = o?["callSign"]?.ToString() ?? "";
-        agency = o?["agency"]?.ToString() ?? "";
-        var b = o?["badgeNumber"];
+        first = ReadOfficerStringField(o, "firstName", "FirstName");
+        last = ReadOfficerStringField(o, "lastName", "LastName");
+        rank = ReadOfficerStringField(o, "rank", "Rank");
+        call = ReadOfficerStringField(o, "callSign", "CallSign", "callsign");
+        agency = ReadOfficerStringField(o, "agency", "Agency");
+        var b = o?["badgeNumber"] ?? o?["BadgeNumber"];
         badge = b == null || b.Type == JTokenType.Null ? "" : b.ToString();
+    }
+
+    static string ReadOfficerStringField(JObject? o, params string[] keys)
+    {
+        if (o == null) return "";
+        foreach (var key in keys)
+        {
+            var t = o[key];
+            if (t == null || t.Type == JTokenType.Null) continue;
+            var s = t.ToString();
+            if (!string.IsNullOrWhiteSpace(s)) return s;
+        }
+
+        return "";
     }
 
     public static JObject BuildLocation(string area, string street, string county, string postal) =>

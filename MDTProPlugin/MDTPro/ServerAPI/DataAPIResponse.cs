@@ -24,7 +24,7 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/json";
             } else if (path == "nearbyVehicles") {
-                int limit = Helper.ParsePostBodyAsPositiveInt(Helper.GetRequestPostData(req), 5);
+                int limit = Helper.ParsePostBodyAsPositiveInt(Helper.GetRequestPostData(req), 8);
                 if (limit < 1) limit = 1;
                 if (limit > 20) limit = 20;
 

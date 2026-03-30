@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using System.Windows.Controls;
 using MDTProNative.Wpf.Helpers;
 using MDTProNative.Wpf.Services;
@@ -11,9 +12,35 @@ public partial class ImpoundReportForm : UserControl, IReportFormPane
 {
     sealed record StatusPick(int Value, string Label);
 
+    // Match MDTPro/main/scripts/reportSections/impoundSection.js (IMPOUND_LOTS, TOW_COMPANIES, reason select options).
+    static readonly string[] ImpoundReasonOptions =
+    [
+        "",
+        "Stolen recovery",
+        "Abandoned",
+        "Evidence",
+        "Traffic violation",
+        "No insurance",
+        "Other",
+    ];
+
+    static readonly string[] TowCompanyOptions = ["", "Camel Towing", "Davis Towing"];
+
+    static readonly string[] ImpoundLotOptions =
+    [
+        "LSPD Auto Impound — Mission Row (Sinner St & Vespucci Blvd)",
+        "LSPD Auto Impound — Davis (Roy Lowenstein Blvd & Innocence Blvd)",
+    ];
+
     public ImpoundReportForm()
     {
         InitializeComponent();
+        ImpoundReasonCombo.ItemsSource = ImpoundReasonOptions;
+        TowCompanyCombo.ItemsSource = TowCompanyOptions;
+        ImpoundLotCombo.ItemsSource = ImpoundLotOptions;
+        ImpoundReasonCombo.SelectedIndex = 0;
+        TowCompanyCombo.SelectedIndex = 0;
+        ImpoundLotCombo.SelectedIndex = Random.Shared.Next(ImpoundLotOptions.Length);
         StatusCombo.ItemsSource = new StatusPick[]
         {
             new(0, "Closed"),
@@ -32,6 +59,8 @@ public partial class ImpoundReportForm : UserControl, IReportFormPane
         ReportFormCopyButtons.Wire(CopyReportIdBtn, IdBox);
         ReportFormCopyButtons.Wire(CopyLicensePlateBtn, LicensePlateBox);
     }
+
+    public void ApplyVehicleSearchPrefill(JObject vehicleSnapshot) => ApplyVehicleSnapshot(vehicleSnapshot);
 
     void ApplyVehicleSnapshot(JObject vehicle)
     {
@@ -83,20 +112,13 @@ public partial class ImpoundReportForm : UserControl, IReportFormPane
 
         NotesBox.Text = report["Notes"]?.ToString() ?? "";
 
-        if (report["OfficerInformation"] is JObject off)
-        {
-            OfficerFirstBox.Text = off["firstName"]?.ToString() ?? "";
-            OfficerLastBox.Text = off["lastName"]?.ToString() ?? "";
-            OfficerRankBox.Text = off["rank"]?.ToString() ?? "";
-            OfficerCallSignBox.Text = off["callSign"]?.ToString() ?? "";
-            OfficerAgencyBox.Text = off["agency"]?.ToString() ?? "";
-            OfficerBadgeBox.Text = off["badgeNumber"]?.ToString() ?? "";
-        }
-        else
-        {
-            OfficerFirstBox.Text = OfficerLastBox.Text = OfficerRankBox.Text = "";
-            OfficerCallSignBox.Text = OfficerAgencyBox.Text = OfficerBadgeBox.Text = "";
-        }
+        ReportFormJson.ReadOfficer(report["OfficerInformation"], out var offFirst, out var offLast, out var offRank, out var offCall, out var offAgency, out var offBadge);
+        OfficerFirstBox.Text = offFirst;
+        OfficerLastBox.Text = offLast;
+        OfficerRankBox.Text = offRank;
+        OfficerCallSignBox.Text = offCall;
+        OfficerAgencyBox.Text = offAgency;
+        OfficerBadgeBox.Text = offBadge;
 
         if (report["Location"] is JObject loc)
         {
@@ -115,9 +137,9 @@ public partial class ImpoundReportForm : UserControl, IReportFormPane
         OwnerBox.Text = report["Owner"]?.ToString() ?? "";
         PersonAtFaultNameBox.Text = report["PersonAtFaultName"]?.ToString() ?? "";
         VinBox.Text = report["Vin"]?.ToString() ?? "";
-        ImpoundReasonBox.Text = report["ImpoundReason"]?.ToString() ?? "";
-        TowCompanyBox.Text = report["TowCompany"]?.ToString() ?? "";
-        ImpoundLotBox.Text = report["ImpoundLot"]?.ToString() ?? "";
+        SelectComboFromSaved(ImpoundReasonCombo, ImpoundReasonOptions, report["ImpoundReason"]?.ToString());
+        SelectComboFromSaved(TowCompanyCombo, TowCompanyOptions, report["TowCompany"]?.ToString());
+        SelectImpoundLotCombo(report["ImpoundLot"]?.ToString());
     }
 
     public JObject BuildReport()
@@ -170,9 +192,9 @@ public partial class ImpoundReportForm : UserControl, IReportFormPane
             ["Owner"] = OwnerBox.Text.Trim(),
             ["PersonAtFaultName"] = personTok,
             ["Vin"] = VinBox.Text.Trim(),
-            ["ImpoundReason"] = ImpoundReasonBox.Text.Trim(),
-            ["TowCompany"] = TowCompanyBox.Text.Trim(),
-            ["ImpoundLot"] = ImpoundLotBox.Text.Trim(),
+            ["ImpoundReason"] = ComboSelectionText(ImpoundReasonCombo),
+            ["TowCompany"] = ComboSelectionText(TowCompanyCombo),
+            ["ImpoundLot"] = ComboSelectionText(ImpoundLotCombo),
         };
     }
 
@@ -186,7 +208,47 @@ public partial class ImpoundReportForm : UserControl, IReportFormPane
         OfficerCallSignBox.Text = OfficerAgencyBox.Text = OfficerBadgeBox.Text = "";
         LocAreaBox.Text = LocStreetBox.Text = LocCountyBox.Text = LocPostalBox.Text = "";
         LicensePlateBox.Text = VehicleModelBox.Text = OwnerBox.Text = "";
-        PersonAtFaultNameBox.Text = VinBox.Text = ImpoundReasonBox.Text = "";
-        TowCompanyBox.Text = ImpoundLotBox.Text = "";
+        PersonAtFaultNameBox.Text = VinBox.Text = "";
+        ImpoundReasonCombo.ItemsSource = ImpoundReasonOptions;
+        ImpoundReasonCombo.SelectedIndex = 0;
+        TowCompanyCombo.ItemsSource = TowCompanyOptions;
+        TowCompanyCombo.SelectedIndex = 0;
+        ImpoundLotCombo.ItemsSource = ImpoundLotOptions;
+        ImpoundLotCombo.SelectedIndex = Random.Shared.Next(ImpoundLotOptions.Length);
     }
+
+    static void SelectComboFromSaved(ComboBox combo, IReadOnlyList<string> baseline, string? saved)
+    {
+        var s = saved ?? "";
+        if (!string.IsNullOrEmpty(s) && !baseline.Contains(s))
+            combo.ItemsSource = baseline.Concat(new[] { s }).ToList();
+        else
+            combo.ItemsSource = baseline;
+        combo.SelectedItem = s;
+    }
+
+    void SelectImpoundLotCombo(string? saved)
+    {
+        var s = (saved ?? "").Trim();
+        if (string.IsNullOrEmpty(s))
+        {
+            ImpoundLotCombo.ItemsSource = ImpoundLotOptions;
+            ImpoundLotCombo.SelectedIndex = Random.Shared.Next(ImpoundLotOptions.Length);
+            return;
+        }
+
+        if (ImpoundLotOptions.Contains(s))
+        {
+            ImpoundLotCombo.ItemsSource = ImpoundLotOptions;
+            ImpoundLotCombo.SelectedItem = s;
+        }
+        else
+        {
+            ImpoundLotCombo.ItemsSource = ImpoundLotOptions.Concat(new[] { s }).ToList();
+            ImpoundLotCombo.SelectedItem = s;
+        }
+    }
+
+    static string ComboSelectionText(ComboBox combo) =>
+        (combo.SelectedItem as string ?? "").Trim();
 }

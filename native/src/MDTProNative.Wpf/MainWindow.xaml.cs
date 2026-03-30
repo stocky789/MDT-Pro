@@ -84,6 +84,7 @@ public partial class MainWindow : Window
         MdtShellEvents.NavigateToPersonSearchRequested += OnNavigateToPersonSearchRequested;
         MdtShellEvents.NavigateToReportRequested += OnNavigateToReportRequested;
         MdtShellEvents.NavigateToNewReportFromPersonSearchRequested += OnNavigateToNewReportFromPersonSearchRequested;
+        MdtShellEvents.NavigateToNewReportFromVehicleSearchRequested += OnNavigateToNewReportFromVehicleSearchRequested;
         SetQuickActionsEnabled(false);
 
         ApplyTerminalChrome();
@@ -101,6 +102,7 @@ public partial class MainWindow : Window
             MdtShellEvents.NavigateToPersonSearchRequested -= OnNavigateToPersonSearchRequested;
             MdtShellEvents.NavigateToReportRequested -= OnNavigateToReportRequested;
             MdtShellEvents.NavigateToNewReportFromPersonSearchRequested -= OnNavigateToNewReportFromPersonSearchRequested;
+            MdtShellEvents.NavigateToNewReportFromVehicleSearchRequested -= OnNavigateToNewReportFromVehicleSearchRequested;
             if (ContentHost.Content is IMdtBoundView b) b.Bind(null);
             await _connection.DisposeAsync();
         };
@@ -210,6 +212,13 @@ public partial class MainWindow : Window
     void OnNavigateToNewReportFromPersonSearchRequested(string reportTypeKey, string pedName, string? vehicleLicensePlate)
     {
         ReportsView.PendingNewReportFromPersonSearch = new(reportTypeKey, pedName, vehicleLicensePlate);
+        if (_nav.FirstOrDefault(x => x.Id == "reports") is { } item)
+            NavList.SelectedItem = item;
+    }
+
+    void OnNavigateToNewReportFromVehicleSearchRequested(string reportTypeKey, JObject vehicle)
+    {
+        ReportsView.PendingNewReportFromVehicleSearch = new(reportTypeKey, (JObject)vehicle.DeepClone());
         if (_nav.FirstOrDefault(x => x.Id == "reports") is { } item)
             NavList.SelectedItem = item;
     }
@@ -398,7 +407,8 @@ public partial class MainWindow : Window
             try
             {
                 var http = _connection.Http!;
-                var officer = await http.GetDataJsonAsync("officerInformation");
+                var officer = await http.GetDataJsonAsync("officerInformationData") as JObject
+                    ?? await http.GetDataJsonAsync("officerInformation") as JObject;
                 var unit = officer?["callSign"]?.ToString() ?? officer?["callsign"]?.ToString();
                 StatusUnit.Text = string.IsNullOrEmpty(unit) ? "—" : unit;
                 await UpdateOfficerStripAsync();
@@ -471,19 +481,30 @@ public partial class MainWindow : Window
         if (http == null) { ClearOfficerStrip(); return; }
         try
         {
-            var j = await http.GetDataJsonAsync("officerInformation") as JObject;
-            if (j == null) { ClearOfficerStrip(); return; }
+            // Officer tab persists to officerInformationData; live session exposes officerInformation — prefer tab data.
+            var data = await http.GetDataJsonAsync("officerInformationData") as JObject;
+            var live = await http.GetDataJsonAsync("officerInformation") as JObject;
+            if (data == null && live == null) { ClearOfficerStrip(); return; }
             _ = Dispatcher.BeginInvoke(() =>
             {
-                OfFirst.Text = F(j["firstName"]);
-                OfLast.Text = F(j["lastName"]);
-                OfBadge.Text = F(j["badgeNumber"]);
-                OfRank.Text = F(j["rank"]);
-                OfCall.Text = F(j["callSign"]);
-                OfDept.Text = F(j["agency"]);
+                OfFirst.Text = F(OfficerStripPick(data, live, "firstName"));
+                OfLast.Text = F(OfficerStripPick(data, live, "lastName"));
+                OfBadge.Text = F(OfficerStripPick(data, live, "badgeNumber"));
+                OfRank.Text = F(OfficerStripPick(data, live, "rank"));
+                OfCall.Text = F(OfficerStripPick(data, live, "callSign"));
+                OfDept.Text = F(OfficerStripPick(data, live, "agency"));
             });
         }
         catch { _ = Dispatcher.BeginInvoke(ClearOfficerStrip); }
+    }
+
+    static JToken? OfficerStripPick(JObject? data, JObject? live, string name)
+    {
+        static bool Meaningful(JToken? tok) =>
+            tok != null && tok.Type != JTokenType.Null && !string.IsNullOrWhiteSpace(tok.ToString());
+        var a = data?[name];
+        if (Meaningful(a)) return a;
+        return live?[name];
     }
 
     static string F(JToken? t)

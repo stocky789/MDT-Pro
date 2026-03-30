@@ -108,10 +108,13 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
         if (sender is not ComboBox cb || cb.DataContext is not ArrestChargeRow row) return;
         if (cb.SelectedItem is not ArrestChargePickerOption opt) return;
         opt.ApplyTo(row);
+        // Clearing selection resets editable ComboBox Text and pushes "" into the ChargeName binding.
+        var name = opt.ChargeName;
         _suppressArrestChargePick = true;
         try
         {
             cb.SelectedItem = null;
+            row.ChargeName = name;
         }
         finally
         {
@@ -145,20 +148,13 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
 
         NotesBox.Text = report["Notes"]?.ToString() ?? "";
 
-        if (report["OfficerInformation"] is JObject off)
-        {
-            OfficerFirstBox.Text = off["firstName"]?.ToString() ?? "";
-            OfficerLastBox.Text = off["lastName"]?.ToString() ?? "";
-            OfficerRankBox.Text = off["rank"]?.ToString() ?? "";
-            OfficerCallSignBox.Text = off["callSign"]?.ToString() ?? "";
-            OfficerAgencyBox.Text = off["agency"]?.ToString() ?? "";
-            OfficerBadgeBox.Text = off["badgeNumber"]?.ToString() ?? "";
-        }
-        else
-        {
-            OfficerFirstBox.Text = OfficerLastBox.Text = OfficerRankBox.Text = "";
-            OfficerCallSignBox.Text = OfficerAgencyBox.Text = OfficerBadgeBox.Text = "";
-        }
+        ReportFormJson.ReadOfficer(report["OfficerInformation"], out var offFirst, out var offLast, out var offRank, out var offCall, out var offAgency, out var offBadge);
+        OfficerFirstBox.Text = offFirst;
+        OfficerLastBox.Text = offLast;
+        OfficerRankBox.Text = offRank;
+        OfficerCallSignBox.Text = offCall;
+        OfficerAgencyBox.Text = offAgency;
+        OfficerBadgeBox.Text = offBadge;
 
         if (report["Location"] is JObject loc)
         {

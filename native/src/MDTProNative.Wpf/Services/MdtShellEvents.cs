@@ -1,3 +1,5 @@
+using Newtonsoft.Json.Linq;
+
 namespace MDTProNative.Wpf.Services;
 
 /// <summary>Cross-view hooks into the main MDT shell (taskbar, CAD message log).</summary>
@@ -16,6 +18,9 @@ public static class MdtShellEvents
 
     /// <summary>Switch to Reports, create a new draft of <paramref name="reportTypeKey"/>, and prefill from person search.</summary>
     public static event Action<string, string, string?>? NavigateToNewReportFromPersonSearchRequested;
+
+    /// <summary>Switch to Reports, new draft, prefill from vehicle search (vehicle JSON snapshot).</summary>
+    public static event Action<string, JObject>? NavigateToNewReportFromVehicleSearchRequested;
 
     public static void RequestOfficerStripRefresh() => OfficerStripRefreshRequested?.Invoke();
 
@@ -43,5 +48,12 @@ public static class MdtShellEvents
         if (rk.Length == 0 || pn.Length == 0) return;
         var plate = string.IsNullOrWhiteSpace(vehicleLicensePlate) ? null : vehicleLicensePlate.Trim();
         NavigateToNewReportFromPersonSearchRequested?.Invoke(rk, pn, plate);
+    }
+
+    public static void RequestNavigateToNewReportFromVehicleSearch(string? reportTypeKey, JObject? vehicle)
+    {
+        var rk = reportTypeKey?.Trim() ?? "";
+        if (rk.Length == 0 || vehicle == null) return;
+        NavigateToNewReportFromVehicleSearchRequested?.Invoke(rk, vehicle);
     }
 }

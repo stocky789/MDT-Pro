@@ -20,4 +20,7 @@ public interface IReportFormPane
 
     /// <summary>Optional: after a new draft load, prefill offender / injured party from person search navigation.</summary>
     void ApplyPersonSearchPrefill(string pedName, string? vehicleLicensePlate) { }
+
+    /// <summary>Optional: after a new draft load, prefill from vehicle search (e.g. impound).</summary>
+    void ApplyVehicleSearchPrefill(JObject vehicleSnapshot) { }
 }

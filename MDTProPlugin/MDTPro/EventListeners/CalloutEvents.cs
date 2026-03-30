@@ -38,7 +38,7 @@ namespace MDTPro.EventListeners {
             public DateTime? FinishedTime = null;
             public List<string> AdditionalMessages = new List<string>();
 
-            internal CalloutInformation(Callout callout) {
+            internal CalloutInformation(Callout callout, LHandle handle) {
                 Id = Guid.NewGuid().ToString("N");
                 Name = callout.FriendlyName;
                 Agency = Helper.GetAgencyNameFromScriptName(LSPD_First_Response.Mod.API.Functions.GetCurrentAgencyScriptName()) ?? LSPD_First_Response.Mod.API.Functions.GetCurrentAgencyScriptName();
@@ -59,7 +59,8 @@ namespace MDTPro.EventListeners {
                 Location = new Location(callout.CalloutPosition);
                 Coords[0] = callout.CalloutPosition.X;
                 Coords[1] = callout.CalloutPosition.Y;
-                AcceptanceState = callout.AcceptanceState;
+                // LSPDFR handle reflects the live acceptance state; some CI/LSPDFR callout instances report a stale property at display time.
+                AcceptanceState = handle != null ? LspdFunc.GetCalloutAcceptanceState(handle) : callout.AcceptanceState;
                 DisplayedTime = DateTime.Now;
             }
         }
@@ -95,7 +96,7 @@ namespace MDTPro.EventListeners {
                 Helper.Log("MDT Pro: OnCalloutDisplayed — could not resolve Callout from handle (LSPDFR + CalloutInterface). Active Call list will miss this dispatch.", true, Helper.LogSeverity.Warning);
                 return;
             }
-            var info = new CalloutInformation(callout);
+            var info = new CalloutInformation(callout, handle);
 
             lock (CalloutListLock) {
                 CalloutInfo = info;

@@ -144,8 +144,8 @@ namespace MDTPro {
                         if (!string.IsNullOrWhiteSpace(menuKeyStr) && Enum.TryParse<Keys>(menuKeyStr.Trim(), true, out parsedKey))
                             UI.SettingsMenu.MenuKey = parsedKey;
 
-                        // StopThePed-path citation menu + keybind only when Policing Redefined is not loaded (PR uses GiveCitationToPed / ped menu).
-                        if (!Main.usePR && ModIntegration.StpPluginLoaded) {
+                        // MDT Pro citation handoff menu + keybind when PR is not issuing tickets (native RAGENativeUI; works without StopThePed.dll name detection).
+                        if (!Main.usePR) {
                             string handoffKeyStr = ReadIniValue(iniPath, "MDTPro", "CitationHandoffKey");
                             if (!string.IsNullOrWhiteSpace(handoffKeyStr) && Enum.TryParse<Keys>(handoffKeyStr.Trim(), true, out Keys handoffKey))
                                 UI.CitationHandoffKeybind.HandoffKey = handoffKey;

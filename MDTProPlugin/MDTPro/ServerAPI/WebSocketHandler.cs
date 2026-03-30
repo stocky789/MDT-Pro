@@ -212,6 +212,7 @@ namespace MDTPro.ServerAPI {
                 plate = hit.Plate,
                 owner = hit.Owner,
                 modelDisplayName = hit.ModelDisplayName,
+                vehicleColor = hit.VehicleColor,
                 flags = hit.Flags ?? new System.Collections.Generic.List<string>(),
                 timeScanned = hit.TimeScanned.ToString("o")
             });

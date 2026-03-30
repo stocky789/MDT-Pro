@@ -29,6 +29,22 @@
         <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
     </Style>
 
+    <!-- Selected report DataGrid cells inherit Cad foreground (light); force dark type on light combo fields. -->
+    <Style x:Key="ReportDocComboItem" TargetType="ComboBoxItem">
+        <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+        <Setter Property="Padding" Value="6,4" />
+        <Style.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Setter Property="Background" Value="#B8D4E8" />
+                <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="#7EB8E0" />
+                <Setter Property="Foreground" Value="#FF000000" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <Style x:Key="ReportDocCombo" TargetType="ComboBox">
         <Setter Property="FontFamily" Value="Segoe UI" />
         <Setter Property="FontSize" Value="11" />
@@ -36,5 +52,14 @@
         <Setter Property="BorderBrush" Value="{StaticResource ReportDocInkBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="4,2" />
+        <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+        <Setter Property="TextElement.Foreground" Value="{StaticResource ReportDocInkBrush}" />
+        <Setter Property="ItemContainerStyle" Value="{StaticResource ReportDocComboItem}" />
+        <Style.Resources>
+            <Style TargetType="TextBox">
+                <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+                <Setter Property="CaretBrush" Value="{StaticResource ReportDocInkBrush}" />
+            </Style>
+        </Style.Resources>
     </Style>
 </ResourceDictionary>

@@ -124,6 +124,7 @@
     <Compile Include="Utility\DependencyCheck.cs" />
     <Compile Include="Utility\LspdfrCalloutFromHandle.cs" />
     <Compile Include="Utility\CalloutHandleResolver.cs" />
+    <Compile Include="Utility\CalloutInterfaceCadPublisher.cs" />
     <Compile Include="EventListeners\CDFEvents.cs" />
     <Compile Include="EventListeners\CalloutEvents.cs" />
     <Compile Include="EventListeners\CalloutActionHelper.cs" />

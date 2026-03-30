@@ -198,6 +198,8 @@ namespace MDTPro.Setup {
 
         /// <summary>When true, browser/native MDT ALPR toasts are driven by Callout Interface plate-check events (CalloutInterfaceAPI). Phase 1: primary web toast source.</summary>
         public bool alprWebToastsFromCalloutInterface = true;
+        /// <summary>Minimum seconds before the same plate can trigger another web ALPR toast (Callout Interface and/or built-in scanner). Clamped 15–600 in code; 0 or invalid reads as 90.</summary>
+        public int alprWebToastPlateCooldownSeconds = 90;
         /// <summary>When true, the built-in ALPR scan loop also pushes hits to web clients. Usually false when <see cref="alprWebToastsFromCalloutInterface"/> is true to avoid duplicates.</summary>
         public bool alprWebToastsFromScanner = false;
         /// <summary>Bumped when ALPR web toast source defaults change; used to migrate older configs that omitted the flags.</summary>
