@@ -1,4 +1,5 @@
-// StopThePed: inject*SearchItems + reflection discovery of search-result getters (public API surface in References/StopThePed).
+// StopThePed: injectPedSearchItems / injectVehicleSearchItems + reflection discovery of search-result getters.
+// Verified method names: STP/StopThePed.dll (see STP/StopThePed.API.cs and scripts/dump-stp-api.ps1).
 using Rage;
 using System;
 using System.Collections;
@@ -149,12 +150,12 @@ namespace MDTPro.Utility {
             }
         }
 
-        /// <summary>StopThePed.API.Functions.isPedAlcoholOverLimit (decompiled public API).</summary>
+        /// <summary>StopThePed.API.Functions.isPedAlcoholOverLimit — see STP/StopThePed.API.cs.</summary>
         internal static bool TryIsPedAlcoholOverLimit(Ped ped) {
             return TryInvokePedBool("isPedAlcoholOverLimit", ped);
         }
 
-        /// <summary>StopThePed.API.Functions.isPedUnderDrugsInfluence (decompiled public API).</summary>
+        /// <summary>StopThePed.API.Functions.isPedUnderDrugsInfluence — see STP/StopThePed.API.cs.</summary>
         internal static bool TryIsPedUnderDrugsInfluence(Ped ped) {
             return TryInvokePedBool("isPedUnderDrugsInfluence", ped);
         }
@@ -173,7 +174,7 @@ namespace MDTPro.Utility {
             }
         }
 
-        /// <summary>StopThePed.API.Functions.getVehicleRegistrationStatus → <c>STPVehicleStatus</c> (decompiled StopThePed/Decompiled). Single source for what STP shows after a check, separate from CDF document enums.</summary>
+        /// <summary>StopThePed.API.Functions.getVehicleRegistrationStatus → <c>STPVehicleStatus</c> (STP/StopThePed.API.cs). Single source for what STP shows after a check, separate from CDF document enums.</summary>
         internal static bool TryGetVehicleRegistrationStatusStp(Vehicle veh, out string status) {
             return TryGetStpVehicleDocStatus(veh, "getVehicleRegistrationStatus", out status);
         }
@@ -188,16 +189,58 @@ namespace MDTPro.Utility {
             if (veh == null || !veh.Exists()) return false;
             Type fn = ModIntegration.FindTypeInLoadedAssemblies("StopThePed.API.Functions");
             if (fn == null) return false;
-            MethodInfo m = fn.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase, null, new[] { typeof(Vehicle) }, null);
+            MethodInfo m = fn.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase, null, new[] { typeof(Vehicle) }, null)
+                ?? fn.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase, null, new[] { typeof(Entity) }, null)
+                ?? fn.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase, null, new[] { typeof(uint) }, null);
+            if (m == null) {
+                foreach (MethodInfo cand in fn.GetMethods(BindingFlags.Public | BindingFlags.Static)) {
+                    if (!string.Equals(cand.Name, methodName, StringComparison.OrdinalIgnoreCase)) continue;
+                    ParameterInfo[] ps = cand.GetParameters();
+                    if (ps.Length != 1) continue;
+                    Type pt = ps[0].ParameterType;
+                    if (pt == typeof(Vehicle) || pt == typeof(Entity) || pt == typeof(uint)) {
+                        m = cand;
+                        break;
+                    }
+                }
+            }
             if (m == null) return false;
             try {
-                object r = m.Invoke(null, new object[] { veh });
-                if (r == null) return false;
-                status = r.ToString();
-                return !string.IsNullOrEmpty(status);
+                Type pt = m.GetParameters()[0].ParameterType;
+                object arg = pt == typeof(uint) ? (object)veh.Handle : pt == typeof(Entity) ? (Entity)veh : (object)veh;
+                object r = m.Invoke(null, new[] { arg });
+                return TryFormatStpVehicleStatusResult(r, out status);
             } catch {
                 return false;
             }
+        }
+
+        private static bool TryFormatStpVehicleStatusResult(object r, out string status) {
+            status = null;
+            if (r == null) return false;
+            if (r is string s) {
+                status = s.Trim();
+                return status.Length > 0;
+            }
+            Type t = r.GetType();
+            if (t.IsEnum) {
+                status = Enum.GetName(t, r) ?? r.ToString();
+                return !string.IsNullOrEmpty(status);
+            }
+            try {
+                PropertyInfo stProp = t.GetProperty("Status", BindingFlags.Public | BindingFlags.Instance);
+                if (stProp != null) {
+                    object v = stProp.GetValue(r);
+                    if (v != null) {
+                        Type vt = v.GetType();
+                        if (vt.IsEnum) status = Enum.GetName(vt, v) ?? v.ToString();
+                        else status = v.ToString()?.Trim();
+                        if (!string.IsNullOrEmpty(status)) return true;
+                    }
+                }
+            } catch { /* ignore */ }
+            status = r.ToString()?.Trim();
+            return !string.IsNullOrEmpty(status) && status != t.FullName;
         }
     }
 }

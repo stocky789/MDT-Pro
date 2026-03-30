@@ -41,6 +41,8 @@ To build the plugin from source:
 
    Other dependencies (CommonDataFramework, Newtonsoft.Json, System.Data.SQLite, etc.) come from NuGet. `References` is in `.gitignore` (each dev uses their own game copy).
 
+   **StopThePed API check (optional):** The repo can include `STP/StopThePed.dll` (same file the mod ships). After you upgrade StopThePed, run `powershell -NoProfile -File scripts/verify-stp-api.ps1` to confirm `STPEvents` still matches `StopThePed.API.Events`, and `powershell -NoProfile -File scripts/dump-stp-api.ps1` to refresh the human-readable snapshot in `STP/StopThePed.API.cs`.
+
 3. **Build**  
    From repo root:  
    `dotnet build MDTProPlugin\MDTPro.sln -c Release`  

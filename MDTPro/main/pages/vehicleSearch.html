@@ -55,7 +55,7 @@
           <label
             for="modelDisplayNameInput"
             data-language="labels.modelDisplayName"
-            >Model</label
+            >Display name</label
           >
           <input
             type="text"
@@ -63,6 +63,10 @@
             disabled
             data-property="ModelDisplayName"
           />
+        </div>
+        <div>
+          <label for="cdfModelInput" data-language="labels.model">Model (CDF)</label>
+          <input type="text" id="cdfModelInput" disabled data-property="Model" />
         </div>
         <div>
           <label for="ownerInput" data-language="labels.owner">Owner</label>
@@ -80,12 +84,28 @@
           />
         </div>
         <div>
-          <label data-language="labels.color">Color</label>
-          <div data-property="Color"></div>
-        </div>
-        <div>
           <label for="makeInput" data-language="labels.make">Make</label>
           <input type="text" id="makeInput" disabled data-property="Make" />
+        </div>
+        <div>
+          <label for="primaryColorInput" data-language="labels.primaryColor">Primary color</label>
+          <input type="text" id="primaryColorInput" disabled data-property="PrimaryColor" />
+        </div>
+        <div>
+          <label for="secondaryColorInput" data-language="labels.secondaryColor">Secondary color</label>
+          <input type="text" id="secondaryColorInput" disabled data-property="SecondaryColor" />
+        </div>
+        <div>
+          <label for="primaryColorGtaInput" data-language="labels.primaryColorGta">Primary (GTA)</label>
+          <input type="text" id="primaryColorGtaInput" disabled data-property="PrimaryColorSpecific" />
+        </div>
+        <div>
+          <label for="secondaryColorGtaInput" data-language="labels.secondaryColorGta">Secondary (GTA)</label>
+          <input type="text" id="secondaryColorGtaInput" disabled data-property="SecondaryColorSpecific" />
+        </div>
+        <div>
+          <label data-language="labels.color">Color</label>
+          <div data-property="Color"></div>
         </div>
         <div>
           <label for="vinStatusInput" data-language="labels.vinStatus">VIN Status</label>

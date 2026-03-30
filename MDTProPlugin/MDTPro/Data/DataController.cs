@@ -18,6 +18,13 @@ using System.Threading;
 
 namespace MDTPro.Data {
     public class DataController {
+        /// <summary>RAGE Plugin Hook throws <see cref="ArgumentOutOfRangeException"/> (parameter <c>maximumCount</c>) if <see cref="Ped.GetNearbyVehicles"/> / <see cref="Ped.GetNearbyPeds"/> are given a count outside 1..16.</summary>
+        internal static int ClampRageNearbyPoolQueryCount(int requested) {
+            const int rageMax = 16;
+            if (requested < 1) return 1;
+            return requested > rageMax ? rageMax : requested;
+        }
+
         private const string LifeIncarcerationValue = "LIFE";
         private const double RealDaysPerGameYear = 7d;
         private const double GameDaysPerYear = 365d;
@@ -292,7 +299,7 @@ namespace MDTPro.Data {
             SetVehicleDatabase();
         }
 
-        /// <summary>Cached on game thread for /data/nearbyVehicles so the HTTP handler never touches game entities.</summary>
+        /// <summary>Cached on game thread for /data/nearbyVehicles so the HTTP handler never touches game entities. Built from a live world scan (not only vehicleDatabase) so plates appear even when CDF has not registered vehicles yet.</summary>
         internal static List<CachedNearbyVehicleEntry> CachedNearbyVehicles = new List<CachedNearbyVehicleEntry>();
         private static readonly object _cachedNearbyLock = new object();
         /// <summary>Serializes HTTP <c>/data/nearbyVehicles</c> refreshes so concurrent native/browser requests do not interleave Populate/Update on overlapping game fibers.</summary>
@@ -307,7 +314,64 @@ namespace MDTPro.Data {
         internal static void SetDynamicData() {
             UpdatePlayerLocation();
             CurrentTime = World.TimeOfDay.ToString();
-            UpdateCachedNearbyVehicles();
+            UpdateCachedNearbyVehicles(fullWorldScan: false);
+        }
+
+        /// <summary>HTTP runs on the pool; refresh nearby-vehicle cache on the game fiber before Vehicle Search reads it (same idea as <see cref="RefreshMdtLocationOnGameFiberBlocking"/>).</summary>
+        internal static void RefreshCachedNearbyVehiclesOnGameFiberBlocking(int timeoutMs = 2000) {
+            try {
+                var done = new ManualResetEventSlim(false);
+                GameFiber.StartNew(() => {
+                    try {
+                        UpdateCachedNearbyVehicles(fullWorldScan: true);
+                    } catch (Exception ex) {
+                        Helper.Log($"RefreshCachedNearbyVehiclesOnGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
+                    } finally {
+                        try { done.Set(); } catch { /* ignore */ }
+                    }
+                }, "mdtpro-nearby-veh-refresh");
+                bool ok = done.Wait(timeoutMs);
+                if (!ok)
+                    Helper.Log("RefreshCachedNearbyVehiclesOnGameFiberBlocking: timed out (game paused or overloaded).", false, Helper.LogSeverity.Warning);
+            } catch (Exception ex) {
+                Helper.Log($"RefreshCachedNearbyVehiclesOnGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>Visible vehicles you have not stopped or saved: merge BOLO stubs and keep a session row in the in-memory vehicle list only (no SQLite). Lets Vehicle Search find the same plate again without a full world walk.</summary>
+        private static void RegisterVisibleVehicleLookupSessionOnly(MDTProVehicleData mdt) {
+            if (mdt == null || string.IsNullOrWhiteSpace(mdt.LicensePlate)) return;
+            try {
+                if (mdt.Holder == null || !mdt.Holder.Exists()) return;
+                MergeBOLOsFromStubByPlate(mdt);
+                AddOrReplaceVehicleInLiveVehicleDatabase(mdt);
+            } catch (Exception ex) {
+                Helper.Log($"RegisterVisibleVehicleLookupSessionOnly: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>When <see cref="GetVehicleByPlateOrVin"/> misses, scan live vehicles (same radius/walk as nearby refresh) on the game fiber. Does not require SQLite or a prior stop — any spawned car in range with a readable plate (or VIN on CDF) can be opened in Vehicle Search.</summary>
+        internal static MDTProVehicleData TryResolveVehicleFromLiveWorldByPlateOrVinBlocking(string plateOrVin, int timeoutMs = 2000) {
+            if (string.IsNullOrWhiteSpace(plateOrVin)) return null;
+            MDTProVehicleData found = null;
+            try {
+                var done = new ManualResetEventSlim(false);
+                string q = plateOrVin.Trim();
+                GameFiber.StartNew(() => {
+                    try {
+                        found = TryFindLiveWorldVehicleDataForPlateOrVin(q);
+                    } catch (Exception ex) {
+                        Helper.Log($"TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
+                    } finally {
+                        try { done.Set(); } catch { /* ignore */ }
+                    }
+                }, "mdtpro-specific-veh-resolve");
+                if (!done.Wait(timeoutMs))
+                    Helper.Log("TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: timed out (game paused or overloaded).", false, Helper.LogSeverity.Warning);
+            } catch (Exception ex) {
+                Helper.Log($"TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+            return found;
         }
 
         /// <summary>HTTP/WebSocket run on the thread pool; schedule <see cref="UpdatePlayerLocation"/> on the game fiber then wait so reads are not stale or never filled.</summary>
@@ -330,62 +394,132 @@ namespace MDTPro.Data {
             }
         }
 
-        private static void RunShortGameFiberBlocking(Action work, int timeoutMs, string fiberName) {
+        private struct NearbyVehicleScanStats {
+            internal int Examined;
+            internal int SkippedNullOrDead;
+            internal int SkippedSelfVehicle;
+            internal int BlankPlateAfterResolve;
+            internal int ResolvedViaNative;
+        }
+
+        /// <summary>Plate from <see cref="Vehicle.LicensePlate"/> or native when the property is blank (some worlds / timing).</summary>
+        private static string TryResolveLiveVehiclePlate(Vehicle v, out bool resolvedViaNative) {
+            resolvedViaNative = false;
+            if (v == null || !v.Exists()) return null;
+            string p = null;
+            try { p = (v.LicensePlate ?? "").Trim(); } catch { /* ignore */ }
+            if (!string.IsNullOrWhiteSpace(p) && !string.Equals(p, "NULL", StringComparison.OrdinalIgnoreCase)) return p;
             try {
-                var done = new ManualResetEventSlim(false);
-                GameFiber.StartNew(() => {
-                    try {
-                        work();
-                    } catch (Exception ex) {
-                        Helper.Log($"[{fiberName}] {ex.Message}", false, Helper.LogSeverity.Warning);
-                    } finally {
-                        try { done.Set(); } catch { }
-                    }
-                }, fiberName);
-                if (!done.Wait(timeoutMs))
-                    Helper.Log($"[{fiberName}] timed out after {timeoutMs}ms", false, Helper.LogSeverity.Warning);
-            } catch (Exception ex) {
-                Helper.Log($"RunShortGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
+                string n = NativeFunction.Natives.GET_VEHICLE_NUMBER_PLATE_TEXT<string>(v);
+                if (!string.IsNullOrWhiteSpace(n)) {
+                    resolvedViaNative = true;
+                    return n.Trim();
+                }
+            } catch { /* RPH build may differ; ignore */ }
+            return null;
+        }
+
+        private static MDTProVehicleData TryBuildMdtVehicleIfMatchesPlateOrVin(Vehicle v, string queryRaw, string queryPlateNormalized) {
+            if (v == null || !v.Exists()) return null;
+            string plate = TryResolveLiveVehiclePlate(v, out _);
+            if (!string.IsNullOrEmpty(plate) && NormalizeVehiclePlateKey(plate) == queryPlateNormalized)
+                return new MDTProVehicleData(v);
+            try {
+                var cdf = v.GetVehicleData();
+                string vin = cdf?.Vin?.Number;
+                if (!string.IsNullOrEmpty(vin) && string.Equals(vin.Trim(), queryRaw, StringComparison.OrdinalIgnoreCase))
+                    return new MDTProVehicleData(v);
+            } catch { /* CDF / entity */ }
+            return null;
+        }
+
+        private static void TryAddNearbyVehicleEntry(Vehicle v, Dictionary<string, CachedNearbyVehicleEntry> bestByPlate, ref NearbyVehicleScanStats stats) {
+            if (Main.Player == null || !Main.Player.Exists()) return;
+            if (v == null || !v.Exists()) {
+                stats.SkippedNullOrDead++;
+                return;
             }
-        }
-
-        /// <summary>HTTP <c>/data/nearbyVehicles</c>: rescan world vehicles and rebuild distance cache on the game fiber so native/browser lists are not stuck on a stale 1s/10s tick.</summary>
-        internal static void PrepareNearbyVehiclesForHttpBlocking(int timeoutMs = 5000) {
-            lock (_httpNearbyRefreshLock) {
-                RunShortGameFiberBlocking(() => {
-                    PopulateVehicleDatabase();
-                    UpdateCachedNearbyVehicles();
-                }, timeoutMs, "mdtpro-http-nearby");
+            stats.Examined++;
+            try {
+                if (v == Main.Player.CurrentVehicle) {
+                    stats.SkippedSelfVehicle++;
+                    return;
+                }
+            } catch { /* ignore */ }
+            string plate = TryResolveLiveVehiclePlate(v, out bool viaNative);
+            if (viaNative) stats.ResolvedViaNative++;
+            if (string.IsNullOrWhiteSpace(plate)) {
+                stats.BlankPlateAfterResolve++;
+                return;
             }
+            float dist;
+            try {
+                dist = (float)Math.Round(Main.Player.DistanceTo(v), 1);
+            } catch { return; }
+
+            string modelDisplay = null;
+            try {
+                string unloc = NativeFunction.Natives.GET_DISPLAY_NAME_FROM_VEHICLE_MODEL<string>(v.Model.Hash);
+                modelDisplay = Game.GetLocalizedString(unloc);
+            } catch { }
+
+            bool stolen = false;
+            try {
+                var cdf = v.GetVehicleData();
+                if (cdf != null) stolen = cdf.IsStolen;
+            } catch { }
+
+            var entry = new CachedNearbyVehicleEntry {
+                LicensePlate = plate,
+                ModelDisplayName = modelDisplay,
+                Distance = dist,
+                IsStolen = stolen
+            };
+            if (!bestByPlate.TryGetValue(plate, out var prev) || (prev.Distance ?? float.MaxValue) > dist)
+                bestByPlate[plate] = entry;
         }
 
-        /// <summary>HTTP <c>/data/specificVehicle</c>: rescan nearby world vehicles before lookup so plates not yet in <see cref="vehicleDatabase"/> (10s tick) still resolve.</summary>
-        internal static void PrepareVehicleLookupForHttpBlocking(int timeoutMs = 2000) {
-            RunShortGameFiberBlocking(() => PopulateVehicleDatabase(), timeoutMs, "mdtpro-http-veh-lookup");
-        }
-
-        private static void UpdateCachedNearbyVehicles() {
+        /// <param name="fullWorldScan">When true (Vehicle Search HTTP refresh), also walk <see cref="World.GetAllVehicles"/> within range so the list is not empty if <see cref="Ped.GetNearbyVehicles"/> omits traffic.</param>
+        private static void UpdateCachedNearbyVehicles(bool fullWorldScan) {
             var list = new List<CachedNearbyVehicleEntry>();
             int withDist = 0;
             if (Main.Player != null && Main.Player.Exists()) {
-                lock (_vehicleDbLock) {
-                    foreach (var v in vehicleDatabase) {
-                        if (string.IsNullOrEmpty(v.LicensePlate)) continue;
-                        float? dist = null;
-                        try {
-                            if (v.Holder != null && v.Holder.Exists())
-                                dist = (float?)Math.Round(Main.Player.DistanceTo(v.Holder), 1);
-                        } catch { }
-                        if (dist != null) withDist++;
-                        list.Add(new CachedNearbyVehicleEntry {
-                            LicensePlate = v.LicensePlate,
-                            ModelDisplayName = v.ModelDisplayName,
-                            Distance = dist,
-                            IsStolen = v.IsStolen
-                        });
+                try {
+                    int scanCount = SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles;
+                    if (scanCount < 1) scanCount = 15;
+                    scanCount = ClampRageNearbyPoolQueryCount(scanCount);
+                    var bestByPlate = new Dictionary<string, CachedNearbyVehicleEntry>(StringComparer.OrdinalIgnoreCase);
+                    NearbyVehicleScanStats stNearby = default;
+                    NearbyVehicleScanStats stWorld = default;
+                    int worldIterations = 0;
+
+                    Vehicle[] nearby = Main.Player.GetNearbyVehicles(scanCount);
+                    if (nearby != null) {
+                        for (int i = 0; i < nearby.Length; i++)
+                            TryAddNearbyVehicleEntry(nearby[i], bestByPlate, ref stNearby);
                     }
+
+                    if (fullWorldScan) {
+                        const float maxWorldScanMeters = 95f;
+                        try {
+                            foreach (Vehicle v in World.GetAllVehicles()) {
+                                worldIterations++;
+                                if (worldIterations > 2048) break;
+                                if (v == null || !v.Exists()) continue;
+                                float d;
+                                try { d = Main.Player.DistanceTo(v); } catch { continue; }
+                                if (d > maxWorldScanMeters) continue;
+                                TryAddNearbyVehicleEntry(v, bestByPlate, ref stWorld);
+                            }
+                        } catch (Exception ex) {
+                            Helper.Log($"UpdateCachedNearbyVehicles world scan: {ex.Message}", false, Helper.LogSeverity.Warning);
+                        }
+                    }
+
+                    list = bestByPlate.Values.OrderBy(x => x.Distance ?? float.MaxValue).ToList();
+                } catch (Exception ex) {
+                    Helper.Log($"UpdateCachedNearbyVehicles: {ex.Message}", false, Helper.LogSeverity.Warning);
                 }
-                list.Sort((a, b) => (a.Distance ?? float.MaxValue).CompareTo(b.Distance ?? float.MaxValue));
             }
             lock (_cachedNearbyLock) {
                 // When the game is unfocused/paused, entity reads often yield no distances; every row ties at MaxValue
@@ -394,6 +528,50 @@ namespace MDTPro.Data {
                     return;
                 CachedNearbyVehicles = list;
             }
+        }
+
+        private static MDTProVehicleData TryFindLiveWorldVehicleDataForPlateOrVin(string queryRaw) {
+            if (Main.Player == null || !Main.Player.Exists()) return null;
+            string q = queryRaw.Trim();
+            if (q.Length == 0) return null;
+            string qNorm = NormalizeVehiclePlateKey(q);
+
+            int wantNearby = SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles;
+            if (wantNearby < 1) wantNearby = 15;
+            int scanCount = ClampRageNearbyPoolQueryCount(wantNearby);
+
+            Vehicle[] nearby = Main.Player.GetNearbyVehicles(scanCount);
+            if (nearby != null) {
+                for (int i = 0; i < nearby.Length; i++) {
+                    var hit = TryBuildMdtVehicleIfMatchesPlateOrVin(nearby[i], q, qNorm);
+                    if (hit != null) {
+                        RegisterVisibleVehicleLookupSessionOnly(hit);
+                        return hit;
+                    }
+                }
+            }
+
+            const float maxWorldScanMeters = 95f;
+            int worldIterations = 0;
+            try {
+                foreach (Vehicle v in World.GetAllVehicles()) {
+                    worldIterations++;
+                    if (worldIterations > 2048) break;
+                    if (v == null || !v.Exists()) continue;
+                    float d;
+                    try { d = Main.Player.DistanceTo(v); } catch { continue; }
+                    if (d > maxWorldScanMeters) continue;
+                    var hit = TryBuildMdtVehicleIfMatchesPlateOrVin(v, q, qNorm);
+                    if (hit != null) {
+                        RegisterVisibleVehicleLookupSessionOnly(hit);
+                        return hit;
+                    }
+                }
+            } catch (Exception ex) {
+                Helper.Log($"TryFindLiveWorldVehicleDataForPlateOrVin: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+
+            return null;
         }
 
         /// <summary>Called from HTTP handler; returns cached list so handler never touches game entities.</summary>
@@ -410,12 +588,13 @@ namespace MDTPro.Data {
                 Helper.Log("Failed to get nearby peds; Invalid player", true, Helper.LogSeverity.Error);
                 return;
             }
-            Ped[] nearbyPeds = Main.Player.GetNearbyPeds(SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles);
+            Ped[] nearbyPeds = Main.Player.GetNearbyPeds(ClampRageNearbyPoolQueryCount(SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles));
+            bool persistNearbyPedSql = !ModIntegration.SubscribedStopThePedStopEvents;
             for (int i = 0; i < nearbyPeds.Length; i++) {
                 Ped p = nearbyPeds[i];
                 if (p == null || !p.Exists()) continue;
                 try {
-                    ResolvePedForReEncounter(p);
+                    ResolvePedForReEncounter(p, persistNearbyPedSql);
                 } catch (Exception ex) {
                     Helper.Log($"Skipping ped in PopulatePedDatabase: {ex.Message}", false, Helper.LogSeverity.Warning);
                 }
@@ -440,20 +619,20 @@ namespace MDTPro.Data {
                     }
                 }
             }
-            if (!haveNearbyScan)
-                return;
+            Vehicle[] nearbyVehicles = Main.Player.GetNearbyVehicles(ClampRageNearbyPoolQueryCount(SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles));
             for (int i = 0; i < nearbyVehicles.Length; i++) {
                 Vehicle v = nearbyVehicles[i];
                 if (v == null || !v.Exists()) continue;
                 try {
                     MDTProVehicleData mdtProVehicleData = new MDTProVehicleData(v);
-                    if (mdtProVehicleData == null || mdtProVehicleData.LicensePlate == null) continue;
+                    if (mdtProVehicleData == null || string.IsNullOrWhiteSpace(mdtProVehicleData.LicensePlate)) continue;
                     bool exists;
                     lock (_vehicleDbLock) {
                         exists = vehicleDatabase.Any(x => string.Equals(x.LicensePlate, mdtProVehicleData.LicensePlate, StringComparison.OrdinalIgnoreCase));
                     }
                     if (exists) continue;
-                    TryApplyReEncounterVehicleProfile(mdtProVehicleData, v);
+                    bool persistVehicleReEncounterSql = !ModIntegration.SubscribedStopThePedStopEvents;
+                    TryApplyReEncounterVehicleProfile(mdtProVehicleData, v, persistVehicleReEncounterSql);
                     MergeBOLOsFromStubByPlate(mdtProVehicleData);
                     lock (_vehicleDbLock) {
                         if (vehicleDatabase.Any(x => string.Equals(x.LicensePlate, mdtProVehicleData.LicensePlate, StringComparison.OrdinalIgnoreCase))) continue;
@@ -465,39 +644,48 @@ namespace MDTPro.Data {
             }
         }
 
-        private static void TryApplyReEncounterVehicleProfile(MDTProVehicleData currentVehicleData, Vehicle vehicle) {
+        private static void TryApplyReEncounterVehicleProfile(MDTProVehicleData currentVehicleData, Vehicle vehicle, bool persistToSql = true) {
             MDTProVehicleData persistentMatch = GetReEncounterVehicleCandidate(currentVehicleData, vehicle);
             if (persistentMatch == null) return;
 
             string originalPlate = currentVehicleData.LicensePlate;
             currentVehicleData.ApplyPersistentVehicleIdentity(persistentMatch);
+            // SQLite row can have stale owner/stolen/VIN/colors vs live CDF; re-read CDF before pushing back (BOLO stub merge runs after this in ResolveVehicleAndDriverForStop).
+            currentVehicleData.RefreshCdfBackedVehicleFieldsFromCdf();
             SyncSingleVehicleToCDF(currentVehicleData);
-            KeepVehicleInDatabase(currentVehicleData);
+            if (persistToSql)
+                KeepVehicleInDatabase(currentVehicleData);
             Helper.Log($"Vehicle re-encounter matched by model+owner: {originalPlate} => same as {persistentMatch.LicensePlate} ({currentVehicleData.Owner})", false, Helper.LogSeverity.Info);
         }
 
-        /// <summary>Called when Policing Redefined fires OnVehicleStopped. Resolves the driver and ensures the vehicle is in the DB so the MDT has them for citations/reports.</summary>
-        internal static void ResolveVehicleAndDriverForStop(Vehicle vehicle) {
+        private static void AddOrReplaceVehicleInLiveVehicleDatabase(MDTProVehicleData mdtProVehicleData) {
+            if (mdtProVehicleData == null || string.IsNullOrWhiteSpace(mdtProVehicleData.LicensePlate)) return;
+            lock (_vehicleDbLock) {
+                if (ModIntegration.SubscribedStopThePedStopEvents) {
+                    vehicleDatabase.RemoveAll(x => x != null && string.Equals(x.LicensePlate, mdtProVehicleData.LicensePlate, StringComparison.OrdinalIgnoreCase));
+                    vehicleDatabase.Add(mdtProVehicleData);
+                } else if (!vehicleDatabase.Any(x => x.LicensePlate == mdtProVehicleData.LicensePlate)) {
+                    vehicleDatabase.Add(mdtProVehicleData);
+                }
+            }
+        }
+
+        /// <summary>Called when Policing Redefined fires OnVehicleStopped (always persists). With StopThePed, set <paramref name="persistToSql"/> false unless the player obtained vehicle documents (registration/insurance) — see STP handlers.</summary>
+        internal static void ResolveVehicleAndDriverForStop(Vehicle vehicle, bool persistToSql = true) {
             if (vehicle == null || !vehicle.Exists()) return;
             try {
                 Ped driver = vehicle.Driver;
-                if (driver != null && driver.IsValid()) ResolvePedForReEncounter(driver);
+                if (driver != null && driver.IsValid()) ResolvePedForReEncounter(driver, persistToSql);
 
                 MDTProVehicleData mdtProVehicleData = new MDTProVehicleData(vehicle);
-                if (mdtProVehicleData.LicensePlate == null) return;
-                TryApplyReEncounterVehicleProfile(mdtProVehicleData, vehicle);
+                if (string.IsNullOrWhiteSpace(mdtProVehicleData.LicensePlate)) return;
+                TryApplyReEncounterVehicleProfile(mdtProVehicleData, vehicle, persistToSql);
                 MergeBOLOsFromStubByPlate(mdtProVehicleData);
                 if (ModIntegration.SubscribedStopThePedStopEvents)
                     TryOverlayStopThePedVehicleDocStatusFromApi(mdtProVehicleData, vehicle);
-                lock (_vehicleDbLock) {
-                    if (ModIntegration.SubscribedStopThePedStopEvents) {
-                        vehicleDatabase.RemoveAll(x => x != null && string.Equals(x.LicensePlate, mdtProVehicleData.LicensePlate, StringComparison.OrdinalIgnoreCase));
-                        vehicleDatabase.Add(mdtProVehicleData);
-                    } else if (!vehicleDatabase.Any(x => x.LicensePlate == mdtProVehicleData.LicensePlate)) {
-                        vehicleDatabase.Add(mdtProVehicleData);
-                    }
-                }
-                KeepVehicleInDatabase(mdtProVehicleData);
+                AddOrReplaceVehicleInLiveVehicleDatabase(mdtProVehicleData);
+                if (persistToSql)
+                    KeepVehicleInDatabase(mdtProVehicleData);
 
                 MDTProVehicleData contextSource = GetVehicleByPlateOrVin(mdtProVehicleData.LicensePlate);
                 if (contextSource != null) {
@@ -701,47 +889,141 @@ namespace MDTPro.Data {
             }
         }
 
-        /// <summary>Push a single ped's MDT data to CDF (DriversLicense, WeaponPermit, FishingPermit, etc.). Ensures CDF/PR reflect our persisted revocations.</summary>
-        private static void SyncSinglePedToCDF(MDTProPedData databasePed) {
-            if (databasePed == null || databasePed.CDFPedData == null) return;
+        /// <summary>Writes MDT ped fields onto a CDF <see cref="PedData"/> (court revocations, warrants cleared, supervision). Used for cached <see cref="MDTProPedData.CDFPedData"/> or a live world match by name.</summary>
+        private static void PushPedSnapshotOntoCdf(PedData cdf, MDTProPedData databasePed) {
+            if (cdf == null || databasePed == null) return;
             try {
-                databasePed.CDFPedData.Wanted = databasePed.IsWanted;
-                databasePed.CDFPedData.IsOnProbation = databasePed.IsOnProbation;
-                databasePed.CDFPedData.IsOnParole = databasePed.IsOnParole;
-                databasePed.CDFPedData.Citations = databasePed.Citations?.Count ?? 0;
-                databasePed.CDFPedData.TimesStopped = databasePed.TimesStopped;
-                try { databasePed.CDFPedData.AdvisoryText = databasePed.AdvisoryText ?? ""; } catch { }
+                cdf.Wanted = databasePed.IsWanted;
+                cdf.IsOnProbation = databasePed.IsOnProbation;
+                cdf.IsOnParole = databasePed.IsOnParole;
+                cdf.Citations = databasePed.Citations?.Count ?? 0;
+                cdf.TimesStopped = databasePed.TimesStopped;
+                try { cdf.AdvisoryText = databasePed.AdvisoryText ?? ""; } catch { }
 
                 if (!string.IsNullOrEmpty(databasePed.LicenseStatus) && Enum.TryParse(databasePed.LicenseStatus, true, out ELicenseState licenseStatusValue)) {
-                    databasePed.CDFPedData.DriversLicenseState = licenseStatusValue;
+                    cdf.DriversLicenseState = licenseStatusValue;
                 }
                 if (!string.IsNullOrEmpty(databasePed.LicenseExpiration) && DateTime.TryParse(databasePed.LicenseExpiration, out DateTime licenseExp)) {
-                    try { databasePed.CDFPedData.DriversLicenseExpiration = licenseExp; } catch { }
+                    try { cdf.DriversLicenseExpiration = licenseExp; } catch { }
                 }
 
-                if (databasePed.CDFPedData.WeaponPermit != null && !string.IsNullOrEmpty(databasePed.WeaponPermitStatus) && Enum.TryParse(databasePed.WeaponPermitStatus, true, out EDocumentStatus weaponStatus)) {
-                    try { databasePed.CDFPedData.WeaponPermit.Status = weaponStatus; } catch { }
+                if (cdf.WeaponPermit != null && !string.IsNullOrEmpty(databasePed.WeaponPermitStatus) && Enum.TryParse(databasePed.WeaponPermitStatus, true, out EDocumentStatus weaponStatus)) {
+                    try { cdf.WeaponPermit.Status = weaponStatus; } catch { }
                 }
-                if (databasePed.CDFPedData.WeaponPermit != null && !string.IsNullOrEmpty(databasePed.WeaponPermitExpiration) && DateTime.TryParse(databasePed.WeaponPermitExpiration, out DateTime weaponExp)) {
-                    try { databasePed.CDFPedData.WeaponPermit.ExpirationDate = weaponExp; } catch { }
-                }
-
-                if (databasePed.CDFPedData.FishingPermit != null && !string.IsNullOrEmpty(databasePed.FishingPermitStatus) && Enum.TryParse(databasePed.FishingPermitStatus, true, out EDocumentStatus fishingStatus)) {
-                    try { databasePed.CDFPedData.FishingPermit.Status = fishingStatus; } catch { }
-                }
-                if (databasePed.CDFPedData.FishingPermit != null && !string.IsNullOrEmpty(databasePed.FishingPermitExpiration) && DateTime.TryParse(databasePed.FishingPermitExpiration, out DateTime fishingExp)) {
-                    try { databasePed.CDFPedData.FishingPermit.ExpirationDate = fishingExp; } catch { }
+                if (cdf.WeaponPermit != null && !string.IsNullOrEmpty(databasePed.WeaponPermitExpiration) && DateTime.TryParse(databasePed.WeaponPermitExpiration, out DateTime weaponExp)) {
+                    try { cdf.WeaponPermit.ExpirationDate = weaponExp; } catch { }
                 }
 
-                if (databasePed.CDFPedData.HuntingPermit != null && !string.IsNullOrEmpty(databasePed.HuntingPermitStatus) && Enum.TryParse(databasePed.HuntingPermitStatus, true, out EDocumentStatus huntingStatus)) {
-                    try { databasePed.CDFPedData.HuntingPermit.Status = huntingStatus; } catch { }
+                if (cdf.FishingPermit != null && !string.IsNullOrEmpty(databasePed.FishingPermitStatus) && Enum.TryParse(databasePed.FishingPermitStatus, true, out EDocumentStatus fishingStatus)) {
+                    try { cdf.FishingPermit.Status = fishingStatus; } catch { }
                 }
-                if (databasePed.CDFPedData.HuntingPermit != null && !string.IsNullOrEmpty(databasePed.HuntingPermitExpiration) && DateTime.TryParse(databasePed.HuntingPermitExpiration, out DateTime huntingExp)) {
-                    try { databasePed.CDFPedData.HuntingPermit.ExpirationDate = huntingExp; } catch { }
+                if (cdf.FishingPermit != null && !string.IsNullOrEmpty(databasePed.FishingPermitExpiration) && DateTime.TryParse(databasePed.FishingPermitExpiration, out DateTime fishingExp)) {
+                    try { cdf.FishingPermit.ExpirationDate = fishingExp; } catch { }
+                }
+
+                if (cdf.HuntingPermit != null && !string.IsNullOrEmpty(databasePed.HuntingPermitStatus) && Enum.TryParse(databasePed.HuntingPermitStatus, true, out EDocumentStatus huntingStatus)) {
+                    try { cdf.HuntingPermit.Status = huntingStatus; } catch { }
+                }
+                if (cdf.HuntingPermit != null && !string.IsNullOrEmpty(databasePed.HuntingPermitExpiration) && DateTime.TryParse(databasePed.HuntingPermitExpiration, out DateTime huntingExp)) {
+                    try { cdf.HuntingPermit.ExpirationDate = huntingExp; } catch { }
                 }
             } catch (Exception ex) {
-                Helper.Log($"SyncSinglePedToCDF skip ped: {ex.Message}", false, Helper.LogSeverity.Warning);
+                Helper.Log($"PushPedSnapshotOntoCdf: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
+        }
+
+        /// <summary>Must run on the game fiber. Finds an in-world ped whose CDF full name matches (e.g. after court updates SQLite but <see cref="MDTProPedData.CDFPedData"/> is null).</summary>
+        private static PedData TryGetLivePedDataByFullName(string fullName) {
+            if (string.IsNullOrWhiteSpace(fullName)) return null;
+            string want = fullName.Trim();
+            try {
+                foreach (Ped p in World.GetAllPeds()) {
+                    if (p == null || !p.IsValid()) continue;
+                    PedData pd = null;
+                    try { pd = p.GetPedData(); } catch { continue; }
+                    string n = pd?.FullName?.Trim();
+                    if (!string.IsNullOrEmpty(n) && string.Equals(n, want, StringComparison.OrdinalIgnoreCase))
+                        return pd;
+                }
+            } catch (Exception ex) {
+                Helper.Log($"TryGetLivePedDataByFullName: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+            return null;
+        }
+
+        /// <summary>Push MDT → CDF so PR/STP see court revocations and warrant clears. Uses cached <see cref="MDTProPedData.CDFPedData"/> when set; otherwise resolves live <see cref="PedData"/> by name. Marshals to a game fiber when called from the HTTP listener.</summary>
+        /// <remarks>STP/PR read the same CDF; if CDF was never updated (ped not spawned) or later reset to defaults, STP can show Valid until the next push or MDT re-encounter reapplies Revoked from SQLite and syncs again.</remarks>
+        private static void SyncSinglePedToCDF(MDTProPedData databasePed) {
+            if (databasePed == null) return;
+            void Push() {
+                PedData cdf = databasePed.CDFPedData ?? TryGetLivePedDataByFullName(databasePed.Name);
+                if (cdf == null) return;
+                PushPedSnapshotOntoCdf(cdf, databasePed);
+            }
+            try {
+                if (GameFiber.CanSleepNow)
+                    Push();
+                else
+                    GameFiber.StartNew(Push, "mdtpro-sync-ped-cdf");
+            } catch (Exception ex) {
+                Helper.Log($"SyncSinglePedToCDF schedule: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>After court revokes licenses, the first CDF push can miss if no matching ped exists yet. Retries on the game fiber so a spawn shortly after sentencing still gets Revoked onto CDF before STP reads it.</summary>
+        private static void ScheduleCourtLicenseRevocationCdfRetry(string pedName) {
+            if (string.IsNullOrWhiteSpace(pedName)) return;
+            string name = pedName.Trim();
+            try {
+                GameFiber.StartNew(() => {
+                    int[] delaysMs = { 750, 3000, 8000 };
+                    foreach (int ms in delaysMs) {
+                        GameFiber.Wait(ms);
+                        try {
+                            MDTProPedData p = GetPedDataByName(name);
+                            if (p != null) SyncSinglePedToCDF(p);
+                        } catch { /* retry */ }
+                    }
+                }, "mdtpro-court-cdf-retry");
+            } catch (Exception ex) {
+                Helper.Log($"ScheduleCourtLicenseRevocationCdfRetry: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>Court outcomes set permit strings to Revoked; those must win over a live CDF row until the next sync. Anything else is refreshed from CDF so StopThePed / PR and Person Search agree.</summary>
+        private static bool IsCourtRevokedDocumentStatus(string status) {
+            if (string.IsNullOrEmpty(status)) return false;
+            if (status.Equals(EDocumentStatus.Revoked.ToString(), StringComparison.OrdinalIgnoreCase)) return true;
+            return Enum.TryParse(status, true, out EDocumentStatus d) && d == EDocumentStatus.Revoked;
+        }
+
+        private static bool IsCourtRevokedDriverLicense(string status) {
+            return !string.IsNullOrEmpty(status) && status.Equals("Revoked", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>After refreshing ped display fields from CDF, re-apply court-ordered revocations that live in SQLite (<see cref="ApplyLicenseRevocationsToPed"/>).</summary>
+        private static void ApplyCourtRevokedPermitHintsFrom(MDTProPedData target, MDTProPedData sqliteHintRow) {
+            if (target == null || sqliteHintRow == null) return;
+            if (IsCourtRevokedDriverLicense(sqliteHintRow.LicenseStatus)) target.LicenseStatus = sqliteHintRow.LicenseStatus;
+            if (IsCourtRevokedDocumentStatus(sqliteHintRow.WeaponPermitStatus)) target.WeaponPermitStatus = sqliteHintRow.WeaponPermitStatus;
+            if (IsCourtRevokedDocumentStatus(sqliteHintRow.FishingPermitStatus)) target.FishingPermitStatus = sqliteHintRow.FishingPermitStatus;
+            if (IsCourtRevokedDocumentStatus(sqliteHintRow.HuntingPermitStatus)) target.HuntingPermitStatus = sqliteHintRow.HuntingPermitStatus;
+        }
+
+        /// <summary>Aligns a persisted ped row with a live CDF snapshot (<c>new MDTProPedData(ped)</c> or vehicle owner). Times stopped uses max(SQLite, CDF). Court revocations from the pre-merge row win.</summary>
+        private static void ReconcilePedCdfBackedFieldsWithLiveSnapshot(MDTProPedData persistedRow, MDTProPedData liveRead) {
+            if (persistedRow == null || liveRead == null) return;
+            string sl = persistedRow.LicenseStatus;
+            string sw = persistedRow.WeaponPermitStatus;
+            string sf = persistedRow.FishingPermitStatus;
+            string sh = persistedRow.HuntingPermitStatus;
+            int persistedTimes = persistedRow.TimesStopped;
+            persistedRow.CopyCdfMirroredDisplayFieldsFrom(liveRead);
+            persistedRow.TimesStopped = Math.Max(liveRead.TimesStopped, persistedTimes);
+            if (IsCourtRevokedDriverLicense(sl)) persistedRow.LicenseStatus = sl;
+            if (IsCourtRevokedDocumentStatus(sw)) persistedRow.WeaponPermitStatus = sw;
+            if (IsCourtRevokedDocumentStatus(sf)) persistedRow.FishingPermitStatus = sf;
+            if (IsCourtRevokedDocumentStatus(sh)) persistedRow.HuntingPermitStatus = sh;
         }
 
         /// <summary>Add a BOLO to a vehicle. Works for in-world vehicles (via CDF) or persistent/stub records. Accepts optional modelDisplayName for new stubs.</summary>
@@ -1118,6 +1400,15 @@ namespace MDTPro.Data {
                 EnsureSupervisionCourtBackstory(pedData);
             Database.SavePed(pedData);
             SetContextPed(pedData);
+            // After STP/PR ID: merge live CDF into our row, preserve court Revoked from SQLite, then push back so the next in-game check sees MDT truth.
+            // Use reconcile-only snapshot so we do not run PopulateParameters twice (avoids mutating CDF TimesStopped/citations again in the same stop).
+            try {
+                MDTProPedData liveFromPed = new MDTProPedData(ped, forReconcileSnapshotOnly: true);
+                ReconcilePedCdfBackedFieldsWithLiveSnapshot(pedData, liveFromPed);
+                SyncSinglePedToCDF(pedData);
+            } catch (Exception ex) {
+                Helper.Log($"AddIdentificationEvent CDF sync: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
         }
 
         /// <summary>StopThePed passenger ID flow supplies a vehicle; record ID history for the driver when possible.</summary>
@@ -1220,16 +1511,12 @@ namespace MDTPro.Data {
                 lock (_pedDbLock) {
                     MDTProPedData existingByName = pedDatabase.FirstOrDefault(x => x.Name != null && x.Name.Equals(mdtProPedData.Name, StringComparison.OrdinalIgnoreCase));
                     if (existingByName != null) {
-                        // Same person already in DB (e.g. prior stop): refresh warrant/supervision from this CDF owner snapshot.
-                        // Otherwise vehicle plate checks show WANTED in STP/CDF but Person Search still shows cleared — we used to return without updating.
-                        existingByName.IsWanted = mdtProPedData.IsWanted;
-                        existingByName.WarrantText = mdtProPedData.WarrantText;
-                        existingByName.IsOnProbation = mdtProPedData.IsOnProbation;
-                        existingByName.IsOnParole = mdtProPedData.IsOnParole;
+                        ReconcilePedCdfBackedFieldsWithLiveSnapshot(existingByName, mdtProPedData);
                         if (existingByName.CDFPedData != null) {
-                            existingByName.CDFPedData.Wanted = mdtProPedData.CDFPedData.Wanted;
-                            existingByName.CDFPedData.IsOnProbation = mdtProPedData.CDFPedData.IsOnProbation;
-                            existingByName.CDFPedData.IsOnParole = mdtProPedData.CDFPedData.IsOnParole;
+                            existingByName.CDFPedData.Wanted = existingByName.IsWanted;
+                            existingByName.CDFPedData.IsOnProbation = existingByName.IsOnProbation;
+                            existingByName.CDFPedData.IsOnParole = existingByName.IsOnParole;
+                            SyncSinglePedToCDF(existingByName);
                         }
                         Database.SavePed(existingByName);
                         return;
@@ -1557,26 +1844,17 @@ namespace MDTPro.Data {
             AddReportToCurrentShift(report.Id);
         }
 
-        private static void TryApplyReEncounterProfile(MDTProPedData currentPedData) {
+        private static void TryApplyReEncounterProfile(MDTProPedData currentPedData, bool persistToSql = true) {
             MDTProPedData persistentMatch = GetReEncounterCandidate(currentPedData);
             if (persistentMatch == null) return;
 
             string liveName = currentPedData.Name;
+            int cdfTimesStoppedBefore = currentPedData.CDFPedData?.TimesStopped ?? 0;
             currentPedData.ApplyPersistentRecordPreservingLiveIdentity(persistentMatch);
-            // Merged row can have stale IsWanted=false while live CDF on this ped still has a warrant (vehicle/plate checks update CDF first).
             if (currentPedData.CDFPedData != null) {
-                currentPedData.IsWanted = currentPedData.CDFPedData.Wanted;
-                if (currentPedData.IsWanted && string.IsNullOrEmpty(currentPedData.WarrantText))
-                    currentPedData.WarrantText = CitationArrestHelper.GetRandomWarrantCharge().name;
-                else if (!currentPedData.IsWanted)
-                    currentPedData.WarrantText = null;
-                currentPedData.IsOnProbation = currentPedData.CDFPedData.IsOnProbation;
-                currentPedData.IsOnParole = currentPedData.CDFPedData.IsOnParole;
-            }
-            currentPedData.TimesStopped = Math.Max(currentPedData.TimesStopped, persistentMatch.TimesStopped + 1);
-            currentPedData.TryParseNameIntoFirstLast();
-
-            if (currentPedData.CDFPedData != null) {
+                currentPedData.ApplyCdfPersonaAndDocumentsToDisplayFields();
+                ApplyCourtRevokedPermitHintsFrom(currentPedData, persistentMatch);
+                currentPedData.TimesStopped = Math.Max(cdfTimesStoppedBefore, persistentMatch.TimesStopped + 1);
                 currentPedData.CDFPedData.Wanted = currentPedData.IsWanted;
                 currentPedData.CDFPedData.IsOnProbation = currentPedData.IsOnProbation;
                 currentPedData.CDFPedData.IsOnParole = currentPedData.IsOnParole;
@@ -1588,23 +1866,100 @@ namespace MDTPro.Data {
 
             if (currentPedData.IsOnProbation || currentPedData.IsOnParole)
                 EnsureSupervisionCourtBackstory(currentPedData);
-            KeepPedInDatabase(currentPedData);
+            if (persistToSql)
+                KeepPedInDatabase(currentPedData);
             Helper.Log($"Re-encounter merged prior record (model + name match); live identity kept: {liveName}", false, Helper.LogSeverity.Info);
         }
 
-        internal static void ResolvePedForReEncounter(Ped ped) {
+        /// <summary>When <see cref="ResolvePedForReEncounter"/> already registered this pool handle, still merge live CDF + SQLite (court Revoked) and push to CDF so repeat STP stops / patrol ticks are not stale.</summary>
+        private static void TryLightReconcileAndSyncExistingPedByName(string pedName, Ped ped, MDTProPedData liveSnapshot, bool persistToSql) {
+            if (string.IsNullOrEmpty(pedName) || liveSnapshot == null) return;
+            MDTProPedData existingPed = null;
+            lock (_pedDbLock) {
+                existingPed = pedDatabase.FirstOrDefault(x => x.Name != null && x.Name.Equals(pedName, StringComparison.OrdinalIgnoreCase))
+                    ?? keepInPedDatabase.FirstOrDefault(x => x.Name != null && x.Name.Equals(pedName, StringComparison.OrdinalIgnoreCase));
+                if (existingPed != null && !pedDatabase.Any(x => x != null && x.Name != null && x.Name.Equals(existingPed.Name, StringComparison.OrdinalIgnoreCase)))
+                    pedDatabase.Add(existingPed);
+            }
+            if (existingPed == null) return;
+            try {
+                if (liveSnapshot.ModelHash != 0) existingPed.ModelHash = liveSnapshot.ModelHash;
+                if (!string.IsNullOrEmpty(liveSnapshot.ModelName)) existingPed.ModelName = liveSnapshot.ModelName;
+                if (existingPed.CDFPedData != null)
+                    ReconcilePedCdfBackedFieldsWithLiveSnapshot(existingPed, liveSnapshot);
+                else {
+                    existingPed.IsWanted = liveSnapshot.IsWanted;
+                    existingPed.WarrantText = liveSnapshot.WarrantText;
+                    existingPed.IsOnProbation = liveSnapshot.IsOnProbation;
+                    existingPed.IsOnParole = liveSnapshot.IsOnParole;
+                    existingPed.LicenseStatus = liveSnapshot.LicenseStatus;
+                    existingPed.LicenseExpiration = liveSnapshot.LicenseExpiration;
+                    existingPed.WeaponPermitStatus = liveSnapshot.WeaponPermitStatus;
+                    existingPed.WeaponPermitExpiration = liveSnapshot.WeaponPermitExpiration;
+                    existingPed.WeaponPermitType = liveSnapshot.WeaponPermitType;
+                    existingPed.FishingPermitStatus = liveSnapshot.FishingPermitStatus;
+                    existingPed.FishingPermitExpiration = liveSnapshot.FishingPermitExpiration;
+                    existingPed.HuntingPermitStatus = liveSnapshot.HuntingPermitStatus;
+                    existingPed.HuntingPermitExpiration = liveSnapshot.HuntingPermitExpiration;
+                    if (!string.IsNullOrEmpty(liveSnapshot.FirstName)) existingPed.FirstName = existingPed.FirstName ?? liveSnapshot.FirstName;
+                    if (!string.IsNullOrEmpty(liveSnapshot.LastName)) existingPed.LastName = existingPed.LastName ?? liveSnapshot.LastName;
+                    if (!string.IsNullOrEmpty(liveSnapshot.Birthday)) existingPed.Birthday = existingPed.Birthday ?? liveSnapshot.Birthday;
+                    if (!string.IsNullOrEmpty(liveSnapshot.Gender)) existingPed.Gender = existingPed.Gender ?? liveSnapshot.Gender;
+                    if (!string.IsNullOrEmpty(liveSnapshot.Address)) existingPed.Address = existingPed.Address ?? liveSnapshot.Address;
+                    existingPed.TryParseNameIntoFirstLast();
+                }
+                if (existingPed.CDFPedData != null)
+                    SyncSinglePedToCDF(existingPed);
+                if (existingPed.IsOnProbation || existingPed.IsOnParole)
+                    EnsureSupervisionCourtBackstory(existingPed);
+                if (persistToSql) {
+                    KeepPedInDatabase(existingPed);
+                    Database.SavePed(existingPed);
+                }
+                SetContextPed(existingPed);
+            } catch (Exception ex) {
+                Helper.Log($"TryLightReconcileAndSyncExistingPedByName: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>With StopThePed, pass <paramref name="persistToSql"/> false until an identification/document event (see <see cref="AddIdentificationEvent"/>) persists the person.</summary>
+        internal static void ResolvePedForReEncounter(Ped ped, bool persistToSql = true) {
             if (ped == null || !ped.IsValid()) return;
             if (NativeFunction.Natives.IS_PED_FLEEING<bool>(ped)) MarkPedFleeing(ped);
 
-            // StopThePed often fires stopPedEvent before CDF has a full name, then askIdEvent once ID is shown.
-            // Do not register resolvedPedHandles until we have a name — otherwise the ID event hits the early
-            // return and never runs SetContextPed, so Person Search does not auto-open like with PR.
+            // Cheap name check before full PopulateParameters (avoids double CDF synthetic mutation on repeat visits).
+            string pedNameEarly = null;
+            try { pedNameEarly = ped.GetPedData()?.FullName; } catch { }
+            if (string.IsNullOrEmpty(pedNameEarly)) {
+                try {
+                    var persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped);
+                    if (persona != null && !string.IsNullOrEmpty(persona.FullName)) pedNameEarly = persona.FullName;
+                } catch { }
+            }
+            if (string.IsNullOrEmpty(pedNameEarly)) return;
+
+            // Repeat visits: same pool handle must still reconcile + sync (court/STP may have changed CDF since first resolve).
+            lock (_resolvedPedHandlesLock) {
+                PruneResolvedPedHandlesCore();
+                if (resolvedPedHandles.Contains(ped.Handle)) {
+                    MDTProPedData liveSnap = new MDTProPedData(ped, forReconcileSnapshotOnly: true);
+                    StoreIdentifiedPedHandle(pedNameEarly, ped.Handle);
+                    TryLightReconcileAndSyncExistingPedByName(pedNameEarly, ped, liveSnap, persistToSql);
+                    return;
+                }
+            }
+
+            // First visit with a name: full PopulateParameters once (synthetic priors, CDF counters). Do not register handle until Name is confirmed.
             MDTProPedData mdtProPedData = new MDTProPedData(ped);
             if (mdtProPedData == null || string.IsNullOrEmpty(mdtProPedData.Name)) return;
 
             lock (_resolvedPedHandlesLock) {
-                PruneResolvedPedHandlesCore();
-                if (resolvedPedHandles.Contains(ped.Handle)) return;
+                if (resolvedPedHandles.Contains(ped.Handle)) {
+                    MDTProPedData liveSnap = new MDTProPedData(ped, forReconcileSnapshotOnly: true);
+                    StoreIdentifiedPedHandle(mdtProPedData.Name, ped.Handle);
+                    TryLightReconcileAndSyncExistingPedByName(mdtProPedData.Name, ped, liveSnap, persistToSql);
+                    return;
+                }
                 resolvedPedHandles.Add(ped.Handle);
             }
 
@@ -1614,18 +1969,21 @@ namespace MDTPro.Data {
 
             MDTProPedData existingPed;
             lock (_pedDbLock) {
-                existingPed = pedDatabase.FirstOrDefault(x => x.Name == mdtProPedData.Name);
+                // Match keepInPedDatabase too (ped may have been removed from active pedDatabase when CDF despawned) and ignore case.
+                existingPed = pedDatabase.FirstOrDefault(x => x.Name != null && x.Name.Equals(mdtProPedData.Name, StringComparison.OrdinalIgnoreCase))
+                    ?? keepInPedDatabase.FirstOrDefault(x => x.Name != null && x.Name.Equals(mdtProPedData.Name, StringComparison.OrdinalIgnoreCase));
+                if (existingPed != null && !pedDatabase.Any(x => x != null && x.Name != null && x.Name.Equals(existingPed.Name, StringComparison.OrdinalIgnoreCase)))
+                    pedDatabase.Add(existingPed);
                 if (existingPed != null) {
-                    // Always refresh wanted status from CDF so PR dispatch results (warrants) show in MDT search
-                    existingPed.IsWanted = mdtProPedData.IsWanted;
-                    existingPed.WarrantText = mdtProPedData.WarrantText;
-                    // Supervision must track live CDF too; otherwise DB stays false while the game shows probation/parole and synthetic court never runs
-                    existingPed.IsOnProbation = mdtProPedData.IsOnProbation;
-                    existingPed.IsOnParole = mdtProPedData.IsOnParole;
-                    // Always refresh portrait model from the live ped (was incorrectly gated on CDFPedData == null, leaving stale ModelName for most peds)
-                    if (mdtProPedData.ModelHash != 0) existingPed.ModelHash = mdtProPedData.ModelHash;
-                    if (!string.IsNullOrEmpty(mdtProPedData.ModelName)) existingPed.ModelName = mdtProPedData.ModelName;
-                    if (existingPed.CDFPedData == null) {
+                    if (existingPed.CDFPedData != null)
+                        ReconcilePedCdfBackedFieldsWithLiveSnapshot(existingPed, mdtProPedData);
+                    else {
+                        existingPed.IsWanted = mdtProPedData.IsWanted;
+                        existingPed.WarrantText = mdtProPedData.WarrantText;
+                        existingPed.IsOnProbation = mdtProPedData.IsOnProbation;
+                        existingPed.IsOnParole = mdtProPedData.IsOnParole;
+                        if (mdtProPedData.ModelHash != 0) existingPed.ModelHash = mdtProPedData.ModelHash;
+                        if (!string.IsNullOrEmpty(mdtProPedData.ModelName)) existingPed.ModelName = mdtProPedData.ModelName;
                         existingPed.LicenseStatus = mdtProPedData.LicenseStatus;
                         existingPed.LicenseExpiration = mdtProPedData.LicenseExpiration;
                         existingPed.WeaponPermitStatus = mdtProPedData.WeaponPermitStatus;
@@ -1635,7 +1993,6 @@ namespace MDTPro.Data {
                         existingPed.FishingPermitExpiration = mdtProPedData.FishingPermitExpiration;
                         existingPed.HuntingPermitStatus = mdtProPedData.HuntingPermitStatus;
                         existingPed.HuntingPermitExpiration = mdtProPedData.HuntingPermitExpiration;
-                        // Fill identity when stub/callout record has no CDF data (e.g. callout suspects)
                         if (!string.IsNullOrEmpty(mdtProPedData.FirstName)) existingPed.FirstName = existingPed.FirstName ?? mdtProPedData.FirstName;
                         if (!string.IsNullOrEmpty(mdtProPedData.LastName)) existingPed.LastName = existingPed.LastName ?? mdtProPedData.LastName;
                         if (!string.IsNullOrEmpty(mdtProPedData.Birthday)) existingPed.Birthday = existingPed.Birthday ?? mdtProPedData.Birthday;
@@ -1646,27 +2003,33 @@ namespace MDTPro.Data {
                 }
             }
             if (existingPed != null) {
+                if (existingPed.CDFPedData != null)
+                    SyncSinglePedToCDF(existingPed);
                 if (existingPed.IsOnProbation || existingPed.IsOnParole)
                     EnsureSupervisionCourtBackstory(existingPed);
-                KeepPedInDatabase(existingPed);
-                Database.SavePed(existingPed);
+                if (persistToSql) {
+                    KeepPedInDatabase(existingPed);
+                    Database.SavePed(existingPed);
+                }
                 SetContextPed(existingPed);
                 return;
             }
 
-            TryApplyReEncounterProfile(mdtProPedData);
+            TryApplyReEncounterProfile(mdtProPedData, persistToSql);
             if (mdtProPedData.IsOnProbation || mdtProPedData.IsOnParole)
                 EnsureSupervisionCourtBackstory(mdtProPedData);
             lock (_pedDbLock) {
-                if (pedDatabase.Any(x => x.Name == mdtProPedData.Name)) return;
+                if (pedDatabase.Any(x => x != null && x.Name != null && x.Name.Equals(mdtProPedData.Name, StringComparison.OrdinalIgnoreCase))) return;
                 pedDatabase.Add(mdtProPedData);
             }
-            if (!MDTProPedData.IsMinimalIdentity(mdtProPedData))
+            if (persistToSql && !MDTProPedData.IsMinimalIdentity(mdtProPedData))
                 Database.SavePed(mdtProPedData);
             SetContextPed(mdtProPedData);
+            // Push MDT row (incl. court revocations from TryApply merge) onto CDF before STP/PR read another layer.
+            SyncSinglePedToCDF(mdtProPedData);
 
             // Delayed CDF retry: if CDF was null or minimal, PR may populate shortly; re-read after 2s and merge identity
-            if (mdtProPedData.CDFPedData == null || MDTProPedData.IsMinimalIdentity(mdtProPedData)) {
+            if (persistToSql && (mdtProPedData.CDFPedData == null || MDTProPedData.IsMinimalIdentity(mdtProPedData))) {
                 uint pedHandle = ped.Handle;
                 if (pedHandle == 0) return; // invalid handle - skip retry
                 string pedName = mdtProPedData.Name;
@@ -1676,34 +2039,21 @@ namespace MDTPro.Data {
                         Ped p = null;
                         try { p = World.GetEntityByHandle<Ped>(pedHandle); } catch { return; } // ped despawned - expected, no log
                         if (p == null || !p.IsValid()) return;
-                        MDTProPedData updated = new MDTProPedData(p);
+                        MDTProPedData updated = new MDTProPedData(p, forReconcileSnapshotOnly: true);
                         if (updated.CDFPedData == null || MDTProPedData.IsMinimalIdentity(updated)) return;
                         MDTProPedData existing = null;
                         lock (_pedDbLock) {
                             existing = pedDatabase.FirstOrDefault(x => x != null && string.Equals(x.Name, pedName, StringComparison.OrdinalIgnoreCase));
                             if (existing == null) return;
-                            if (!string.IsNullOrEmpty(updated.Birthday)) existing.Birthday = existing.Birthday ?? updated.Birthday;
-                            if (!string.IsNullOrEmpty(updated.Gender)) existing.Gender = existing.Gender ?? updated.Gender;
-                            if (!string.IsNullOrEmpty(updated.Address)) existing.Address = existing.Address ?? updated.Address;
-                            if (!string.IsNullOrEmpty(updated.LicenseStatus)) existing.LicenseStatus = existing.LicenseStatus ?? updated.LicenseStatus;
-                            if (!string.IsNullOrEmpty(updated.LicenseExpiration)) existing.LicenseExpiration = existing.LicenseExpiration ?? updated.LicenseExpiration;
-                            if (!string.IsNullOrEmpty(updated.WeaponPermitStatus)) existing.WeaponPermitStatus = existing.WeaponPermitStatus ?? updated.WeaponPermitStatus;
-                            if (!string.IsNullOrEmpty(updated.WeaponPermitExpiration)) existing.WeaponPermitExpiration = existing.WeaponPermitExpiration ?? updated.WeaponPermitExpiration;
-                            if (!string.IsNullOrEmpty(updated.WeaponPermitType)) existing.WeaponPermitType = existing.WeaponPermitType ?? updated.WeaponPermitType;
-                            if (!string.IsNullOrEmpty(updated.FishingPermitStatus)) existing.FishingPermitStatus = existing.FishingPermitStatus ?? updated.FishingPermitStatus;
-                            if (!string.IsNullOrEmpty(updated.FishingPermitExpiration)) existing.FishingPermitExpiration = existing.FishingPermitExpiration ?? updated.FishingPermitExpiration;
-                            if (!string.IsNullOrEmpty(updated.HuntingPermitStatus)) existing.HuntingPermitStatus = existing.HuntingPermitStatus ?? updated.HuntingPermitStatus;
-                            if (!string.IsNullOrEmpty(updated.HuntingPermitExpiration)) existing.HuntingPermitExpiration = existing.HuntingPermitExpiration ?? updated.HuntingPermitExpiration;
-                            if (updated.ModelHash != 0) existing.ModelHash = updated.ModelHash;
-                            if (!string.IsNullOrEmpty(updated.ModelName)) existing.ModelName = updated.ModelName;
-                            existing.IsOnProbation = updated.IsOnProbation;
-                            existing.IsOnParole = updated.IsOnParole;
+                            ReconcilePedCdfBackedFieldsWithLiveSnapshot(existing, updated);
                             existing.TryParseNameIntoFirstLast();
                         }
                         if (existing.IsOnProbation || existing.IsOnParole)
                             EnsureSupervisionCourtBackstory(existing);
-                        KeepPedInDatabase(existing);
-                        Database.SavePed(existing);
+                        if (persistToSql) {
+                            KeepPedInDatabase(existing);
+                            Database.SavePed(existing);
+                        }
                         Helper.Log($"[MDTPro] Delayed CDF retry filled identity for: {pedName}", false, Helper.LogSeverity.Info);
                     } catch (Exception ex) {
                         // Expected when ped despawned before retry - don't spam log
@@ -1780,31 +2130,8 @@ namespace MDTPro.Data {
             return plate.Trim().Replace(" ", "").ToUpperInvariant();
         }
 
-        /// <summary>Normalize VIN for lookup (ignore spaces and hyphens, case-insensitive).</summary>
-        internal static string NormalizeVinKey(string vin) {
-            if (string.IsNullOrWhiteSpace(vin)) return "";
-            return new string(vin.Trim().Where(ch => !char.IsWhiteSpace(ch) && ch != '-' && ch != '\u2013').ToArray()).ToUpperInvariant();
-        }
-
-        static bool VehicleMatchesPlateOrVin(MDTProVehicleData x, string rawKey, string normPlateKey, string normVinKey) {
-            if (x == null) return false;
-            if (!string.IsNullOrEmpty(rawKey)) {
-                if (!string.IsNullOrEmpty(x.LicensePlate) && string.Equals(x.LicensePlate, rawKey, StringComparison.OrdinalIgnoreCase))
-                    return true;
-                if (!string.IsNullOrEmpty(x.VehicleIdentificationNumber) && string.Equals(x.VehicleIdentificationNumber, rawKey, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-            if (!string.IsNullOrEmpty(normPlateKey) && !string.IsNullOrEmpty(x.LicensePlate)
-                && NormalizeVehiclePlateKey(x.LicensePlate) == normPlateKey)
-                return true;
-            if (!string.IsNullOrEmpty(normVinKey) && !string.IsNullOrEmpty(x.VehicleIdentificationNumber)
-                && NormalizeVinKey(x.VehicleIdentificationNumber) == normVinKey)
-                return true;
-            return false;
-        }
-
-        /// <summary>StopThePed-only: copies registration/insurance expiration from CDF on the live vehicle, then overwrites <see cref="MDTProVehicleData.RegistrationStatus"/> / <see cref="MDTProVehicleData.InsuranceStatus"/> from <c>StopThePed.API.Functions.getVehicleRegistrationStatus</c> / <c>getVehicleInsuranceStatus</c> (STP’s own flags, not only CDF enums).</summary>
-        internal static bool TryRefreshVehicleDocumentsFromLiveWorld(MDTProVehicleData vehicleData) {
+        /// <summary>StopThePed-only: resolves live <see cref="Vehicle"/> (Holder or world scan by plate), copies CDF reg/ins, then STP status API. Must run on the game fiber — <see cref="TryRefreshVehicleDocumentsFromLiveWorld"/> marshals from HTTP.</summary>
+        private static bool TryRefreshVehicleDocumentsFromLiveWorldExecute(MDTProVehicleData vehicleData) {
             if (!ModIntegration.SubscribedStopThePedStopEvents) return false;
             if (vehicleData == null || string.IsNullOrWhiteSpace(vehicleData.LicensePlate)) return false;
             string want = NormalizeVehiclePlateKey(vehicleData.LicensePlate);
@@ -1816,9 +2143,12 @@ namespace MDTPro.Data {
             } catch { /* entity disposed */ }
             if (live == null) {
                 try {
+                    int n = 0;
                     foreach (Vehicle v in World.GetAllVehicles()) {
+                        if (++n > 2048) break;
                         if (v == null || !v.Exists()) continue;
-                        if (NormalizeVehiclePlateKey(v.LicensePlate) != want) continue;
+                        string plate = TryResolveLiveVehiclePlate(v, out _);
+                        if (string.IsNullOrEmpty(plate) || NormalizeVehiclePlateKey(plate) != want) continue;
                         live = v;
                         break;
                     }
@@ -1826,13 +2156,39 @@ namespace MDTPro.Data {
                     return false;
                 }
             }
-            if (live == null) return false;
+            if (live == null || !live.Exists()) return false;
             VehicleData cdf = null;
             try { cdf = live.GetVehicleData(); } catch { }
             if (cdf != null)
                 vehicleData.CopyRegistrationInsuranceFromCdf(cdf);
             bool stp = TryOverlayStopThePedVehicleDocStatusFromApi(vehicleData, live);
             return cdf != null || stp;
+        }
+
+        /// <summary>StopThePed-only: registration/insurance in Vehicle Search must match STP’s doc check. RAGE entity + STP APIs are not reliable from the HTTP thread — run on game fiber (blocking when called from pool).</summary>
+        internal static bool TryRefreshVehicleDocumentsFromLiveWorld(MDTProVehicleData vehicleData) {
+            if (!ModIntegration.SubscribedStopThePedStopEvents || vehicleData == null || string.IsNullOrWhiteSpace(vehicleData.LicensePlate))
+                return false;
+            bool result = false;
+            try {
+                if (GameFiber.CanSleepNow) {
+                    result = TryRefreshVehicleDocumentsFromLiveWorldExecute(vehicleData);
+                } else {
+                    var done = new ManualResetEventSlim(false);
+                    GameFiber.StartNew(() => {
+                        try {
+                            result = TryRefreshVehicleDocumentsFromLiveWorldExecute(vehicleData);
+                        } finally {
+                            try { done.Set(); } catch { /* ignore */ }
+                        }
+                    }, "mdtpro-stp-vehicle-docs");
+                    if (!done.Wait(2500))
+                        Helper.Log("TryRefreshVehicleDocumentsFromLiveWorld: timed out waiting for game fiber (paused game?).", false, Helper.LogSeverity.Warning);
+                }
+            } catch (Exception ex) {
+                Helper.Log($"TryRefreshVehicleDocumentsFromLiveWorld: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+            return result;
         }
 
         /// <summary>STP stop integration: sets registration/insurance status strings from StopThePed public API (matches in-game plate/doc checks). Call on game thread.</summary>
@@ -1857,24 +2213,13 @@ namespace MDTPro.Data {
                 var owner = vehicleData.CDFVehicleData.Owner;
                 string name = owner.FullName?.Trim();
                 if (string.IsNullOrEmpty(name) || string.Equals(name, "Government", StringComparison.OrdinalIgnoreCase)) return;
-                bool wanted = owner.Wanted;
-                bool onProbation = owner.IsOnProbation;
-                bool onParole = owner.IsOnParole;
+                MDTProPedData liveFromOwner = new MDTProPedData(owner);
                 lock (_pedDbLock) {
                     MDTProPedData existing = pedDatabase.FirstOrDefault(x => x.Name != null && x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
                     if (existing == null) return;
-                    existing.IsWanted = wanted;
-                    if (wanted && string.IsNullOrEmpty(existing.WarrantText))
-                        existing.WarrantText = CitationArrestHelper.GetRandomWarrantCharge().name;
-                    else if (!wanted)
-                        existing.WarrantText = null;
-                    existing.IsOnProbation = onProbation;
-                    existing.IsOnParole = onParole;
-                    if (existing.CDFPedData != null) {
-                        existing.CDFPedData.Wanted = wanted;
-                        existing.CDFPedData.IsOnProbation = onProbation;
-                        existing.CDFPedData.IsOnParole = onParole;
-                    }
+                    ReconcilePedCdfBackedFieldsWithLiveSnapshot(existing, liveFromOwner);
+                    if (existing.CDFPedData != null)
+                        SyncSinglePedToCDF(existing);
                     Database.SavePed(existing);
                 }
             } catch (Exception ex) {
@@ -2774,6 +3119,8 @@ namespace MDTPro.Data {
                         pedData.IsWanted = false;
                         pedData.WarrantText = null;
                         SyncSinglePedToCDF(pedData);
+                        if (courtCase.LicenseRevocations != null && courtCase.LicenseRevocations.Count > 0)
+                            ScheduleCourtLicenseRevocationCdfRetry(courtCase.PedName);
                     } else if (status == 2 || status == 3) {
                         pedData.IsWanted = false;
                         pedData.WarrantText = null;
@@ -2809,7 +3156,7 @@ namespace MDTPro.Data {
                     || IsPedFleeingTaskActive(ped);
 
                 // clearAfterRead: false so we don't clear damage state on first check (improves reliability)
-                Ped[] nearbyPeds = ped.GetNearbyPeds(50);
+                Ped[] nearbyPeds = ped.GetNearbyPeds(ClampRageNearbyPoolQueryCount(50));
                 bool assaultedPed = false;
                 Ped playerPed = Main.Player;
                 if (playerPed != null && playerPed.IsValid() && playerPed != ped) {
@@ -2944,7 +3291,7 @@ namespace MDTPro.Data {
         private static bool CheckVehicleDamageByPed(Ped ped) {
             if (ped == null || !ped.IsValid()) return false;
             try {
-                Vehicle[] nearbyVehicles = ped.GetNearbyVehicles(50);
+                Vehicle[] nearbyVehicles = ped.GetNearbyVehicles(ClampRageNearbyPoolQueryCount(50));
                 // (1) Direct: vehicle damaged by ped entity (rare; usually applies to on-foot damage)
                 bool any = nearbyVehicles != null && nearbyVehicles.Any(v =>
                     v != null && v.IsValid() &&
@@ -3052,7 +3399,7 @@ namespace MDTPro.Data {
             }
         }
 
-        /// <summary>Uses StopThePed.API.Functions isPedAlcoholOverLimit / isPedUnderDrugsInfluence (see StopThePed/Decompiled) after breathalyzer, drug swab, or SFST events.</summary>
+        /// <summary>Uses StopThePed.API.Functions isPedAlcoholOverLimit / isPedUnderDrugsInfluence (STP/StopThePed.API.cs) after breathalyzer, drug swab, or SFST events.</summary>
         internal static void ApplyStopThePedImpairmentEvidence(Ped ped) {
             if (ped == null || !ped.IsValid()) return;
             try {
@@ -3494,6 +3841,78 @@ namespace MDTPro.Data {
                 || m.Contains("SNOWBALL") || m.Contains("BALL") || m.EndsWith("_BAT"); // WEAPON_BAT, not COMBATPISTOL
         }
 
+        private static bool NameLooksSerialValueMember(string name) {
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.ToLowerInvariant();
+            if (n.Contains("scratch") || n.Contains("defaced") || n.Contains("obliterat")) return false;
+            return n.Contains("serial") || n == "sn" || n.EndsWith("s/n", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool NameHintsScratchedSerialState(string name) {
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.ToLowerInvariant();
+            return (n.Contains("scratch") || n.Contains("defaced")) && (n.Contains("serial") || n.Contains("weapon") || n.Contains("firearm"))
+                || n == "state" || n == "firearmstate" || n == "serialstate";
+        }
+
+        private static void ApplyScratchHintFromValue(object val, ref string serial, ref bool isSerialScratched) {
+            if (val == null) return;
+            try {
+                if (val is bool b && b) {
+                    isSerialScratched = true;
+                    serial = null;
+                    return;
+                }
+                string s = val.ToString();
+                if (string.IsNullOrEmpty(s)) return;
+                if (s.IndexOf("scratch", StringComparison.OrdinalIgnoreCase) >= 0 || s.Equals("ScratchedSN", StringComparison.OrdinalIgnoreCase)) {
+                    isSerialScratched = true;
+                    serial = null;
+                }
+            } catch { /* ignore */ }
+        }
+
+        /// <summary>STP/PR weapon search items may expose serial on <c>WeaponSerial</c>, non-public members, etc. Runs after named-property pass.</summary>
+        private static void RefineFirearmSerialFromReflection(object item, Type t, ref string serial, ref bool isSerialScratched) {
+            if (item == null || t == null) return;
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+            foreach (PropertyInfo prop in t.GetProperties(flags)) {
+                try {
+                    if (NameHintsScratchedSerialState(prop.Name))
+                        ApplyScratchHintFromValue(prop.GetValue(item), ref serial, ref isSerialScratched);
+                } catch { /* ignore */ }
+            }
+            foreach (FieldInfo fi in t.GetFields(flags)) {
+                try {
+                    if (fi.Name.Contains(">k__BackingField")) continue;
+                    if (NameHintsScratchedSerialState(fi.Name))
+                        ApplyScratchHintFromValue(fi.GetValue(item), ref serial, ref isSerialScratched);
+                } catch { /* ignore */ }
+            }
+            if (isSerialScratched) return;
+            foreach (PropertyInfo prop in t.GetProperties(flags)) {
+                try {
+                    if (!NameLooksSerialValueMember(prop.Name)) continue;
+                    object val = prop.GetValue(item);
+                    if (val == null) continue;
+                    string s = (val as string ?? val.ToString())?.Trim();
+                    if (string.IsNullOrWhiteSpace(s)) continue;
+                    if (string.IsNullOrWhiteSpace(serial) || s.Length > serial.Length) serial = s;
+                } catch { /* ignore */ }
+            }
+            foreach (FieldInfo fi in t.GetFields(flags)) {
+                try {
+                    if (fi.Name.Contains(">k__BackingField")) continue;
+                    if (!NameLooksSerialValueMember(fi.Name)) continue;
+                    object val = fi.GetValue(item);
+                    if (val == null) continue;
+                    string s = (val as string ?? val.ToString())?.Trim();
+                    if (string.IsNullOrWhiteSpace(s)) continue;
+                    if (string.IsNullOrWhiteSpace(serial) || s.Length > serial.Length) serial = s;
+                } catch { /* ignore */ }
+            }
+        }
+
         /// <summary>Extracts FirearmRecords from PR search item list. Shared by CaptureFirearmsFromPed and pickup/player capture.</summary>
         private static List<FirearmRecord> ExtractFirearmRecordsFromItemList(System.Collections.IEnumerable list, string ownerName, string source) {
             var records = new List<FirearmRecord>();
@@ -3533,6 +3952,7 @@ namespace MDTPro.Data {
                         }
                     } catch { }
                 }
+                RefineFirearmSerialFromReflection(item, t, ref serial, ref isSerialScratched);
                 if (hash == 0u) continue;
                 if (IsMeleeOrNonFirearm(hash, modelId)) continue; // Knives, bats, etc. don't belong in Firearms Check
                 if (isSerialScratched) serial = null;
@@ -3727,6 +4147,7 @@ namespace MDTPro.Data {
                             }
                         } catch { }
                     }
+                    RefineFirearmSerialFromReflection(item, t, ref serial, ref isSerialScratched);
                     string firearmOwner = !string.IsNullOrWhiteSpace(itemOwner) ? itemOwner : ownerForFirearms;
                     if (weaponHash != 0u && firearmOwner != null && !IsMeleeOrNonFirearm(weaponHash, weaponModelId)) {
                         string displayName = GetWeaponDisplayNameFromHash(weaponHash) ?? description ?? weaponModelId;
@@ -6171,6 +6592,8 @@ namespace MDTPro.Data {
                         pedData.IsWanted = false;
                         pedData.WarrantText = null;
                         SyncSinglePedToCDF(pedData);
+                        if (newStatus == 1 && courtCase.LicenseRevocations != null && courtCase.LicenseRevocations.Count > 0)
+                            ScheduleCourtLicenseRevocationCdfRetry(courtCase.PedName);
                         KeepPedInDatabase(pedData);
                         pedDatabase[pedIndex] = pedData;
                         Database.SavePed(pedData);

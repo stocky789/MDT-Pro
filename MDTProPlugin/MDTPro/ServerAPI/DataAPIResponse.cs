@@ -28,7 +28,7 @@ namespace MDTPro.ServerAPI {
                 if (limit < 1) limit = 1;
                 if (limit > 20) limit = 20;
 
-                DataController.PrepareNearbyVehiclesForHttpBlocking();
+                DataController.RefreshCachedNearbyVehiclesOnGameFiberBlocking();
                 var cached = DataController.GetCachedNearbyVehicles(limit);
                 var nearbyVehicles = cached.Select(x => new {
                     x.LicensePlate,
@@ -123,6 +123,8 @@ namespace MDTPro.ServerAPI {
                 }
                 if (vehicleData == null && !string.IsNullOrEmpty(licensePlateOrVin) && !wantContextOnly)
                     vehicleData = DataController.GetVehicleByPlateOrVin(licensePlateOrVin);
+                if (vehicleData == null && !string.IsNullOrEmpty(licensePlateOrVin) && !wantContextOnly)
+                    vehicleData = DataController.TryResolveVehicleFromLiveWorldByPlateOrVinBlocking(licensePlateOrVin);
 
                 if (vehicleData != null && vehicleData.CDFVehicleData != null)
                     DataController.MergeBOLOsFromStubByPlate(vehicleData);
