@@ -3,8 +3,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid Margin="8">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="280" />
-            <ColumnDefinition Width="8" />
+            <ColumnDefinition x:Name="DashboardSidebarColumn" Width="280" MinWidth="200" />
+            <ColumnDefinition Width="6" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
         <Border Grid.Column="0" Style="{StaticResource CadSectionBorder}" Padding="10">
@@ -18,6 +18,13 @@
                 <ListBox x:Name="CalloutList" Style="{StaticResource CadListBox}" FontFamily="{StaticResource CadFontMono}" FontSize="12" SelectionChanged="CalloutList_OnSelectionChanged" />
             </DockPanel>
         </Border>
+        <GridSplitter x:Name="DashboardSplitter"
+                      Grid.Column="1"
+                      Width="6"
+                      HorizontalAlignment="Stretch"
+                      ResizeDirection="Columns"
+                      ResizeBehavior="PreviousAndNext"
+                      Background="{StaticResource CadBorder}" />
         <Border Grid.Column="2" Style="{StaticResource CadSectionBorder}" Padding="10">
             <DockPanel LastChildFill="True">
                 <TextBlock DockPanel.Dock="Top" Text="CALLOUT DETAIL" Style="{StaticResource CadSectionTitle}" Margin="0,0,0,8" />

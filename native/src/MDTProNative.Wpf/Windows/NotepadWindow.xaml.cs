@@ -14,6 +14,7 @@ public partial class NotepadWindow : Window
     void Save_Click(object sender, RoutedEventArgs e)
     {
         NotepadStore.Save(NotesBox.Text);
+        CadSaveSound.TryPlay();
         MdtShellEvents.LogCad("Notepad: saved to this computer.");
     }
 

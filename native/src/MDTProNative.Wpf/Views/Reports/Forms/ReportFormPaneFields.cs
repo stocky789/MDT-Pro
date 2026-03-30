@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Windows.Controls;
+using MDTProNative.Wpf.Helpers;
 using Newtonsoft.Json.Linq;
 
 namespace MDTProNative.Wpf.Views.Reports.Forms;
@@ -173,10 +174,15 @@ internal static class ReportFormPaneFields
     static DateTime ReadDateTime(JToken? t, DateTime fallback)
     {
         if (t == null || t.Type == JTokenType.Null) return fallback;
+        if (t.Type == JTokenType.Date)
+        {
+            var dt = t.Value<DateTime>();
+            return dt.Kind == DateTimeKind.Utc ? dt.ToLocalTime() : dt;
+        }
+
         var s = t.ToString();
-        if (DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dt)) return dt;
-        if (DateTime.TryParse(s, CultureInfo.CurrentCulture, DateTimeStyles.None, out dt)) return dt;
-        return fallback;
+        if (!NativeMdtFormat.TryParseMdtDateTime(s, out var parsed)) return fallback;
+        return parsed.Kind == DateTimeKind.Utc ? parsed.ToLocalTime() : DateTime.SpecifyKind(parsed, DateTimeKind.Local);
     }
 
     public static bool ReadBool(JToken? t, bool defaultValue = false)

@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using MDTProNative.Wpf.Helpers;
 using MDTProNative.Wpf.Services;
+using MDTProNative.Wpf.Views.Controls;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -12,11 +13,13 @@ namespace MDTProNative.Wpf.Views;
 public partial class FirearmsView : UserControl, IMdtBoundView
 {
     MdtConnectionManager? _connection;
+    bool _layoutPersistWired;
     int _searchGen;
 
     public FirearmsView()
     {
         InitializeComponent();
+        Loaded += OnFirearmsLoaded;
         RecentList.DisplayMemberPath = nameof(RecentWeaponRow.Display);
         SearchBtn.Click += async (_, _) => await SearchAsync(QueryBox.Text);
         QueryBox.KeyDown += async (_, e) =>
@@ -32,6 +35,13 @@ public partial class FirearmsView : UserControl, IMdtBoundView
                 await SearchAsync(rw.LookupKey);
             }
         };
+    }
+
+    void OnFirearmsLoaded(object sender, RoutedEventArgs e)
+    {
+        if (_layoutPersistWired) return;
+        _layoutPersistWired = true;
+        UiLayoutHooks.WireFirearms(this);
     }
 
     Brush R(string key) => (Brush)FindResource(key);
@@ -51,6 +61,8 @@ public partial class FirearmsView : UserControl, IMdtBoundView
     {
         var http = _connection?.Http;
         if (http == null) return;
+        await MdtBusyUi.RunAsync(ModuleBusy, "FIREARMS REGISTRY", "Polling recent weapon activity…", async () =>
+        {
         try
         {
             var tok = await http.GetDataJsonAsync("recentFirearms").ConfigureAwait(false);
@@ -83,6 +95,7 @@ public partial class FirearmsView : UserControl, IMdtBoundView
                 RecentEmptyHint.Visibility = Visibility.Visible;
             });
         }
+        });
     }
 
     async Task SearchAsync(string? raw)
@@ -101,55 +114,58 @@ public partial class FirearmsView : UserControl, IMdtBoundView
             return;
         }
 
-        var gen = ++_searchGen;
-        JObject? bySerial = null;
-        try
+        await MdtBusyUi.RunAsync(ModuleBusy, "NCIC / WEAPONS", "Querying firearm registry…", async () =>
         {
-            var (_, text) = await http.PostAsync("data/firearmBySerial", JsonConvert.SerializeObject(query)).ConfigureAwait(false);
-            if (gen != _searchGen) return;
-            if (!string.IsNullOrWhiteSpace(text) && text.TrimStart().StartsWith('{'))
-                bySerial = JObject.Parse(text);
-        }
-        catch
-        {
-            bySerial = null;
-        }
-
-        if (gen != _searchGen) return;
-
-        if (bySerial != null && LooksLikeFirearmHit(bySerial))
-        {
-            await Dispatcher.InvokeAsync(() => RenderFirearms(new[] { bySerial }, single: true));
-            return;
-        }
-
-        JArray? byOwner = null;
-        try
-        {
-            var (_, text) = await http.PostAsync("data/firearmsForPed", JsonConvert.SerializeObject(query)).ConfigureAwait(false);
-            if (gen != _searchGen) return;
-            if (!string.IsNullOrWhiteSpace(text) && text.TrimStart().StartsWith('['))
-                byOwner = JArray.Parse(text);
-        }
-        catch
-        {
-            byOwner = null;
-        }
-
-        if (gen != _searchGen) return;
-
-        await Dispatcher.InvokeAsync(() =>
-        {
-            if (byOwner == null || byOwner.Count == 0)
+            var gen = ++_searchGen;
+            JObject? bySerial = null;
+            try
             {
-                MessageBox.Show("No firearm on file for that serial or owner.", "Firearms", MessageBoxButton.OK, MessageBoxImage.Information);
-                DetailPanel.Children.Clear();
-                DetailPanel.Children.Add(DetailPlaceholder);
-                DetailPlaceholder.Visibility = Visibility.Visible;
+                var (_, text) = await http.PostAsync("data/firearmBySerial", JsonConvert.SerializeObject(query)).ConfigureAwait(false);
+                if (gen != _searchGen) return;
+                if (!string.IsNullOrWhiteSpace(text) && text.TrimStart().StartsWith('{'))
+                    bySerial = JObject.Parse(text);
+            }
+            catch
+            {
+                bySerial = null;
+            }
+
+            if (gen != _searchGen) return;
+
+            if (bySerial != null && LooksLikeFirearmHit(bySerial))
+            {
+                await Dispatcher.InvokeAsync(() => RenderFirearms(new[] { bySerial }, single: true));
                 return;
             }
 
-            RenderFirearms(byOwner.OfType<JObject>().ToList(), single: false);
+            JArray? byOwner = null;
+            try
+            {
+                var (_, text) = await http.PostAsync("data/firearmsForPed", JsonConvert.SerializeObject(query)).ConfigureAwait(false);
+                if (gen != _searchGen) return;
+                if (!string.IsNullOrWhiteSpace(text) && text.TrimStart().StartsWith('['))
+                    byOwner = JArray.Parse(text);
+            }
+            catch
+            {
+                byOwner = null;
+            }
+
+            if (gen != _searchGen) return;
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (byOwner == null || byOwner.Count == 0)
+                {
+                    MessageBox.Show("No firearm on file for that serial or owner.", "Firearms", MessageBoxButton.OK, MessageBoxImage.Information);
+                    DetailPanel.Children.Clear();
+                    DetailPanel.Children.Add(DetailPlaceholder);
+                    DetailPlaceholder.Visibility = Visibility.Visible;
+                    return;
+                }
+
+                RenderFirearms(byOwner.OfType<JObject>().ToList(), single: false);
+            });
         });
     }
 
@@ -281,24 +297,28 @@ public partial class FirearmsView : UserControl, IMdtBoundView
 
             try
             {
-                var (code, text) = await http.PostActionAsync("firearmCheckResult", body).ConfigureAwait(false);
-                await Dispatcher.InvokeAsync(() =>
+                await MdtBusyUi.RunAsync(ModuleBusy, "DISPATCH LOG", "Recording firearm check result…", async () =>
                 {
-                    if (code == HttpStatusCode.OK && !string.IsNullOrWhiteSpace(text) && text.TrimStart().StartsWith('{'))
+                    var (code, text) = await http.PostActionAsync("firearmCheckResult", body).ConfigureAwait(false);
+                    await Dispatcher.InvokeAsync(() =>
                     {
-                        var jo = JObject.Parse(text);
-                        if (jo.Value<bool?>("success") == true)
+                        if (code == HttpStatusCode.OK && !string.IsNullOrWhiteSpace(text) && text.TrimStart().StartsWith('{'))
                         {
-                            MessageBox.Show("Check result logged.", "Firearms", MessageBoxButton.OK, MessageBoxImage.Information);
+                            var jo = JObject.Parse(text);
+                            if (jo.Value<bool?>("success") == true)
+                            {
+                                CadSaveSound.TryPlay();
+                                MessageBox.Show("Check result logged.", "Firearms", MessageBoxButton.OK, MessageBoxImage.Information);
+                                return;
+                            }
+
+                            MessageBox.Show(jo["error"]?.ToString() ?? text, "Firearms", MessageBoxButton.OK, MessageBoxImage.Warning);
                             return;
                         }
 
-                        MessageBox.Show(jo["error"]?.ToString() ?? text, "Firearms", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        return;
-                    }
-
-                    MessageBox.Show(text, "Firearms", MessageBoxButton.OK, MessageBoxImage.Warning);
-                });
+                        MessageBox.Show(text, "Firearms", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    });
+                }, minimumVisibleMs: 560);
             }
             catch (Exception ex)
             {

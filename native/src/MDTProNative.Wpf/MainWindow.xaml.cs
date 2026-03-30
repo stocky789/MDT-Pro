@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using MDTProNative.Wpf.Services;
 using MDTProNative.Wpf.Views;
@@ -21,6 +22,11 @@ public partial class MainWindow : Window
     readonly ObservableCollection<string> _logLines = new();
     readonly ObservableCollection<NavItem> _nav = new();
     bool _navInit;
+    double _cadLogExpandedHeight = 168;
+    bool _cadLogCollapsed;
+    bool _suppressNavFadeOnce = true;
+    int _lastCalloutCount = -1;
+    Storyboard? _connLampPulse;
 
     public MainWindow() : this(new TerminalSessionConfig("Operator", "127.0.0.1", 9000)) { }
 
@@ -33,14 +39,26 @@ public partial class MainWindow : Window
         _connection.LocationUpdated += OnLocationUpdated;
         _connection.CalloutsUpdated += (_, count) =>
         {
+            if (_connection.IsConnected && count > _lastCalloutCount && _lastCalloutCount >= 0)
+                CadCalloutSound.TryPlay();
+            _lastCalloutCount = count;
             StatusCallouts.Text = count == 0 && !_connection.IsConnected ? "—" : count.ToString();
             if (RightRailActivityTab != null)
                 RightRailActivityTab.Text = _connection.IsConnected ? $"CALLOUTS ({count})" : "CALLOUTS (—)";
             RefreshFooterSummary();
         };
-        _connection.Log += AppendLog;
+        _connection.Log += OnConnectionLog;
 
         MessageLog.ItemsSource = _logLines;
+        ApplyPersistedShellLayout();
+        MainLeftRailSplitter.DragCompleted += (_, _) => SaveShellLayout();
+        MainRightRailSplitter.DragCompleted += (_, _) => SaveShellLayout();
+        CadLogRowSplitter.DragCompleted += (_, _) =>
+        {
+            if (!_cadLogCollapsed && CadLogRow.ActualHeight >= 80)
+                _cadLogExpandedHeight = CadLogRow.ActualHeight;
+            SaveShellLayout();
+        };
         _nav.Add(new NavItem("dashboard", "OVERVIEW"));
         _nav.Add(new NavItem("person", "PERSON"));
         _nav.Add(new NavItem("vehicle", "VEHICLE"));
@@ -54,26 +72,101 @@ public partial class MainWindow : Window
 
         MdtShellEvents.OfficerStripRefreshRequested += OnOfficerStripRefreshRequested;
         MdtShellEvents.CadMessageLogged += OnCadMessageLogged;
+        MdtShellEvents.NavigateToPersonSearchRequested += OnNavigateToPersonSearchRequested;
+        MdtShellEvents.NavigateToReportRequested += OnNavigateToReportRequested;
         SetQuickActionsEnabled(false);
 
         ApplyTerminalChrome();
         RefreshFooterSummary();
         SetConnectionLamp(online: false);
+        RefreshSoundMuteButtonChrome();
         Loaded += MainWindow_OnLoaded;
 
         Closing += async (_, _) =>
         {
+            SaveShellLayout();
+            _connection.Log -= OnConnectionLog;
             MdtShellEvents.OfficerStripRefreshRequested -= OnOfficerStripRefreshRequested;
             MdtShellEvents.CadMessageLogged -= OnCadMessageLogged;
+            MdtShellEvents.NavigateToPersonSearchRequested -= OnNavigateToPersonSearchRequested;
+            MdtShellEvents.NavigateToReportRequested -= OnNavigateToReportRequested;
             if (ContentHost.Content is IMdtBoundView b) b.Bind(null);
             await _connection.DisposeAsync();
         };
     }
 
+    void ApplyPersistedShellLayout()
+    {
+        var p = UiLayoutStore.Load();
+        if (p.MainActionsWidth is { } mw && mw >= MainActionsColumn.MinWidth)
+            MainActionsColumn.Width = new GridLength(mw);
+        if (p.MainRelatedWidth is { } rw && rw >= MainRelatedColumn.MinWidth)
+            MainRelatedColumn.Width = new GridLength(rw);
+        _cadLogExpandedHeight = p.CadLogHeight is >= 80 and < 2000 ? p.CadLogHeight.Value : 168;
+        _cadLogCollapsed = p.CadLogCollapsed == true;
+        SyncCadLogLayoutToState();
+    }
+
+    void SyncCadLogLayoutToState()
+    {
+        if (_cadLogCollapsed)
+        {
+            CadLogSplitterRow.Height = new GridLength(0);
+            CadLogRow.MinHeight = 0;
+            CadLogRow.Height = new GridLength(36);
+            MessageLog.Visibility = Visibility.Collapsed;
+            CadLogRowSplitter.IsHitTestVisible = false;
+            CadLogExpandBtn.Visibility = Visibility.Visible;
+            CadLogCollapseBtn.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            CadLogSplitterRow.Height = new GridLength(6);
+            CadLogRow.MinHeight = 80;
+            CadLogRow.Height = new GridLength(_cadLogExpandedHeight);
+            MessageLog.Visibility = Visibility.Visible;
+            CadLogRowSplitter.IsHitTestVisible = true;
+            CadLogExpandBtn.Visibility = Visibility.Collapsed;
+            CadLogCollapseBtn.Visibility = Visibility.Visible;
+        }
+    }
+
+    void SaveShellLayout()
+    {
+        try
+        {
+            var p = UiLayoutStore.Load();
+            p.MainActionsWidth = MainActionsColumn.ActualWidth;
+            p.MainRelatedWidth = MainRelatedColumn.ActualWidth;
+            p.CadLogCollapsed = _cadLogCollapsed;
+            p.CadLogHeight = _cadLogExpandedHeight;
+            UiLayoutStore.Save(p);
+        }
+        catch { /* ignore */ }
+    }
+
+    void CadLogCollapse_Click(object sender, RoutedEventArgs e)
+    {
+        if (_cadLogCollapsed) return;
+        if (CadLogRow.ActualHeight >= 80)
+            _cadLogExpandedHeight = CadLogRow.ActualHeight;
+        _cadLogCollapsed = true;
+        SyncCadLogLayoutToState();
+        SaveShellLayout();
+    }
+
+    void CadLogExpand_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_cadLogCollapsed) return;
+        _cadLogCollapsed = false;
+        SyncCadLogLayoutToState();
+        SaveShellLayout();
+    }
+
     void ApplyTerminalChrome()
     {
         TerminalOperatorLabel.Text = _session.TerminalDisplayName;
-        Title = $"MDT Pro — MDC Terminal — {_session.TerminalDisplayName}";
+        Title = $"MDTPro — MDC Terminal — {_session.TerminalDisplayName}";
         HostBox.Text = _session.Host;
         PortBox.Text = _session.Port.ToString();
     }
@@ -88,6 +181,22 @@ public partial class MainWindow : Window
     void OnOfficerStripRefreshRequested() => _ = UpdateOfficerStripAsync();
 
     void OnCadMessageLogged(string line) => Dispatcher.BeginInvoke(() => AppendLog(line));
+
+    void OnNavigateToPersonSearchRequested(string pedName)
+    {
+        PersonSearchView.PendingInitialPersonQuery = pedName;
+        if (_nav.FirstOrDefault(x => x.Id == "person") is { } item)
+            NavList.SelectedItem = item;
+    }
+
+    void OnNavigateToReportRequested(string reportId, string? reportTypeKey)
+    {
+        ReportsView.PendingOpenReport = (reportId, reportTypeKey);
+        if (_nav.FirstOrDefault(x => x.Id == "reports") is { } item)
+            NavList.SelectedItem = item;
+    }
+
+    void OnConnectionLog(string line) => AppendLog(line);
 
     void OnLocationUpdated(string s)
     {
@@ -127,9 +236,14 @@ public partial class MainWindow : Window
                 ShadowDepth = 0,
                 Opacity = 0.9
             };
+            if (ImmersionStore.Current.SubtleAnimations)
+                StartConnLampPulse();
+            else
+                StopConnLampPulse();
         }
         else
         {
+            StopConnLampPulse();
             ConnLamp.Fill = (Brush)FindResource("CadUrgent");
             ConnLamp.Stroke = (Brush)FindResource("CadBorder");
             ConnLamp.Effect = new DropShadowEffect
@@ -140,6 +254,53 @@ public partial class MainWindow : Window
                 Opacity = 0.85
             };
         }
+    }
+
+    internal void ApplyImmersionPreferences()
+    {
+        ImmersionStore.ReloadCache();
+        SetConnectionLamp(_connection.IsConnected);
+        RefreshSoundMuteButtonChrome();
+    }
+
+    void RefreshSoundMuteButtonChrome()
+    {
+        if (SoundMuteBtn == null) return;
+        SoundMuteBtn.Content = ImmersionStore.Current.MuteAllSoundEffects ? "Unmute" : "Mute";
+    }
+
+    void SoundMuteBtn_OnClick(object sender, RoutedEventArgs e)
+    {
+        var p = ImmersionStore.Load();
+        p.MuteAllSoundEffects = !p.MuteAllSoundEffects;
+        ImmersionStore.Save(p);
+        RefreshSoundMuteButtonChrome();
+    }
+
+    void StopConnLampPulse()
+    {
+        if (_connLampPulse != null && ConnLamp != null)
+            _connLampPulse.Stop(ConnLamp);
+        if (ConnLampScale != null)
+            ConnLampScale.ScaleX = ConnLampScale.ScaleY = 1;
+        _connLampPulse = null;
+    }
+
+    void StartConnLampPulse()
+    {
+        if (!ImmersionStore.Current.SubtleAnimations || ConnLamp == null) return;
+        StopConnLampPulse();
+        var dur = TimeSpan.FromSeconds(1.15);
+        var ax = new DoubleAnimation(1, 1.18, dur) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever };
+        var ay = new DoubleAnimation(1, 1.18, dur) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever };
+        Storyboard.SetTarget(ax, ConnLamp);
+        Storyboard.SetTarget(ay, ConnLamp);
+        Storyboard.SetTargetProperty(ax, new PropertyPath("(UIElement.RenderTransform).(ScaleTransform.ScaleX)"));
+        Storyboard.SetTargetProperty(ay, new PropertyPath("(UIElement.RenderTransform).(ScaleTransform.ScaleY)"));
+        _connLampPulse = new Storyboard();
+        _connLampPulse.Children.Add(ax);
+        _connLampPulse.Children.Add(ay);
+        _connLampPulse.Begin(ConnLamp, true);
     }
 
     static string TruncateStatusLine(string s, int max)
@@ -164,10 +325,26 @@ public partial class MainWindow : Window
     void NavList_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (NavList.SelectedItem is not NavItem nav) return;
+        var skipFade = _suppressNavFadeOnce;
+        if (_suppressNavFadeOnce) _suppressNavFadeOnce = false;
+        var animate = ImmersionStore.Current.SubtleAnimations && !skipFade;
         if (ContentHost.Content is IMdtBoundView old) old.Bind(null);
+        if (animate)
+        {
+            ContentHost.BeginAnimation(UIElement.OpacityProperty, null);
+            ContentHost.Opacity = 0;
+        }
+
         var view = CreateView(nav.Id);
         ContentHost.Content = view;
         if (view is IMdtBoundView bound) bound.Bind(_connection.IsConnected ? _connection : null);
+        if (animate)
+        {
+            var anim = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(150)) { FillBehavior = FillBehavior.HoldEnd };
+            ContentHost.BeginAnimation(UIElement.OpacityProperty, anim);
+        }
+        else
+            ContentHost.Opacity = 1;
     }
 
     static UserControl CreateView(string id) => id switch
@@ -195,7 +372,7 @@ public partial class MainWindow : Window
             {
                 AppendLog("Port must be between 1 and 65535.");
                 if (!isInitialAuto)
-                    MessageBox.Show(this, "Port must be between 1 and 65535.", "MDT Pro Native", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(this, "Port must be between 1 and 65535.", "MDTPro", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             var host = string.IsNullOrWhiteSpace(HostBox.Text) ? "127.0.0.1" : HostBox.Text.Trim();
@@ -226,13 +403,13 @@ public partial class MainWindow : Window
         catch (HttpRequestException ex)
         {
             AppendLog($"HTTP error: {ex.Message}");
-            MessageBox.Show(this, "Could not reach MDT Pro. Is the game on duty and the plugin listening?\n\n" + ex.Message, "MDT Pro Native", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(this, "Could not reach MDT Pro. Is the game on duty and the plugin listening?\n\n" + ex.Message, "MDTPro", MessageBoxButton.OK, MessageBoxImage.Error);
             await DisconnectCoreAsync();
         }
         catch (Exception ex)
         {
             AppendLog($"Error: {ex.Message}");
-            MessageBox.Show(this, ex.Message, "MDT Pro Native", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(this, ex.Message, "MDTPro", MessageBoxButton.OK, MessageBoxImage.Error);
             await DisconnectCoreAsync();
         }
         finally
@@ -246,6 +423,7 @@ public partial class MainWindow : Window
     async Task DisconnectCoreAsync()
     {
         await _connection.DisconnectAsync();
+        _lastCalloutCount = -1;
         ConnStateText.Text = "OFFLINE";
         ConnStateText.Foreground = (Brush)FindResource("CadUrgent");
         SetConnectionLamp(online: false);

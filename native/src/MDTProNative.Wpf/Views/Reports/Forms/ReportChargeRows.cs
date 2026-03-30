@@ -1,18 +1,61 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using Newtonsoft.Json.Linq;
 
 namespace MDTProNative.Wpf.Views.Reports.Forms;
 
 /// <summary>Editable citation charge row (serializes to plugin <c>CitationReport.Charge</c> field names).</summary>
-public sealed class CitationChargeRow
+public sealed class CitationChargeRow : INotifyPropertyChanged
 {
-    public string ChargeName { get; set; } = "";
-    public int MinFine { get; set; }
-    public int MaxFine { get; set; }
-    public bool CanRevokeLicense { get; set; }
-    public bool IsArrestable { get; set; }
-    public bool AddedByReportInEdit { get; set; }
+    string _chargeName = "";
+    int _minFine;
+    int _maxFine;
+    bool _canRevokeLicense;
+    bool _isArrestable;
+    bool _addedByReportInEdit;
+
+    public string ChargeName
+    {
+        get => _chargeName;
+        set { if (_chargeName == value) return; _chargeName = value; OnPropertyChanged(); }
+    }
+
+    public int MinFine
+    {
+        get => _minFine;
+        set { if (_minFine == value) return; _minFine = value; OnPropertyChanged(); }
+    }
+
+    public int MaxFine
+    {
+        get => _maxFine;
+        set { if (_maxFine == value) return; _maxFine = value; OnPropertyChanged(); }
+    }
+
+    public bool CanRevokeLicense
+    {
+        get => _canRevokeLicense;
+        set { if (_canRevokeLicense == value) return; _canRevokeLicense = value; OnPropertyChanged(); }
+    }
+
+    public bool IsArrestable
+    {
+        get => _isArrestable;
+        set { if (_isArrestable == value) return; _isArrestable = value; OnPropertyChanged(); }
+    }
+
+    public bool AddedByReportInEdit
+    {
+        get => _addedByReportInEdit;
+        set { if (_addedByReportInEdit == value) return; _addedByReportInEdit = value; OnPropertyChanged(); }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    void OnPropertyChanged([CallerMemberName] string? name = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
     public static ObservableCollection<CitationChargeRow> CollectionFromCharges(JToken? tok)
     {
@@ -94,18 +137,83 @@ public sealed class CitationChargeRow
 }
 
 /// <summary>Editable arrest charge row (plugin <c>ArrestReport.Charge</c>).</summary>
-public sealed class ArrestChargeRow
+public sealed class ArrestChargeRow : INotifyPropertyChanged
 {
-    public string ChargeName { get; set; } = "";
-    public int MinFine { get; set; }
-    public int MaxFine { get; set; }
-    public bool CanRevokeLicense { get; set; }
-    public bool IsArrestable { get; set; } = true;
-    public bool AddedByReportInEdit { get; set; }
-    public int MinDays { get; set; }
-    public string MaxDaysText { get; set; } = "";
-    public double Probation { get; set; }
-    public bool CanBeWarrant { get; set; }
+    string _chargeName = "";
+    int _minFine;
+    int _maxFine;
+    bool _canRevokeLicense = true;
+    bool _isArrestable = true;
+    bool _addedByReportInEdit;
+    int _minDays;
+    string _maxDaysText = "";
+    double _probation;
+    bool _canBeWarrant;
+
+    public string ChargeName
+    {
+        get => _chargeName;
+        set { if (_chargeName == value) return; _chargeName = value; OnPropertyChanged(); }
+    }
+
+    public int MinFine
+    {
+        get => _minFine;
+        set { if (_minFine == value) return; _minFine = value; OnPropertyChanged(); }
+    }
+
+    public int MaxFine
+    {
+        get => _maxFine;
+        set { if (_maxFine == value) return; _maxFine = value; OnPropertyChanged(); }
+    }
+
+    public bool CanRevokeLicense
+    {
+        get => _canRevokeLicense;
+        set { if (_canRevokeLicense == value) return; _canRevokeLicense = value; OnPropertyChanged(); }
+    }
+
+    public bool IsArrestable
+    {
+        get => _isArrestable;
+        set { if (_isArrestable == value) return; _isArrestable = value; OnPropertyChanged(); }
+    }
+
+    public bool AddedByReportInEdit
+    {
+        get => _addedByReportInEdit;
+        set { if (_addedByReportInEdit == value) return; _addedByReportInEdit = value; OnPropertyChanged(); }
+    }
+
+    public int MinDays
+    {
+        get => _minDays;
+        set { if (_minDays == value) return; _minDays = value; OnPropertyChanged(); }
+    }
+
+    public string MaxDaysText
+    {
+        get => _maxDaysText;
+        set { if (_maxDaysText == value) return; _maxDaysText = value; OnPropertyChanged(); }
+    }
+
+    public double Probation
+    {
+        get => _probation;
+        set { if (Math.Abs(_probation - value) < 1e-9) return; _probation = value; OnPropertyChanged(); }
+    }
+
+    public bool CanBeWarrant
+    {
+        get => _canBeWarrant;
+        set { if (_canBeWarrant == value) return; _canBeWarrant = value; OnPropertyChanged(); }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    void OnPropertyChanged([CallerMemberName] string? name = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
     public static ObservableCollection<ArrestChargeRow> CollectionFromCharges(JToken? tok)
     {

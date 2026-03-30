@@ -116,7 +116,7 @@ public static class JTokenDisplay
         return sb.ToString().TrimEnd();
     }
 
-    static string FormatPropertyValue(JToken value)
+    public static string FormatPropertyValue(JToken value)
     {
         if (value is JArray ja && ja.Count > 0 && ja.All(t => t is JObject))
         {
@@ -135,7 +135,7 @@ public static class JTokenDisplay
             JTokenType.String => v.Value<string>() ?? "",
             JTokenType.Integer or JTokenType.Float or JTokenType.Boolean =>
                 v.ToString(CultureInfo.InvariantCulture),
-            JTokenType.Date => v.Value<DateTime>().ToString("g", CultureInfo.CurrentCulture),
+            JTokenType.Date => NativeMdtFormat.FormatDateTimeDisplay(v.Value<DateTime>()),
             JTokenType.Null => "",
             _ => v.ToString(CultureInfo.InvariantCulture)
         };

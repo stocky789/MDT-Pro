@@ -157,6 +157,15 @@ namespace MDTPro.ServerAPI {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.OfficerInformation));
                 contentType = "text/json";
                 status = 200;
+            } else if (path == "reportBranding") {
+                var q = HttpUtility.ParseQueryString(req.Url.Query ?? "");
+                string reportType = q["reportType"]?.Trim();
+                var branding = ReportBrandingResolver.BuildResponse(
+                    string.IsNullOrEmpty(reportType) ? null : reportType,
+                    DataController.OfficerInformation);
+                buffer = Encoding.UTF8.GetBytes(branding.ToString(Formatting.None));
+                contentType = "text/json";
+                status = 200;
             } else if (path == "officerInformationData") {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.OfficerInformationData));
                 status = 200;
@@ -461,6 +470,11 @@ namespace MDTPro.ServerAPI {
                     var cit = DataController.CitationReports?.FirstOrDefault(r => r.Id == tid);
                     if (cit != null) {
                         summaries.Add(new { id = cit.Id, type = "citation", typeLabel = "Citation", date = cit.TimeStamp.ToString("yyyy-MM-dd"), subtitle = cit.OffenderPedName });
+                        continue;
+                    }
+                    var arrRep = DataController.arrestReports?.FirstOrDefault(r => r.Id == tid);
+                    if (arrRep != null) {
+                        summaries.Add(new { id = arrRep.Id, type = "arrest", typeLabel = "Arrest", date = arrRep.TimeStamp.ToString("yyyy-MM-dd"), subtitle = arrRep.OffenderPedName });
                         continue;
                     }
                     var tra = DataController.TrafficIncidentReports?.FirstOrDefault(r => r.Id == tid);

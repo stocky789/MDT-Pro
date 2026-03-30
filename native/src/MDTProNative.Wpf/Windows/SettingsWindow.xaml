@@ -15,6 +15,19 @@
             <Button Content="Close" Style="{StaticResource CadButton}" HorizontalAlignment="Right" Click="Close_Click" MinWidth="100" />
         </StackPanel>
         <TabControl Background="{StaticResource CadPanel}" BorderBrush="{StaticResource CadBorder}">
+            <TabItem Header="Immersion">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,8,8,0">
+                    <StackPanel>
+                        <TextBlock TextWrapping="Wrap" Foreground="{StaticResource CadMuted}" FontSize="11" Margin="0,0,0,12"
+                                   Text="CAD-style feedback: bundled MP3 cues and UI motion. No Windows system beeps. Turn off if you stream or use push-to-talk." />
+                        <CheckBox x:Name="ImmSoundCheck" Content="Terminal sounds (court, saves to MDT, new-callout clip when enabled below)" Margin="0,0,0,8" />
+                        <CheckBox x:Name="ImmCalloutCheck" Content="New callout clip when active callout count increases (newcallout.mp3)" Margin="0,0,0,8" />
+                        <CheckBox x:Name="ImmMotionCheck" Content="Subtle animations (link lamp pulse, module cross-fade)" Margin="0,0,0,8" />
+                        <CheckBox x:Name="ImmClickSoundCheck" Content="Click sound on UI (bundled slick-notification.mp3)" Margin="0,0,0,16" />
+                        <Button Content="Save immersion settings" Style="{StaticResource CadAccentButton}" HorizontalAlignment="Left" Click="SaveImmersion_Click" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
             <TabItem Header="About">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,8,8,0">
                     <StackPanel>

@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using MDTProNative.Wpf.Helpers;
 using MDTProNative.Wpf.Services;
+using MDTProNative.Wpf.Views.Controls;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -12,14 +13,23 @@ namespace MDTProNative.Wpf.Views;
 public partial class BoloView : UserControl, IMdtBoundView
 {
     MdtConnectionManager? _connection;
+    bool _layoutPersistWired;
 
     public BoloView()
     {
         InitializeComponent();
+        Loaded += OnBoloLoaded;
         ExpiresPicker.SelectedDate = DateTime.Today.AddDays(7);
         VehicleList.DisplayMemberPath = nameof(VehicleBoloRow.Display);
         RefreshBtn.Click += async (_, _) => await RefreshAsync();
         AddBoloBtn.Click += async (_, _) => await TryAddAsync();
+    }
+
+    void OnBoloLoaded(object sender, RoutedEventArgs e)
+    {
+        if (_layoutPersistWired) return;
+        _layoutPersistWired = true;
+        UiLayoutHooks.WireBolo(this);
     }
 
     Brush R(string key) => (Brush)FindResource(key);
@@ -37,6 +47,8 @@ public partial class BoloView : UserControl, IMdtBoundView
     {
         var http = _connection?.Http;
         if (http == null) return;
+        await MdtBusyUi.RunAsync(ModuleBusy, "BOLO TERMINAL", "Refreshing active BOLO list…", async () =>
+        {
         try
         {
             var tok = await http.GetDataJsonAsync("activeBolos").ConfigureAwait(false);
@@ -71,6 +83,7 @@ public partial class BoloView : UserControl, IMdtBoundView
                 BoloLinesPanel.ItemsSource = null;
             });
         }
+        });
     }
 
     void VehicleList_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -169,40 +182,48 @@ public partial class BoloView : UserControl, IMdtBoundView
             ModelDisplayName = string.IsNullOrEmpty(model) ? null : model
         });
 
+        var refresh = false;
         try
         {
-            var (status, text) = await http.PostActionAsync("addBOLO", body).ConfigureAwait(false);
-            await Dispatcher.InvokeAsync(() =>
+            await MdtBusyUi.RunAsync(ModuleBusy, "BOLO TERMINAL", "Submitting new BOLO…", async () =>
             {
-                if (status == HttpStatusCode.OK)
+                var (status, text) = await http.PostActionAsync("addBOLO", body).ConfigureAwait(false);
+                await Dispatcher.InvokeAsync(() =>
                 {
-                    try
+                    if (status == HttpStatusCode.OK)
                     {
-                        var jo = JObject.Parse(text);
-                        if (jo.Value<bool?>("success") == true)
+                        try
                         {
-                            MdtShellEvents.LogCad("BOLO added.");
-                            NewReasonBox.Clear();
-                            NewModelBox.Clear();
-                            _ = RefreshAsync();
-                            return;
-                        }
+                            var jo = JObject.Parse(text);
+                            if (jo.Value<bool?>("success") == true)
+                            {
+                                CadSaveSound.TryPlay();
+                                MdtShellEvents.LogCad("BOLO added.");
+                                NewReasonBox.Clear();
+                                NewModelBox.Clear();
+                                refresh = true;
+                                return;
+                            }
 
-                        MessageBox.Show(jo["error"]?.ToString() ?? text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            MessageBox.Show(jo["error"]?.ToString() ?? text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        }
+                        catch
+                        {
+                            MessageBox.Show(text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        }
                     }
-                    catch
-                    {
+                    else
                         MessageBox.Show(text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    }
-                }
-                else
-                    MessageBox.Show(text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
-            });
+                });
+            }, minimumVisibleMs: 480);
         }
         catch (Exception ex)
         {
             await Dispatcher.InvokeAsync(() => MessageBox.Show(ex.Message, "BOLO", MessageBoxButton.OK, MessageBoxImage.Error));
         }
+
+        if (refresh)
+            await RefreshAsync();
     }
 
     async Task TryRemoveAsync(string plate, string reason)
@@ -210,38 +231,45 @@ public partial class BoloView : UserControl, IMdtBoundView
         var http = _connection?.Http;
         if (http == null) return;
         var body = JsonConvert.SerializeObject(new { LicensePlate = plate.Trim(), Reason = reason });
+        var refresh = false;
         try
         {
-            var (status, text) = await http.PostActionAsync("removeBOLO", body).ConfigureAwait(false);
-            await Dispatcher.InvokeAsync(() =>
+            await MdtBusyUi.RunAsync(ModuleBusy, "BOLO TERMINAL", "Removing BOLO entry…", async () =>
             {
-                if (status == HttpStatusCode.OK)
+                var (status, text) = await http.PostActionAsync("removeBOLO", body).ConfigureAwait(false);
+                await Dispatcher.InvokeAsync(() =>
                 {
-                    try
+                    if (status == HttpStatusCode.OK)
                     {
-                        var jo = JObject.Parse(text);
-                        if (jo.Value<bool?>("success") == true)
+                        try
                         {
-                            MdtShellEvents.LogCad("BOLO removed.");
-                            _ = RefreshAsync();
-                            return;
-                        }
+                            var jo = JObject.Parse(text);
+                            if (jo.Value<bool?>("success") == true)
+                            {
+                                MdtShellEvents.LogCad("BOLO removed.");
+                                refresh = true;
+                                return;
+                            }
 
-                        MessageBox.Show(jo["error"]?.ToString() ?? text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            MessageBox.Show(jo["error"]?.ToString() ?? text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        }
+                        catch
+                        {
+                            MessageBox.Show(text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        }
                     }
-                    catch
-                    {
+                    else
                         MessageBox.Show(text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    }
-                }
-                else
-                    MessageBox.Show(text, "BOLO", MessageBoxButton.OK, MessageBoxImage.Warning);
-            });
+                });
+            }, minimumVisibleMs: 480);
         }
         catch (Exception ex)
         {
             await Dispatcher.InvokeAsync(() => MessageBox.Show(ex.Message, "BOLO", MessageBoxButton.OK, MessageBoxImage.Error));
         }
+
+        if (refresh)
+            await RefreshAsync();
     }
 
     sealed class VehicleBoloRow(string plate, string model, bool stolen, bool canModify, JArray bolos)

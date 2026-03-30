@@ -11,6 +11,10 @@ public partial class InjuryReportForm : UserControl, IReportFormPane
     public InjuryReportForm()
     {
         InitializeComponent();
+        ExportPdfBtn.Click += (_, _) =>
+            ReportDocumentBrandingHelper.PrintToPdf(DocumentBodyScroll, DocumentPrintRoot,
+                "MDT Injury " + (GeneralIdBox.Text.Trim().Length > 0 ? GeneralIdBox.Text.Trim() : "report"));
+        ReportDocumentBrandingHelper.ApplyChrome(null, "injuryTitle", "Injury / Medical Incident Report", DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
     }
 
     ReportFormBaseControls BaseControls => new()
@@ -33,7 +37,16 @@ public partial class InjuryReportForm : UserControl, IReportFormPane
         LocPostal = LocPostalBox
     };
 
-    public void Bind(MdtConnectionManager? connection) { }
+    public void Bind(MdtConnectionManager? connection)
+    {
+        if (connection?.Http == null)
+        {
+            ReportDocumentBrandingHelper.ApplyChrome(null, "injuryTitle", "Injury / Medical Incident Report", DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
+            return;
+        }
+
+        _ = ReportDocumentBrandingHelper.LoadBrandingAsync(connection, "injury", "injuryTitle", "Injury / Medical Incident Report", DocHeader, BrandingTemplateHint, Dispatcher, BrandingFooter);
+    }
 
     public void LoadFromReport(JObject report)
     {

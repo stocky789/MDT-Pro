@@ -15,12 +15,32 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <AssemblyName>MDTPro</AssemblyName>
+    <AssemblyTitle>MDTPro</AssemblyTitle>
+    <Product>MDTPro</Product>
+    <ApplicationIcon>Assets\MdtProApp.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <Resource Include="..\..\..\MDTPro\img\favicon.png">
       <Link>Assets\MdtProLogo.png</Link>
     </Resource>
+    <Content Include="..\..\slick-notification.mp3">
+      <Link>slick-notification.mp3</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\courtcase-update.mp3">
+      <Link>courtcase-update.mp3</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\savebutton.mp3">
+      <Link>savebutton.mp3</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\newcallout.mp3">
+      <Link>newcallout.mp3</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

@@ -1206,6 +1206,8 @@ namespace MDTPro.Data {
                                 }
                             }
 
+                            GtaVVehicleMakeModelCatalog.TryEnrichFromSpawnName(vehicle.ModelName, vehicle);
+
                             vehicles.Add(vehicle);
                         }
                     }

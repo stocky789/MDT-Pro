@@ -1,3 +1,4 @@
+using System.Globalization;
 using MDTProNative.Client;
 using Newtonsoft.Json.Linq;
 
@@ -42,13 +43,20 @@ public static class NativeReportDraftFactory
 
         var now = DateTime.Now;
         var shortYearInt = now.Year % 100;
-        var shortYearStr = shortYearInt.ToString("D2", System.Globalization.CultureInfo.InvariantCulture);
-        var index = 1;
+        var shortYearStr = shortYearInt.ToString("D2", CultureInfo.InvariantCulture);
+        // Match reports.js: count reports whose ShortYear matches this calendar year (JS uses loose == with string "26").
+        // Native forms sometimes persist ShortYear as 0 when empty; also parse existing Id suffix so the next index never collides.
+        var indexByCount = 1;
+        var maxIndexFromIds = 0;
         foreach (var r in reports.OfType<JObject>())
         {
-            var sy = r["ShortYear"]?.Value<int?>();
-            if (sy == shortYearInt) index++;
+            if (ShortYearMatchesCurrentYear(r, shortYearInt, shortYearStr))
+                indexByCount++;
+            if (TryParseReportIdIndex(r["Id"]?.ToString(), shortYearStr, out var parsed) && parsed > maxIndexFromIds)
+                maxIndexFromIds = parsed;
         }
+
+        var index = Math.Max(indexByCount, maxIndexFromIds + 1);
 
         var typePrefix = ResolveTypePrefix(language, reportType);
         var format = config["reportIdFormat"]?.ToString() ?? "{type}-{shortYear}-{index}";
@@ -56,10 +64,10 @@ public static class NativeReportDraftFactory
         var id = format
             .Replace("{type}", typePrefix, StringComparison.Ordinal)
             .Replace("{shortYear}", shortYearStr, StringComparison.Ordinal)
-            .Replace("{year}", now.Year.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal)
-            .Replace("{month}", now.Month.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal)
-            .Replace("{day}", now.Day.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal)
-            .Replace("{index}", index.ToString(System.Globalization.CultureInfo.InvariantCulture).PadLeft(pad, '0'), StringComparison.Ordinal);
+            .Replace("{year}", now.Year.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)
+            .Replace("{month}", now.Month.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)
+            .Replace("{day}", now.Day.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)
+            .Replace("{index}", index.ToString(CultureInfo.InvariantCulture).PadLeft(pad, '0'), StringComparison.Ordinal);
 
         JObject? officerTok = null;
         try
@@ -169,6 +177,35 @@ public static class NativeReportDraftFactory
         }
 
         return root;
+    }
+
+    /// <summary>True if report JSON is for the same two-digit year as <paramref name="shortYearInt"/> (browser uses <c>report.ShortYear == "26"</c>).</summary>
+    static bool ShortYearMatchesCurrentYear(JObject r, int shortYearInt, string shortYearTwoDigits)
+    {
+        var tok = r["ShortYear"] ?? r["shortYear"];
+        if (tok == null || tok.Type == JTokenType.Null) return false;
+        if (tok.Type == JTokenType.String)
+        {
+            var s = tok.ToString().Trim();
+            if (string.Equals(s, shortYearTwoDigits, StringComparison.Ordinal)) return true;
+            return int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i) && i == shortYearInt;
+        }
+
+        if (tok.Type == JTokenType.Integer || tok.Type == JTokenType.Float)
+            return tok.Value<int>() == shortYearInt;
+        return false;
+    }
+
+    /// <summary>Reads trailing numeric index from ids shaped like <c>C-26-000014</c> (default <c>reportIdFormat</c>).</summary>
+    static bool TryParseReportIdIndex(string? id, string shortYearTwoDigits, out int index)
+    {
+        index = 0;
+        if (string.IsNullOrWhiteSpace(id)) return false;
+        var needle = "-" + shortYearTwoDigits + "-";
+        var p = id.IndexOf(needle, StringComparison.Ordinal);
+        if (p < 0) return false;
+        var tail = id.AsSpan(p + needle.Length).Trim();
+        return int.TryParse(tail, NumberStyles.Integer, CultureInfo.InvariantCulture, out index);
     }
 
     static string ResolveTypePrefix(JObject language, string reportType)

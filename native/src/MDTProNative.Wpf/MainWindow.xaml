@@ -4,7 +4,7 @@
 
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 
-        Title="MDT Pro — MDC Terminal"
+        Title="MDTPro — MDC Terminal"
 
         Icon="{StaticResource MdtProLogoImage}"
 
@@ -70,7 +70,15 @@
 
                              Stroke="#FF5C2A22"
 
-                             StrokeThickness="1">
+                             StrokeThickness="1"
+
+                             RenderTransformOrigin="0.5,0.5">
+
+                        <Ellipse.RenderTransform>
+
+                            <ScaleTransform x:Name="ConnLampScale" ScaleX="1" ScaleY="1" />
+
+                        </Ellipse.RenderTransform>
 
                         <Ellipse.Effect>
 
@@ -79,6 +87,30 @@
                         </Ellipse.Effect>
 
                     </Ellipse>
+
+                    <Button x:Name="SoundMuteBtn"
+
+                            Content="Mute"
+
+                            Style="{StaticResource CadButton}"
+
+                            FontSize="10"
+
+                            FontFamily="{StaticResource CadFontCondensed}"
+
+                            FontWeight="Bold"
+
+                            Padding="8,4"
+
+                            MinWidth="58"
+
+                            Margin="14,0,0,0"
+
+                            VerticalAlignment="Center"
+
+                            Click="SoundMuteBtn_OnClick"
+
+                            ToolTip="Mute or unmute all MDC sound effects (clicks, saves, court chime, CAD tones). Saved on this computer." />
 
                 </StackPanel>
 
@@ -222,11 +254,15 @@
 
                 <Grid.ColumnDefinitions>
 
-                    <ColumnDefinition Width="168" />
+                    <ColumnDefinition x:Name="MainActionsColumn" Width="168" MinWidth="120" />
+
+                    <ColumnDefinition Width="6" />
 
                     <ColumnDefinition Width="*" MinWidth="320" />
 
-                    <ColumnDefinition Width="272" />
+                    <ColumnDefinition Width="6" />
+
+                    <ColumnDefinition x:Name="MainRelatedColumn" Width="272" MinWidth="200" />
 
                 </Grid.ColumnDefinitions>
 
@@ -372,17 +408,33 @@
 
                 </Border>
 
+                <GridSplitter x:Name="MainLeftRailSplitter"
+
+                              Grid.Column="1"
+
+                              Width="6"
+
+                              HorizontalAlignment="Stretch"
+
+                              ResizeDirection="Columns"
+
+                              ResizeBehavior="PreviousAndNext"
+
+                              Background="{StaticResource CadBorder}" />
+
 
 
                 <!-- Center: module + CAD message log -->
 
-                <Grid Grid.Column="1">
+                <Grid Grid.Column="2">
 
                     <Grid.RowDefinitions>
 
-                        <RowDefinition Height="*" />
+                        <RowDefinition Height="*" MinHeight="120" />
 
-                        <RowDefinition Height="168" />
+                        <RowDefinition x:Name="CadLogSplitterRow" Height="6" />
+
+                        <RowDefinition x:Name="CadLogRow" Height="168" MinHeight="80" />
 
                     </Grid.RowDefinitions>
 
@@ -394,11 +446,29 @@
 
                             BorderThickness="0,0,1,0">
 
-                        <ContentControl x:Name="ContentHost" />
+                        <ContentControl x:Name="ContentHost" Opacity="1" />
 
                     </Border>
 
-                    <Border Grid.Row="1"
+                    <GridSplitter x:Name="CadLogRowSplitter"
+
+                                  Grid.Row="1"
+
+                                  Height="6"
+
+                                  HorizontalAlignment="Stretch"
+
+                                  VerticalAlignment="Stretch"
+
+                                  ResizeDirection="Rows"
+
+                                  ResizeBehavior="PreviousAndNext"
+
+                                  Background="{StaticResource CadBorder}" />
+
+                    <Border x:Name="CadLogPanel"
+
+                            Grid.Row="2"
 
                             Background="{StaticResource CadPanel}"
 
@@ -410,13 +480,59 @@
 
                         <DockPanel LastChildFill="True">
 
-                            <TextBlock DockPanel.Dock="Top"
+                            <DockPanel DockPanel.Dock="Top" LastChildFill="False" Margin="0,0,0,6">
 
-                                       Text="CAD MESSAGE LOG"
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
 
-                                       Style="{StaticResource CadPanelHeader}"
+                                    <Button x:Name="CadLogExpandBtn"
 
-                                       Margin="0,0,0,6" />
+                                            Content="▲"
+
+                                            Width="28"
+
+                                            Height="22"
+
+                                            Padding="0"
+
+                                            FontSize="11"
+
+                                            Margin="4,0,0,0"
+
+                                            Style="{StaticResource CadButton}"
+
+                                            ToolTip="Expand CAD log"
+
+                                            Click="CadLogExpand_Click" />
+
+                                    <Button x:Name="CadLogCollapseBtn"
+
+                                            Content="▼"
+
+                                            Width="28"
+
+                                            Height="22"
+
+                                            Padding="0"
+
+                                            FontSize="11"
+
+                                            Margin="4,0,0,0"
+
+                                            Style="{StaticResource CadButton}"
+
+                                            ToolTip="Minimize CAD log"
+
+                                            Click="CadLogCollapse_Click" />
+
+                                </StackPanel>
+
+                                <TextBlock Text="CAD MESSAGE LOG"
+
+                                           Style="{StaticResource CadPanelHeader}"
+
+                                           VerticalAlignment="Center" />
+
+                            </DockPanel>
 
                             <ListBox x:Name="MessageLog"
 
@@ -434,11 +550,25 @@
 
                 </Grid>
 
+                <GridSplitter x:Name="MainRightRailSplitter"
+
+                              Grid.Column="3"
+
+                              Width="6"
+
+                              HorizontalAlignment="Stretch"
+
+                              ResizeDirection="Columns"
+
+                              ResizeBehavior="PreviousAndNext"
+
+                              Background="{StaticResource CadBorder}" />
+
 
 
                 <!-- Right: related / system (officer + link + situation) -->
 
-                <Border Grid.Column="2"
+                <Border Grid.Column="4"
 
                         Background="{StaticResource CadPanel}"
 

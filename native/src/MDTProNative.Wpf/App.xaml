@@ -4,10 +4,11 @@
     <Application.Resources>
         <ResourceDictionary>
             <BitmapImage x:Key="MdtProLogoImage"
-                         UriSource="pack://application:,,,/MDTProNative.Wpf;component/Assets/MdtProLogo.png"
+                         UriSource="pack://application:,,,/MDTPro;component/Assets/MdtProLogo.png"
                          DecodePixelWidth="128" />
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Themes/CadResources.xaml" />
+                <ResourceDictionary Source="Themes/ReportDocumentResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

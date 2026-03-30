@@ -1,174 +1,224 @@
 <UserControl x:Class="MDTProNative.Wpf.Views.Reports.Forms.ArrestReportForm"
+             x:Name="Root"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,8,0">
-        <StackPanel>
-            <TextBlock Text="BASE REPORT" Style="{StaticResource CadSectionTitle}" />
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="REPORT ID" />
-                <TextBox x:Name="IdBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="SHORT YEAR" />
-                <TextBox x:Name="ShortYearBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="DATE/TIME" />
-                <TextBox x:Name="TimeStampBox" Style="{StaticResource CadTextBoxCadField}"
-                         ToolTip="ISO or local date/time (e.g. 2026-03-29T14:30:00)" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="STATUS" />
-                <ComboBox x:Name="StatusCombo" Style="{StaticResource CadComboBox}" />
-            </DockPanel>
-            <TextBlock Text="NOTES" Style="{StaticResource CadFieldLabel}" Margin="0,4,0,2" />
-            <TextBox x:Name="NotesBox"
-                     MinHeight="56"
-                     AcceptsReturn="True"
-                     Style="{StaticResource CadTextBoxCadField}"
-                     TextWrapping="Wrap"
-                     VerticalScrollBarVisibility="Auto" />
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:reports="clr-namespace:MDTProNative.Wpf.Views.Reports">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-            <TextBlock Text="OFFICER INFORMATION" Style="{StaticResource CadSectionTitle}" Margin="0,14,0,0" />
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="FIRST NAME" />
-                <TextBox x:Name="OfficerFirstBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="LAST NAME" />
-                <TextBox x:Name="OfficerLastBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="RANK" />
-                <TextBox x:Name="OfficerRankBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="CALL SIGN" />
-                <TextBox x:Name="OfficerCallSignBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="AGENCY" />
-                <TextBox x:Name="OfficerAgencyBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="BADGE #" />
-                <TextBox x:Name="OfficerBadgeBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-
-            <TextBlock Text="LOCATION" Style="{StaticResource CadSectionTitle}" Margin="0,14,0,0" />
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="AREA" />
-                <TextBox x:Name="LocAreaBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="STREET" />
-                <TextBox x:Name="LocStreetBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="COUNTY" />
-                <TextBox x:Name="LocCountyBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="POSTAL" />
-                <TextBox x:Name="LocPostalBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-
-            <TextBlock Text="ARREST" Style="{StaticResource CadSectionTitle}" Margin="0,14,0,0" />
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="SUBJECT NAME" />
-                <TextBox x:Name="OffenderPedNameBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="VEHICLE PLATE" />
-                <TextBox x:Name="OffenderPlateBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="COURT CASE #" />
-                <TextBox x:Name="CourtCaseNumberBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <CheckBox x:Name="DocumentedDrugsCheck" Margin="0,6,0,4" Content="Drugs documented on scene" Foreground="{StaticResource CadText}" />
-            <CheckBox x:Name="DocumentedFirearmsCheck" Margin="0,0,0,8" Content="Firearms documented on scene" Foreground="{StaticResource CadText}" />
-
-            <TextBlock Text="ATTACHED REPORT IDS (one per line)" Style="{StaticResource CadFieldLabel}" Margin="0,0,0,2" />
-            <TextBox x:Name="AttachedReportIdsBox"
-                     MinHeight="64"
-                     AcceptsReturn="True"
-                     Style="{StaticResource CadTextBoxCadField}"
-                     TextWrapping="Wrap"
-                     VerticalScrollBarVisibility="Auto" />
-
-            <TextBlock Text="CHARGES" Style="{StaticResource CadSectionTitle}" Margin="0,12,0,4" />
-            <TextBlock TextWrapping="Wrap"
+        <StackPanel x:Name="ReportEditorToolbar" Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+            <Button x:Name="ExportPdfBtn" Content="EXPORT PDF…" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
+            <TextBlock x:Name="BrandingTemplateHint"
+                       VerticalAlignment="Center"
                        Foreground="{StaticResource CadMuted}"
                        FontSize="11"
-                       Margin="0,0,0,8"
-                       Text="Booking charges including fine range, custody days, and statutory flags." />
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                <Button x:Name="AddArrestChargeBtn" Content="ADD CHARGE" Style="{StaticResource CadButton}" Padding="12,4" />
-                <Button x:Name="RemoveArrestChargeBtn" Content="REMOVE SELECTED" Style="{StaticResource CadRailOutlineButton}" Margin="8,0,0,0" Padding="12,4" />
-            </StackPanel>
-            <DataGrid x:Name="ArrestChargesGrid"
-                      AutoGenerateColumns="False"
-                      CanUserAddRows="False"
-                      HeadersVisibility="Column"
-                      SelectionMode="Single"
-                      MinHeight="160"
-                      MaxHeight="320"
-                      Background="{StaticResource CadPanel}"
-                      Foreground="{StaticResource CadText}"
-                      BorderBrush="{StaticResource CadBorder}"
-                      GridLinesVisibility="Horizontal"
-                      RowHeight="28"
-                      HorizontalScrollBarVisibility="Auto">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="CHARGE" Binding="{Binding ChargeName, UpdateSourceTrigger=PropertyChanged}" Width="2*" />
-                    <DataGridTextColumn Header="MIN FINE" Binding="{Binding MinFine, UpdateSourceTrigger=PropertyChanged}" Width="70" />
-                    <DataGridTextColumn Header="MAX FINE" Binding="{Binding MaxFine, UpdateSourceTrigger=PropertyChanged}" Width="70" />
-                    <DataGridTextColumn Header="MIN DAYS" Binding="{Binding MinDays, UpdateSourceTrigger=PropertyChanged}" Width="70" />
-                    <DataGridTextColumn Header="MAX DAYS" Binding="{Binding MaxDaysText, UpdateSourceTrigger=PropertyChanged}" Width="80" />
-                    <DataGridTextColumn Header="PROB." Binding="{Binding Probation, UpdateSourceTrigger=PropertyChanged}" Width="55" />
-                    <DataGridCheckBoxColumn Header="REV. LIC." Binding="{Binding CanRevokeLicense, UpdateSourceTrigger=PropertyChanged}" Width="72" />
-                    <DataGridCheckBoxColumn Header="ARREST" Binding="{Binding IsArrestable, UpdateSourceTrigger=PropertyChanged}" Width="68" />
-                    <DataGridCheckBoxColumn Header="WARRANT" Binding="{Binding CanBeWarrant, UpdateSourceTrigger=PropertyChanged}" Width="72" />
-                </DataGrid.Columns>
-            </DataGrid>
-
-            <TextBlock Text="USE OF FORCE" Style="{StaticResource CadSectionTitle}" Margin="0,14,0,4" />
-            <TextBlock TextWrapping="Wrap" Foreground="{StaticResource CadMuted}" FontSize="11" Margin="0,0,0,8"
-                       Text="Complete only if force was used. Leave type as not applicable if none." />
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="FORCE TYPE" />
-                <ComboBox x:Name="UofTypeCombo" Style="{StaticResource CadComboBox}">
-                    <ComboBoxItem Content="(not applicable)" Tag="" />
-                    <ComboBoxItem Content="Taser" Tag="Taser" />
-                    <ComboBoxItem Content="Baton" Tag="Baton" />
-                    <ComboBoxItem Content="Fist / hands" Tag="Fist" />
-                    <ComboBoxItem Content="Firearm" Tag="Firearm" />
-                    <ComboBoxItem Content="Other" Tag="Other" />
-                </ComboBox>
-            </DockPanel>
-            <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="OTHER (SPECIFY)" />
-                <TextBox x:Name="UofTypeOtherBox" Style="{StaticResource CadTextBoxCadField}" />
-            </DockPanel>
-            <TextBlock Text="JUSTIFICATION" Style="{StaticResource CadFieldLabel}" Margin="0,4,0,2" />
-            <TextBox x:Name="UofJustificationBox"
-                     MinHeight="56"
-                     AcceptsReturn="True"
-                     Style="{StaticResource CadTextBoxCadField}"
-                     TextWrapping="Wrap"
-                     VerticalScrollBarVisibility="Auto" />
-            <StackPanel Orientation="Horizontal" Margin="0,8,0,4">
-                <CheckBox x:Name="UofInjurySuspectCheck" Content="Injury to subject" Margin="0,0,16,0" Foreground="{StaticResource CadText}" />
-                <CheckBox x:Name="UofInjuryOfficerCheck" Content="Injury to officer" Foreground="{StaticResource CadText}" />
-            </StackPanel>
-            <TextBlock Text="WITNESSES" Style="{StaticResource CadFieldLabel}" Margin="0,4,0,2" />
-            <TextBox x:Name="UofWitnessesBox"
-                     MinHeight="44"
-                     AcceptsReturn="True"
-                     Style="{StaticResource CadTextBoxCadField}"
-                     TextWrapping="Wrap"
-                     VerticalScrollBarVisibility="Auto" />
+                       Text="" />
         </StackPanel>
-    </ScrollViewer>
+
+        <ScrollViewer x:Name="DocumentBodyScroll"
+                      Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <Border x:Name="DocumentPrintRoot"
+                    Background="{StaticResource ReportDocPaperBrush}"
+                    BorderBrush="{StaticResource ReportDocInkBrush}"
+                    BorderThickness="1"
+                    Padding="18"
+                    MaxWidth="920"
+                    HorizontalAlignment="Left">
+                <StackPanel>
+                    <reports:ReportDocumentHeader x:Name="DocHeader" />
+
+                    <TextBlock Text="Report identification" Style="{StaticResource ReportDocSectionTitle}" />
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Report ID" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
+                        <TextBox x:Name="IdBox" Grid.Row="0" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,6" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Short year" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
+                        <TextBox x:Name="ShortYearBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,6" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Date / time" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" VerticalAlignment="Top" />
+                        <TextBox x:Name="TimeStampBox"
+                                 Grid.Row="2"
+                                 Grid.Column="1"
+                                 Style="{StaticResource ReportDocTextBox}"
+                                 Margin="0,0,0,6"
+                                 ToolTip="dd/MM/yyyy HH:mm (local), or ISO (e.g. 2026-03-29T14:30:00Z)" />
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Status" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
+                        <ComboBox x:Name="StatusCombo" Grid.Row="3" Grid.Column="1" Style="{StaticResource ReportDocCombo}" Margin="0,0,0,6" />
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Notes" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,0" VerticalAlignment="Top" />
+                        <TextBox x:Name="NotesBox"
+                                 Grid.Row="4"
+                                 Grid.Column="1"
+                                 MinHeight="56"
+                                 AcceptsReturn="True"
+                                 Style="{StaticResource ReportDocTextBox}"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto" />
+                    </Grid>
+
+                    <TextBlock Text="Arresting officer" Style="{StaticResource ReportDocSectionTitle}" />
+                    <UniformGrid Columns="2" Margin="0,0,0,10">
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="First name" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OfficerFirstBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Last name" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OfficerLastBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="Rank" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OfficerRankBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Call sign" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OfficerCallSignBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="Agency" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OfficerAgencyBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Badge #" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OfficerBadgeBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </UniformGrid>
+
+                    <TextBlock Text="Location" Style="{StaticResource ReportDocSectionTitle}" />
+                    <UniformGrid Columns="2" Margin="0,0,0,10">
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="Area" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="LocAreaBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Street" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="LocStreetBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="County" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="LocCountyBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Postal" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="LocPostalBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </UniformGrid>
+
+                    <TextBlock Text="Arrest details" Style="{StaticResource ReportDocSectionTitle}" />
+                    <TextBlock Text="Subject name" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,4" />
+                    <TextBox x:Name="OffenderPedNameBox" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,8" />
+                    <TextBlock Text="Vehicle plate" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,4" />
+                    <TextBox x:Name="OffenderPlateBox" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,8" />
+                    <TextBlock Text="Court case #" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,4" />
+                    <TextBox x:Name="CourtCaseNumberBox" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,8" />
+                    <CheckBox x:Name="DocumentedDrugsCheck" Margin="0,6,0,4" Content="Drugs documented on scene" Foreground="{StaticResource ReportDocInkBrush}" />
+                    <CheckBox x:Name="DocumentedFirearmsCheck" Margin="0,0,0,8" Content="Firearms documented on scene" Foreground="{StaticResource ReportDocInkBrush}" />
+
+                    <TextBlock Text="Attached report IDs (one per line)" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
+                    <TextBox x:Name="AttachedReportIdsBox"
+                             MinHeight="64"
+                             AcceptsReturn="True"
+                             Style="{StaticResource ReportDocTextBox}"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto" />
+
+                    <TextBlock Text="Charges" Style="{StaticResource ReportDocSectionTitle}" Margin="0,12,0,4" />
+                    <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#444" Margin="0,0,0,8"
+                               Text="Charge column: /arrestOptions catalog (same as browser). Edit cells or type a custom charge in the combo." />
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button x:Name="AddArrestChargeBtn" Content="ADD CHARGE" Style="{StaticResource CadButton}" Padding="12,4" />
+                        <Button x:Name="RemoveArrestChargeBtn" Content="REMOVE SELECTED" Style="{StaticResource CadRailOutlineButton}" Margin="8,0,0,0" Padding="12,4" />
+                    </StackPanel>
+                    <DataGrid x:Name="ArrestChargesGrid"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              HeadersVisibility="Column"
+                              SelectionMode="Single"
+                              MinHeight="160"
+                              MaxHeight="320"
+                              Background="{StaticResource ReportDocFieldFill}"
+                              Foreground="{StaticResource ReportDocInkBrush}"
+                              BorderBrush="{StaticResource ReportDocInkBrush}"
+                              GridLinesVisibility="Horizontal"
+                              RowHeight="28"
+                              HorizontalScrollBarVisibility="Auto">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="CHARGE" Width="2*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <ComboBox IsEditable="True"
+                                                  Style="{StaticResource ReportDocCombo}"
+                                                  Text="{Binding ChargeName, UpdateSourceTrigger=PropertyChanged}"
+                                                  DisplayMemberPath="DisplayName"
+                                                  Loaded="ArrestChargeCombo_Loaded"
+                                                  SelectionChanged="ArrestChargeCombo_SelectionChanged" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="MIN FINE" Binding="{Binding MinFine, UpdateSourceTrigger=PropertyChanged}" Width="70" />
+                            <DataGridTextColumn Header="MAX FINE" Binding="{Binding MaxFine, UpdateSourceTrigger=PropertyChanged}" Width="70" />
+                            <DataGridTextColumn Header="MIN DAYS" Binding="{Binding MinDays, UpdateSourceTrigger=PropertyChanged}" Width="70" />
+                            <DataGridTextColumn Header="MAX DAYS" Binding="{Binding MaxDaysText, UpdateSourceTrigger=PropertyChanged}" Width="80" />
+                            <DataGridTextColumn Header="PROB." Binding="{Binding Probation, UpdateSourceTrigger=PropertyChanged}" Width="55" />
+                            <DataGridCheckBoxColumn Header="REV. LIC." Binding="{Binding CanRevokeLicense, UpdateSourceTrigger=PropertyChanged}" Width="72" />
+                            <DataGridCheckBoxColumn Header="ARREST" Binding="{Binding IsArrestable, UpdateSourceTrigger=PropertyChanged}" Width="68" />
+                            <DataGridCheckBoxColumn Header="WARRANT" Binding="{Binding CanBeWarrant, UpdateSourceTrigger=PropertyChanged}" Width="72" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <TextBlock Text="Use of force" Style="{StaticResource ReportDocSectionTitle}" Margin="0,14,0,4" />
+                    <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#444" Margin="0,0,0,8"
+                               Text="Complete only if force was used. Leave type as not applicable if none." />
+                    <TextBlock Text="Force type" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,4" />
+                    <ComboBox x:Name="UofTypeCombo" Style="{StaticResource ReportDocCombo}" Margin="0,0,0,8">
+                        <ComboBoxItem Content="(not applicable)" Tag="" />
+                        <ComboBoxItem Content="Taser" Tag="Taser" />
+                        <ComboBoxItem Content="Baton" Tag="Baton" />
+                        <ComboBoxItem Content="Fist / hands" Tag="Fist" />
+                        <ComboBoxItem Content="Firearm" Tag="Firearm" />
+                        <ComboBoxItem Content="Other" Tag="Other" />
+                    </ComboBox>
+                    <TextBlock Text="Other (specify)" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,4" />
+                    <TextBox x:Name="UofTypeOtherBox" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,8" />
+                    <TextBlock Text="Justification" Style="{StaticResource ReportDocLabel}" Margin="0,4,0,2" />
+                    <TextBox x:Name="UofJustificationBox"
+                             MinHeight="56"
+                             AcceptsReturn="True"
+                             Style="{StaticResource ReportDocTextBox}"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto" />
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,4">
+                        <CheckBox x:Name="UofInjurySuspectCheck" Content="Injury to subject" Margin="0,0,16,0" Foreground="{StaticResource ReportDocInkBrush}" />
+                        <CheckBox x:Name="UofInjuryOfficerCheck" Content="Injury to officer" Foreground="{StaticResource ReportDocInkBrush}" />
+                    </StackPanel>
+                    <TextBlock Text="Witnesses" Style="{StaticResource ReportDocLabel}" Margin="0,4,0,2" />
+                    <TextBox x:Name="UofWitnessesBox"
+                             MinHeight="44"
+                             AcceptsReturn="True"
+                             Style="{StaticResource ReportDocTextBox}"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto" />
+
+                    <TextBlock x:Name="BrandingFooter"
+                               TextWrapping="Wrap"
+                               FontSize="10"
+                               Foreground="#444"
+                               Margin="0,16,0,0" />
+                </StackPanel>
+            </Border>
+        </ScrollViewer>
+    </Grid>
 </UserControl>

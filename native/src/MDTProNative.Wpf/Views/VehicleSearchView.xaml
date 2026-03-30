@@ -1,6 +1,7 @@
 <UserControl x:Class="MDTProNative.Wpf.Views.VehicleSearchView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:cad="clr-namespace:MDTProNative.Wpf.Views.Controls">
     <Grid Margin="8">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -21,16 +22,17 @@
         </Border>
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280" MinWidth="220" />
-                <ColumnDefinition Width="10" />
+                <ColumnDefinition x:Name="VehicleSidebarColumn" Width="280" MinWidth="220" />
+                <ColumnDefinition Width="6" />
                 <ColumnDefinition Width="*" MinWidth="280" />
             </Grid.ColumnDefinitions>
-            <Grid Grid.Column="0">
+            <Grid x:Name="VehicleSidebarInnerGrid" Grid.Column="0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" MinHeight="80" />
+                    <RowDefinition x:Name="VehicleTopListRow" Height="*" MinHeight="60" />
+                    <RowDefinition Height="6" />
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" MinHeight="80" />
+                    <RowDefinition x:Name="VehicleBottomListRow" Height="*" MinHeight="60" />
                 </Grid.RowDefinitions>
                 <TextBlock Grid.Row="0" Text="NEARBY VEHICLES" Style="{StaticResource CadSectionTitle}" />
                 <TextBlock Grid.Row="0"
@@ -46,7 +48,15 @@
                          Style="{StaticResource CadListBox}"
                          ItemContainerStyle="{StaticResource CadSidebarListBoxItem}"
                          Margin="0,4,0,10" />
-                <DockPanel Grid.Row="2" LastChildFill="False" Margin="0,0,0,4">
+                <GridSplitter Grid.Row="2"
+                              Height="6"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch"
+                              ResizeDirection="Rows"
+                              ResizeBehavior="PreviousAndNext"
+                              Background="{StaticResource CadBorder}"
+                              x:Name="VehicleSidebarSplitter" />
+                <DockPanel Grid.Row="3" LastChildFill="False" Margin="0,0,0,4">
                     <Button x:Name="ClearVehHistoryBtn"
                             DockPanel.Dock="Right"
                             Content="CLEAR HISTORY"
@@ -56,11 +66,18 @@
                     <TextBlock Text="RECENT SEARCHES" Style="{StaticResource CadSectionTitle}" VerticalAlignment="Center" />
                 </DockPanel>
                 <ListBox x:Name="HistoryList"
-                         Grid.Row="3"
+                         Grid.Row="4"
                          Style="{StaticResource CadListBox}"
                          ItemContainerStyle="{StaticResource CadSidebarListBoxItem}"
                          Margin="0,4,0,0" />
             </Grid>
+            <GridSplitter x:Name="VehicleMainSplitter"
+                          Grid.Column="1"
+                          Width="6"
+                          HorizontalAlignment="Stretch"
+                          ResizeDirection="Columns"
+                          ResizeBehavior="PreviousAndNext"
+                          Background="{StaticResource CadBorder}" />
             <Border Grid.Column="2" Style="{StaticResource CadModuleChromeBorder}" Padding="12">
                 <DockPanel LastChildFill="True">
                     <TabControl x:Name="VehicleDetailTabs"
@@ -148,5 +165,10 @@
                 </DockPanel>
             </Border>
         </Grid>
+        <cad:MdtBusyOverlay x:Name="ModuleBusy"
+                            Grid.RowSpan="2"
+                            Panel.ZIndex="100"
+                            VerticalAlignment="Stretch"
+                            HorizontalAlignment="Stretch" />
     </Grid>
 </UserControl>

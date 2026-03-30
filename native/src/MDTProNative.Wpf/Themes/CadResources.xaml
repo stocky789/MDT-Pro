@@ -55,6 +55,10 @@
     <SolidColorBrush x:Key="CadRailDarkType" Color="{StaticResource CadRailDarkTypeColor}" />
     <SolidColorBrush x:Key="CadSubTabActiveBg" Color="{StaticResource CadSubTabActiveBgColor}" />
     <SolidColorBrush x:Key="CadSubTabActiveText" Color="{StaticResource CadSubTabActiveTextColor}" />
+    <!-- Person/vehicle CDF status semantics; matches browser MDT root.css success, warning, and error tokens -->
+    <SolidColorBrush x:Key="CadSemanticSuccess" Color="#FF34D399" />
+    <SolidColorBrush x:Key="CadSemanticWarning" Color="#FFFBBF24" />
+    <SolidColorBrush x:Key="CadSemanticDanger" Color="#FFF87171" />
 
     <FontFamily x:Key="CadFontMono">Consolas</FontFamily>
     <FontFamily x:Key="CadFontUi">Segoe UI Semibold</FontFamily>

@@ -1,6 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
+using MDTProNative.Client;
 using MDTProNative.Wpf.Services;
 using MDTProNative.Wpf.Views.Reports;
 using Newtonsoft.Json;
@@ -10,9 +13,14 @@ namespace MDTProNative.Wpf.Views.Reports.Forms;
 
 public partial class CitationReportForm : UserControl, IReportFormPane
 {
+    const string TitleKey = "citationTitle";
+    const string DefaultDocTitle = "Uniform Traffic Citation — Violation Notice";
+
     JObject? _source;
     MdtConnectionManager? _connection;
     readonly ObservableCollection<CitationChargeRow> _charges = new();
+    readonly List<CitationChargePickerOption> _citationChargePickList = new();
+    bool _suppressCitationChargePick;
 
     public CitationReportForm()
     {
@@ -33,9 +41,67 @@ public partial class CitationReportForm : UserControl, IReportFormPane
         };
         StatusCombo.SelectedIndex = 1;
         ClearFormBtn.Click += (_, _) => Clear();
+        ExportPdfBtn.Click += (_, _) =>
+            ReportDocumentBrandingHelper.PrintToPdf(DocumentBodyScroll, DocumentPrintRoot,
+                "MDT Citation " + (IdBox.Text.Trim().Length > 0 ? IdBox.Text.Trim() : "report"));
+        ReportDocumentBrandingHelper.ApplyChrome(null, TitleKey, DefaultDocTitle, DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
     }
 
-    public void Bind(MdtConnectionManager? connection) => _connection = connection;
+    public void Bind(MdtConnectionManager? connection)
+    {
+        _connection = connection;
+        if (connection?.Http == null)
+        {
+            _citationChargePickList.Clear();
+            ReportDocumentBrandingHelper.ApplyChrome(null, TitleKey, DefaultDocTitle, DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
+            return;
+        }
+
+        _ = ReportDocumentBrandingHelper.LoadBrandingAsync(connection, "citation", TitleKey, DefaultDocTitle, DocHeader, BrandingTemplateHint, Dispatcher, BrandingFooter);
+        _ = LoadCitationChargePickListAsync(connection.Http);
+    }
+
+    async Task LoadCitationChargePickListAsync(MdtHttpClient http)
+    {
+        try
+        {
+            var arr = await http.GetCitationOptionsJsonAsync().ConfigureAwait(false);
+            var list = CitationChargePickerOption.ParseGroups(arr);
+            await Dispatcher.InvokeAsync(() =>
+            {
+                _citationChargePickList.Clear();
+                _citationChargePickList.AddRange(list);
+                CollectionViewSource.GetDefaultView(_charges).Refresh();
+            });
+        }
+        catch
+        {
+            /* keep empty */
+        }
+    }
+
+    void CitationChargeCombo_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is ComboBox cb)
+            cb.ItemsSource = _citationChargePickList;
+    }
+
+    void CitationChargeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressCitationChargePick) return;
+        if (sender is not ComboBox cb || cb.DataContext is not CitationChargeRow row) return;
+        if (cb.SelectedItem is not CitationChargePickerOption opt) return;
+        opt.ApplyTo(row);
+        _suppressCitationChargePick = true;
+        try
+        {
+            cb.SelectedItem = null;
+        }
+        finally
+        {
+            _suppressCitationChargePick = false;
+        }
+    }
 
     public void LoadFromReport(JObject report)
     {
@@ -90,7 +156,7 @@ public partial class CitationReportForm : UserControl, IReportFormPane
             if (int.TryParse(ShortYearBox.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var sy))
                 o["ShortYear"] = sy;
             else
-                o["ShortYear"] = 0;
+                o["ShortYear"] = combined.Year % 100;
             o["TimeStamp"] = combined;
             o["Status"] = statusIdx;
             o["Notes"] = NotesBox.Text ?? "";

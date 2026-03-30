@@ -713,6 +713,15 @@ async function renderReportInformation(report, type, isList) {
   reportInformationEl.innerHTML = ''
   delete reportInformationEl.dataset.courtCaseNumber
 
+  let reportBodyMount = reportInformationEl
+  if (
+    !isList &&
+    type !== 'propertyEvidence' &&
+    typeof window.mdtproMountStandardReportDocument === 'function'
+  ) {
+    reportBodyMount = window.mdtproMountStandardReportDocument(reportInformationEl, type)
+  }
+
   const timeStamp = new Date(report.TimeStamp)
   timeStamp.setMinutes(timeStamp.getMinutes() - timeStamp.getTimezoneOffset())
 
@@ -727,18 +736,18 @@ async function renderReportInformation(report, type, isList) {
 
   const location = report.Location
 
-  reportInformationEl.appendChild(
+  reportBodyMount.appendChild(
     await getGeneralInformationSection(generalInformation, isList, type)
   )
-  reportInformationEl.appendChild(
+  reportBodyMount.appendChild(
     await getOfficerInformationSection(officerInformation, isList)
   )
-  reportInformationEl.appendChild(await getLocationSection(location, isList))
+  reportBodyMount.appendChild(await getLocationSection(location, isList))
 
   switch (type) {
     case 'incident':
       if (!isList || report.OffenderPedsNames.length > 0) {
-        reportInformationEl.appendChild(
+        reportBodyMount.appendChild(
           await getMultipleNameInputsSection(
             language.reports.sections.incident.titleOffenders,
             language.reports.sections.incident.labelOffenders,
@@ -750,7 +759,7 @@ async function renderReportInformation(report, type, isList) {
         )
       }
       if (!isList || report.WitnessPedsNames.length > 0) {
-        reportInformationEl.appendChild(
+        reportBodyMount.appendChild(
           await getMultipleNameInputsSection(
             language.reports.sections.incident.titleWitnesses,
             language.reports.sections.incident.labelWitnesses,
@@ -765,7 +774,7 @@ async function renderReportInformation(report, type, isList) {
     case 'citation':
     case 'arrest':
       const canEditCharges = !isList || report.canEditCitationArrest
-      reportInformationEl.appendChild(
+      reportBodyMount.appendChild(
         await getOffenderSection(
           {
             pedName: report.OffenderPedName,
@@ -776,7 +785,7 @@ async function renderReportInformation(report, type, isList) {
         )
       )
       if (canEditCharges || (report.Charges && report.Charges.length > 0)) {
-        reportInformationEl.appendChild(
+        reportBodyMount.appendChild(
           await getCitationArrestSection(type, isList, report.Charges || [])
         )
       }
@@ -788,23 +797,23 @@ async function renderReportInformation(report, type, isList) {
         reportInformationEl.dataset.documentedFirearms = String(!!report.DocumentedFirearms)
       }
       if (type === 'arrest' && (!isList || (report.UseOfForce && report.UseOfForce.Type))) {
-        reportInformationEl.appendChild(
+        reportBodyMount.appendChild(
           await getUseOfForceSection(report.UseOfForce || {}, isList)
         )
       }
       if (type === 'arrest') {
-        reportInformationEl.appendChild(
+        reportBodyMount.appendChild(
           await getEvidenceSeizedSection(report, isList)
         )
       }
       if (type === 'arrest' && !isList) {
-        reportInformationEl.appendChild(
+        reportBodyMount.appendChild(
           await getArrestAttachedReportsSection(report)
         )
       }
       break
     case 'impound':
-      reportInformationEl.appendChild(
+      reportBodyMount.appendChild(
         await getImpoundSection(
           {
             LicensePlate: report.LicensePlate,
@@ -820,7 +829,7 @@ async function renderReportInformation(report, type, isList) {
       )
       break
     case 'trafficIncident':
-      reportInformationEl.appendChild(
+      reportBodyMount.appendChild(
         await getTrafficIncidentSection(
           {
             DriverNames: report.DriverNames || [],
@@ -837,7 +846,7 @@ async function renderReportInformation(report, type, isList) {
       )
       break
     case 'injury':
-      reportInformationEl.appendChild(
+      reportBodyMount.appendChild(
         await getInjurySection(
           {
             InjuredPartyName: report.InjuredPartyName,
@@ -852,7 +861,7 @@ async function renderReportInformation(report, type, isList) {
       )
       break
     case 'propertyEvidence':
-      reportInformationEl.appendChild(
+      reportBodyMount.appendChild(
         await getPropertyEvidenceSection(
           {
             SubjectPedNames: report.SubjectPedNames || [],
@@ -868,7 +877,7 @@ async function renderReportInformation(report, type, isList) {
       break
   }
 
-  reportInformationEl.appendChild(await getNotesSection(report.Notes, isList))
+  reportBodyMount.appendChild(await getNotesSection(report.Notes, isList))
 }
 
 /**

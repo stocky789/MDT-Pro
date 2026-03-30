@@ -11,4 +11,10 @@ public interface IReportFormPane
     /// <summary>Builds a report object including base <see cref="Report"/> fields.</summary>
     JObject BuildReport();
     void Clear();
+
+    /// <summary>True when the pane is still the active editor but not hosted in <c>FormHost</c> (e.g. pop-out window).</summary>
+    bool IsDetachedFromHost => false;
+
+    /// <summary>Closes any secondary surface detached from <c>FormHost</c> before clearing the host or disposing panes.</summary>
+    void CloseDetachSurfaces() { }
 }

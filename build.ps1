@@ -36,6 +36,13 @@ $dllDest = Join-Path $dllDestDir 'MDTPro.dll'
 $mdtSource = Join-Path $root 'MDTPro'
 $mdtDest = Join-Path $release 'MDTPro'
 
+function Get-DotNetProjectAssemblyName {
+    param([Parameter(Mandatory)][string]$ProjectPath)
+    $m = Select-String -Path $ProjectPath -Pattern '<AssemblyName>\s*([^<]+?)\s*</AssemblyName>' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($m) { return $m.Matches.Groups[1].Value.Trim() }
+    return [System.IO.Path]::GetFileNameWithoutExtension($ProjectPath)
+}
+
 # SQLite dependency paths - check multiple locations:
 # 1. Dependencies folder (committed to repo for easy builds)
 # 2. NuGet packages folder (if restored) - discover version dynamically
@@ -523,6 +530,15 @@ if (-not $SkipWindowsApp) {
     if ($LASTEXITCODE -ne 0) { Write-Error "Native WPF publish failed."; exit $LASTEXITCODE }
     Write-Host "  -> $nativePublishDir (win-x64, self-contained)"
 
+    $nativeAppExeName = "$(Get-DotNetProjectAssemblyName $nativeWpfProj).exe"
+    $nativeAppExePath = Join-Path $nativePublishDir $nativeAppExeName
+    if (-not (Test-Path -LiteralPath $nativeAppExePath)) {
+        $firstExe = Get-ChildItem -Path $nativePublishDir -Filter '*.exe' -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notlike 'createdump.exe' } |
+            Select-Object -First 1
+        if ($firstExe) { $nativeAppExeName = $firstExe.Name }
+    }
+
     $nativeReadme = Join-Path $nativePublishDir 'README.txt'
     @"
 MDT Pro — Native MDC (Windows desktop)
@@ -532,7 +548,7 @@ This folder is the published Windows desktop MDC terminal. It talks to the same 
 API as the in-game browser MDT (your LSPDFR plugin must be running and on duty).
 
   1. Start GTA V, go on duty; note the MDT URL/port (default http://127.0.0.1:9000).
-  2. Run MDTProNative.Wpf.exe.
+  2. Run $nativeAppExeName.
   3. Enter the same host and port, then Connect.
 
 Requires the WebView2 Runtime for Settings → embedded customization page (usually already installed with Edge). Reports and most modules are native WPF.
@@ -554,5 +570,5 @@ Write-Host "  Release\x64\SQLite.Interop.dll (GTA V root\x64)"
 Write-Host "  Release\MDTPro\"
 Write-Host "Distribution copy (mod + desktop): $nativeReleaseDir"
 if (-not $SkipWindowsApp) {
-    Write-Host "  Native Release\MDTProNative\MDTProNative.Wpf.exe"
+    Write-Host "  Native Release\MDTProNative\$nativeAppExeName"
 }

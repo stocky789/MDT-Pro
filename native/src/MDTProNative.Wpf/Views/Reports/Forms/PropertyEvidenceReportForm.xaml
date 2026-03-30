@@ -1,139 +1,283 @@
 <UserControl x:Class="MDTProNative.Wpf.Views.Reports.Forms.PropertyEvidenceReportForm"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Margin="0,0,12,12">
-            <TextBlock Text="GENERAL" Style="{StaticResource CadSectionTitle}" />
-            <Grid Margin="0,0,0,10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="140" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="REPORT ID" Style="{StaticResource CadFieldLabel}" Margin="0,0,8,6" />
-                <TextBox x:Name="GeneralIdBox" Grid.Row="0" Grid.Column="1" Style="{StaticResource CadTextBox}" Margin="0,0,0,6" />
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="SHORT YEAR" Style="{StaticResource CadFieldLabel}" Margin="0,0,8,6" />
-                <TextBox x:Name="GeneralShortYearBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource CadTextBox}" Margin="0,0,0,6" />
-                <TextBlock Grid.Row="2" Grid.Column="0" Text="DATE" Style="{StaticResource CadFieldLabel}" Margin="0,0,8,6" />
-                <DatePicker x:Name="GeneralDatePicker" Grid.Row="2" Grid.Column="1" Margin="0,0,0,6" />
-                <TextBlock Grid.Row="3" Grid.Column="0" Text="TIME" Style="{StaticResource CadFieldLabel}" Margin="0,0,8,6" />
-                <TextBox x:Name="GeneralTimeBox" Grid.Row="3" Grid.Column="1" Style="{StaticResource CadTextBox}" Margin="0,0,0,6"
-                         ToolTip="HH:mm or HH:mm:ss" />
-                <TextBlock Grid.Row="4" Grid.Column="0" Text="STATUS" Style="{StaticResource CadFieldLabel}" Margin="0,0,8,0" VerticalAlignment="Center" />
-                <ComboBox x:Name="StatusCombo" Grid.Row="4" Grid.Column="1" Style="{StaticResource CadComboBox}">
-                    <ComboBoxItem Content="Closed" />
-                    <ComboBoxItem Content="Open" />
-                    <ComboBoxItem Content="Canceled" />
-                    <ComboBoxItem Content="Pending" />
-                </ComboBox>
-            </Grid>
-            <TextBlock Text="NOTES" Style="{StaticResource CadFieldLabel}" />
-            <TextBox x:Name="NotesBox"
-                     Style="{StaticResource CadTextBoxCadField}"
-                     MinHeight="56"
-                     AcceptsReturn="True"
-                     TextWrapping="Wrap"
-                     VerticalScrollBarVisibility="Auto"
-                     Margin="0,4,0,10" />
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:forms="clr-namespace:MDTProNative.Wpf.Views.Reports.Forms">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-            <TextBlock Text="OFFICER" Style="{StaticResource CadSectionTitle}" />
-            <UniformGrid Columns="2" Margin="0,0,0,10">
-                <StackPanel Margin="0,0,8,6">
-                    <TextBlock Text="FIRST NAME" Style="{StaticResource CadFieldLabel}" />
-                    <TextBox x:Name="OffFirstBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
-                </StackPanel>
-                <StackPanel Margin="0,0,0,6">
-                    <TextBlock Text="LAST NAME" Style="{StaticResource CadFieldLabel}" />
-                    <TextBox x:Name="OffLastBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
-                </StackPanel>
-                <StackPanel Margin="0,0,8,6">
-                    <TextBlock Text="BADGE #" Style="{StaticResource CadFieldLabel}" />
-                    <TextBox x:Name="OffBadgeBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
-                </StackPanel>
-                <StackPanel Margin="0,0,0,6">
-                    <TextBlock Text="RANK" Style="{StaticResource CadFieldLabel}" />
-                    <TextBox x:Name="OffRankBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
-                </StackPanel>
-                <StackPanel Margin="0,0,8,6">
-                    <TextBlock Text="CALL SIGN" Style="{StaticResource CadFieldLabel}" />
-                    <TextBox x:Name="OffCallBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
-                </StackPanel>
-                <StackPanel Margin="0,0,0,6">
-                    <TextBlock Text="AGENCY" Style="{StaticResource CadFieldLabel}" />
-                    <TextBox x:Name="OffAgencyBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
-                </StackPanel>
-            </UniformGrid>
-
-            <TextBlock Text="LOCATION" Style="{StaticResource CadSectionTitle}" />
-            <UniformGrid Columns="2" Margin="0,0,0,10">
-                <StackPanel Margin="0,0,8,6">
-                    <TextBlock Text="AREA" Style="{StaticResource CadFieldLabel}" />
-                    <TextBox x:Name="LocAreaBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
-                </StackPanel>
-                <StackPanel Margin="0,0,0,6">
-                    <TextBlock Text="STREET" Style="{StaticResource CadFieldLabel}" />
-                    <TextBox x:Name="LocStreetBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
-                </StackPanel>
-                <StackPanel Margin="0,0,8,6">
-                    <TextBlock Text="COUNTY" Style="{StaticResource CadFieldLabel}" />
-                    <TextBox x:Name="LocCountyBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
-                </StackPanel>
-                <StackPanel Margin="0,0,0,6">
-                    <TextBlock Text="POSTAL" Style="{StaticResource CadFieldLabel}" />
-                    <TextBox x:Name="LocPostalBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
-                </StackPanel>
-            </UniformGrid>
-
-            <TextBlock Text="PROPERTY / EVIDENCE" Style="{StaticResource CadSectionTitle}" />
-            <TextBlock Text="SUBJECT PEDS (one per line)" Style="{StaticResource CadFieldLabel}" />
-            <TextBox x:Name="SubjectPedNamesBox"
-                     Style="{StaticResource CadTextBoxCadField}"
-                     MinHeight="72"
-                     AcceptsReturn="True"
-                     TextWrapping="Wrap"
-                     Margin="0,4,0,8" />
-            <TextBlock Text="SEIZED CONTROLLED SUBSTANCES" Style="{StaticResource CadSectionTitle}" Margin="0,8,0,4" />
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                <Button x:Name="AddDrugRowBtn" Content="ADD ROW" Style="{StaticResource CadButton}" Padding="12,4" />
-                <Button x:Name="RemoveDrugRowBtn" Content="REMOVE SELECTED" Style="{StaticResource CadRailOutlineButton}" Margin="8,0,0,0" Padding="12,4" />
-            </StackPanel>
-            <DataGrid x:Name="SeizedDrugsGrid"
-                      AutoGenerateColumns="False"
-                      CanUserAddRows="False"
-                      HeadersVisibility="Column"
-                      SelectionMode="Single"
-                      MinHeight="100"
-                      MaxHeight="200"
-                      Background="{StaticResource CadPanel}"
-                      Foreground="{StaticResource CadText}"
-                      BorderBrush="{StaticResource CadBorder}"
-                      GridLinesVisibility="Horizontal"
-                      RowHeight="28">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="SUBSTANCE TYPE" Binding="{Binding DrugType, UpdateSourceTrigger=PropertyChanged}" Width="2*" />
-                    <DataGridTextColumn Header="QTY / UNIT" Binding="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}" Width="*" />
-                </DataGrid.Columns>
-            </DataGrid>
-            <TextBlock Text="SEIZED FIREARM TYPES (one per line)" Style="{StaticResource CadFieldLabel}" Margin="0,12,0,0" />
-            <TextBox x:Name="SeizedFirearmTypesBox"
-                     Style="{StaticResource CadTextBoxCadField}"
-                     MinHeight="72"
-                     AcceptsReturn="True"
-                     TextWrapping="Wrap"
-                     Margin="0,4,0,8" />
-            <TextBlock Text="OTHER CONTRABAND NOTES" Style="{StaticResource CadFieldLabel}" />
-            <TextBox x:Name="OtherContrabandNotesBox"
-                     Style="{StaticResource CadTextBoxCadField}"
-                     MinHeight="48"
-                     AcceptsReturn="True"
-                     TextWrapping="Wrap"
-                     Margin="0,4,0,0" />
+        <StackPanel x:Name="ReportEditorToolbar" Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+            <Button x:Name="RecentIdsBtn" Content="RECENT IDS" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
+            <Button x:Name="ExportPdfBtn" Content="EXPORT PDF…" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
+            <Button x:Name="PopoutBtn" Content="POP OUT" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
+            <TextBlock x:Name="BrandingTemplateHint"
+                       VerticalAlignment="Center"
+                       Foreground="{StaticResource CadMuted}"
+                       FontSize="11"
+                       Text="" />
         </StackPanel>
-    </ScrollViewer>
+
+        <ScrollViewer x:Name="DocumentBodyScroll"
+                      Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <Border x:Name="DocumentPrintRoot"
+                    Background="{StaticResource ReportDocPaperBrush}"
+                    BorderBrush="{StaticResource ReportDocInkBrush}"
+                    BorderThickness="1"
+                    Padding="18"
+                    MaxWidth="920"
+                    HorizontalAlignment="Left">
+                <StackPanel>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MinWidth="160" />
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="*" MinWidth="200" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="BrandingLeftColumn"
+                                   Grid.Column="0"
+                                   Style="{StaticResource ReportDocLabel}"
+                                   TextWrapping="Wrap"
+                                   LineHeight="16" />
+                        <Border Grid.Column="1"
+                                Width="72"
+                                Height="72"
+                                CornerRadius="36"
+                                BorderBrush="{StaticResource ReportDocInkBrush}"
+                                BorderThickness="2"
+                                Background="#E8F4FC"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Top"
+                                Margin="4,0">
+                            <TextBlock x:Name="BrandingCenterTitle"
+                                       TextAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontWeight="Bold"
+                                       FontSize="11"
+                                       TextWrapping="Wrap"
+                                       Margin="4" />
+                        </Border>
+                        <StackPanel Grid.Column="2" Margin="8,0,0,0">
+                            <TextBlock x:Name="DocumentTitleBlock"
+                                       FontWeight="Bold"
+                                       FontSize="13"
+                                       TextWrapping="Wrap"
+                                       Foreground="{StaticResource ReportDocInkBrush}" />
+                            <TextBlock x:Name="BrandingRightTitle"
+                                       Margin="0,4,0,0"
+                                       Style="{StaticResource ReportDocLabel}"
+                                       TextWrapping="Wrap"
+                                       LineHeight="16" />
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Agency case #" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <TextBox x:Name="GeneralIdBox" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" />
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Text="Report metadata" Style="{StaticResource ReportDocSectionTitle}" Margin="0,0,0,0" />
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="120" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Date" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
+                        <DatePicker x:Name="GeneralDatePicker" Grid.Row="1" Grid.Column="0" FontSize="11" Margin="0,0,0,0" />
+                        <TextBlock Grid.Row="0" Grid.Column="2" Text="Short year" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
+                        <TextBox x:Name="GeneralShortYearBox" Grid.Row="1" Grid.Column="2" Style="{StaticResource ReportDocTextBox}" />
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="200" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Time (HH:mm)" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
+                        <TextBox x:Name="GeneralTimeBox" Grid.Row="1" Grid.Column="0" Style="{StaticResource ReportDocTextBox}" ToolTip="HH:mm or HH:mm:ss" />
+                        <TextBlock Grid.Row="0" Grid.Column="2" Text="Status" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
+                        <ComboBox x:Name="StatusCombo" Grid.Row="1" Grid.Column="2" Style="{StaticResource ReportDocCombo}">
+                            <ComboBoxItem Content="Closed" />
+                            <ComboBoxItem Content="Open" />
+                            <ComboBoxItem Content="Canceled" />
+                            <ComboBoxItem Content="Pending" />
+                        </ComboBox>
+                    </Grid>
+
+                    <TextBlock Text="Officer" Style="{StaticResource ReportDocSectionTitle}" />
+                    <UniformGrid Columns="2" Margin="0,0,0,8">
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="First name" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
+                            <TextBox x:Name="OffFirstBox" Style="{StaticResource ReportDocTextBox}" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Last name" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
+                            <TextBox x:Name="OffLastBox" Style="{StaticResource ReportDocTextBox}" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="Badge #" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
+                            <TextBox x:Name="OffBadgeBox" Style="{StaticResource ReportDocTextBox}" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Rank" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
+                            <TextBox x:Name="OffRankBox" Style="{StaticResource ReportDocTextBox}" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="Call sign" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
+                            <TextBox x:Name="OffCallBox" Style="{StaticResource ReportDocTextBox}" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Agency" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
+                            <TextBox x:Name="OffAgencyBox" Style="{StaticResource ReportDocTextBox}" />
+                        </StackPanel>
+                    </UniformGrid>
+
+                    <TextBlock Text="Location" Style="{StaticResource ReportDocSectionTitle}" />
+                    <UniformGrid Columns="2" Margin="0,0,0,8">
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="Area" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
+                            <TextBox x:Name="LocAreaBox" Style="{StaticResource ReportDocTextBox}" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Street" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
+                            <TextBox x:Name="LocStreetBox" Style="{StaticResource ReportDocTextBox}" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="County" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
+                            <TextBox x:Name="LocCountyBox" Style="{StaticResource ReportDocTextBox}" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Postal" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
+                            <TextBox x:Name="LocPostalBox" Style="{StaticResource ReportDocTextBox}" />
+                        </StackPanel>
+                    </UniformGrid>
+
+                    <Border Background="{StaticResource ReportDocAuthBarBrush}" BorderBrush="{StaticResource ReportDocInkBrush}" BorderThickness="1" Padding="8" Margin="0,0,0,10">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource ReportDocLabel}"
+                                   Text="Authorization (roleplay): I authorize the prosecuting attorney to receive a copy of the related lab report. Signature: ________________________________  Date: __________" />
+                    </Border>
+
+                    <TextBlock Text="Subjects (from whom seized)" Style="{StaticResource ReportDocLabel}" FontWeight="Bold" Margin="0,0,0,2" />
+                    <TextBox x:Name="SubjectPedNamesBox"
+                             Style="{StaticResource ReportDocTextBox}"
+                             MinHeight="72"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             Margin="0,0,0,8" />
+
+                    <TextBlock Text="Notes" Style="{StaticResource ReportDocSectionTitle}" Margin="0,0,0,0" />
+                    <TextBox x:Name="NotesBox"
+                             Style="{StaticResource ReportDocTextBox}"
+                             MinHeight="56"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             Margin="0,0,0,8" />
+
+                    <TextBlock x:Name="SeizureOptionsHint"
+                               TextWrapping="Wrap"
+                               Foreground="#8B0000"
+                               FontSize="11"
+                               Margin="0,0,0,8"
+                               Visibility="Collapsed" />
+
+                    <TextBlock Text="Evidence submitted" Style="{StaticResource ReportDocSectionTitle}" />
+                    <TextBlock TextWrapping="Wrap" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,6"
+                               Text="FD = fire debris, DR = drugs, DNA = serology/DNA, FA = firearm. Use plugin drug/firearm IDs below for court evidence scoring." />
+
+                    <TextBlock Text="Drugs seized" Style="{StaticResource ReportDocLabel}" FontWeight="Bold" Margin="0,0,0,4" />
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MinWidth="100" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" MinWidth="120" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" MinWidth="100" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="DrugScheduleCombo" Grid.Column="0" Style="{StaticResource ReportDocCombo}" DisplayMemberPath="Label" SelectedValuePath="Value" />
+                        <ComboBox x:Name="DrugTypeCombo" Grid.Column="2" Style="{StaticResource ReportDocCombo}" DisplayMemberPath="Label" SelectedValuePath="Value" />
+                        <ComboBox x:Name="DrugQtyCombo" Grid.Column="4" Style="{StaticResource ReportDocCombo}" DisplayMemberPath="Label" SelectedValuePath="Value" />
+                        <Button x:Name="AddDrugBtn" Grid.Column="6" Content="ADD" Style="{StaticResource CadButton}" Padding="14,6" VerticalAlignment="Center" />
+                    </Grid>
+                    <ListBox x:Name="SeizedDrugsList"
+                             MinHeight="56"
+                             MaxHeight="220"
+                             Margin="0,0,0,10"
+                             BorderBrush="{StaticResource ReportDocInkBrush}"
+                             BorderThickness="1"
+                             Background="{StaticResource ReportDocFieldFill}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type forms:SeizedDrugRow}">
+                                <DockPanel LastChildFill="True">
+                                    <Button DockPanel.Dock="Right" Content="REMOVE" Style="{StaticResource CadRailOutlineButton}" Padding="10,2" Margin="8,0,0,0" VerticalAlignment="Center" Click="RemoveSeizedDrug_Click" />
+                                    <TextBlock Text="{Binding DisplayLine}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="4" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <TextBlock Text="Firearms seized" Style="{StaticResource ReportDocLabel}" FontWeight="Bold" Margin="0,0,0,4" />
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="FirearmTypeCombo" Grid.Column="0" Style="{StaticResource ReportDocCombo}" DisplayMemberPath="Label" SelectedValuePath="Value" />
+                        <Button x:Name="AddFirearmBtn" Grid.Column="2" Content="ADD" Style="{StaticResource CadButton}" Padding="14,6" VerticalAlignment="Center" />
+                    </Grid>
+                    <ListBox x:Name="SeizedFirearmsList"
+                             MinHeight="48"
+                             MaxHeight="160"
+                             Margin="0,0,0,10"
+                             BorderBrush="{StaticResource ReportDocInkBrush}"
+                             BorderThickness="1"
+                             Background="{StaticResource ReportDocFieldFill}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type forms:SeizedFirearmRow}">
+                                <DockPanel LastChildFill="True">
+                                    <Button DockPanel.Dock="Right" Content="REMOVE" Style="{StaticResource CadRailOutlineButton}" Padding="10,2" Margin="8,0,0,0" VerticalAlignment="Center" Click="RemoveFirearm_Click" />
+                                    <TextBlock Text="{Binding DisplayLine}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="4" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <TextBlock Text="Other contraband" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
+                    <TextBox x:Name="OtherContrabandNotesBox"
+                             Style="{StaticResource ReportDocTextBox}"
+                             MinHeight="48"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             Margin="0,0,0,8" />
+
+                    <TextBlock x:Name="BrandingFooter"
+                               TextWrapping="Wrap"
+                               FontSize="10"
+                               Foreground="#444"
+                               Margin="0,8,0,0" />
+                </StackPanel>
+            </Border>
+        </ScrollViewer>
+    </Grid>
 </UserControl>
