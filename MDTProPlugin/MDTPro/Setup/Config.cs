@@ -49,11 +49,13 @@ namespace MDTPro.Setup {
         public int citationHandoffBehaviorDelayAfterPaperworkMs = 1800;
         /// <summary>After the suspect subtitle is shown, wait this many ms before rolling hostility. 0 = immediately after subtitle call.</summary>
         public int citationHandoffDelayBeforeViolenceAfterReactionMs = 1200;
+        /// <summary>Passed to RAGE <c>GetNearbyPeds</c>/<c>GetNearbyVehicles</c>; values above 16 are clamped (RPH throws <c>maximumCount</c> out of range otherwise).</summary>
         public int maxNumberOfNearbyPedsOrVehicles = 15;
         public int databaseLimitMultiplier = 10;
         /// <summary>Milliseconds between WebSocket pushes for time, location, and map coords. Higher = less CPU; 1000 is smooth for taskbar/map.</summary>
         public int webSocketUpdateInterval = 1000;
-        public int databaseUpdateInterval = 10000;
+        /// <summary>Milliseconds between <see cref="DataController.SetDatabases"/> runs on the data-update fiber (nearby ped/vehicle scan, pending cases, vehicle-search capture). Lower = peds/vehicles enter the MDT pool sooner; higher = less CPU.</summary>
+        public int databaseUpdateInterval = 5000;
         public bool updateDomWithLanguageOnLoad = false;
         public bool useInGameTime = false;
         public bool showSecondsInTaskbarClock = false;
@@ -199,6 +201,9 @@ namespace MDTPro.Setup {
 
         /// <summary>When true, log detailed firearm capture flow (PR API results, fallback, event triggers) to MDT Pro log. Use for debugging Firearms Check.</summary>
         public bool firearmDebugLogging = false;
+
+        /// <summary>When true, log Vehicle Search nearby-vehicle refresh (HTTP → game fiber, GetNearbyVehicles vs world scan, plate resolution, counts) to MDTPro.log. Turn off after diagnosing empty lists.</summary>
+        public bool vehicleSearchDebugLogging = false;
 
         /// <summary>When true, log MDT location resolution (player position, STP stop scene, postal/street/area/county strings) to MDTPro.log on change or every 30s. Use when taskbar/report location is blank or wrong.</summary>
         public bool locationDebugLogging = false;

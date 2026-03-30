@@ -165,6 +165,8 @@ namespace MDTPro.Setup {
             }
             if (config.firearmDebugLogging)
                 Helper.Log("[Firearm] Debug logging ENABLED – firearm capture flow will be logged to this file.", false, Helper.LogSeverity.Info);
+            if (config.vehicleSearchDebugLogging)
+                Helper.Log("[VehicleSearch] Debug logging ENABLED – nearby vehicle refresh details will be logged to this file.", false, Helper.LogSeverity.Info);
         }
 
         internal static void ClearCache() {

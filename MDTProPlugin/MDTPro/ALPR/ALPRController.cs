@@ -264,13 +264,15 @@ namespace MDTPro.ALPR {
         private static string GetVehicleColorDisplay(MDTProVehicleData vd, MDTProVehicleData dbVehicle) {
             string primary = null;
             string secondary = null;
-            if (vd != null && (vd.PrimaryColor != null || vd.SecondaryColor != null)) {
-                primary = vd.PrimaryColor?.Trim();
-                secondary = vd.SecondaryColor?.Trim();
+            if (vd != null && (vd.PrimaryColor != null || vd.SecondaryColor != null || vd.PrimaryColorSpecific != null || vd.SecondaryColorSpecific != null)) {
+                primary = !string.IsNullOrWhiteSpace(vd.PrimaryColor) ? vd.PrimaryColor.Trim() : vd.PrimaryColorSpecific?.Trim();
+                secondary = !string.IsNullOrWhiteSpace(vd.SecondaryColor) ? vd.SecondaryColor.Trim() : vd.SecondaryColorSpecific?.Trim();
             }
             if ((primary == null || secondary == null) && dbVehicle != null) {
-                if (string.IsNullOrEmpty(primary)) primary = dbVehicle.PrimaryColor?.Trim();
-                if (string.IsNullOrEmpty(secondary)) secondary = dbVehicle.SecondaryColor?.Trim();
+                if (string.IsNullOrEmpty(primary))
+                    primary = !string.IsNullOrWhiteSpace(dbVehicle.PrimaryColor) ? dbVehicle.PrimaryColor.Trim() : dbVehicle.PrimaryColorSpecific?.Trim();
+                if (string.IsNullOrEmpty(secondary))
+                    secondary = !string.IsNullOrWhiteSpace(dbVehicle.SecondaryColor) ? dbVehicle.SecondaryColor.Trim() : dbVehicle.SecondaryColorSpecific?.Trim();
             }
             if (!string.IsNullOrEmpty(primary) && !string.IsNullOrEmpty(secondary))
                 return primary + " / " + secondary;

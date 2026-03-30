@@ -45,11 +45,22 @@ namespace MDTPro.Data {
         public List<ArrestGroup.Charge> Arrests;
         public List<IdentificationEntry> IdentificationHistory;
 
-        internal MDTProPedData(Ped ped) {
+        /// <param name="forReconcileSnapshotOnly">When true, copies persona/documents from CDF without synthetic citations or mutating CDF counters (safe for a second read in the same STP flow).</param>
+        internal MDTProPedData(Ped ped, bool forReconcileSnapshotOnly) {
             CDFPedData = ped.GetPedData();
             Holder = ped;
+            if (forReconcileSnapshotOnly) {
+                if (CDFPedData == null) {
+                    PopulateFromLSPDFRPersonaFallback();
+                    return;
+                }
+                ApplyCdfPersonaAndDocumentsToDisplayFields();
+                return;
+            }
             PopulateParameters();
         }
+
+        internal MDTProPedData(Ped ped) : this(ped, false) { }
         internal MDTProPedData(PedData pedData) {
             CDFPedData = pedData;
             Holder = pedData.Holder;
@@ -140,6 +151,90 @@ namespace MDTPro.Data {
 
             TimesStopped = CDFPedData.TimesStopped;
 
+            TryParseNameIntoFirstLast();
+        }
+
+        /// <summary>Re-copy driver license and permit strings from live CDF (same backing StopThePed uses after ID / permit checks). Keeps Person Search aligned with STP when SQLite still holds an older row.</summary>
+        internal void RefreshLicenseAndPermitFieldsFromCdf() {
+            if (CDFPedData == null) return;
+            try {
+                LicenseStatus = CDFPedData.DriversLicenseState.ToString();
+                LicenseExpiration = CDFPedData.DriversLicenseExpiration?.ToString("s");
+                if (CDFPedData.WeaponPermit != null) {
+                    WeaponPermitStatus = CDFPedData.WeaponPermit.Status.ToString();
+                    WeaponPermitExpiration = CDFPedData.WeaponPermit.ExpirationDate?.ToString("s");
+                    WeaponPermitType = GetWeaponPermitType(CDFPedData.WeaponPermit);
+                }
+                FishingPermitStatus = CDFPedData.FishingPermit.Status.ToString();
+                FishingPermitExpiration = CDFPedData.FishingPermit.ExpirationDate?.ToString("s");
+                HuntingPermitStatus = CDFPedData.HuntingPermit.Status.ToString();
+                HuntingPermitExpiration = CDFPedData.HuntingPermit.ExpirationDate?.ToString("s");
+            } catch (Exception e) {
+                Helper.Log($"[MDTPro] CDF permit/license refresh failed for {Name}: {e.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>Re-read name, DOB, address, warrants, supervision, advisory, gang, and license/permit display fields from <see cref="CDFPedData"/> without touching MDT citation/arrest lists or mutating CDF stop counters. Use after merging SQLite so Person Search matches PR/STP/CDF.</summary>
+        internal void ApplyCdfPersonaAndDocumentsToDisplayFields() {
+            if (CDFPedData == null) return;
+            string warrantKeep = WarrantText;
+            Name = CDFPedData.FullName;
+            FirstName = CDFPedData.Firstname;
+            LastName = CDFPedData.Lastname;
+            if (Holder != null && Holder.IsValid())
+                PedPortraitModelHelper.TryGetPortraitModelFromPed(Holder, out ModelHash, out ModelName);
+            Birthday = CDFPedData.Birthday.ToString("s");
+            Gender = CDFPedData.Gender.ToString();
+            IsWanted = CDFPedData.Wanted;
+            IsOnProbation = CDFPedData.IsOnProbation;
+            IsOnParole = CDFPedData.IsOnParole;
+            if (CDFPedData.Address != null && CDFPedData.Address.Zone != null)
+                Address = $"{CDFPedData.Address}, {CDFPedData.Address.Zone.RealAreaName}";
+            else
+                Address = CDFPedData.Address?.ToString() ?? string.Empty;
+            RefreshLicenseAndPermitFieldsFromCdf();
+            if (CDFPedData.HasRealPed && Holder != null && Holder.IsValid()) {
+                try {
+                    var rg = Holder.RelationshipGroup;
+                    string groupName = rg.Name;
+                    IsInGang = groupName != null && groupName.ToLower().Contains("gang");
+                } catch {
+                    IsInGang = false;
+                }
+            }
+            AdvisoryText = CDFPedData.AdvisoryText;
+            if (!IsWanted) WarrantText = null;
+            else if (string.IsNullOrEmpty(warrantKeep)) WarrantText = GetRandomWarrantCharge().name;
+            else WarrantText = warrantKeep;
+            TryParseNameIntoFirstLast();
+        }
+
+        /// <summary>Copies CDF-backed display fields from another row (e.g. <c>new MDTProPedData(ped)</c>) onto this record. Does not copy citations, arrests, identification history, incarceration, deceased flags, or times stopped.</summary>
+        internal void CopyCdfMirroredDisplayFieldsFrom(MDTProPedData liveRead) {
+            if (liveRead == null) return;
+            Name = liveRead.Name;
+            FirstName = liveRead.FirstName;
+            LastName = liveRead.LastName;
+            ModelHash = liveRead.ModelHash;
+            ModelName = liveRead.ModelName;
+            Birthday = liveRead.Birthday;
+            Gender = liveRead.Gender;
+            Address = liveRead.Address;
+            IsInGang = liveRead.IsInGang;
+            AdvisoryText = liveRead.AdvisoryText;
+            IsWanted = liveRead.IsWanted;
+            WarrantText = liveRead.WarrantText;
+            IsOnProbation = liveRead.IsOnProbation;
+            IsOnParole = liveRead.IsOnParole;
+            LicenseStatus = liveRead.LicenseStatus;
+            LicenseExpiration = liveRead.LicenseExpiration;
+            WeaponPermitStatus = liveRead.WeaponPermitStatus;
+            WeaponPermitExpiration = liveRead.WeaponPermitExpiration;
+            WeaponPermitType = liveRead.WeaponPermitType;
+            FishingPermitStatus = liveRead.FishingPermitStatus;
+            FishingPermitExpiration = liveRead.FishingPermitExpiration;
+            HuntingPermitStatus = liveRead.HuntingPermitStatus;
+            HuntingPermitExpiration = liveRead.HuntingPermitExpiration;
             TryParseNameIntoFirstLast();
         }
 
@@ -259,7 +354,7 @@ namespace MDTPro.Data {
                 .ToList() ?? new List<ArrestGroup.Charge>();
         }
 
-        /// <summary>Merge citations, warrants, permits, and incarceration from a saved ped while keeping the live ped's name/DOB/address from CDF. Used for model-based re-encounter so we never label one NPC with another's identity (many peds share the same model).</summary>
+        /// <summary>Merge citations/arrests and SQLite-only fields from a saved ped. CDF-backed persona (name, DOB, licenses, warrants, advisory, etc.) is overwritten immediately after in <see cref="DataController.TryApplyReEncounterProfile"/> / <see cref="DataController.ReconcilePedCdfBackedFieldsWithLiveSnapshot"/> so live CDF stays authoritative.</summary>
         internal void ApplyPersistentRecordPreservingLiveIdentity(MDTProPedData source) {
             if (source == null) return;
 

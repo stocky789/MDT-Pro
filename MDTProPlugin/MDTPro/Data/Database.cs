@@ -161,6 +161,8 @@ namespace MDTPro.Data {
                     Model                       TEXT,
                     PrimaryColor                TEXT,
                     SecondaryColor              TEXT,
+                    PrimaryColorSpecific        TEXT,
+                    SecondaryColorSpecific      TEXT,
                     RegistrationStatus          TEXT,
                     RegistrationExpiration      TEXT,
                     InsuranceStatus             TEXT,
@@ -1019,7 +1021,7 @@ namespace MDTPro.Data {
             try { using (var cmd = new SQLiteCommand("ALTER TABLE firearm_records ADD COLUMN IsSerialScratched INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS drug_records (Id INTEGER PRIMARY KEY AUTOINCREMENT, OwnerPedName TEXT NOT NULL, DrugType TEXT, DrugCategory TEXT, Description TEXT, Source TEXT, FirstSeenAt TEXT NOT NULL, LastSeenAt TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_drug_records_owner ON drug_records(OwnerPedName); CREATE INDEX IF NOT EXISTS idx_drug_records_drugtype ON drug_records(DrugType);", connection)) { cmd.ExecuteNonQuery(); } } catch { }
             try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS vehicle_search_records (Id INTEGER PRIMARY KEY AUTOINCREMENT, LicensePlate TEXT NOT NULL, ItemType TEXT, DrugType TEXT, ItemLocation TEXT, Description TEXT, WeaponModelHash INTEGER NOT NULL DEFAULT 0, WeaponModelId TEXT, Source TEXT, CapturedAt TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_vehicle_search_records_plate ON vehicle_search_records(LicensePlate);", connection)) { cmd.ExecuteNonQuery(); } } catch { }
-            foreach (string col in new[] { "VinStatus", "Make", "Model", "PrimaryColor", "SecondaryColor" }) {
+            foreach (string col in new[] { "VinStatus", "Make", "Model", "PrimaryColor", "SecondaryColor", "PrimaryColorSpecific", "SecondaryColorSpecific" }) {
                 try { using (var cmd = new SQLiteCommand($"ALTER TABLE vehicles ADD COLUMN {col} TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             }
             foreach (string col in new[] { "UseOfForceType", "UseOfForceTypeOther", "UseOfForceJustification", "UseOfForceWitnesses" }) {
@@ -1191,6 +1193,8 @@ namespace MDTPro.Data {
                                 Model = reader["Model"] as string,
                                 PrimaryColor = reader["PrimaryColor"] as string,
                                 SecondaryColor = reader["SecondaryColor"] as string,
+                                PrimaryColorSpecific = ReaderOptionalString(reader, "PrimaryColorSpecific"),
+                                SecondaryColorSpecific = ReaderOptionalString(reader, "SecondaryColorSpecific"),
                                 RegistrationStatus = reader["RegistrationStatus"] as string,
                                 RegistrationExpiration = reader["RegistrationExpiration"] as string,
                                 InsuranceStatus = reader["InsuranceStatus"] as string,
@@ -2028,11 +2032,13 @@ namespace MDTPro.Data {
                 INSERT OR REPLACE INTO vehicles (
                     LicensePlate, ModelName, ModelDisplayName, IsStolen, Owner, Color,
                     VehicleIdentificationNumber, VinStatus, Make, Model, PrimaryColor, SecondaryColor,
+                    PrimaryColorSpecific, SecondaryColorSpecific,
                     RegistrationStatus, RegistrationExpiration,
                     InsuranceStatus, InsuranceExpiration, BOLOs
                 ) VALUES (
                     @LicensePlate, @ModelName, @ModelDisplayName, @IsStolen, @Owner, @Color,
                     @VIN, @VinStatus, @Make, @Model, @PrimaryColor, @SecondaryColor,
+                    @PrimaryColorSpecific, @SecondaryColorSpecific,
                     @RegStatus, @RegExpiration, @InsStatus, @InsExpiration, @BOLOs
                 )", connection, transaction)) {
                 cmd.Parameters.AddWithValue("@LicensePlate", (object)vehicle.LicensePlate ?? DBNull.Value);
@@ -2047,6 +2053,8 @@ namespace MDTPro.Data {
                 cmd.Parameters.AddWithValue("@Model", (object)vehicle.Model ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@PrimaryColor", (object)vehicle.PrimaryColor ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@SecondaryColor", (object)vehicle.SecondaryColor ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@PrimaryColorSpecific", (object)vehicle.PrimaryColorSpecific ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@SecondaryColorSpecific", (object)vehicle.SecondaryColorSpecific ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@RegStatus", (object)vehicle.RegistrationStatus ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@RegExpiration", (object)vehicle.RegistrationExpiration ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@InsStatus", (object)vehicle.InsuranceStatus ?? DBNull.Value);
@@ -2672,20 +2680,27 @@ namespace MDTPro.Data {
                 var entries = new List<SearchHistoryEntry>();
 
                 using (var cmd = new SQLiteCommand(@"
-                    SELECT ResultName, Timestamp AS LastSearched
+                    SELECT ResultName, MAX(Timestamp) AS LastSearched, COUNT(*) AS SearchCount
                     FROM search_history
-                    WHERE SearchType = @type AND ResultName IS NOT NULL
-                    ORDER BY Timestamp DESC
+                    WHERE SearchType = @type AND ResultName IS NOT NULL AND TRIM(ResultName) <> ''
+                    GROUP BY ResultName COLLATE NOCASE
+                    ORDER BY LastSearched DESC
                     LIMIT @limit", connection)) {
                     cmd.Parameters.AddWithValue("@type", searchType);
                     cmd.Parameters.AddWithValue("@limit", limit);
 
                     using (var reader = cmd.ExecuteReader()) {
                         while (reader.Read()) {
+                            int cnt = 1;
+                            try {
+                                var sc = reader["SearchCount"];
+                                if (sc != null && sc != DBNull.Value)
+                                    cnt = Convert.ToInt32(sc);
+                            } catch { /* ignore */ }
                             entries.Add(new SearchHistoryEntry {
                                 ResultName = reader["ResultName"] as string,
                                 LastSearched = reader["LastSearched"] as string,
-                                SearchCount = 1
+                                SearchCount = cnt
                             });
                         }
                     }
