@@ -4,6 +4,28 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
+## [0.9.8.2] — 2026-03-30
+
+### Bug Fixes
+
+- **Vehicle Search — nearby plates** — The nearby-plates list updates when you open or refresh Vehicle Search, picks up plates more reliably, and recent searches no longer lists the same plate as separate entries over and over.
+
+- **Firearms Check (StopThePed)** — After a weapon or serial check in StopThePed, the MDT saves the correct serial instead of the wrong one or a blank. (Needs more testing)
+
+### Improvements
+
+- **Person Search** — Person records stay consistent when you identify or meet someone again; court outcomes (for example a revoked license or permit) still show correctly when they apply.
+
+- **Same person, another stop** — If you interact with the same pedestrian again (for example another StopThePed stop), permits and court-related status stay up to date instead of being skipped.
+
+- **Vehicle Search — seen before** — When you run into a vehicle you’ve looked up before, registration-style details refresh so the MDT matches what you see in-game.
+
+### Other
+
+- **Optional logging** — For troubleshooting missing nearby plates: **Customization → Config → Debugging** → vehicle search debug logging (or `vehicleSearchDebugLogging` in **config.json**) writes extra detail to **MDTPro.log**. Turn it off when you’re done.
+
+---
+
 ## [0.9.8.1] — 2026-03-29
 
 ### Bug Fixes

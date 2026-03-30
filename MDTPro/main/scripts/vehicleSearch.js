@@ -267,18 +267,35 @@ async function performSearch(query) {
         el.value = await getLanguageValue(response[key])
         if (response[key] === 'Scratched') el.style.color = 'var(--color-warning)'
         break
-      case 'Color':
-        if (!response[key]) {
+      case 'Color': {
+        const raw = response[key]
+        if (!raw) {
           el.parentElement.classList.add('hidden')
           break
         }
         el.parentElement.classList.remove('hidden')
-        const color = `rgb(${response[key].split('-')[0]}, ${
-          response[key].split('-')[1]
-        }, ${response[key].split('-')[2]})`
-        el.style.backgroundColor = color
-        el.style.height = '19px'
+        const parts = String(raw)
+          .split('-')
+          .map((s) => s.trim())
+        const rgbTriplet =
+          parts.length === 3 &&
+          parts.every((p) => /^\d{1,3}$/.test(p)) &&
+          parts.every((p) => {
+            const n = Number(p)
+            return n >= 0 && n <= 255
+          })
+        if (rgbTriplet) {
+          const [r, g, b] = parts
+          el.textContent = ''
+          el.style.backgroundColor = `rgb(${r}, ${g}, ${b})`
+          el.style.height = '19px'
+        } else {
+          el.style.backgroundColor = ''
+          el.style.height = ''
+          el.textContent = raw
+        }
         break
+      }
       case 'ModelDisplayName':
         el.parentElement.querySelector('img')?.remove()
         const imageEl = document.createElement('img')
