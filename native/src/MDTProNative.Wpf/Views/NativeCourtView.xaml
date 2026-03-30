@@ -1,0 +1,38 @@
+<UserControl x:Class="MDTProNative.Wpf.Views.NativeCourtView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel Margin="0,8,0,0">
+        <Border DockPanel.Dock="Top" Style="{StaticResource CadModuleChromeBorder}" Padding="10" Margin="0,0,0,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MinWidth="160" />
+                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="160" />
+                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="FilterBox"
+                         Grid.Column="0"
+                         Style="{StaticResource CadTextBoxCadField}"
+                         VerticalContentAlignment="Center"
+                         ToolTip="Filter by case number, defendant, or report ID" />
+                <ComboBox x:Name="StatusFilter"
+                          Grid.Column="2"
+                          Style="{StaticResource CadComboBox}" />
+                <Button x:Name="RefreshBtn"
+                        Grid.Column="4"
+                        Content="REFRESH DOCKET"
+                        Style="{StaticResource CadPrimaryActionButton}" />
+            </Grid>
+        </Border>
+        <TextBlock DockPanel.Dock="Top"
+                   TextWrapping="Wrap"
+                   Foreground="{StaticResource CadMuted}"
+                   FontSize="11"
+                   Margin="0,0,0,8"
+                   Text="Pending cases: expand a row to set plea and notes, apply a conviction/acquittal/dismissal, attach or detach evidence report IDs, or run auto-resolution. Synthetic supervision backstory rows stay read-only." />
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="CaseStack" />
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

@@ -13,7 +13,7 @@ using System.Web;
 namespace MDTPro.ServerAPI {
     internal class DataAPIResponse : APIResponse {
         internal DataAPIResponse(HttpListenerRequest req) : base(null) {
-            string path = req.Url.AbsolutePath.Substring("/data/".Length);
+            string path = req.Url.AbsolutePath.Substring("/data/".Length).TrimEnd('/');
             if (string.IsNullOrEmpty(path)) return;
             else if (path == "peds") {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.PedDatabase));
@@ -24,14 +24,11 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/json";
             } else if (path == "nearbyVehicles") {
-                string body = Helper.GetRequestPostData(req);
-                int limit = 5;
-                if (int.TryParse(body, out int parsedLimit)) {
-                    limit = parsedLimit;
-                }
+                int limit = Helper.ParsePostBodyAsPositiveInt(Helper.GetRequestPostData(req), 5);
                 if (limit < 1) limit = 1;
                 if (limit > 20) limit = 20;
 
+                DataController.PrepareNearbyVehiclesForHttpBlocking();
                 var cached = DataController.GetCachedNearbyVehicles(limit);
                 var nearbyVehicles = cached.Select(x => new {
                     x.LicensePlate,
@@ -44,8 +41,7 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/json";
             } else if (path == "specificPed") {
-                string body = Helper.GetRequestPostData(req);
-                string name = !string.IsNullOrEmpty(body) ? body.Trim() : "";
+                string name = Helper.GetRequestBodyAsString(req)?.Trim() ?? "";
                 string reversedName = string.Join(" ", name.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Reverse());
 
                 // Prefer context ped when it matches the search name (person in front of you just got ID)
@@ -104,6 +100,8 @@ namespace MDTPro.ServerAPI {
             } else if (path == "specificVehicle") {
                 string licensePlateOrVin = Helper.GetRequestBodyAsString(req);
                 if (!string.IsNullOrEmpty(licensePlateOrVin)) licensePlateOrVin = licensePlateOrVin.Trim();
+
+                DataController.PrepareVehicleLookupForHttpBlocking();
 
                 MDTProVehicleData vehicleData = null;
                 bool wantContextOnly = string.Equals(licensePlateOrVin, "context", StringComparison.OrdinalIgnoreCase)
@@ -213,7 +211,7 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/plain";
             } else if (path == "searchHistory") {
-                string body = Helper.GetRequestPostData(req);
+                string body = Helper.GetRequestBodyAsString(req)?.Trim() ?? "";
                 string type = !string.IsNullOrEmpty(body) ? body : "ped";
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(Database.LoadSearchHistory(type)));
                 status = 200;

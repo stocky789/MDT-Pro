@@ -1,8 +1,10 @@
 using MDTPro.Data;
 using MDTPro.Setup;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Rage;
 using System;
+using System.Globalization;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
@@ -143,9 +145,37 @@ namespace MDTPro.Utility {
             if (string.IsNullOrEmpty(body)) return "";
             body = body.Trim();
             if (body.Length >= 2 && body[0] == '"' && body[body.Length - 1] == '"') {
-                try { return JsonConvert.DeserializeObject<string>(body) ?? ""; } catch { }
+                try { return JsonConvert.DeserializeObject<string>(body) ?? ""; } catch {
+                    // Avoid searching for a literal "Name" including quote chars if JSON unescape fails.
+                    return body.Substring(1, body.Length - 2);
+                }
             }
             return body;
+        }
+
+        /// <summary>Parses POST body as a positive int: plain <c>10</c>, JSON number, or JSON string <c>"10"</c> (native MDT may send any of these).</summary>
+        internal static int ParsePostBodyAsPositiveInt(string body, int defaultValue) {
+            if (string.IsNullOrWhiteSpace(body)) return defaultValue;
+            string t = body.Trim();
+            if (int.TryParse(t, NumberStyles.Integer, CultureInfo.InvariantCulture, out int direct))
+                return direct;
+            if (t.Length >= 2 && t[0] == '"' && t[t.Length - 1] == '"') {
+                try {
+                    string inner = JsonConvert.DeserializeObject<string>(t)?.Trim();
+                    if (!string.IsNullOrEmpty(inner) && int.TryParse(inner, NumberStyles.Integer, CultureInfo.InvariantCulture, out int q))
+                        return q;
+                } catch { }
+            }
+            try {
+                var tok = JToken.Parse(t);
+                if (tok.Type == JTokenType.Integer) return tok.Value<int>();
+                if (tok.Type == JTokenType.String) {
+                    string s = tok.Value<string>()?.Trim();
+                    if (!string.IsNullOrEmpty(s) && int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out int sVal))
+                        return sVal;
+                }
+            } catch { }
+            return defaultValue;
         }
 
         internal static string GetAgencyNameFromScriptName(string scriptName) {

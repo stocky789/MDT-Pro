@@ -328,6 +328,38 @@ namespace MDTPro.Data {
             }
         }
 
+        private static void RunShortGameFiberBlocking(Action work, int timeoutMs, string fiberName) {
+            try {
+                var done = new ManualResetEventSlim(false);
+                GameFiber.StartNew(() => {
+                    try {
+                        work();
+                    } catch (Exception ex) {
+                        Helper.Log($"[{fiberName}] {ex.Message}", false, Helper.LogSeverity.Warning);
+                    } finally {
+                        try { done.Set(); } catch { }
+                    }
+                }, fiberName);
+                if (!done.Wait(timeoutMs))
+                    Helper.Log($"[{fiberName}] timed out after {timeoutMs}ms", false, Helper.LogSeverity.Warning);
+            } catch (Exception ex) {
+                Helper.Log($"RunShortGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        /// <summary>HTTP <c>/data/nearbyVehicles</c>: rescan world vehicles and rebuild distance cache on the game fiber so native/browser lists are not stuck on a stale 1s/10s tick.</summary>
+        internal static void PrepareNearbyVehiclesForHttpBlocking(int timeoutMs = 2000) {
+            RunShortGameFiberBlocking(() => {
+                PopulateVehicleDatabase();
+                UpdateCachedNearbyVehicles();
+            }, timeoutMs, "mdtpro-http-nearby");
+        }
+
+        /// <summary>HTTP <c>/data/specificVehicle</c>: rescan nearby world vehicles before lookup so plates not yet in <see cref="vehicleDatabase"/> (10s tick) still resolve.</summary>
+        internal static void PrepareVehicleLookupForHttpBlocking(int timeoutMs = 2000) {
+            RunShortGameFiberBlocking(() => PopulateVehicleDatabase(), timeoutMs, "mdtpro-http-veh-lookup");
+        }
+
         private static void UpdateCachedNearbyVehicles() {
             var list = new List<CachedNearbyVehicleEntry>();
             if (Main.Player != null && Main.Player.Exists()) {
@@ -548,25 +580,28 @@ namespace MDTPro.Data {
         internal static MDTProVehicleData GetVehicleByLicensePlate(string plate) {
             if (string.IsNullOrWhiteSpace(plate)) return null;
             string key = plate.Trim();
-            lock (_vehicleDbLock) {
-                var v = vehicleDatabase.FirstOrDefault(x => string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase));
-                if (v != null) return v;
-                return keepInVehicleDatabase.FirstOrDefault(x => string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase));
-            }
-        }
-
-        /// <summary>Look up vehicle by plate or VIN. Checks both vehicleDatabase and keepInVehicleDatabase.</summary>
-        internal static MDTProVehicleData GetVehicleByPlateOrVin(string plateOrVin) {
-            if (string.IsNullOrWhiteSpace(plateOrVin)) return null;
-            string key = plateOrVin.Trim();
+            string norm = NormalizeVehiclePlateKey(key);
             lock (_vehicleDbLock) {
                 var v = vehicleDatabase.FirstOrDefault(x =>
                     string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(x.VehicleIdentificationNumber, key, StringComparison.OrdinalIgnoreCase));
+                    || (!string.IsNullOrEmpty(norm) && !string.IsNullOrEmpty(x.LicensePlate) && NormalizeVehiclePlateKey(x.LicensePlate) == norm));
                 if (v != null) return v;
                 return keepInVehicleDatabase.FirstOrDefault(x =>
                     string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(x.VehicleIdentificationNumber, key, StringComparison.OrdinalIgnoreCase));
+                    || (!string.IsNullOrEmpty(norm) && !string.IsNullOrEmpty(x.LicensePlate) && NormalizeVehiclePlateKey(x.LicensePlate) == norm));
+            }
+        }
+
+        /// <summary>Look up vehicle by plate or VIN. Checks both vehicleDatabase and keepInVehicleDatabase. Plate matching ignores spaces/case; VIN ignores spaces and hyphens.</summary>
+        internal static MDTProVehicleData GetVehicleByPlateOrVin(string plateOrVin) {
+            if (string.IsNullOrWhiteSpace(plateOrVin)) return null;
+            string key = plateOrVin.Trim();
+            string normPlate = NormalizeVehiclePlateKey(key);
+            string normVin = NormalizeVinKey(key);
+            lock (_vehicleDbLock) {
+                var v = vehicleDatabase.FirstOrDefault(x => VehicleMatchesPlateOrVin(x, key, normPlate, normVin));
+                if (v != null) return v;
+                return keepInVehicleDatabase.FirstOrDefault(x => VehicleMatchesPlateOrVin(x, key, normPlate, normVin));
             }
         }
 
@@ -1732,6 +1767,29 @@ namespace MDTPro.Data {
         internal static string NormalizeVehiclePlateKey(string plate) {
             if (string.IsNullOrWhiteSpace(plate)) return "";
             return plate.Trim().Replace(" ", "").ToUpperInvariant();
+        }
+
+        /// <summary>Normalize VIN for lookup (ignore spaces and hyphens, case-insensitive).</summary>
+        internal static string NormalizeVinKey(string vin) {
+            if (string.IsNullOrWhiteSpace(vin)) return "";
+            return new string(vin.Trim().Where(ch => !char.IsWhiteSpace(ch) && ch != '-' && ch != '\u2013').ToArray()).ToUpperInvariant();
+        }
+
+        static bool VehicleMatchesPlateOrVin(MDTProVehicleData x, string rawKey, string normPlateKey, string normVinKey) {
+            if (x == null) return false;
+            if (!string.IsNullOrEmpty(rawKey)) {
+                if (!string.IsNullOrEmpty(x.LicensePlate) && string.Equals(x.LicensePlate, rawKey, StringComparison.OrdinalIgnoreCase))
+                    return true;
+                if (!string.IsNullOrEmpty(x.VehicleIdentificationNumber) && string.Equals(x.VehicleIdentificationNumber, rawKey, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            if (!string.IsNullOrEmpty(normPlateKey) && !string.IsNullOrEmpty(x.LicensePlate)
+                && NormalizeVehiclePlateKey(x.LicensePlate) == normPlateKey)
+                return true;
+            if (!string.IsNullOrEmpty(normVinKey) && !string.IsNullOrEmpty(x.VehicleIdentificationNumber)
+                && NormalizeVinKey(x.VehicleIdentificationNumber) == normVinKey)
+                return true;
+            return false;
         }
 
         /// <summary>StopThePed-only: copies registration/insurance expiration from CDF on the live vehicle, then overwrites <see cref="MDTProVehicleData.RegistrationStatus"/> / <see cref="MDTProVehicleData.InsuranceStatus"/> from <c>StopThePed.API.Functions.getVehicleRegistrationStatus</c> / <c>getVehicleInsuranceStatus</c> (STP’s own flags, not only CDF enums).</summary>

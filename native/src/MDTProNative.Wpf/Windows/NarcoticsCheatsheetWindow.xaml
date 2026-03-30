@@ -1,0 +1,19 @@
+<Window x:Class="MDTProNative.Wpf.Windows.NarcoticsCheatsheetWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Narcotics &amp; drugs — field reference"
+        Icon="{StaticResource MdtProLogoImage}"
+        Width="820" Height="720"
+        MinWidth="640" MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource CadBg}"
+        Foreground="{StaticResource CadText}">
+    <DockPanel Margin="14">
+        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="{StaticResource CadMuted}" FontSize="11" Margin="0,0,0,10"
+                   Text="RP reference aligned with the web MDT cheat sheet — not legal or medical advice." />
+        <Button DockPanel.Dock="Bottom" Content="Close" Style="{StaticResource CadButton}" HorizontalAlignment="Right" Click="Close_Click" Margin="0,10,0,0" MinWidth="88" />
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="BodyStack" />
+        </ScrollViewer>
+    </DockPanel>
+</Window>

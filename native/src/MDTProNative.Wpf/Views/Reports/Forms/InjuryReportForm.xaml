@@ -1,0 +1,124 @@
+<UserControl x:Class="MDTProNative.Wpf.Views.Reports.Forms.InjuryReportForm"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="0,0,12,12">
+            <TextBlock Text="GENERAL" Style="{StaticResource CadSectionTitle}" />
+            <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="140" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="REPORT ID" Style="{StaticResource CadFieldLabel}" Margin="0,0,8,6" />
+                <TextBox x:Name="GeneralIdBox" Grid.Row="0" Grid.Column="1" Style="{StaticResource CadTextBox}" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="SHORT YEAR" Style="{StaticResource CadFieldLabel}" Margin="0,0,8,6" />
+                <TextBox x:Name="GeneralShortYearBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource CadTextBox}" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="DATE" Style="{StaticResource CadFieldLabel}" Margin="0,0,8,6" />
+                <DatePicker x:Name="GeneralDatePicker" Grid.Row="2" Grid.Column="1" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="TIME" Style="{StaticResource CadFieldLabel}" Margin="0,0,8,6" />
+                <TextBox x:Name="GeneralTimeBox" Grid.Row="3" Grid.Column="1" Style="{StaticResource CadTextBox}" Margin="0,0,0,6"
+                         ToolTip="HH:mm or HH:mm:ss" />
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="STATUS" Style="{StaticResource CadFieldLabel}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                <ComboBox x:Name="StatusCombo" Grid.Row="4" Grid.Column="1" Style="{StaticResource CadComboBox}">
+                    <ComboBoxItem Content="Closed" />
+                    <ComboBoxItem Content="Open" />
+                    <ComboBoxItem Content="Canceled" />
+                    <ComboBoxItem Content="Pending" />
+                </ComboBox>
+            </Grid>
+            <TextBlock Text="NOTES" Style="{StaticResource CadFieldLabel}" />
+            <TextBox x:Name="NotesBox"
+                     Style="{StaticResource CadTextBoxCadField}"
+                     MinHeight="56"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto"
+                     Margin="0,4,0,10" />
+
+            <TextBlock Text="OFFICER" Style="{StaticResource CadSectionTitle}" />
+            <UniformGrid Columns="2" Margin="0,0,0,10">
+                <StackPanel Margin="0,0,8,6">
+                    <TextBlock Text="FIRST NAME" Style="{StaticResource CadFieldLabel}" />
+                    <TextBox x:Name="OffFirstBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
+                </StackPanel>
+                <StackPanel Margin="0,0,0,6">
+                    <TextBlock Text="LAST NAME" Style="{StaticResource CadFieldLabel}" />
+                    <TextBox x:Name="OffLastBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
+                </StackPanel>
+                <StackPanel Margin="0,0,8,6">
+                    <TextBlock Text="BADGE #" Style="{StaticResource CadFieldLabel}" />
+                    <TextBox x:Name="OffBadgeBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
+                </StackPanel>
+                <StackPanel Margin="0,0,0,6">
+                    <TextBlock Text="RANK" Style="{StaticResource CadFieldLabel}" />
+                    <TextBox x:Name="OffRankBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
+                </StackPanel>
+                <StackPanel Margin="0,0,8,6">
+                    <TextBlock Text="CALL SIGN" Style="{StaticResource CadFieldLabel}" />
+                    <TextBox x:Name="OffCallBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
+                </StackPanel>
+                <StackPanel Margin="0,0,0,6">
+                    <TextBlock Text="AGENCY" Style="{StaticResource CadFieldLabel}" />
+                    <TextBox x:Name="OffAgencyBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
+                </StackPanel>
+            </UniformGrid>
+
+            <TextBlock Text="LOCATION" Style="{StaticResource CadSectionTitle}" />
+            <UniformGrid Columns="2" Margin="0,0,0,10">
+                <StackPanel Margin="0,0,8,6">
+                    <TextBlock Text="AREA" Style="{StaticResource CadFieldLabel}" />
+                    <TextBox x:Name="LocAreaBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
+                </StackPanel>
+                <StackPanel Margin="0,0,0,6">
+                    <TextBlock Text="STREET" Style="{StaticResource CadFieldLabel}" />
+                    <TextBox x:Name="LocStreetBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
+                </StackPanel>
+                <StackPanel Margin="0,0,8,6">
+                    <TextBlock Text="COUNTY" Style="{StaticResource CadFieldLabel}" />
+                    <TextBox x:Name="LocCountyBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
+                </StackPanel>
+                <StackPanel Margin="0,0,0,6">
+                    <TextBlock Text="POSTAL" Style="{StaticResource CadFieldLabel}" />
+                    <TextBox x:Name="LocPostalBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,0" />
+                </StackPanel>
+            </UniformGrid>
+
+            <TextBlock Text="INJURY" Style="{StaticResource CadSectionTitle}" />
+            <TextBlock Text="INJURED PARTY" Style="{StaticResource CadFieldLabel}" />
+            <TextBox x:Name="InjuredPartyNameBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,8" />
+            <TextBlock Text="INJURY TYPE" Style="{StaticResource CadFieldLabel}" />
+            <TextBox x:Name="InjuryTypeBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,8" />
+            <TextBlock Text="SEVERITY" Style="{StaticResource CadFieldLabel}" />
+            <TextBox x:Name="SeverityBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,8" />
+            <TextBlock Text="TREATMENT" Style="{StaticResource CadFieldLabel}" />
+            <TextBox x:Name="TreatmentBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,8" />
+            <TextBlock Text="INCIDENT CONTEXT" Style="{StaticResource CadFieldLabel}" />
+            <TextBox x:Name="IncidentContextBox"
+                     Style="{StaticResource CadTextBoxCadField}"
+                     MinHeight="56"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     Margin="0,4,0,8" />
+            <TextBlock Text="LINKED REPORT ID" Style="{StaticResource CadFieldLabel}" />
+            <TextBox x:Name="LinkedReportIdBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,8" />
+            <TextBlock Text="GAME INJURY SNAPSHOT (optional JSON)" Style="{StaticResource CadFieldLabel}" />
+            <TextBox x:Name="GameInjurySnapshotBox"
+                     Style="{StaticResource CadTextBoxCadField}"
+                     MinHeight="100"
+                     AcceptsReturn="True"
+                     AcceptsTab="True"
+                     TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto"
+                     FontFamily="{StaticResource CadFontMono}"
+                     FontSize="11"
+                     Margin="0,4,0,0" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

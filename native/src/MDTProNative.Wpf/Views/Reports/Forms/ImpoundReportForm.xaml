@@ -1,0 +1,111 @@
+<UserControl x:Class="MDTProNative.Wpf.Views.Reports.Forms.ImpoundReportForm"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,8,0">
+        <StackPanel>
+            <TextBlock Text="BASE REPORT" Style="{StaticResource CadSectionTitle}" />
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Id" />
+                <TextBox x:Name="IdBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="ShortYear" />
+                <TextBox x:Name="ShortYearBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="TimeStamp" />
+                <TextBox x:Name="TimeStampBox" Style="{StaticResource CadTextBoxCadField}"
+                         ToolTip="ISO or local date/time (e.g. 2026-03-29T14:30:00)" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Status" />
+                <ComboBox x:Name="StatusCombo" Style="{StaticResource CadComboBox}" />
+            </DockPanel>
+            <TextBlock Text="Notes" Style="{StaticResource CadFieldLabel}" Margin="0,4,0,2" />
+            <TextBox x:Name="NotesBox"
+                     MinHeight="56"
+                     AcceptsReturn="True"
+                     Style="{StaticResource CadTextBoxCadField}"
+                     TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto" />
+
+            <TextBlock Text="OFFICER (officerInformation shape)" Style="{StaticResource CadSectionTitle}" Margin="0,14,0,0" />
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="firstName" />
+                <TextBox x:Name="OfficerFirstBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="lastName" />
+                <TextBox x:Name="OfficerLastBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="rank" />
+                <TextBox x:Name="OfficerRankBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="callSign" />
+                <TextBox x:Name="OfficerCallSignBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="agency" />
+                <TextBox x:Name="OfficerAgencyBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="badgeNumber" />
+                <TextBox x:Name="OfficerBadgeBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+
+            <TextBlock Text="LOCATION" Style="{StaticResource CadSectionTitle}" Margin="0,14,0,0" />
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Area" />
+                <TextBox x:Name="LocAreaBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Street" />
+                <TextBox x:Name="LocStreetBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="County" />
+                <TextBox x:Name="LocCountyBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Postal" />
+                <TextBox x:Name="LocPostalBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+
+            <TextBlock Text="IMPOUND" Style="{StaticResource CadSectionTitle}" Margin="0,14,0,0" />
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="LicensePlate" />
+                <TextBox x:Name="LicensePlateBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="VehicleModel" />
+                <TextBox x:Name="VehicleModelBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Owner" />
+                <TextBox x:Name="OwnerBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="PersonAtFaultName" />
+                <TextBox x:Name="PersonAtFaultNameBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="Vin" />
+                <TextBox x:Name="VinBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="ImpoundReason" />
+                <TextBox x:Name="ImpoundReasonBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="TowCompany" />
+                <TextBox x:Name="TowCompanyBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+            <DockPanel Margin="0,0,0,4">
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="ImpoundLot" />
+                <TextBox x:Name="ImpoundLotBox" Style="{StaticResource CadTextBoxCadField}" />
+            </DockPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

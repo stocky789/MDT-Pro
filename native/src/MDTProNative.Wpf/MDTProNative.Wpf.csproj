@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\MDTProNative.Client\MDTProNative.Client.csproj" />
@@ -16,5 +16,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="..\..\..\MDTPro\img\favicon.png">
+      <Link>Assets\MdtProLogo.png</Link>
+    </Resource>
+  </ItemGroup>
 
 </Project>

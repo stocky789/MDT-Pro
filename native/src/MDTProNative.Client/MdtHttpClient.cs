@@ -29,6 +29,21 @@ public sealed class MdtHttpClient : IDisposable
         return await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<string?> GetVersionPlainAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _http.GetAsync("version", cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) return null;
+        return (await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false)).Trim();
+    }
+
+    public async Task<JObject?> GetIntegrationJsonAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _http.GetAsync("integration", cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) return null;
+        var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        return string.IsNullOrWhiteSpace(text) ? null : JObject.Parse(text);
+    }
+
     public async Task<JObject?> GetConfigJsonAsync(CancellationToken cancellationToken = default)
     {
         using var response = await _http.GetAsync("config", cancellationToken).ConfigureAwait(false);
@@ -37,11 +52,25 @@ public sealed class MdtHttpClient : IDisposable
         return string.IsNullOrWhiteSpace(text) ? null : JObject.Parse(text);
     }
 
+    public async Task<JObject?> GetLanguageJsonAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _http.GetAsync("language", cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) return null;
+        var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        return string.IsNullOrWhiteSpace(text) ? null : JObject.Parse(text);
+    }
+
     public async Task<JToken?> GetDataJsonAsync(string dataPath, CancellationToken cancellationToken = default)
     {
-        using var response = await _http.GetAsync("data/" + dataPath.TrimStart('/'), cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        var rel = "data/" + dataPath.TrimStart('/');
+        using var response = await _http.GetAsync(rel, cancellationToken).ConfigureAwait(false);
         var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            var snippet = text.Length > 240 ? text[..240] + "…" : text;
+            throw new HttpRequestException($"GET {rel} failed: HTTP {(int)response.StatusCode}. {snippet}");
+        }
+
         return string.IsNullOrWhiteSpace(text) ? null : JToken.Parse(text);
     }
 

@@ -4,13 +4,15 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
+## [0.9.9.0] — 2026-03-29
+
 ## Native Windows client (`native/` folder)
 
-Optional **WPF** companion app (not bundled in the LSPDFR OIV). Uses the same `http://host:port/` and `ws://host:port/ws` endpoints as the browser MDT; the web UI remains the full-featured in-game surface.
+Optional **WPF** companion app (not bundled in the LSPDFR OIV). Uses the same `http://host:port/` and `ws://host:port/ws` endpoints as the browser MDT. **Reports** are edited only in **native** structured forms plus a JSON tab (same `/post/create*Report` contracts as the web UI — no embedded reports WebView).
 
 ### Added — 2026-03-29
 
-- **Shell**: CAD-style navigation — Dashboard (callouts, set GPS waypoint), Person search, Vehicle search (incl. nearby), Firearms, BOLO (add/remove, optional auto-refresh), **Reports** tabs (incident, citation, arrest, impound, traffic, injury, property/evidence), Shift/Court, **Map** (WebView2 hosting `page/map.html`), Officer profile (load/save via `officerInformationData`).
+- **Shell**: CAD-style navigation — Dashboard (callouts, set GPS waypoint), Person search, Vehicle search (incl. nearby), Firearms, BOLO (add/remove, optional auto-refresh), **Reports** (native FORM + JSON for all types, same save APIs as web), Shift/Court, **Map** (native tactical position readout), Officer profile (load/save via `officerInformationData`).
 - **Client library**: `MdtHttpClient` POST helpers for `/data/*` and `/post/*`; `MdtConnectionManager` centralizes WebSocket streams.
 
 ---

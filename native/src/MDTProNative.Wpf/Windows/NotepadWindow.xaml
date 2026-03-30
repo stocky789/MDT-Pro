@@ -1,0 +1,26 @@
+<Window x:Class="MDTProNative.Wpf.Windows.NotepadWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Notepad"
+        Icon="{StaticResource MdtProLogoImage}"
+        Width="520" Height="440"
+        MinWidth="400" MinHeight="320"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource CadBg}"
+        Foreground="{StaticResource CadText}">
+    <DockPanel Margin="14">
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+            <TextBlock DockPanel.Dock="Left" Text="NOTEPAD" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" />
+            <Button DockPanel.Dock="Right" Content="✕" Width="36" Padding="0" Click="Close_Click"
+                    Style="{StaticResource CadButton}" ToolTip="Close" />
+        </DockPanel>
+        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="{StaticResource CadMuted}" FontSize="12" Margin="0,0,0,8"
+                   Text="Notes are stored on this PC only (LocalApplicationData\MDTProNative), not on the game machine unless you use the same profile." />
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="Save" Style="{StaticResource CadAccentButton}" Click="Save_Click" Margin="0,0,8,0" MinWidth="88" />
+            <Button Content="Close" Style="{StaticResource CadButton}" Click="Close_Click" MinWidth="88" />
+        </StackPanel>
+        <TextBox x:Name="NotesBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                 Style="{StaticResource CadTextBox}" FontFamily="Consolas" FontSize="13" />
+    </DockPanel>
+</Window>

@@ -7,21 +7,24 @@
             <ColumnDefinition Width="8" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
-        <Border Grid.Column="0" Background="{StaticResource CadPanel}" BorderBrush="{StaticResource CadBorder}" BorderThickness="1" CornerRadius="2" Padding="8">
+        <Border Grid.Column="0" Style="{StaticResource CadSectionBorder}" Padding="10">
             <DockPanel LastChildFill="True">
-                <TextBlock DockPanel.Dock="Top" Text="ACTIVE CALLOUTS" FontWeight="SemiBold" Margin="0,0,0,8" FontSize="11" Foreground="{StaticResource CadMuted}" />
+                <TextBlock DockPanel.Dock="Top" Text="ACTIVE CALLOUTS" Style="{StaticResource CadSectionTitle}" Margin="0,0,0,8" />
                 <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-                    <Button Content="Set GPS waypoint" Style="{StaticResource CadAccentButton}" Click="SetWaypoint_Click" Margin="0,0,0,6" />
-                    <TextBlock Text="Uses active callout coords or last known (plugin)." Style="{StaticResource CadLabelMuted}" TextWrapping="Wrap" FontSize="11" />
+                    <Button Content="SET GPS WAYPOINT" Style="{StaticResource CadAccentButton}" Click="SetWaypoint_Click" Margin="0,0,0,6" />
+                    <TextBlock Text="Uses selected callout coordinates when the plugin provides them; otherwise the default in-game target."
+                               Style="{StaticResource CadLabelMuted}" TextWrapping="Wrap" FontSize="11" />
                 </StackPanel>
-                <ListBox x:Name="CalloutList" Style="{StaticResource CadListBox}" FontFamily="Consolas" FontSize="12" SelectionChanged="CalloutList_OnSelectionChanged" />
+                <ListBox x:Name="CalloutList" Style="{StaticResource CadListBox}" FontFamily="{StaticResource CadFontMono}" FontSize="12" SelectionChanged="CalloutList_OnSelectionChanged" />
             </DockPanel>
         </Border>
-        <Border Grid.Column="2" Background="{StaticResource CadPanel}" BorderBrush="{StaticResource CadBorder}" BorderThickness="1" CornerRadius="2" Padding="10">
+        <Border Grid.Column="2" Style="{StaticResource CadSectionBorder}" Padding="10">
             <DockPanel LastChildFill="True">
-                <TextBlock DockPanel.Dock="Top" Text="DETAIL" FontWeight="SemiBold" Margin="0,0,0,8" FontSize="11" Foreground="{StaticResource CadMuted}" />
+                <TextBlock DockPanel.Dock="Top" Text="CALLOUT DETAIL" Style="{StaticResource CadSectionTitle}" Margin="0,0,0,8" />
+                <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="{StaticResource CadMuted}" FontSize="11" Margin="0,0,0,8"
+                           Text="Native readout of the selected callout payload. Accept / en route and other callout-interface actions remain in-game (no programmatic API)." />
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <TextBlock x:Name="DetailText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" Foreground="{StaticResource CadText}" />
+                    <TextBlock x:Name="DetailText" TextWrapping="Wrap" FontFamily="{StaticResource CadFontMono}" FontSize="12" Foreground="{StaticResource CadText}" />
                 </ScrollViewer>
             </DockPanel>
         </Border>
