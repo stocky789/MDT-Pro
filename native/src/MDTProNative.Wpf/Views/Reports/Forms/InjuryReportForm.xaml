@@ -108,16 +108,18 @@
                      Margin="0,4,0,8" />
             <TextBlock Text="LINKED REPORT ID" Style="{StaticResource CadFieldLabel}" />
             <TextBox x:Name="LinkedReportIdBox" Style="{StaticResource CadTextBox}" Margin="0,4,0,8" />
-            <TextBlock Text="GAME INJURY SNAPSHOT (optional JSON)" Style="{StaticResource CadFieldLabel}" />
+            <TextBlock Text="ATTACHED INJURY / TELEMETRY NOTES (optional)" Style="{StaticResource CadFieldLabel}" TextWrapping="Wrap" />
+            <TextBlock TextWrapping="Wrap"
+                       Foreground="{StaticResource CadMuted}"
+                       FontSize="11"
+                       Margin="0,0,0,4"
+                       Text="Free text or structured notes captured from the game injury workflow, if any." />
             <TextBox x:Name="GameInjurySnapshotBox"
                      Style="{StaticResource CadTextBoxCadField}"
                      MinHeight="100"
                      AcceptsReturn="True"
-                     AcceptsTab="True"
                      TextWrapping="Wrap"
                      VerticalScrollBarVisibility="Auto"
-                     FontFamily="{StaticResource CadFontMono}"
-                     FontSize="11"
                      Margin="0,4,0,0" />
         </StackPanel>
     </ScrollViewer>

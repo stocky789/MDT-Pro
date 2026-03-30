@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using Newtonsoft.Json.Linq;
 
@@ -26,6 +27,77 @@ public static class JTokenDisplay
         if (token == null || token.Type == JTokenType.Null) return "";
         if (token is JObject o) return FormatObject(o);
         return FormatScalar((JValue)token);
+    }
+
+    /// <summary>Callout payload formatted as MDC-style lines (not raw property dumps).</summary>
+    public static string FormatCalloutDetail(JObject? co)
+    {
+        if (co == null) return "";
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var lines = new List<string>();
+
+        void AddLine(string label, JToken? tok)
+        {
+            if (tok == null || tok.Type == JTokenType.Null) return;
+            var text = tok is JObject jo && LooksLikeLocation(jo) ? FormatObject(jo) : ForDataCell(tok);
+            if (string.IsNullOrWhiteSpace(text)) return;
+            lines.Add($"{label}: {text}");
+        }
+
+        AddLine("CALL", co["Name"] ?? co["name"]);
+        used.Add("Name");
+        used.Add("name");
+        var locTok = co["Location"] ?? co["location"];
+        if (locTok != null)
+        {
+            AddLine("LOCATION", locTok);
+            used.Add("Location");
+            used.Add("location");
+        }
+
+        var coords = co["Coords"] as JArray ?? co["coords"] as JArray;
+        if (coords != null && coords.Count >= 2 && coords[0].Type != JTokenType.Null && coords[1].Type != JTokenType.Null)
+        {
+            lines.Add($"GRID REF: {ForDataCell(coords[0])}, {ForDataCell(coords[1])}");
+            used.Add("Coords");
+            used.Add("coords");
+        }
+
+        foreach (var key in new[] { "Status", "status", "Priority", "priority", "Code", "code", "Agency", "agency", "Unit", "unit" })
+        {
+            var t = co[key];
+            if (t == null || t.Type == JTokenType.Null) continue;
+            AddLine(key.ToUpperInvariant(), t);
+            used.Add(key);
+        }
+
+        foreach (var key in new[] { "Description", "description", "Narrative", "narrative", "Details", "details", "Summary", "summary", "Message", "message" })
+        {
+            var t = co[key];
+            if (t == null || t.Type == JTokenType.Null) continue;
+            AddLine("NARRATIVE", t);
+            used.Add(key);
+            break;
+        }
+
+        foreach (var p in co.Properties())
+        {
+            if (used.Contains(p.Name)) continue;
+            if (p.Value.Type == JTokenType.Null) continue;
+            var label = HumanizeKey(p.Name);
+            var text = FormatPropertyValue(p.Value);
+            if (string.IsNullOrWhiteSpace(text)) continue;
+            lines.Add($"{label}: {text}");
+        }
+
+        return lines.Count == 0 ? "—" : string.Join(Environment.NewLine, lines);
+    }
+
+    static string HumanizeKey(string key)
+    {
+        if (string.IsNullOrEmpty(key)) return key;
+        var withSpaces = string.Concat(key.Select((c, i) => i > 0 && char.IsUpper(c) ? " " + c : c.ToString()));
+        return withSpaces.ToUpperInvariant();
     }
 
     /// <summary>Multi-line key/value block for search results, callout detail, etc.</summary>

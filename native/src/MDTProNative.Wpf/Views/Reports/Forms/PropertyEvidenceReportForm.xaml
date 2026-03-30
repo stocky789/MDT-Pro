@@ -97,28 +97,35 @@
                      MinHeight="72"
                      AcceptsReturn="True"
                      TextWrapping="Wrap"
-                     FontFamily="{StaticResource CadFontMono}"
-                     FontSize="11"
                      Margin="0,4,0,8" />
-            <TextBlock Text="SEIZED DRUGS (JSON array of {&quot;DrugType&quot;,&quot;Quantity&quot;})" Style="{StaticResource CadFieldLabel}" TextWrapping="Wrap" />
-            <TextBox x:Name="SeizedDrugsJsonBox"
-                     Style="{StaticResource CadTextBoxCadField}"
-                     MinHeight="120"
-                     AcceptsReturn="True"
-                     AcceptsTab="True"
-                     TextWrapping="Wrap"
-                     VerticalScrollBarVisibility="Auto"
-                     FontFamily="{StaticResource CadFontMono}"
-                     FontSize="11"
-                     Margin="0,4,0,8" />
-            <TextBlock Text="SEIZED FIREARM TYPES (one per line)" Style="{StaticResource CadFieldLabel}" />
+            <TextBlock Text="SEIZED CONTROLLED SUBSTANCES" Style="{StaticResource CadSectionTitle}" Margin="0,8,0,4" />
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <Button x:Name="AddDrugRowBtn" Content="ADD ROW" Style="{StaticResource CadButton}" Padding="12,4" />
+                <Button x:Name="RemoveDrugRowBtn" Content="REMOVE SELECTED" Style="{StaticResource CadRailOutlineButton}" Margin="8,0,0,0" Padding="12,4" />
+            </StackPanel>
+            <DataGrid x:Name="SeizedDrugsGrid"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      HeadersVisibility="Column"
+                      SelectionMode="Single"
+                      MinHeight="100"
+                      MaxHeight="200"
+                      Background="{StaticResource CadPanel}"
+                      Foreground="{StaticResource CadText}"
+                      BorderBrush="{StaticResource CadBorder}"
+                      GridLinesVisibility="Horizontal"
+                      RowHeight="28">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="SUBSTANCE TYPE" Binding="{Binding DrugType, UpdateSourceTrigger=PropertyChanged}" Width="2*" />
+                    <DataGridTextColumn Header="QTY / UNIT" Binding="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}" Width="*" />
+                </DataGrid.Columns>
+            </DataGrid>
+            <TextBlock Text="SEIZED FIREARM TYPES (one per line)" Style="{StaticResource CadFieldLabel}" Margin="0,12,0,0" />
             <TextBox x:Name="SeizedFirearmTypesBox"
                      Style="{StaticResource CadTextBoxCadField}"
                      MinHeight="72"
                      AcceptsReturn="True"
                      TextWrapping="Wrap"
-                     FontFamily="{StaticResource CadFontMono}"
-                     FontSize="11"
                      Margin="0,4,0,8" />
             <TextBlock Text="OTHER CONTRABAND NOTES" Style="{StaticResource CadFieldLabel}" />
             <TextBox x:Name="OtherContrabandNotesBox"

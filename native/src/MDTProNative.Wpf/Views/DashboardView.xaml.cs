@@ -67,7 +67,7 @@ public partial class DashboardView : UserControl, IMdtBoundView
         var i = CalloutList.SelectedIndex;
         if (i < 0 || i >= _lastCallouts.Count) return;
         var sel = _lastCallouts[i];
-        DetailText.Text = sel is JObject jo ? JTokenDisplay.FormatDocument(jo) : JTokenDisplay.ForDataCell(sel);
+        DetailText.Text = sel is JObject jo ? JTokenDisplay.FormatCalloutDetail(jo) : JTokenDisplay.ForDataCell(sel);
     }
 
     async void SetWaypoint_Click(object sender, RoutedEventArgs e)

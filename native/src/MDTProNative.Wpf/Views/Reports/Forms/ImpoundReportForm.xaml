@@ -29,29 +29,29 @@
                      TextWrapping="Wrap"
                      VerticalScrollBarVisibility="Auto" />
 
-            <TextBlock Text="OFFICER (officerInformation shape)" Style="{StaticResource CadSectionTitle}" Margin="0,14,0,0" />
+            <TextBlock Text="OFFICER INFORMATION" Style="{StaticResource CadSectionTitle}" Margin="0,14,0,0" />
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="firstName" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="FIRST NAME" />
                 <TextBox x:Name="OfficerFirstBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="lastName" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="LAST NAME" />
                 <TextBox x:Name="OfficerLastBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="rank" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="RANK" />
                 <TextBox x:Name="OfficerRankBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="callSign" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="CALL SIGN" />
                 <TextBox x:Name="OfficerCallSignBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="agency" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="AGENCY" />
                 <TextBox x:Name="OfficerAgencyBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="badgeNumber" />
+                <TextBlock DockPanel.Dock="Left" Width="168" Style="{StaticResource CadFieldLabel}" Text="BADGE #" />
                 <TextBox x:Name="OfficerBadgeBox" Style="{StaticResource CadTextBoxCadField}" />
             </DockPanel>
 

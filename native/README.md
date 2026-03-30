@@ -1,6 +1,6 @@
 # MDT Pro — Native desktop client (WPF)
 
-This folder is a **separate .NET solution** that implements a **native Windows** shell for the same MDT Pro plugin endpoints used by the **browser MDT**. **Reports** are **native WPF** only (structured FORM + JSON editors per type, same `/post` save routes as the web UI). **WebView2** is used only where explicitly listed below (e.g. settings customization), not for reports.
+This folder is a **separate .NET solution** that implements a **native Windows** shell for the same MDT Pro plugin endpoints used by the **browser MDT**. **Reports** are **native WPF** structured forms only (same `/post` save routes as the web UI). **WebView2** is used only where explicitly listed below (e.g. settings customization), not for reports.
 
 ## Requirements
 
@@ -25,7 +25,7 @@ dotnet run --project src/MDTProNative.Wpf -c Release
 
 | Area | Native behavior |
 |------|-----------------|
-| Reports | Native FORM + JSON per report type; same `/post` create/save APIs as the web MDT (no WebView). |
+| Reports | Native structured forms per report type; same `/post` create/save APIs as the web MDT (no WebView). |
 | Shift history | Native list + **Court** native docket (`Shift/Court` tab). |
 | Court (cases, resolve, attach reports) | Native `NativeCourtView` (pending-case actions). |
 | Person / vehicle / firearms / BOLO | Native WPF views (same `/data` + `/post` as web). |

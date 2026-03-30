@@ -97,8 +97,6 @@
                      MinHeight="64"
                      AcceptsReturn="True"
                      TextWrapping="Wrap"
-                     FontFamily="{StaticResource CadFontMono}"
-                     FontSize="11"
                      Margin="0,4,0,8" />
             <TextBlock Text="PASSENGERS (one per line)" Style="{StaticResource CadFieldLabel}" />
             <TextBox x:Name="PassengerNamesBox"
@@ -106,8 +104,6 @@
                      MinHeight="64"
                      AcceptsReturn="True"
                      TextWrapping="Wrap"
-                     FontFamily="{StaticResource CadFontMono}"
-                     FontSize="11"
                      Margin="0,4,0,8" />
             <TextBlock Text="PEDESTRIANS (one per line)" Style="{StaticResource CadFieldLabel}" />
             <TextBox x:Name="PedestrianNamesBox"
@@ -115,8 +111,6 @@
                      MinHeight="64"
                      AcceptsReturn="True"
                      TextWrapping="Wrap"
-                     FontFamily="{StaticResource CadFontMono}"
-                     FontSize="11"
                      Margin="0,4,0,8" />
             <TextBlock Text="VEHICLE PLATES (one per line)" Style="{StaticResource CadFieldLabel}" />
             <TextBox x:Name="VehiclePlatesBox"
@@ -124,8 +118,6 @@
                      MinHeight="64"
                      AcceptsReturn="True"
                      TextWrapping="Wrap"
-                     FontFamily="{StaticResource CadFontMono}"
-                     FontSize="11"
                      Margin="0,4,0,8" />
             <TextBlock Text="VEHICLE MODELS (one per line)" Style="{StaticResource CadFieldLabel}" />
             <TextBox x:Name="VehicleModelsBox"
@@ -133,8 +125,6 @@
                      MinHeight="64"
                      AcceptsReturn="True"
                      TextWrapping="Wrap"
-                     FontFamily="{StaticResource CadFontMono}"
-                     FontSize="11"
                      Margin="0,4,0,8" />
             <CheckBox x:Name="InjuryReportedCheck" Content="Injury reported" Margin="0,0,0,8" />
             <TextBlock Text="INJURY DETAILS" Style="{StaticResource CadFieldLabel}" />

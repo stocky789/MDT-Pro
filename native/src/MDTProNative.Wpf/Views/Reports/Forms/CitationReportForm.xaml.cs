@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows.Controls;
 using MDTProNative.Wpf.Services;
@@ -11,10 +12,18 @@ public partial class CitationReportForm : UserControl, IReportFormPane
 {
     JObject? _source;
     MdtConnectionManager? _connection;
+    readonly ObservableCollection<CitationChargeRow> _charges = new();
 
     public CitationReportForm()
     {
         InitializeComponent();
+        ChargesGrid.ItemsSource = _charges;
+        AddChargeBtn.Click += (_, _) => _charges.Add(new CitationChargeRow { AddedByReportInEdit = true });
+        RemoveChargeBtn.Click += (_, _) =>
+        {
+            if (ChargesGrid.SelectedItem is CitationChargeRow r)
+                _charges.Remove(r);
+        };
         StatusCombo.ItemsSource = new[]
         {
             "Closed (0)",
@@ -64,14 +73,16 @@ public partial class CitationReportForm : UserControl, IReportFormPane
         OffenderPlateBox.Text = report["OffenderVehicleLicensePlate"]?.ToString() ?? "";
         var cc = report["CourtCaseNumber"];
         CourtCaseBox.Text = cc == null || cc.Type == JTokenType.Null ? "" : cc.ToString();
-        ChargesBox.Text = ReportFormJson.ChargesToEditorText(report["Charges"]);
+        _charges.Clear();
+        foreach (var row in CitationChargeRow.CollectionFromCharges(report["Charges"]))
+            _charges.Add(row);
     }
 
     public JObject BuildReport()
     {
         var statusIdx = StatusCombo.SelectedIndex is >= 0 and <= 3 ? StatusCombo.SelectedIndex : 1;
         var combined = ReportFormJson.CombineDateAndTime(TsDatePicker.SelectedDate, TsTimeBox.Text);
-        var charges = ReportFormJson.ParseChargesMultiline(ChargesBox.Text);
+        var charges = CitationChargeRow.ToJArray(_charges);
 
         return ReportFormJson.MergeOverlay(_source, o =>
         {
@@ -106,6 +117,6 @@ public partial class CitationReportForm : UserControl, IReportFormPane
         OfFirstBox.Text = OfLastBox.Text = OfRankBox.Text = OfCallBox.Text = OfAgencyBox.Text = OfBadgeBox.Text = "";
         LocAreaBox.Text = LocStreetBox.Text = LocCountyBox.Text = LocPostalBox.Text = "";
         OffenderPedBox.Text = OffenderPlateBox.Text = CourtCaseBox.Text = "";
-        ChargesBox.Text = "";
+        _charges.Clear();
     }
 }

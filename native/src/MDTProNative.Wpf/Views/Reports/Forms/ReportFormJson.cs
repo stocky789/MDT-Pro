@@ -111,28 +111,6 @@ internal static class ReportFormJson
         return ja;
     }
 
-    public static JArray ParseChargesMultiline(string? text)
-    {
-        if (string.IsNullOrWhiteSpace(text)) return new JArray();
-        try
-        {
-            var tok = JToken.Parse(text.Trim());
-            if (tok is JArray a) return (JArray)a.DeepClone();
-            if (tok is JObject one) return new JArray(one);
-            return new JArray();
-        }
-        catch
-        {
-            return new JArray();
-        }
-    }
-
-    public static string ChargesToEditorText(JToken? t)
-    {
-        if (t is not JArray arr || arr.Count == 0) return "";
-        return arr.ToString(Newtonsoft.Json.Formatting.Indented);
-    }
-
     public static DateTime CombineDateAndTime(DateTime? datePart, string? timeText)
     {
         var d = (datePart ?? DateTime.Today).Date;
