@@ -20,10 +20,6 @@ All notable changes to MDT Pro are documented here.
 
 - **Vehicle Search — seen before** — When you run into a vehicle you’ve looked up before, registration-style details refresh so the MDT matches what you see in-game.
 
-### Other
-
-- **Optional logging** — For troubleshooting missing nearby plates: **Customization → Config → Debugging** → vehicle search debug logging (or `vehicleSearchDebugLogging` in **config.json**) writes extra detail to **MDTPro.log**. Turn it off when you’re done.
-
 ---
 
 ## [0.9.8.1] — 2026-03-29

@@ -312,23 +312,18 @@ namespace MDTPro.Data {
         internal static void SetDynamicData() {
             UpdatePlayerLocation();
             CurrentTime = World.TimeOfDay.ToString();
-            UpdateCachedNearbyVehicles(fullWorldScan: false, reason: "tick_SetDynamicData");
+            UpdateCachedNearbyVehicles(fullWorldScan: false);
         }
 
         /// <summary>HTTP runs on the pool; refresh nearby-vehicle cache on the game fiber before Vehicle Search reads it (same idea as <see cref="RefreshMdtLocationOnGameFiberBlocking"/>).</summary>
         internal static void RefreshCachedNearbyVehiclesOnGameFiberBlocking(int timeoutMs = 2000) {
-            bool dbg = false;
-            try { dbg = SetupController.GetConfig().vehicleSearchDebugLogging; } catch { /* ignore */ }
-            var sw = dbg ? System.Diagnostics.Stopwatch.StartNew() : null;
-            if (dbg) Helper.LogVehicleSearchVerbose($"RefreshCachedNearbyVehiclesOnGameFiberBlocking: starting (timeoutMs={timeoutMs})");
             try {
                 var done = new ManualResetEventSlim(false);
                 GameFiber.StartNew(() => {
                     try {
-                        UpdateCachedNearbyVehicles(fullWorldScan: true, reason: "http_nearbyVehicles");
+                        UpdateCachedNearbyVehicles(fullWorldScan: true);
                     } catch (Exception ex) {
                         Helper.Log($"RefreshCachedNearbyVehiclesOnGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
-                        if (dbg) Helper.LogVehicleSearchVerbose($"RefreshCachedNearbyVehiclesOnGameFiberBlocking: game fiber exception: {ex.Message}");
                     } finally {
                         try { done.Set(); } catch { /* ignore */ }
                     }
@@ -336,15 +331,8 @@ namespace MDTPro.Data {
                 bool ok = done.Wait(timeoutMs);
                 if (!ok)
                     Helper.Log("RefreshCachedNearbyVehiclesOnGameFiberBlocking: timed out (game paused or overloaded).", false, Helper.LogSeverity.Warning);
-                if (dbg) {
-                    sw.Stop();
-                    int n = 0;
-                    lock (_cachedNearbyLock) { n = CachedNearbyVehicles?.Count ?? 0; }
-                    Helper.LogVehicleSearchVerbose($"RefreshCachedNearbyVehiclesOnGameFiberBlocking: done waitOk={ok} elapsedMs={sw.ElapsedMilliseconds} cachedListCount={n}");
-                }
             } catch (Exception ex) {
                 Helper.Log($"RefreshCachedNearbyVehiclesOnGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
-                if (dbg) Helper.LogVehicleSearchVerbose($"RefreshCachedNearbyVehiclesOnGameFiberBlocking: outer exception: {ex.Message}");
             }
         }
 
@@ -364,24 +352,20 @@ namespace MDTPro.Data {
         internal static MDTProVehicleData TryResolveVehicleFromLiveWorldByPlateOrVinBlocking(string plateOrVin, int timeoutMs = 2000) {
             if (string.IsNullOrWhiteSpace(plateOrVin)) return null;
             MDTProVehicleData found = null;
-            bool dbg = false;
-            try { dbg = SetupController.GetConfig().vehicleSearchDebugLogging; } catch { /* ignore */ }
             try {
                 var done = new ManualResetEventSlim(false);
                 string q = plateOrVin.Trim();
                 GameFiber.StartNew(() => {
                     try {
-                        found = TryFindLiveWorldVehicleDataForPlateOrVin(q, dbg);
+                        found = TryFindLiveWorldVehicleDataForPlateOrVin(q);
                     } catch (Exception ex) {
                         Helper.Log($"TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
                     } finally {
                         try { done.Set(); } catch { /* ignore */ }
                     }
                 }, "mdtpro-specific-veh-resolve");
-                if (!done.Wait(timeoutMs)) {
+                if (!done.Wait(timeoutMs))
                     Helper.Log("TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: timed out (game paused or overloaded).", false, Helper.LogSeverity.Warning);
-                    if (dbg) Helper.LogVehicleSearchVerbose("specificVehicle live-world scan: timeout waiting for game fiber");
-                }
             } catch (Exception ex) {
                 Helper.Log($"TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
@@ -494,9 +478,7 @@ namespace MDTPro.Data {
         }
 
         /// <param name="fullWorldScan">When true (Vehicle Search HTTP refresh), also walk <see cref="World.GetAllVehicles"/> within range so the list is not empty if <see cref="Ped.GetNearbyVehicles"/> omits traffic.</param>
-        private static void UpdateCachedNearbyVehicles(bool fullWorldScan, string reason = null) {
-            bool dbg = false;
-            try { dbg = SetupController.GetConfig().vehicleSearchDebugLogging; } catch { /* ignore */ }
+        private static void UpdateCachedNearbyVehicles(bool fullWorldScan) {
             var list = new List<CachedNearbyVehicleEntry>();
             if (Main.Player != null && Main.Player.Exists()) {
                 try {
@@ -507,10 +489,8 @@ namespace MDTPro.Data {
                     NearbyVehicleScanStats stNearby = default;
                     NearbyVehicleScanStats stWorld = default;
                     int worldIterations = 0;
-                    int worldInRange = 0;
 
                     Vehicle[] nearby = Main.Player.GetNearbyVehicles(scanCount);
-                    int nearbyLen = nearby?.Length ?? 0;
                     if (nearby != null) {
                         for (int i = 0; i < nearby.Length; i++)
                             TryAddNearbyVehicleEntry(nearby[i], bestByPlate, ref stNearby);
@@ -526,51 +506,24 @@ namespace MDTPro.Data {
                                 float d;
                                 try { d = Main.Player.DistanceTo(v); } catch { continue; }
                                 if (d > maxWorldScanMeters) continue;
-                                worldInRange++;
                                 TryAddNearbyVehicleEntry(v, bestByPlate, ref stWorld);
                             }
                         } catch (Exception ex) {
                             Helper.Log($"UpdateCachedNearbyVehicles world scan: {ex.Message}", false, Helper.LogSeverity.Warning);
-                            if (dbg) Helper.LogVehicleSearchVerbose($"UpdateCachedNearbyVehicles: world scan exception: {ex.Message}");
                         }
                     }
 
                     list = bestByPlate.Values.OrderBy(x => x.Distance ?? float.MaxValue).ToList();
-                    if (dbg) {
-                        string pos = "?";
-                        try {
-                            var p = Main.Player.Position;
-                            pos = $"({p.X:F1},{p.Y:F1},{p.Z:F1})";
-                        } catch { /* ignore */ }
-                        Helper.LogVehicleSearchVerbose(
-                            $"UpdateCachedNearbyVehicles reason={reason ?? "?"}" +
-                            $" fullWorldScan={fullWorldScan} playerPos={pos} scanCount={scanCount}" +
-                            $" GetNearbyVehicles returned len={nearbyLen}" +
-                            $" | pass1 examined={stNearby.Examined} skipDead={stNearby.SkippedNullOrDead} skipSelf={stNearby.SkippedSelfVehicle} blankPlate={stNearby.BlankPlateAfterResolve} nativePlate={stNearby.ResolvedViaNative}");
-                        if (fullWorldScan)
-                            Helper.LogVehicleSearchVerbose(
-                                $"UpdateCachedNearbyVehicles world: iterations={worldIterations} inRange95m={worldInRange}" +
-                                $" examined={stWorld.Examined} skipDead={stWorld.SkippedNullOrDead} skipSelf={stWorld.SkippedSelfVehicle} blankPlate={stWorld.BlankPlateAfterResolve} nativePlate={stWorld.ResolvedViaNative}");
-                        if (list.Count == 0)
-                            Helper.Log("[VehicleSearch] UpdateCachedNearbyVehicles: RESULT empty (0 unique plates) — see prior [VehicleSearch] lines for blankPlate / GetNearbyVehicles len.", false, Helper.LogSeverity.Warning);
-                        else {
-                            var sample = string.Join(", ", list.Take(8).Select(x => $"{x.LicensePlate}@{x.Distance:F1}m"));
-                            Helper.LogVehicleSearchVerbose($"UpdateCachedNearbyVehicles: RESULT count={list.Count} sample=[{sample}]");
-                        }
-                    }
                 } catch (Exception ex) {
                     Helper.Log($"UpdateCachedNearbyVehicles: {ex.Message}", false, Helper.LogSeverity.Warning);
-                    if (dbg) Helper.LogVehicleSearchVerbose($"UpdateCachedNearbyVehicles: exception: {ex.Message}");
                 }
-            } else if (dbg) {
-                Helper.LogVehicleSearchVerbose($"UpdateCachedNearbyVehicles reason={reason ?? "?"} SKIPPED: Main.Player null or not Exists()");
             }
             lock (_cachedNearbyLock) {
                 CachedNearbyVehicles = list;
             }
         }
 
-        private static MDTProVehicleData TryFindLiveWorldVehicleDataForPlateOrVin(string queryRaw, bool dbg) {
+        private static MDTProVehicleData TryFindLiveWorldVehicleDataForPlateOrVin(string queryRaw) {
             if (Main.Player == null || !Main.Player.Exists()) return null;
             string q = queryRaw.Trim();
             if (q.Length == 0) return null;
@@ -585,7 +538,6 @@ namespace MDTPro.Data {
                 for (int i = 0; i < nearby.Length; i++) {
                     var hit = TryBuildMdtVehicleIfMatchesPlateOrVin(nearby[i], q, qNorm);
                     if (hit != null) {
-                        if (dbg) Helper.LogVehicleSearchVerbose($"specificVehicle live-world match (GetNearbyVehicles): {hit.LicensePlate}");
                         RegisterVisibleVehicleLookupSessionOnly(hit);
                         return hit;
                     }
@@ -604,7 +556,6 @@ namespace MDTPro.Data {
                     if (d > maxWorldScanMeters) continue;
                     var hit = TryBuildMdtVehicleIfMatchesPlateOrVin(v, q, qNorm);
                     if (hit != null) {
-                        if (dbg) Helper.LogVehicleSearchVerbose($"specificVehicle live-world match (world ~{d:F1}m): {hit.LicensePlate}");
                         RegisterVisibleVehicleLookupSessionOnly(hit);
                         return hit;
                     }
@@ -613,7 +564,6 @@ namespace MDTPro.Data {
                 Helper.Log($"TryFindLiveWorldVehicleDataForPlateOrVin: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
 
-            if (dbg) Helper.LogVehicleSearchVerbose($"specificVehicle live-world: no in-range vehicle for query (norm={qNorm})");
             return null;
         }
 
