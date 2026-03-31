@@ -16,6 +16,10 @@ namespace MDTProNative.Wpf.Views;
 
 public partial class VehicleSearchView : UserControl, IMdtBoundView
 {
+    const string NearbyEmptyDefault = "No vehicles detected nearby.";
+    const string NearbyEmptyDeferred =
+        "Live scan did not run. GTA V must be focused (not paused) so the mod can read nearby vehicles. Alt-tab into the game briefly, then press Refresh. Tip: turn off Pause on focus loss in GTA if you want the world to keep simulating while using this MDT.";
+
     /// <summary>Top-level JSON names accepted by <c>MDTProVehicleData</c> deserialization for <c>updateVehicleData</c>.</summary>
     static readonly HashSet<string> VehicleDataPropertyNames = new(StringComparer.Ordinal)
     {
@@ -36,7 +40,11 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
         HistoryList.DisplayMemberPath = nameof(HistoryRow.Display);
         SearchBtn.Click += async (_, _) => await SearchAsync(QueryBox.Text);
         ContextVehBtn.Click += async (_, _) => await SearchAsync("context");
-        RefreshNearbyBtn.Click += async (_, _) => await LoadNearbyAsync();
+        RefreshNearbyBtn.Click += async (_, _) =>
+        {
+            if (_connection?.Http == null) return;
+            await MdtBusyUi.RunAsync(ModuleBusy, "VEHICLE MDC", "Refreshing nearby vehicles…", LoadNearbyAsync);
+        };
         QueryBox.KeyDown += async (_, e) =>
         {
             if (e.Key == System.Windows.Input.Key.Enter)
@@ -76,6 +84,8 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
         DetailPlaceholder.Visibility = Visibility.Visible;
         NearbyList.ItemsSource = null;
         HistoryList.ItemsSource = null;
+        NearbyEmptyHint.Text = NearbyEmptyDefault;
+        NearbyEmptyHint.Visibility = Visibility.Collapsed;
         if (connection?.Http == null) return;
         _ = LoadSidebarsAsync();
     }
@@ -95,33 +105,18 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
         if (http == null) return;
         try
         {
-            var (status, text) = await http.PostAsync("data/nearbyVehicles", "8").ConfigureAwait(false);
-            var rows = new List<NearbyRow>();
-            if (status == HttpStatusCode.OK && !string.IsNullOrWhiteSpace(text))
-            {
-                var trimmed = text.Trim();
-                if (trimmed.StartsWith('['))
-                {
-                    var arr = JArray.Parse(trimmed);
-                    foreach (var t in arr)
-                    {
-                        if (t is not JObject o) continue;
-                        var plate = PickStr(o, "LicensePlate", "licensePlate");
-                        if (string.IsNullOrWhiteSpace(plate)) continue;
-                        rows.Add(new NearbyRow(
-                            plate,
-                            PickStr(o, "ModelDisplayName", "modelDisplayName"),
-                            PickDouble(o, "Distance", "distance"),
-                            PickBool(o, "IsStolen", "isStolen")));
-                    }
-                }
-            }
-            else if (status != HttpStatusCode.OK)
-                MdtShellEvents.LogCad($"Nearby vehicles: HTTP {(int)status}.");
+            var fetch = await ReportNearbyVehiclesClient.FetchNearbyAsync(http, 8).ConfigureAwait(false);
+            var rows = fetch.Items
+                .Select(s => new NearbyRow(s.Plate, s.ModelDisplay ?? "", s.DistanceMeters, s.Stolen))
+                .ToList();
+
+            if (fetch.ScanDeferred && rows.Count > 0)
+                MdtShellEvents.LogCad("Nearby vehicles: scan deferred — list may be stale until GTA V is focused and you Refresh.");
 
             await Dispatcher.InvokeAsync(() =>
             {
                 NearbyList.ItemsSource = rows;
+                NearbyEmptyHint.Text = fetch.ScanDeferred && rows.Count == 0 ? NearbyEmptyDeferred : NearbyEmptyDefault;
                 NearbyEmptyHint.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             });
         }
@@ -865,27 +860,6 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
         return g;
     }
 
-    static string PickStr(JObject o, string pascal, string camel)
-    {
-        var t = o[pascal] ?? o[camel];
-        if (t == null || t.Type == JTokenType.Null) return "";
-        var s = t.ToString();
-        return string.IsNullOrWhiteSpace(s) ? "" : s;
-    }
-
-    static double? PickDouble(JObject o, string pascal, string camel)
-    {
-        var t = o[pascal] ?? o[camel];
-        if (t == null || t.Type == JTokenType.Null) return null;
-        return t.Value<double?>();
-    }
-
-    static bool PickBool(JObject o, string pascal, string camel)
-    {
-        var t = o[pascal] ?? o[camel];
-        return t?.Value<bool>() == true;
-    }
-
     TextBlock NoteLine(string s) => new()
     {
         Text = s,
@@ -934,43 +908,5 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
         public string ResultPlate { get; }
         public string LastSearched { get; }
         public string Display => string.IsNullOrWhiteSpace(LastSearched) ? ResultPlate : $"{ResultPlate}  ·  {LastSearched}";
-    }
-
-    static string? PickStr(JObject o, params string[] keys)
-    {
-        foreach (var k in keys)
-        {
-            var t = o[k];
-            if (t == null || t.Type == JTokenType.Null) continue;
-            var s = t.ToString();
-            if (!string.IsNullOrWhiteSpace(s)) return s;
-        }
-        return null;
-    }
-
-    static double? PickDouble(JObject o, params string[] keys)
-    {
-        foreach (var k in keys)
-        {
-            var t = o[k];
-            if (t == null || t.Type == JTokenType.Null) continue;
-            if (t.Type == JTokenType.Float || t.Type == JTokenType.Integer)
-                return t.Value<double>();
-            if (double.TryParse(t.ToString(), CultureInfo.InvariantCulture, out var d))
-                return d;
-        }
-        return null;
-    }
-
-    static bool PickBool(JObject o, params string[] keys)
-    {
-        foreach (var k in keys)
-        {
-            var t = o[k];
-            if (t == null || t.Type == JTokenType.Null) continue;
-            if (t.Type == JTokenType.Boolean) return t.Value<bool>();
-            if (bool.TryParse(t.ToString(), out var b)) return b;
-        }
-        return false;
     }
 }

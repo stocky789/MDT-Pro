@@ -14,7 +14,7 @@
                 <Button x:Name="ExportPdfBtn" Content="EXPORT PDF…" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
                 <TextBlock x:Name="BrandingTemplateHint"
                            VerticalAlignment="Center"
-                           Foreground="{StaticResource CadMuted}"
+                           Foreground="{StaticResource CadText}"
                            FontSize="11"
                            Text="" />
             </StackPanel>
@@ -26,6 +26,7 @@
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
             <Border x:Name="DocumentPrintRoot"
+                    TextElement.Foreground="{StaticResource ReportDocInkBrush}"
                     Background="{StaticResource ReportDocPaperBrush}"
                     BorderBrush="{StaticResource ReportDocInkBrush}"
                     BorderThickness="1"
@@ -67,7 +68,10 @@
                         <TextBox x:Name="ShortYearBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,6" />
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Date / time" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" VerticalAlignment="Top" />
                         <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,6">
-                            <DatePicker x:Name="TsDatePicker" Width="160" Margin="0,0,8,0" FontSize="11" />
+                            <DatePicker x:Name="TsDatePicker"
+                                        Width="160"
+                                        Margin="0,0,8,0"
+                                        Style="{StaticResource ReportDocDatePicker}" />
                             <TextBox x:Name="TsTimeBox" Width="120" ToolTip="Time (e.g. 14:30:00)" Style="{StaticResource ReportDocTextBox}" />
                         </StackPanel>
                         <TextBlock Grid.Row="3" Grid.Column="0" Text="Status" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
@@ -170,9 +174,9 @@
                     <TextBlock Text="Fines / violations" Style="{StaticResource ReportDocSectionTitle}" Margin="0,4,0,4" />
                     <TextBlock TextWrapping="Wrap"
                                FontSize="11"
-                               Foreground="#444"
+                               Foreground="{StaticResource ReportDocInkBrush}"
                                Margin="0,0,0,8"
-                               Text="Use the same violation list as the browser MDT (/citationOptions). Pick an entry to auto-fill fine ranges and flags, or type a custom violation." />
+                               Text="Same catalog as browser MDT (/citationOptions): open the list to pick (auto-fills fines and flags) or type a custom violation in the field." />
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                         <Button x:Name="AddChargeBtn" Content="ADD VIOLATION" Style="{StaticResource CadButton}" Padding="12,4" />
                         <Button x:Name="RemoveChargeBtn" Content="REMOVE SELECTED" Style="{StaticResource CadRailOutlineButton}" Margin="8,0,0,0" Padding="12,4" />
@@ -181,15 +185,33 @@
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
                               HeadersVisibility="Column"
+                              ColumnHeaderStyle="{StaticResource ReportDocDataGridColumnHeader}"
                               SelectionMode="Single"
                               MinHeight="140"
                               MaxHeight="280"
                               Background="{StaticResource ReportDocFieldFill}"
+                              RowBackground="{StaticResource ReportDocFieldFill}"
+                              AlternatingRowBackground="{StaticResource ReportDocFieldFill}"
                               Foreground="{StaticResource ReportDocInkBrush}"
                               BorderBrush="{StaticResource ReportDocInkBrush}"
                               GridLinesVisibility="Horizontal"
+                              HorizontalGridLinesBrush="#D0C8B8"
                               RowHeight="28">
                         <DataGrid.Resources>
+                            <Style TargetType="CheckBox">
+                                <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+                                <Setter Property="VerticalAlignment" Value="Center" />
+                            </Style>
+                            <!-- App DataGridCell selected style uses CadText (light) for dark rows; this grid uses light paper/cream fields. -->
+                            <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+                                <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
                             <Style TargetType="DataGridRow">
                                 <Setter Property="Background" Value="{StaticResource ReportDocFieldFill}" />
                                 <Style.Triggers>
@@ -203,12 +225,26 @@
                             <DataGridTemplateColumn Header="VIOLATION" Width="2*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <ComboBox IsEditable="True"
-                                                  Style="{StaticResource ReportDocCombo}"
-                                                  Text="{Binding ChargeName, UpdateSourceTrigger=PropertyChanged}"
-                                                  DisplayMemberPath="DisplayName"
+                                        <ComboBox Style="{StaticResource ReportDocComboEditable}"
+                                                  IsEditable="True"
+                                                  HorizontalAlignment="Stretch"
+                                                  MinHeight="22"
+                                                  Margin="2,0"
+                                                  VerticalContentAlignment="Center"
+                                                  MaxDropDownHeight="220"
+                                                  Text="{Binding ChargeName, Mode=OneWay}"
+                                                  TextSearch.TextPath="DisplayName"
+                                                  ToolTip="Pick from list or type a violation name"
                                                   Loaded="CitationChargeCombo_Loaded"
-                                                  SelectionChanged="CitationChargeCombo_SelectionChanged" />
+                                                  LostFocus="CitationChargeCombo_LostFocus"
+                                                  SelectionChanged="CitationChargeCombo_SelectionChanged">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding DisplayName}"
+                                                               Foreground="{StaticResource ReportDocInkBrush}" />
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
@@ -259,7 +295,7 @@
                     <TextBlock x:Name="BrandingFooter"
                                TextWrapping="Wrap"
                                FontSize="10"
-                               Foreground="#444"
+                               Foreground="{StaticResource ReportDocInkBrush}"
                                Margin="0,8,0,0" />
                 </StackPanel>
             </Border>

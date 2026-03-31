@@ -13,7 +13,7 @@
                 <Button x:Name="ExportPdfBtn" Content="EXPORT PDF…" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
                 <TextBlock x:Name="BrandingTemplateHint"
                            VerticalAlignment="Center"
-                           Foreground="{StaticResource CadMuted}"
+                           Foreground="{StaticResource CadText}"
                            FontSize="11"
                            Text="" />
             </StackPanel>
@@ -25,6 +25,7 @@
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
             <Border x:Name="DocumentPrintRoot"
+                    TextElement.Foreground="{StaticResource ReportDocInkBrush}"
                     Background="{StaticResource ReportDocPaperBrush}"
                     BorderBrush="{StaticResource ReportDocInkBrush}"
                     BorderThickness="1"
@@ -65,7 +66,11 @@
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Short year" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
                         <TextBox x:Name="GeneralShortYearBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,6" />
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Date" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
-                        <DatePicker x:Name="GeneralDatePicker" Grid.Row="2" Grid.Column="1" Margin="0,0,0,6" FontSize="11" />
+                        <DatePicker x:Name="GeneralDatePicker"
+                                    Grid.Row="2"
+                                    Grid.Column="1"
+                                    Margin="0,0,0,6"
+                                    Style="{StaticResource ReportDocDatePicker}" />
                         <TextBlock Grid.Row="3" Grid.Column="0" Text="Time" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
                         <TextBox x:Name="GeneralTimeBox" Grid.Row="3" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,6" ToolTip="HH:mm or HH:mm:ss" />
                         <TextBlock Grid.Row="4" Grid.Column="0" Text="Status" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,0" VerticalAlignment="Center" />
@@ -213,7 +218,7 @@
                     <TextBlock x:Name="BrandingFooter"
                                TextWrapping="Wrap"
                                FontSize="10"
-                               Foreground="#444"
+                               Foreground="{StaticResource ReportDocInkBrush}"
                                Margin="0,16,0,0" />
                 </StackPanel>
             </Border>

@@ -86,9 +86,15 @@ namespace MDTPro {
                 byte[] buffer = apiRes.buffer;
 
                 res.ContentType = apiRes.contentType;
-                res.ContentLength64 = buffer.LongLength;
                 res.StatusCode = apiRes.status;
+                if (apiRes.ExtraResponseHeaders != null) {
+                    foreach (var (name, value) in apiRes.ExtraResponseHeaders) {
+                        if (string.IsNullOrEmpty(name)) continue;
+                        res.AddHeader(name, value ?? "");
+                    }
+                }
 
+                res.ContentLength64 = buffer.LongLength;
                 res.OutputStream.Write(buffer, 0, buffer.Length);
             } catch (Exception e) {
                 Log($"HandleRequest exception: {e.Message}", true, LogSeverity.Error);

@@ -51,9 +51,9 @@
             <TextBlock x:Name="HintText"
                        TextWrapping="Wrap"
                        FontSize="10"
-                       Foreground="{StaticResource CadMuted}"
+                       Foreground="{StaticResource ReportDocInkBrush}"
                        Margin="0,6,0,0"
-                       Text="Connect to the game, refresh, pick a unit, then Apply — same data as Vehicle MDC." />
+                       Text="Connect to the game, refresh, pick a unit, then Apply — same data as Vehicle MDC. If the list stays empty while alt-tabbed, focus GTA V briefly (live scan runs on the game thread)." />
             <TextBlock x:Name="StatusText"
                        TextWrapping="Wrap"
                        FontSize="10"

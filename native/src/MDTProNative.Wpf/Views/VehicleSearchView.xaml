@@ -93,7 +93,7 @@
                                                TextWrapping="Wrap"
                                                Foreground="{StaticResource CadMuted}"
                                                FontSize="12"
-                                               Text="Search by plate or VIN, pick a nearby vehicle, or use CONTEXT VEH. Data matches the in-game MDC; this layout is native Windows only." />
+                                               Text="Search by plate or VIN, pick a nearby vehicle, or use CONTEXT VEH. Data matches the in-game MDC. The nearby list is built on the game thread: if GTA V is paused or in the background, alt-tab into the game briefly (or disable Pause on focus loss) before Refresh." />
                                 </StackPanel>
                             </ScrollViewer>
                         </TabItem>

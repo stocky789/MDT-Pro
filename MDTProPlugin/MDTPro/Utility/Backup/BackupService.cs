@@ -51,25 +51,23 @@ namespace MDTPro.Utility.Backup {
             object resultLock = new object();
             bool result = false;
             Exception fiberException = null;
-            using (var done = new System.Threading.ManualResetEventSlim(false)) {
-                GameFiber.StartNew(() => {
-                    try {
-                        bool r = action();
-                        lock (resultLock) { result = r; }
-                    } catch (Exception ex) {
-                        Game.LogTrivial($"[MDTPro] BackupService: {ex.Message}");
-                        lock (resultLock) { fiberException = ex; }
-                    } finally {
-                        try { done.Set(); } catch (ObjectDisposedException) { /* timed out on main thread; event already disposed */ }
-                    }
-                });
-                if (!done.Wait(5000))
-                    return false;
-                lock (resultLock) {
-                    if (fiberException != null)
-                        ExceptionDispatchInfo.Capture(fiberException).Throw();
-                    return result;
+            if (!GameFiberHttpBridge.TryExecuteBlocking(() => {
+                try {
+                    bool r = action();
+                    lock (resultLock) { result = r; }
+                } catch (Exception ex) {
+                    Game.LogTrivial($"[MDTPro] BackupService: {ex.Message}");
+                    lock (resultLock) { fiberException = ex; }
                 }
+            }, 5000, out var bridgeEx)) {
+                return false;
+            }
+            lock (resultLock) {
+                if (fiberException != null)
+                    ExceptionDispatchInfo.Capture(fiberException).Throw();
+                if (bridgeEx != null)
+                    ExceptionDispatchInfo.Capture(bridgeEx).Throw();
+                return result;
             }
         }
 

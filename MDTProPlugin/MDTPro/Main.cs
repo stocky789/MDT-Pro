@@ -42,6 +42,7 @@ namespace MDTPro {
             ALPR.ALPRController.Stop();
             Data.DataController.EndCurrentShift();
             Server.Stop();
+            GameFiberHttpBridge.Stop();
             Data.Database.Close();
             ClearCache();
             RageNotification.Show(GetLanguage().inGame.unloaded, RageNotification.NotificationType.Info);
@@ -55,6 +56,7 @@ namespace MDTPro {
                 ALPR.ALPRController.Stop();
                 ALPR.CiAlprWebToastBridge.Stop();
                 Server.Stop();
+                GameFiberHttpBridge.Stop();
                 return;
             }
             {
@@ -104,6 +106,9 @@ namespace MDTPro {
                         // Release port and end prior listener thread (e.g. after off-duty without plugin unload, or RPH reload).
                         Server.Stop();
                         GameFiber.Wait(400);
+
+                        GameFiberHttpBridge.Start();
+                        GameFiber.Wait(50);
 
                         Thread serverThread = new Thread(Server.Start) {
                             IsBackground = true

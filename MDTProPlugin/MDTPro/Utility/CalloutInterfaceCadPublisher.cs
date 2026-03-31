@@ -1,7 +1,5 @@
 using System;
 using System.Reflection;
-using System.Threading;
-using Rage;
 
 namespace MDTPro.Utility {
     /// <summary>
@@ -18,19 +16,15 @@ namespace MDTPro.Utility {
         internal static void TryPublishCadUnitStatus(string statusText) {
             if (string.IsNullOrEmpty(statusText)) return;
             var line = statusText.Trim();
-            // HTTP / listener threads must not call into Rage scheduling directly — marshal onto a game fiber.
-            var gate = new ManualResetEventSlim(false);
-            GameFiber.StartNew(() => {
+            // HTTP / listener threads must not call into Rage scheduling directly — marshal onto the shared game-fiber bridge.
+            if (!GameFiberHttpBridge.TryExecuteBlocking(() => {
                 try {
                     var del = GetPublish();
                     del?.Invoke(line);
                 } catch {
                     /* CI API or game state */
-                } finally {
-                    gate.Set();
                 }
-            });
-            if (!gate.Wait(TimeSpan.FromSeconds(10)))
+            }, 10_000, out _))
                 Helper.Log("MDT Pro: CAD status publish timed out waiting for game fiber.", false, Helper.LogSeverity.Warning);
         }
 

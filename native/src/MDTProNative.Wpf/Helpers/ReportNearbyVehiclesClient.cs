@@ -1,5 +1,6 @@
 using System.Net;
 using MDTProNative.Client;
+using MDTProNative.Wpf.Services;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -10,18 +11,31 @@ public static class ReportNearbyVehiclesClient
 {
     public sealed record NearbySummary(string Plate, string? ModelDisplay, double? DistanceMeters, bool Stolen);
 
-    public static async Task<IReadOnlyList<NearbySummary>> FetchNearbyAsync(
+    /// <param name="ScanDeferred">Host set <c>X-MdtPro-Nearby-Scan: deferred</c> — live world scan did not run (typical when GTA V is unfocused / paused).</param>
+    public sealed record NearbyFetchResult(IReadOnlyList<NearbySummary> Items, bool ScanDeferred);
+
+    public static async Task<NearbyFetchResult> FetchNearbyAsync(
         MdtHttpClient http,
         int limit = 8,
         CancellationToken cancellationToken = default)
     {
         limit = Math.Clamp(limit, 1, 20);
-        var (status, text) = await http.PostAsync("data/nearbyVehicles", limit.ToString(), cancellationToken).ConfigureAwait(false);
+        var (status, text, scanDeferred) = await http.PostNearbyVehiclesAsync(limit, cancellationToken).ConfigureAwait(false);
         var list = new List<NearbySummary>();
-        if (status != HttpStatusCode.OK || string.IsNullOrWhiteSpace(text)) return list;
-        var trimmed = text.Trim();
-        if (!trimmed.StartsWith('[')) return list;
-        var arr = JArray.Parse(trimmed);
+        if (status != HttpStatusCode.OK || string.IsNullOrWhiteSpace(text))
+        {
+            if (status != HttpStatusCode.OK)
+                MdtShellEvents.LogCad($"Nearby vehicles: HTTP {(int)status}.");
+            return new NearbyFetchResult(list, false);
+        }
+        if (!TryParseNearbyVehiclesArray(text, out var arr) || arr == null)
+        {
+            var head = text.Trim();
+            if (head.Length > 120) head = head[..120] + "…";
+            MdtShellEvents.LogCad($"Nearby vehicles: expected JSON array from host; got: {head}");
+            return new NearbyFetchResult(list, scanDeferred);
+        }
+
         foreach (var t in arr)
         {
             if (t is not JObject o) continue;
@@ -34,7 +48,68 @@ public static class ReportNearbyVehiclesClient
                 PickBool(o, "IsStolen", "isStolen")));
         }
 
-        return list;
+        return new NearbyFetchResult(list, scanDeferred);
+    }
+
+    /// <summary>Parses <c>/data/nearbyVehicles</c> body: raw array, UTF-8 BOM, optional JSON string wrapper, or <c>{ data: [...] }</c>.</summary>
+    internal static bool TryParseNearbyVehiclesArray(string text, out JArray? arr)
+    {
+        arr = null;
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        var t = text.Trim().TrimStart('\uFEFF');
+        try
+        {
+            var tok = JToken.Parse(t);
+            tok = UnwrapJsonStringToken(tok);
+            if (tok is JArray ja)
+            {
+                arr = ja;
+                return true;
+            }
+
+            if (tok is JObject jobj)
+            {
+                if (jobj["data"] is JArray d)
+                {
+                    arr = d;
+                    return true;
+                }
+
+                if (jobj["nearbyVehicles"] is JArray n)
+                {
+                    arr = n;
+                    return true;
+                }
+            }
+        }
+        catch
+        {
+            /* caller logs */
+        }
+
+        return false;
+    }
+
+    static JToken UnwrapJsonStringToken(JToken tok)
+    {
+        if (tok.Type != JTokenType.String) return tok;
+        var inner = tok.Value<string>();
+        if (string.IsNullOrWhiteSpace(inner)) return tok;
+        inner = inner.Trim();
+        if (inner.Length < 2) return tok;
+        if ((inner[0] == '[' && inner[^1] == ']') || (inner[0] == '{' && inner[^1] == '}'))
+        {
+            try
+            {
+                return JToken.Parse(inner);
+            }
+            catch
+            {
+                return tok;
+            }
+        }
+
+        return tok;
     }
 
     /// <summary>Resolves full vehicle row; use plate, VIN, or <c>context</c> / <c>current</c> for Stop The Ped / in-game context vehicle.</summary>

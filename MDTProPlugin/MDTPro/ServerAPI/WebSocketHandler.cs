@@ -131,7 +131,7 @@ namespace MDTPro.ServerAPI {
                         string responseMsg;
                         switch (clientMsg) {
                             case "playerLocation":
-                                DataController.RefreshMdtLocationOnGameFiberBlocking(800);
+                                DataController.RefreshMdtLocationOnGameFiberBlocking(250);
                                 responseMsg = JsonConvert.SerializeObject(DataController.MdtPreferredLocation);
 
                                 if (responseMsg != lastLocationJson) {
