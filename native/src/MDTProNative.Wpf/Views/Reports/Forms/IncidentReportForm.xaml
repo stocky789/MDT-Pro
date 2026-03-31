@@ -13,7 +13,7 @@
                 <Button x:Name="ExportPdfBtn" Content="EXPORT PDF…" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
                 <TextBlock x:Name="BrandingTemplateHint"
                            VerticalAlignment="Center"
-                           Foreground="{StaticResource CadMuted}"
+                           Foreground="{StaticResource CadText}"
                            FontSize="11"
                            Text="" />
             </StackPanel>
@@ -25,6 +25,7 @@
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
             <Border x:Name="DocumentPrintRoot"
+                    TextElement.Foreground="{StaticResource ReportDocInkBrush}"
                     Background="{StaticResource ReportDocPaperBrush}"
                     BorderBrush="{StaticResource ReportDocInkBrush}"
                     BorderThickness="1"
@@ -66,7 +67,10 @@
                         <TextBox x:Name="ShortYearBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,6" />
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Date / time" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" VerticalAlignment="Top" />
                         <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,6">
-                            <DatePicker x:Name="TsDatePicker" Width="160" Margin="0,0,8,0" FontSize="11" />
+                            <DatePicker x:Name="TsDatePicker"
+                                        Width="160"
+                                        Margin="0,0,8,0"
+                                        Style="{StaticResource ReportDocDatePicker}" />
                             <TextBox x:Name="TsTimeBox"
                                      Width="120"
                                      ToolTip="Time (e.g. 14:30:00 or 14:30)"
@@ -197,7 +201,7 @@
                     <TextBlock x:Name="BrandingFooter"
                                TextWrapping="Wrap"
                                FontSize="10"
-                               Foreground="#444"
+                               Foreground="{StaticResource ReportDocInkBrush}"
                                Margin="0,8,0,0" />
                 </StackPanel>
             </Border>

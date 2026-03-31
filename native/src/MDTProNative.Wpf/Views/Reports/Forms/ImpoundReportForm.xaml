@@ -13,7 +13,7 @@
                 <Button x:Name="ExportPdfBtn" Content="EXPORT PDF…" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
                 <TextBlock x:Name="BrandingTemplateHint"
                            VerticalAlignment="Center"
-                           Foreground="{StaticResource CadMuted}"
+                           Foreground="{StaticResource CadText}"
                            FontSize="11"
                            Text="" />
             </StackPanel>
@@ -25,6 +25,7 @@
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
             <Border x:Name="DocumentPrintRoot"
+                    TextElement.Foreground="{StaticResource ReportDocInkBrush}"
                     Background="{StaticResource ReportDocPaperBrush}"
                     BorderBrush="{StaticResource ReportDocInkBrush}"
                     BorderThickness="1"
@@ -173,7 +174,7 @@
                     <TextBlock x:Name="BrandingFooter"
                                TextWrapping="Wrap"
                                FontSize="10"
-                               Foreground="#444"
+                               Foreground="{StaticResource ReportDocInkBrush}"
                                Margin="0,8,0,0" />
                 </StackPanel>
             </Border>

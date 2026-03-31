@@ -170,6 +170,7 @@
     <Compile Include="Utility\StpCitationHelper.cs" />
     <Compile Include="Utility\BackupHelper.cs" />
     <Compile Include="Utility\GpsHelper.cs" />
+    <Compile Include="Utility\GameFiberHttpBridge.cs" />
     <Compile Include="Utility\GtaLocationNatives.cs" />
     <Compile Include="UI\CitationHandoffKeybind.cs" />
     <Compile Include="UI\CitationHandoffMenu.cs" />

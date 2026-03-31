@@ -36,6 +36,7 @@
                            HorizontalAlignment="Center"
                            FontWeight="Bold"
                            FontSize="11"
+                           Foreground="{StaticResource ReportDocInkBrush}"
                            TextWrapping="Wrap"
                            Margin="4" />
             </Grid>

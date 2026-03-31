@@ -12,7 +12,6 @@ using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Threading;
-using Rage;
 
 namespace MDTPro.ServerAPI {
     internal class PostAPIResponse : APIResponse {
@@ -40,7 +39,7 @@ namespace MDTPro.ServerAPI {
             if (string.IsNullOrEmpty(path)) return;
 
             if (path.Equals("alprClear", StringComparison.OrdinalIgnoreCase)) {
-                Rage.GameFiber.StartNew(() => ALPR.ALPRController.Clear());
+                GameFiberHttpBridge.EnqueueFireAndForget(() => ALPR.ALPRController.Clear());
                 buffer = Encoding.UTF8.GetBytes("OK");
                 contentType = "text/plain";
                 status = 200;
@@ -275,10 +274,9 @@ namespace MDTPro.ServerAPI {
                     Helper.LogArrestCourtVerbose(
                         $"HTTP createArrestReport: Id={report.Id}, Status={(int)report.Status}, Offender={report.OffenderPedName ?? "?"}, Charges={report.Charges?.Count ?? 0}, CourtCaseNo(before)={report.CourtCaseNumber ?? "(none)"} — queueing game fiber");
 
-                    // RPH / CDF / ped sync expect the game fiber. HTTP uses ThreadPool — running here caused silent failures or deadlocks for arrest→court.
+                    // RPH / CDF / ped sync expect the game fiber. HTTP uses ThreadPool — run on the shared bridge so work is not lost when script ticks stall (pause / alt-tab).
                     Exception fiberError = null;
-                    var gate = new ManualResetEventSlim(false);
-                    GameFiber.StartNew(() => {
+                    if (!GameFiberHttpBridge.TryExecuteBlocking(() => {
                         try {
                             Helper.LogArrestCourtVerbose($"GameFiber createArrestReport: start AddReport for {report.Id}");
                             DataController.AddReport(report);
@@ -298,17 +296,16 @@ namespace MDTPro.ServerAPI {
                         } catch (Exception ex) {
                             fiberError = ex;
                             Helper.LogArrestCourtVerbose($"GameFiber createArrestReport: EXCEPTION {ex.GetType().Name}: {ex.Message}");
-                        } finally {
-                            gate.Set();
                         }
-                    });
-                    if (!gate.Wait(TimeSpan.FromSeconds(45))) {
-                        Utility.Helper.Log("[createArrestReport] TIMEOUT waiting 45s for game fiber (arrest not saved on game thread).", true, Utility.Helper.LogSeverity.Warning);
-                        buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Timed out waiting for game thread to save arrest (is the game paused or loading?)." }));
+                    }, Timeout.Infinite, out var bridgeErr)) {
+                        Utility.Helper.Log("[createArrestReport] Game fiber bridge stopped before arrest save could run.", true, Utility.Helper.LogSeverity.Warning);
+                        buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "MDT Pro server is stopping; try saving the arrest again after going on duty." }));
                         contentType = "application/json";
-                        status = 500;
+                        status = 503;
                         return;
                     }
+                    if (bridgeErr != null)
+                        fiberError = fiberError ?? bridgeErr;
                     Helper.LogArrestCourtVerbose("HTTP createArrestReport: game fiber finished");
                     if (fiberError != null) throw fiberError;
 

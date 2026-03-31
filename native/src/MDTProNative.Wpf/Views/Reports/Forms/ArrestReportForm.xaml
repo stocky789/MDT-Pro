@@ -14,7 +14,7 @@
                 <Button x:Name="ExportPdfBtn" Content="EXPORT PDF…" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
                 <TextBlock x:Name="BrandingTemplateHint"
                            VerticalAlignment="Center"
-                           Foreground="{StaticResource CadMuted}"
+                           Foreground="{StaticResource CadText}"
                            FontSize="11"
                            Text="" />
             </StackPanel>
@@ -26,6 +26,7 @@
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
             <Border x:Name="DocumentPrintRoot"
+                    TextElement.Foreground="{StaticResource ReportDocInkBrush}"
                     Background="{StaticResource ReportDocPaperBrush}"
                     BorderBrush="{StaticResource ReportDocInkBrush}"
                     BorderThickness="1"
@@ -178,7 +179,7 @@
                              VerticalScrollBarVisibility="Auto" />
 
                     <TextBlock Text="Charges" Style="{StaticResource ReportDocSectionTitle}" Margin="0,12,0,4" />
-                    <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#444" Margin="0,0,0,8"
+                    <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource ReportDocInkBrush}" Margin="0,0,0,8"
                                Text="Charge column: /arrestOptions catalog (same as browser). Edit cells or type a custom charge in the combo." />
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                         <Button x:Name="AddArrestChargeBtn" Content="ADD CHARGE" Style="{StaticResource CadButton}" Padding="12,4" />
@@ -188,25 +189,66 @@
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
                               HeadersVisibility="Column"
+                              ColumnHeaderStyle="{StaticResource ReportDocDataGridColumnHeader}"
                               SelectionMode="Single"
                               MinHeight="160"
                               MaxHeight="320"
                               Background="{StaticResource ReportDocFieldFill}"
+                              RowBackground="{StaticResource ReportDocFieldFill}"
+                              AlternatingRowBackground="{StaticResource ReportDocFieldFill}"
                               Foreground="{StaticResource ReportDocInkBrush}"
                               BorderBrush="{StaticResource ReportDocInkBrush}"
                               GridLinesVisibility="Horizontal"
+                              HorizontalGridLinesBrush="#D0C8B8"
                               RowHeight="28"
                               HorizontalScrollBarVisibility="Auto">
+                        <DataGrid.Resources>
+                            <Style TargetType="CheckBox">
+                                <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+                                <Setter Property="VerticalAlignment" Value="Center" />
+                            </Style>
+                            <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+                                <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                            <Style TargetType="DataGridRow">
+                                <Setter Property="Background" Value="{StaticResource ReportDocFieldFill}" />
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="#C8DDF5" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.Resources>
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Header="CHARGE" Width="2*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <ComboBox IsEditable="True"
-                                                  Style="{StaticResource ReportDocCombo}"
-                                                  Text="{Binding ChargeName, UpdateSourceTrigger=PropertyChanged}"
-                                                  DisplayMemberPath="DisplayName"
+                                        <ComboBox Style="{StaticResource ReportDocComboEditable}"
+                                                  IsEditable="True"
+                                                  HorizontalAlignment="Stretch"
+                                                  MinHeight="22"
+                                                  Margin="2,0"
+                                                  VerticalContentAlignment="Center"
+                                                  MaxDropDownHeight="220"
+                                                  Text="{Binding ChargeName, Mode=OneWay}"
+                                                  TextSearch.TextPath="DisplayName"
+                                                  ToolTip="Pick from list or type a charge name"
                                                   Loaded="ArrestChargeCombo_Loaded"
-                                                  SelectionChanged="ArrestChargeCombo_SelectionChanged" />
+                                                  LostFocus="ArrestChargeCombo_LostFocus"
+                                                  SelectionChanged="ArrestChargeCombo_SelectionChanged">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding DisplayName}"
+                                                               Foreground="{StaticResource ReportDocInkBrush}" />
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
@@ -222,7 +264,7 @@
                     </DataGrid>
 
                     <TextBlock Text="Use of force" Style="{StaticResource ReportDocSectionTitle}" Margin="0,14,0,4" />
-                    <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#444" Margin="0,0,0,8"
+                    <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource ReportDocInkBrush}" Margin="0,0,0,8"
                                Text="Complete only if force was used. Leave type as not applicable if none." />
                     <TextBlock Text="Force type" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,4" />
                     <ComboBox x:Name="UofTypeCombo" Style="{StaticResource ReportDocCombo}" Margin="0,0,0,8">
@@ -257,7 +299,7 @@
                     <TextBlock x:Name="BrandingFooter"
                                TextWrapping="Wrap"
                                FontSize="10"
-                               Foreground="#444"
+                               Foreground="{StaticResource ReportDocInkBrush}"
                                Margin="0,16,0,0" />
                 </StackPanel>
             </Border>

@@ -47,7 +47,8 @@ public partial class ReportNearbyVehicleBar : UserControl
         SetStatus(null, null);
         try
         {
-            var rows = await ReportNearbyVehiclesClient.FetchNearbyAsync(http).ConfigureAwait(false);
+            var fetch = await ReportNearbyVehiclesClient.FetchNearbyAsync(http).ConfigureAwait(false);
+            var rows = fetch.Items;
             await Dispatcher.InvokeAsync(() =>
             {
                 NearbyCombo.ItemsSource = rows.Select(r => new NearbyRowVm(r)).ToList();
@@ -55,6 +56,15 @@ public partial class ReportNearbyVehicleBar : UserControl
                 NearbyCombo.SelectedValuePath = nameof(NearbyRowVm.Plate);
                 if (rows.Count > 0)
                     NearbyCombo.SelectedIndex = 0;
+                if (fetch.ScanDeferred)
+                {
+                    if (rows.Count == 0)
+                        SetStatus("GTA V must be focused for a live scan. Alt-tab into the game, then Refresh.", isError: true);
+                    else
+                        SetStatus("Scan was deferred — list may be outdated. Focus GTA V and Refresh before Apply.", isError: false);
+                }
+                else
+                    SetStatus(null, null);
             });
         }
         catch (Exception ex)
@@ -104,12 +114,16 @@ public partial class ReportNearbyVehicleBar : UserControl
 
         if (string.IsNullOrWhiteSpace(plate))
         {
-            SetStatus("No nearby vehicles — drive closer or press Refresh.", isError: true);
+            await Dispatcher.InvokeAsync(() =>
+                SetStatus("No nearby vehicles — drive closer or press Refresh.", isError: true));
             return;
         }
 
-        SetBusy(true);
-        SetStatus("Loading vehicle record…", null);
+        await Dispatcher.InvokeAsync(() =>
+        {
+            SetBusy(true);
+            SetStatus("Loading vehicle record…", null);
+        });
         try
         {
             var jo = await ReportNearbyVehiclesClient.FetchSpecificVehicleAsync(http, plate).ConfigureAwait(false);
@@ -156,7 +170,7 @@ public partial class ReportNearbyVehicleBar : UserControl
         StatusText.Text = message;
         StatusText.Foreground = isError == true
             ? (Brush)FindResource("CadUrgent")
-            : (Brush)FindResource("CadMuted");
+            : (Brush)FindResource("ReportDocInkBrush");
     }
 
     sealed class NearbyRowVm(ReportNearbyVehiclesClient.NearbySummary s)

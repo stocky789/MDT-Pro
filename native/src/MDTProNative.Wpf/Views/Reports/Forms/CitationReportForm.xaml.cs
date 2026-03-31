@@ -3,11 +3,12 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Media;
+using System.Windows.Threading;
 using MDTProNative.Client;
 using MDTProNative.Wpf.Helpers;
 using MDTProNative.Wpf.Services;
 using MDTProNative.Wpf.Views.Reports;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace MDTProNative.Wpf.Views.Reports.Forms;
@@ -20,7 +21,7 @@ public partial class CitationReportForm : UserControl, IReportFormPane
     JObject? _source;
     MdtConnectionManager? _connection;
     readonly ObservableCollection<CitationChargeRow> _charges = new();
-    readonly List<CitationChargePickerOption> _citationChargePickList = new();
+    readonly ObservableCollection<CitationChargePickerOption> _citationChargePickList = new();
     bool _suppressCitationChargePick;
 
     public CitationReportForm()
@@ -68,6 +69,9 @@ public partial class CitationReportForm : UserControl, IReportFormPane
         if (connection?.Http == null)
         {
             _citationChargePickList.Clear();
+            var embedded = MdtEmbeddedChargeOptions.LoadCitationRoot();
+            foreach (var o in CitationChargePickerOption.ParseGroups(embedded))
+                _citationChargePickList.Add(o);
             ReportDocumentBrandingHelper.ApplyChrome(null, TitleKey, DefaultDocTitle, DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
             return;
         }
@@ -85,8 +89,9 @@ public partial class CitationReportForm : UserControl, IReportFormPane
             await Dispatcher.InvokeAsync(() =>
             {
                 _citationChargePickList.Clear();
-                _citationChargePickList.AddRange(list);
-                CollectionViewSource.GetDefaultView(_charges).Refresh();
+                foreach (var o in list)
+                    _citationChargePickList.Add(o);
+                Dispatcher.BeginInvoke(SyncCitationChargeComboTexts, DispatcherPriority.ApplicationIdle);
             });
         }
         catch
@@ -97,8 +102,23 @@ public partial class CitationReportForm : UserControl, IReportFormPane
 
     void CitationChargeCombo_Loaded(object sender, RoutedEventArgs e)
     {
-        if (sender is ComboBox cb)
-            cb.ItemsSource = _citationChargePickList;
+        if (sender is not ComboBox cb) return;
+        cb.ItemsSource = _citationChargePickList;
+        if (cb.DataContext is not CitationChargeRow row) return;
+        void PushText()
+        {
+            cb.Text = row.ChargeName ?? "";
+            BindingOperations.GetBindingExpression(cb, ComboBox.TextProperty)?.UpdateTarget();
+        }
+
+        cb.Dispatcher.BeginInvoke(PushText, DispatcherPriority.Loaded);
+        cb.Dispatcher.BeginInvoke(PushText, DispatcherPriority.ApplicationIdle);
+    }
+
+    void CitationChargeCombo_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ComboBox cb || cb.DataContext is not CitationChargeRow row) return;
+        row.ChargeName = cb.Text?.Trim() ?? "";
     }
 
     void CitationChargeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -106,19 +126,52 @@ public partial class CitationReportForm : UserControl, IReportFormPane
         if (_suppressCitationChargePick) return;
         if (sender is not ComboBox cb || cb.DataContext is not CitationChargeRow row) return;
         if (cb.SelectedItem is not CitationChargePickerOption opt) return;
+
         opt.ApplyTo(row);
-        // Clearing selection resets editable ComboBox Text and pushes "" into the ChargeName binding.
-        var name = opt.ChargeName;
+        var name = opt.ChargeName?.Trim() ?? "";
+
         _suppressCitationChargePick = true;
         try
         {
             cb.SelectedItem = null;
-            row.ChargeName = name;
         }
         finally
         {
             _suppressCitationChargePick = false;
         }
+
+        // Clearing SelectedItem wipes the editable text; TwoWay Text used to push "" into ChargeName. OneWay + deferred Text fixes both.
+        cb.Dispatcher.BeginInvoke(() =>
+        {
+            cb.Text = name;
+            row.ChargeName = name;
+        }, DispatcherPriority.Background);
+    }
+
+    void SyncCitationChargeComboTexts()
+    {
+        ChargesGrid.UpdateLayout();
+        foreach (var item in _charges)
+        {
+            if (ChargesGrid.ItemContainerGenerator.ContainerFromItem(item) is not DataGridRow rowContainer) continue;
+            var cb = FindVisualChild<ComboBox>(rowContainer);
+            if (cb == null || cb.DataContext is not CitationChargeRow r) continue;
+            cb.Text = r.ChargeName ?? "";
+        }
+    }
+
+    static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+    {
+        var n = VisualTreeHelper.GetChildrenCount(parent);
+        for (var i = 0; i < n; i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T t) return t;
+            var nested = FindVisualChild<T>(child);
+            if (nested != null) return nested;
+        }
+
+        return null;
     }
 
     public void LoadFromReport(JObject report)
@@ -160,6 +213,7 @@ public partial class CitationReportForm : UserControl, IReportFormPane
         _charges.Clear();
         foreach (var row in CitationChargeRow.CollectionFromCharges(report["Charges"]))
             _charges.Add(row);
+        Dispatcher.BeginInvoke(SyncCitationChargeComboTexts, DispatcherPriority.ApplicationIdle);
     }
 
     public JObject BuildReport()

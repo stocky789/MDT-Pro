@@ -4,7 +4,6 @@ using System;
 using System.Threading;
 using LSPD_First_Response.Mod.API;
 using LSPD_First_Response.Mod.Callouts;
-using Rage;
 using LspdFunc = LSPD_First_Response.Mod.API.Functions;
 using CiApi = CalloutInterfaceAPI.Functions;
 using MDTPro.Utility;
@@ -26,19 +25,21 @@ namespace MDTPro.EventListeners {
 
         /// <summary>Accept a pending callout, mark en route to scene, or send a line to the in-game Callout Interface MDT for the active callout.</summary>
         internal static CalloutActionOutcome RunOnGameThread(string action, string calloutId, string message) {
-            var gate = new ManualResetEventSlim(false);
             CalloutActionOutcome outcome = new CalloutActionOutcome { Result = CalloutActionResult.Error, Message = "Unknown error." };
-            GameFiber.StartNew(() => {
+            if (!GameFiberHttpBridge.TryExecuteBlocking(() => {
                 try {
                     outcome = RunCore(action, calloutId, message);
                 } catch (Exception ex) {
                     outcome = new CalloutActionOutcome { Result = CalloutActionResult.Error, Message = ex.Message };
-                } finally {
-                    gate.Set();
                 }
-            });
-            if (!gate.Wait(TimeSpan.FromSeconds(20)))
-                return new CalloutActionOutcome { Result = CalloutActionResult.Error, Message = "Timed out waiting for game thread (is the game loading or paused?)." };
+            }, Timeout.Infinite, out var bridgeEx)) {
+                return new CalloutActionOutcome {
+                    Result = CalloutActionResult.Error,
+                    Message = "MDT Pro is not ready (off duty or server stopped). Try again after going on duty."
+                };
+            }
+            if (bridgeEx != null)
+                return new CalloutActionOutcome { Result = CalloutActionResult.Error, Message = bridgeEx.Message };
             return outcome;
         }
 

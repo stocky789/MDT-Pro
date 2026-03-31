@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -14,7 +15,21 @@ public sealed class MdtHttpClient : IDisposable
     public MdtHttpClient(MdtServerEndpoint endpoint)
     {
         Endpoint = endpoint;
-        _http = new HttpClient { BaseAddress = new Uri(endpoint.HttpBaseUrl + "/"), Timeout = TimeSpan.FromSeconds(30) };
+        var handler = new HttpClientHandler();
+        // Corporate/system proxy often breaks localhost; browser MDT still works because it is same-origin in the game page.
+        if (IsLikelyLoopbackHost(endpoint.Host))
+            handler.UseProxy = false;
+        var baseUrl = endpoint.HttpBaseUrl.TrimEnd('/') + "/";
+        // Plugin may block on the game fiber while GTA is paused; align with server-side infinite-wait saves.
+        _http = new HttpClient(handler) { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromMinutes(5) };
+    }
+
+    static bool IsLikelyLoopbackHost(string host)
+    {
+        if (string.IsNullOrWhiteSpace(host)) return false;
+        if (host.Equals("localhost", StringComparison.OrdinalIgnoreCase)) return true;
+        if (host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase)) return true;
+        return host is "::1" or "[::1]";
     }
 
     public MdtServerEndpoint Endpoint { get; }
@@ -91,23 +106,51 @@ public sealed class MdtHttpClient : IDisposable
     /// <summary>Arrest report charge groups (same root array as browser <c>/arrestOptions</c>).</summary>
     public async Task<JArray?> GetArrestOptionsJsonAsync(CancellationToken cancellationToken = default)
     {
-        using var response = await _http.GetAsync("arrestOptions", cancellationToken).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode) return null;
-        var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        if (string.IsNullOrWhiteSpace(text)) return null;
-        var t = JToken.Parse(text);
-        return t as JArray;
+        var remote = await TryGetChargeOptionsRootAsync("arrestOptions", cancellationToken).ConfigureAwait(false);
+        if (remote is { Count: > 0 })
+            return remote;
+        return MdtEmbeddedChargeOptions.LoadArrestRoot();
     }
 
     /// <summary>Citation report charge groups (same root array as browser <c>/citationOptions</c>).</summary>
     public async Task<JArray?> GetCitationOptionsJsonAsync(CancellationToken cancellationToken = default)
     {
-        using var response = await _http.GetAsync("citationOptions", cancellationToken).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode) return null;
-        var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        var remote = await TryGetChargeOptionsRootAsync("citationOptions", cancellationToken).ConfigureAwait(false);
+        if (remote is { Count: > 0 })
+            return remote;
+        return MdtEmbeddedChargeOptions.LoadCitationRoot();
+    }
+
+    static JArray? ParseChargeOptionsRoot(string? text)
+    {
         if (string.IsNullOrWhiteSpace(text)) return null;
-        var t = JToken.Parse(text);
+        JToken t;
+        try
+        {
+            t = JToken.Parse(text);
+        }
+        catch
+        {
+            return null;
+        }
+
+        if (t.Type == JTokenType.Null) return null;
         return t as JArray;
+    }
+
+    async Task<JArray?> TryGetChargeOptionsRootAsync(string relativePath, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await _http.GetAsync(relativePath, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode) return null;
+            var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            return ParseChargeOptionsRoot(text);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>Plugin static image (e.g. <c>DepartmentStyling/image/lssd-badge.png</c>).</summary>
@@ -148,6 +191,19 @@ public sealed class MdtHttpClient : IDisposable
         using var response = await _http.PostAsync(relativePath.TrimStart('/'), content, cancellationToken).ConfigureAwait(false);
         var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         return (response.StatusCode, text);
+    }
+
+    /// <summary>POST <c>/data/nearbyVehicles</c>; reads <c>X-MdtPro-Nearby-Scan: deferred</c> when the plugin game fiber did not finish (GTA V often paused while alt-tabbed).</summary>
+    public async Task<(HttpStatusCode Status, string Body, bool NearbyVehicleScanDeferred)> PostNearbyVehiclesAsync(int limit, CancellationToken cancellationToken = default)
+    {
+        limit = Math.Clamp(limit, 1, 20);
+        using var content = new StringContent(limit.ToString(), Encoding.UTF8, "application/json");
+        using var response = await _http.PostAsync("data/nearbyVehicles", content, cancellationToken).ConfigureAwait(false);
+        var deferred = false;
+        if (response.Headers.TryGetValues("X-MdtPro-Nearby-Scan", out var vals))
+            deferred = vals.Any(v => string.Equals((v ?? "").Trim(), "deferred", StringComparison.OrdinalIgnoreCase));
+        var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        return (response.StatusCode, text, deferred);
     }
 
     public async Task<JToken?> PostForJsonAsync(string relativePath, string? body, CancellationToken cancellationToken = default)

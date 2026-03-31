@@ -580,14 +580,17 @@ public partial class PersonSearchView : UserControl, IMdtBoundView
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 4)
         });
-        panel.Children.Add(new TextBlock
+        if (!string.IsNullOrWhiteSpace(scopeNote))
         {
-            Text = scopeNote,
-            Foreground = R("CadMuted"),
-            FontSize = 10,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 10)
-        });
+            panel.Children.Add(new TextBlock
+            {
+                Text = scopeNote,
+                Foreground = R("CadMuted"),
+                FontSize = 10,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 10)
+            });
+        }
         panel.Children.Add(new Border { Height = 1, Background = R("CadBorder"), Margin = new Thickness(0, 0, 0, 12) });
     }
 
@@ -1616,7 +1619,7 @@ public partial class PersonSearchView : UserControl, IMdtBoundView
             {
                 if (gen != _searchGen) return;
                 PedReportsPanel.Children.Clear();
-                AddSubjectDossierHeader(PedReportsPanel, "MASTER EVENT LOG", "Chronological trail of every report ID returned for this name (newest first). Expand a row to load the full on-file JSON from the MDT (same lists as the Reports module). Traffic incidents are not in the ped index yet.");
+                AddSubjectDossierHeader(PedReportsPanel, "MASTER EVENT LOG", "");
 
                 if (pedRep == null)
                 {

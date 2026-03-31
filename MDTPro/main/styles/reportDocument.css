@@ -55,13 +55,56 @@
 }
 
 .report-document {
+  /* Single source for paper receipt; child sections should not rely on global MDT theme vars */
+  --mdt-report-ink: #0f0f0f;
+  --mdt-report-field: #fdebdf;
   background: #fff;
-  color: #111;
+  color: var(--mdt-report-ink);
   border: 1px solid #000;
   padding: 18px 20px 24px;
   font-family: 'Segoe UI', Tahoma, sans-serif;
   font-size: 13px;
   line-height: 1.35;
+}
+
+/* Citation / arrest charge rows live under .report-document-body but use theme-colored rules in reports.css */
+.report-document .section.citationSection .optionsList .chargeWrapper,
+.report-document .section.arrestSection .optionsList .chargeWrapper {
+  background-color: var(--mdt-report-field) !important;
+  border: 1px solid #000 !important;
+  color: var(--mdt-report-ink) !important;
+}
+
+.report-document .section.citationSection .optionsList .chargeWrapper .chargeName,
+.report-document .section.arrestSection .optionsList .chargeWrapper .chargeName,
+.report-document .section.citationSection .optionsList .chargeWrapper .chargeDetails,
+.report-document .section.arrestSection .optionsList .chargeWrapper .chargeDetails {
+  color: var(--mdt-report-ink) !important;
+}
+
+.report-document .section.citationSection .optionsList .chargeWrapper .deleteChargeButton,
+.report-document .section.arrestSection .optionsList .chargeWrapper .deleteChargeButton {
+  color: var(--mdt-report-ink) !important;
+  fill: var(--mdt-report-ink) !important;
+}
+
+.report-document .section.citationSection .optionsWrapper details > summary,
+.report-document .section.arrestSection .optionsWrapper details > summary {
+  color: var(--mdt-report-ink) !important;
+  background-color: var(--mdt-report-field) !important;
+  border: 1px solid #000 !important;
+}
+
+.report-document .section.citationSection .optionsWrapper details > button,
+.report-document .section.arrestSection .optionsWrapper details > button {
+  color: var(--mdt-report-ink) !important;
+  background-color: var(--mdt-report-field) !important;
+  border-color: #000 !important;
+}
+
+.report-document .section.citationSection .optionsWrapper details > button .chargeDetailsOnButton,
+.report-document .section.arrestSection .optionsWrapper details > button .chargeDetailsOnButton {
+  color: #3a3a3a !important;
 }
 
 .report-doc-header {
@@ -130,7 +173,7 @@
 .report-doc-footer {
   margin-top: 16px;
   font-size: 10px;
-  color: #444;
+  color: #0f0f0f;
 }
 
 .report-document .propertyEvidenceSection {
@@ -155,6 +198,85 @@
 .report-document .propertyEvidenceSection .chargeWrapper {
   border-color: #000;
   background: #fdebdf;
+}
+
+/*
+ * reports.css uses .createPage .reportInformation .section .title { color: var(--color-text-primary) }
+ * (4 classes) — on dark MDT themes that is light text. It beats .report-document .propertyEvidenceSection .title
+ * (3 classes), so paper headings ("Details", "Subjects…") become nearly invisible on white.
+ * Same theme vars on .chargeName + cream wrapper = unreadable subject lines and placeholders.
+ * These selectors intentionally add .report-document (and list/create) so paper chrome always uses ink.
+ */
+.createPage .reportInformation .report-document .propertyEvidenceSection > .title,
+.createPage .reportInformation .report-document .propertyEvidenceSubsectionTitle,
+.listPage .reportInformation .report-document .propertyEvidenceSection > .title,
+.listPage .reportInformation .report-document .propertyEvidenceSubsectionTitle,
+.createPage .reportInformation .report-document .report-document-body .section > .title,
+.createPage .reportInformation .report-document .report-document-body .sectionTitle,
+.createPage .reportInformation .report-document .report-document-body .searchResponseSectionTitle,
+.listPage .reportInformation .report-document .report-document-body .section > .title,
+.listPage .reportInformation .report-document .report-document-body .sectionTitle,
+.listPage .reportInformation .report-document .report-document-body .searchResponseSectionTitle {
+  color: #0f0f0f;
+}
+
+.createPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceSubjectsList .chargeWrapper,
+.createPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceDrugsList .chargeWrapper,
+.createPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceFirearmsList .chargeWrapper,
+.listPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceSubjectsList .chargeWrapper,
+.listPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceDrugsList .chargeWrapper,
+.listPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceFirearmsList .chargeWrapper {
+  background-color: #fdebdf;
+  border-color: #000;
+  color: #0f0f0f;
+}
+
+.createPage .reportInformation .report-document .propertyEvidenceSection .chargeWrapper .chargeName,
+.listPage .reportInformation .report-document .propertyEvidenceSection .chargeWrapper .chargeName {
+  color: #0f0f0f !important;
+}
+
+.createPage .reportInformation .report-document .propertyEvidenceSection .chargeWrapper .deleteChargeButton,
+.listPage .reportInformation .report-document .propertyEvidenceSection .chargeWrapper .deleteChargeButton {
+  color: #0f0f0f;
+  fill: #0f0f0f;
+}
+
+.createPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceAddSubjectInput,
+.listPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceAddSubjectInput,
+.createPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceDrugScheduleSelect,
+.createPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceDrugTypeSelect,
+.createPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceQuantitySelect,
+.createPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceFirearmSelect,
+.listPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceDrugScheduleSelect,
+.listPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceDrugTypeSelect,
+.listPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceQuantitySelect,
+.listPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceFirearmSelect {
+  background-color: #fdebdf;
+  color: #0f0f0f;
+  border: 1px solid #000;
+}
+
+.createPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceAddSubjectInput::placeholder,
+.listPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceAddSubjectInput::placeholder {
+  color: #3a3a3a;
+  opacity: 1;
+}
+
+.createPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceRecentIdsRow label,
+.listPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceRecentIdsRow label {
+  color: #0f0f0f;
+}
+
+.createPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceOtherRow label,
+.listPage .reportInformation .report-document .propertyEvidenceSection .propertyEvidenceOtherRow label {
+  color: #0f0f0f;
+}
+
+/* Standard paper report sections: dimmed theme labels on cream fields */
+.createPage .reportInformation .report-document .report-document-body .section .inputWrapper > div label,
+.listPage .reportInformation .report-document .report-document-body .section .inputWrapper > div label {
+  color: #0f0f0f;
 }
 
 .report-doc-auth-bar {

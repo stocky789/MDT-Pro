@@ -4,6 +4,8 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Media;
+using System.Windows.Threading;
 using MDTProNative.Client;
 using MDTProNative.Wpf.Helpers;
 using MDTProNative.Wpf.Services;
@@ -17,7 +19,7 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
     sealed record StatusPick(int Value, string Label);
 
     readonly ObservableCollection<ArrestChargeRow> _charges = new();
-    readonly List<ArrestChargePickerOption> _arrestChargePickList = new();
+    readonly ObservableCollection<ArrestChargePickerOption> _arrestChargePickList = new();
     MdtConnectionManager? _connection;
     bool _suppressArrestChargePick;
 
@@ -69,6 +71,9 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
         if (connection?.Http == null)
         {
             _arrestChargePickList.Clear();
+            var embedded = MdtEmbeddedChargeOptions.LoadArrestRoot();
+            foreach (var o in ArrestChargePickerOption.ParseGroups(embedded))
+                _arrestChargePickList.Add(o);
             ReportDocumentBrandingHelper.ApplyChrome(null, "arrestTitle", "Arrest & Booking Report", DocHeader, BrandingTemplateHint, "offline", BrandingFooter);
             return;
         }
@@ -86,8 +91,9 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
             await Dispatcher.InvokeAsync(() =>
             {
                 _arrestChargePickList.Clear();
-                _arrestChargePickList.AddRange(list);
-                CollectionViewSource.GetDefaultView(_charges).Refresh();
+                foreach (var o in list)
+                    _arrestChargePickList.Add(o);
+                Dispatcher.BeginInvoke(SyncArrestChargeComboTexts, DispatcherPriority.ApplicationIdle);
             });
         }
         catch
@@ -98,8 +104,23 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
 
     void ArrestChargeCombo_Loaded(object sender, RoutedEventArgs e)
     {
-        if (sender is ComboBox cb)
-            cb.ItemsSource = _arrestChargePickList;
+        if (sender is not ComboBox cb) return;
+        cb.ItemsSource = _arrestChargePickList;
+        if (cb.DataContext is not ArrestChargeRow row) return;
+        void PushText()
+        {
+            cb.Text = row.ChargeName ?? "";
+            BindingOperations.GetBindingExpression(cb, ComboBox.TextProperty)?.UpdateTarget();
+        }
+
+        cb.Dispatcher.BeginInvoke(PushText, DispatcherPriority.Loaded);
+        cb.Dispatcher.BeginInvoke(PushText, DispatcherPriority.ApplicationIdle);
+    }
+
+    void ArrestChargeCombo_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ComboBox cb || cb.DataContext is not ArrestChargeRow row) return;
+        row.ChargeName = cb.Text?.Trim() ?? "";
     }
 
     void ArrestChargeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -107,19 +128,51 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
         if (_suppressArrestChargePick) return;
         if (sender is not ComboBox cb || cb.DataContext is not ArrestChargeRow row) return;
         if (cb.SelectedItem is not ArrestChargePickerOption opt) return;
+
         opt.ApplyTo(row);
-        // Clearing selection resets editable ComboBox Text and pushes "" into the ChargeName binding.
-        var name = opt.ChargeName;
+        var name = opt.ChargeName?.Trim() ?? "";
+
         _suppressArrestChargePick = true;
         try
         {
             cb.SelectedItem = null;
-            row.ChargeName = name;
         }
         finally
         {
             _suppressArrestChargePick = false;
         }
+
+        cb.Dispatcher.BeginInvoke(() =>
+        {
+            cb.Text = name;
+            row.ChargeName = name;
+        }, DispatcherPriority.Background);
+    }
+
+    void SyncArrestChargeComboTexts()
+    {
+        ArrestChargesGrid.UpdateLayout();
+        foreach (var item in _charges)
+        {
+            if (ArrestChargesGrid.ItemContainerGenerator.ContainerFromItem(item) is not DataGridRow rowContainer) continue;
+            var cb = FindVisualChild<ComboBox>(rowContainer);
+            if (cb == null || cb.DataContext is not ArrestChargeRow r) continue;
+            cb.Text = r.ChargeName ?? "";
+        }
+    }
+
+    static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+    {
+        var n = VisualTreeHelper.GetChildrenCount(parent);
+        for (var i = 0; i < n; i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T t) return t;
+            var nested = FindVisualChild<T>(child);
+            if (nested != null) return nested;
+        }
+
+        return null;
     }
 
     public void LoadFromReport(JObject report)
@@ -183,6 +236,7 @@ public partial class ArrestReportForm : UserControl, IReportFormPane
         _charges.Clear();
         foreach (var row in ArrestChargeRow.CollectionFromCharges(report["Charges"]))
             _charges.Add(row);
+        Dispatcher.BeginInvoke(SyncArrestChargeComboTexts, DispatcherPriority.ApplicationIdle);
 
         LoadUseOfForce(report["UseOfForce"] as JObject);
     }

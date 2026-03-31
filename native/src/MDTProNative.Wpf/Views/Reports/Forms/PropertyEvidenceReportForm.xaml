@@ -14,7 +14,7 @@
             <Button x:Name="PopoutBtn" Content="POP OUT" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
             <TextBlock x:Name="BrandingTemplateHint"
                        VerticalAlignment="Center"
-                       Foreground="{StaticResource CadMuted}"
+                       Foreground="{StaticResource CadText}"
                        FontSize="11"
                        Text="" />
         </StackPanel>
@@ -24,6 +24,7 @@
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
             <Border x:Name="DocumentPrintRoot"
+                    TextElement.Foreground="{StaticResource ReportDocInkBrush}"
                     Background="{StaticResource ReportDocPaperBrush}"
                     BorderBrush="{StaticResource ReportDocInkBrush}"
                     BorderThickness="1"
@@ -65,6 +66,7 @@
                                            HorizontalAlignment="Center"
                                            FontWeight="Bold"
                                            FontSize="11"
+                                           Foreground="{StaticResource ReportDocInkBrush}"
                                            TextWrapping="Wrap"
                                            Margin="4" />
                             </Grid>
@@ -111,7 +113,11 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Date" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
-                        <DatePicker x:Name="GeneralDatePicker" Grid.Row="1" Grid.Column="0" FontSize="11" Margin="0,0,0,0" />
+                        <DatePicker x:Name="GeneralDatePicker"
+                                    Grid.Row="1"
+                                    Grid.Column="0"
+                                    Margin="0,0,0,0"
+                                    Style="{StaticResource ReportDocDatePicker}" />
                         <TextBlock Grid.Row="0" Grid.Column="2" Text="Short year" Style="{StaticResource ReportDocLabel}" Margin="0,0,0,2" />
                         <TextBox x:Name="GeneralShortYearBox" Grid.Row="1" Grid.Column="2" Style="{StaticResource ReportDocTextBox}" />
                     </Grid>
@@ -189,7 +195,7 @@
                                    Text="Authorization: I authorize the prosecuting attorney to receive a copy of the related lab report. Signature: ________________________________  Date: __________" />
                     </Border>
 
-                    <TextBlock Text="Subjects (from whom seized)" Style="{StaticResource ReportDocLabel}" FontWeight="Bold" Margin="0,0,0,2" />
+                    <TextBlock Text="Subjects (from whom seized)" Style="{StaticResource ReportDocSectionTitle}" Margin="0,8,0,6" />
                     <TextBox x:Name="SubjectPedNamesBox"
                              Style="{StaticResource ReportDocTextBox}"
                              MinHeight="72"
@@ -235,18 +241,19 @@
                         <Button x:Name="AddDrugBtn" Grid.Column="6" Content="ADD" Style="{StaticResource CadButton}" Padding="14,6" VerticalAlignment="Center" />
                     </Grid>
                     <ListBox x:Name="SeizedDrugsList"
+                             Style="{StaticResource ReportDocListBox}"
                              MinHeight="56"
                              MaxHeight="220"
-                             Margin="0,0,0,10"
-                             BorderBrush="{StaticResource ReportDocInkBrush}"
-                             BorderThickness="1"
-                             Background="{StaticResource ReportDocFieldFill}"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                             Margin="0,0,0,10">
                         <ListBox.ItemTemplate>
                             <DataTemplate DataType="{x:Type forms:SeizedDrugRow}">
                                 <DockPanel LastChildFill="True">
                                     <Button DockPanel.Dock="Right" Content="REMOVE" Style="{StaticResource CadRailOutlineButton}" Padding="10,2" Margin="8,0,0,0" VerticalAlignment="Center" Click="RemoveSeizedDrug_Click" />
-                                    <TextBlock Text="{Binding DisplayLine}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="4" />
+                                    <TextBlock Text="{Binding DisplayLine}"
+                                               TextWrapping="Wrap"
+                                               VerticalAlignment="Center"
+                                               Margin="4"
+                                               Foreground="{StaticResource ReportDocInkBrush}" />
                                 </DockPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -263,18 +270,19 @@
                         <Button x:Name="AddFirearmBtn" Grid.Column="2" Content="ADD" Style="{StaticResource CadButton}" Padding="14,6" VerticalAlignment="Center" />
                     </Grid>
                     <ListBox x:Name="SeizedFirearmsList"
+                             Style="{StaticResource ReportDocListBox}"
                              MinHeight="48"
                              MaxHeight="160"
-                             Margin="0,0,0,10"
-                             BorderBrush="{StaticResource ReportDocInkBrush}"
-                             BorderThickness="1"
-                             Background="{StaticResource ReportDocFieldFill}"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                             Margin="0,0,0,10">
                         <ListBox.ItemTemplate>
                             <DataTemplate DataType="{x:Type forms:SeizedFirearmRow}">
                                 <DockPanel LastChildFill="True">
                                     <Button DockPanel.Dock="Right" Content="REMOVE" Style="{StaticResource CadRailOutlineButton}" Padding="10,2" Margin="8,0,0,0" VerticalAlignment="Center" Click="RemoveFirearm_Click" />
-                                    <TextBlock Text="{Binding DisplayLine}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="4" />
+                                    <TextBlock Text="{Binding DisplayLine}"
+                                               TextWrapping="Wrap"
+                                               VerticalAlignment="Center"
+                                               Margin="4"
+                                               Foreground="{StaticResource ReportDocInkBrush}" />
                                 </DockPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -291,7 +299,7 @@
                     <TextBlock x:Name="BrandingFooter"
                                TextWrapping="Wrap"
                                FontSize="10"
-                               Foreground="#444"
+                               Foreground="{StaticResource ReportDocInkBrush}"
                                Margin="0,8,0,0" />
                 </StackPanel>
             </Border>

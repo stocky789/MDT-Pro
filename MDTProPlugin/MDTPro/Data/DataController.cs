@@ -318,23 +318,25 @@ namespace MDTPro.Data {
         }
 
         /// <summary>HTTP runs on the pool; refresh nearby-vehicle cache on the game fiber before Vehicle Search reads it (same idea as <see cref="RefreshMdtLocationOnGameFiberBlocking"/>).</summary>
-        internal static void RefreshCachedNearbyVehiclesOnGameFiberBlocking(int timeoutMs = 2000) {
+        /// <returns><c>true</c> if the game fiber finished the scan; <c>false</c> on timeout or setup failure (common when GTA V is unfocused and the frame loop is paused).</returns>
+        internal static bool RefreshCachedNearbyVehiclesOnGameFiberBlocking(int timeoutMs = 4500) {
             try {
-                var done = new ManualResetEventSlim(false);
-                GameFiber.StartNew(() => {
+                if (!GameFiberHttpBridge.TryExecuteBlocking(() => {
                     try {
                         UpdateCachedNearbyVehicles(fullWorldScan: true);
                     } catch (Exception ex) {
                         Helper.Log($"RefreshCachedNearbyVehiclesOnGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
-                    } finally {
-                        try { done.Set(); } catch { /* ignore */ }
                     }
-                }, "mdtpro-nearby-veh-refresh");
-                bool ok = done.Wait(timeoutMs);
-                if (!ok)
+                }, timeoutMs, out var caught)) {
                     Helper.Log("RefreshCachedNearbyVehiclesOnGameFiberBlocking: timed out (game paused or overloaded).", false, Helper.LogSeverity.Warning);
+                    return false;
+                }
+                if (caught != null)
+                    Helper.Log($"RefreshCachedNearbyVehiclesOnGameFiberBlocking: {caught.Message}", false, Helper.LogSeverity.Warning);
+                return caught == null;
             } catch (Exception ex) {
                 Helper.Log($"RefreshCachedNearbyVehiclesOnGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
+                return false;
             }
         }
 
@@ -355,19 +357,16 @@ namespace MDTPro.Data {
             if (string.IsNullOrWhiteSpace(plateOrVin)) return null;
             MDTProVehicleData found = null;
             try {
-                var done = new ManualResetEventSlim(false);
                 string q = plateOrVin.Trim();
-                GameFiber.StartNew(() => {
+                if (!GameFiberHttpBridge.TryExecuteBlocking(() => {
                     try {
                         found = TryFindLiveWorldVehicleDataForPlateOrVin(q);
                     } catch (Exception ex) {
                         Helper.Log($"TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
-                    } finally {
-                        try { done.Set(); } catch { /* ignore */ }
                     }
-                }, "mdtpro-specific-veh-resolve");
-                if (!done.Wait(timeoutMs))
+                }, timeoutMs, out _)) {
                     Helper.Log("TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: timed out (game paused or overloaded).", false, Helper.LogSeverity.Warning);
+                }
             } catch (Exception ex) {
                 Helper.Log($"TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
@@ -377,18 +376,17 @@ namespace MDTPro.Data {
         /// <summary>HTTP/WebSocket run on the thread pool; schedule <see cref="UpdatePlayerLocation"/> on the game fiber then wait so reads are not stale or never filled.</summary>
         internal static void RefreshMdtLocationOnGameFiberBlocking(int timeoutMs = 1500) {
             try {
-                var done = new ManualResetEventSlim(false);
-                GameFiber.StartNew(() => {
+                bool ran = GameFiberHttpBridge.TryExecuteBlocking(() => {
                     try {
                         UpdatePlayerLocation();
                     } catch (Exception ex) {
                         Helper.Log($"RefreshMdtLocationOnGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
-                    } finally {
-                        try { done.Set(); } catch { /* ignore */ }
                     }
-                }, "mdtpro-loc-refresh");
-                if (!done.Wait(timeoutMs))
+                }, timeoutMs, out var caught);
+                if (!ran)
                     Helper.Log("RefreshMdtLocationOnGameFiberBlocking: timed out (game paused or overloaded).", false, Helper.LogSeverity.Warning);
+                if (caught != null)
+                    Helper.Log($"RefreshMdtLocationOnGameFiberBlocking: {caught.Message}", false, Helper.LogSeverity.Warning);
             } catch (Exception ex) {
                 Helper.Log($"RefreshMdtLocationOnGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
@@ -2171,16 +2169,13 @@ namespace MDTPro.Data {
                 if (GameFiber.CanSleepNow) {
                     result = TryRefreshVehicleDocumentsFromLiveWorldExecute(vehicleData);
                 } else {
-                    var done = new ManualResetEventSlim(false);
-                    GameFiber.StartNew(() => {
-                        try {
-                            result = TryRefreshVehicleDocumentsFromLiveWorldExecute(vehicleData);
-                        } finally {
-                            try { done.Set(); } catch { /* ignore */ }
-                        }
-                    }, "mdtpro-stp-vehicle-docs");
-                    if (!done.Wait(2500))
+                    if (!GameFiberHttpBridge.TryExecuteBlocking(() => {
+                        result = TryRefreshVehicleDocumentsFromLiveWorldExecute(vehicleData);
+                    }, 2500, out var docEx)) {
                         Helper.Log("TryRefreshVehicleDocumentsFromLiveWorld: timed out waiting for game fiber (paused game?).", false, Helper.LogSeverity.Warning);
+                    } else if (docEx != null) {
+                        Helper.Log($"TryRefreshVehicleDocumentsFromLiveWorld: {docEx.Message}", false, Helper.LogSeverity.Warning);
+                    }
                 }
             } catch (Exception ex) {
                 Helper.Log($"TryRefreshVehicleDocumentsFromLiveWorld: {ex.Message}", false, Helper.LogSeverity.Warning);

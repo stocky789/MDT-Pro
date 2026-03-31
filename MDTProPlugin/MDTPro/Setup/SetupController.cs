@@ -309,13 +309,13 @@ namespace MDTPro.Setup {
 
         private static List<CitationGroup> cachedCitationOptions;
         internal static List<CitationGroup> GetCitationOptions() {
-            cachedCitationOptions ??= Helper.ReadFromJsonFile<List<CitationGroup>>(CitationOptionsPath);
+            cachedCitationOptions ??= Helper.ReadFromJsonFile<List<CitationGroup>>(CitationOptionsPath) ?? new List<CitationGroup>();
             return cachedCitationOptions;
         }
 
         private static List<ArrestGroup> cachedArrestOptions;
         internal static List<ArrestGroup> GetArrestOptions() {
-            cachedArrestOptions ??= Helper.ReadFromJsonFile<List<ArrestGroup>>(ArrestOptionsPath);
+            cachedArrestOptions ??= Helper.ReadFromJsonFile<List<ArrestGroup>>(ArrestOptionsPath) ?? new List<ArrestGroup>();
             return cachedArrestOptions;
         }
 

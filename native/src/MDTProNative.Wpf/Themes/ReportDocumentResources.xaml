@@ -4,7 +4,8 @@
     <SolidColorBrush x:Key="ReportDocFieldFill" Color="{StaticResource ReportDocFieldFillColor}" />
     <SolidColorBrush x:Key="ReportDocAuthBarBrush" Color="#B8D4E8" />
     <SolidColorBrush x:Key="ReportDocPaperBrush" Color="#FFFFFFFF" />
-    <SolidColorBrush x:Key="ReportDocInkBrush" Color="#FF000000" />
+    <!-- High-contrast body copy for paper-style reports (avoid light greys on white/cream). -->
+    <SolidColorBrush x:Key="ReportDocInkBrush" Color="#FF0F0F0F" />
 
     <Style x:Key="ReportDocLabel" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="Segoe UI" />
@@ -27,6 +28,43 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="4,2" />
         <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+        <Setter Property="CaretBrush" Value="{StaticResource ReportDocInkBrush}" />
+    </Style>
+
+    <Style x:Key="ReportDocDatePicker" TargetType="DatePicker">
+        <Setter Property="FontFamily" Value="Segoe UI" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+        <Setter Property="Background" Value="{StaticResource ReportDocFieldFill}" />
+        <Setter Property="BorderBrush" Value="{StaticResource ReportDocInkBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Style.Resources>
+            <Style TargetType="DatePickerTextBox">
+                <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+                <Setter Property="CaretBrush" Value="{StaticResource ReportDocInkBrush}" />
+                <Setter Property="Background" Value="{StaticResource ReportDocFieldFill}" />
+            </Style>
+        </Style.Resources>
+    </Style>
+
+    <!-- Paper-style grids: global CAD DataGrid uses dark rows + light text; reports need cream rows + ink. -->
+    <Style x:Key="ReportDocDataGridColumnHeader" TargetType="DataGridColumnHeader">
+        <Setter Property="Background" Value="{StaticResource ReportDocAuthBarBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource ReportDocInkBrush}" />
+        <Setter Property="BorderThickness" Value="0,0,1,1" />
+        <Setter Property="Padding" Value="8,6" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+    </Style>
+
+    <Style x:Key="ReportDocListBox" TargetType="ListBox">
+        <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+        <Setter Property="Background" Value="{StaticResource ReportDocFieldFill}" />
+        <Setter Property="BorderBrush" Value="{StaticResource ReportDocInkBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
     </Style>
 
     <!-- Selected report DataGrid cells inherit Cad foreground (light); force dark type on light combo fields. -->
@@ -45,6 +83,77 @@
         </Style.Triggers>
     </Style>
 
+    <!-- Non-editable combos: explicit template so OS/Fluent themes cannot draw light text on cream fields. -->
+    <ControlTemplate x:Key="ReportDocComboTemplate" TargetType="ComboBox">
+        <Grid SnapsToDevicePixels="True">
+            <Border x:Name="MainBorder"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ContentPresenter x:Name="ContentSite"
+                                      Grid.Column="0"
+                                      Margin="{TemplateBinding Padding}"
+                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                      IsHitTestVisible="False"
+                                      Content="{TemplateBinding SelectionBoxItem}"
+                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                      ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                      TextElement.Foreground="{TemplateBinding Foreground}" />
+                    <Path Grid.Column="1"
+                          Width="8"
+                          Height="5"
+                          Margin="0,0,10,0"
+                          VerticalAlignment="Center"
+                          Fill="{StaticResource ReportDocInkBrush}"
+                          Stretch="Uniform"
+                          Data="M 0,0 L 4,5 L 8,0 Z" />
+                    <ToggleButton x:Name="DropDownToggle"
+                                  Grid.ColumnSpan="2"
+                                  Focusable="False"
+                                  FocusVisualStyle="{x:Null}"
+                                  Background="Transparent"
+                                  BorderThickness="0"
+                                  IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                  ClickMode="Press" />
+                </Grid>
+            </Border>
+            <Popup x:Name="PART_Popup"
+                   AllowsTransparency="True"
+                   Focusable="False"
+                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                   Placement="Bottom"
+                   PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                   PopupAnimation="Fade"
+                   VerticalOffset="1">
+                <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                        MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                        Background="{StaticResource ReportDocPaperBrush}"
+                        BorderBrush="{StaticResource ReportDocInkBrush}"
+                        BorderThickness="1"
+                        SnapsToDevicePixels="True">
+                    <ScrollViewer Margin="0"
+                                  CanContentScroll="True"
+                                  HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
+                                  VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
+                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"
+                                        SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                    </ScrollViewer>
+                </Border>
+            </Popup>
+        </Grid>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.45" />
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+
     <Style x:Key="ReportDocCombo" TargetType="ComboBox">
         <Setter Property="FontFamily" Value="Segoe UI" />
         <Setter Property="FontSize" Value="11" />
@@ -55,10 +164,43 @@
         <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
         <Setter Property="TextElement.Foreground" Value="{StaticResource ReportDocInkBrush}" />
         <Setter Property="ItemContainerStyle" Value="{StaticResource ReportDocComboItem}" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+        <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template" Value="{StaticResource ReportDocComboTemplate}" />
         <Style.Resources>
             <Style TargetType="TextBox">
                 <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
                 <Setter Property="CaretBrush" Value="{StaticResource ReportDocInkBrush}" />
+            </Style>
+        </Style.Resources>
+    </Style>
+
+    <!--
+      Editable charge/violation combos must NOT use ReportDocComboTemplate (non-editable) and must NOT set Template to null
+      (that removes all chrome — no box, no dropdown arrow). Omit Template so the OS/theme editable ComboBox template applies.
+    -->
+    <Style x:Key="ReportDocComboEditable" TargetType="ComboBox">
+        <Setter Property="FontFamily" Value="Segoe UI" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Background" Value="{StaticResource ReportDocFieldFill}" />
+        <Setter Property="BorderBrush" Value="{StaticResource ReportDocInkBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="4,2" />
+        <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+        <Setter Property="TextElement.Foreground" Value="{StaticResource ReportDocInkBrush}" />
+        <Setter Property="ItemContainerStyle" Value="{StaticResource ReportDocComboItem}" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+        <Style.Resources>
+            <Style TargetType="TextBox">
+                <Setter Property="Foreground" Value="{StaticResource ReportDocInkBrush}" />
+                <Setter Property="CaretBrush" Value="{StaticResource ReportDocInkBrush}" />
+                <Setter Property="Background" Value="{StaticResource ReportDocFieldFill}" />
             </Style>
         </Style.Resources>
     </Style>

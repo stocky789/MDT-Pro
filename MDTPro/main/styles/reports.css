@@ -865,12 +865,13 @@ body {
   margin-top: 8px;
 }
 
-/* Property and Evidence Receipt section */
+/* Property and Evidence Receipt section (always rendered inside .report-document — paper colors, not theme vars) */
 .propertyEvidenceSection .propertyEvidenceSubsectionTitle {
   font-size: 14px;
   font-weight: 600;
   margin-top: 16px;
   margin-bottom: 8px;
+  color: #0f0f0f;
 }
 
 .propertyEvidenceSection .propertyEvidenceRecentIdsList {
@@ -919,8 +920,8 @@ body {
 .propertyEvidenceSection .propertyEvidenceSubjectsList .chargeWrapper,
 .propertyEvidenceSection .propertyEvidenceDrugsList .chargeWrapper,
 .propertyEvidenceSection .propertyEvidenceFirearmsList .chargeWrapper {
-  background-color: var(--color-surface-elevated);
-  border: 1px solid var(--color-border);
+  background-color: #fdebdf;
+  border: 1px solid #000;
   border-radius: 3px;
   padding: 8px 10px;
   font-size: 14px;
@@ -928,12 +929,13 @@ body {
   flex-direction: row;
   align-items: center;
   gap: 8px;
+  color: #0f0f0f;
 }
 
 .propertyEvidenceSection .chargeWrapper .chargeName {
   flex: 1;
   min-width: 0;
-  color: var(--color-text-primary);
+  color: #0f0f0f;
   font-weight: 600;
 }
 
@@ -950,8 +952,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  fill: var(--color-text-primary);
-  color: var(--color-text-primary);
+  fill: #0f0f0f;
+  color: #0f0f0f;
   font-size: 18px;
   line-height: 1;
 }
@@ -983,7 +985,7 @@ body {
 .propertyEvidenceSection .propertyEvidenceOtherRow label {
   font-size: 13px;
   font-weight: 500;
-  color: var(--color-text-primary-dimmed);
+  color: #0f0f0f;
   display: block;
   margin-bottom: 0;
 }

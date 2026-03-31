@@ -4,6 +4,7 @@ using MDTPro.Utility;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
 using System.Net;
@@ -28,7 +29,9 @@ namespace MDTPro.ServerAPI {
                 if (limit < 1) limit = 1;
                 if (limit > 20) limit = 20;
 
-                DataController.RefreshCachedNearbyVehiclesOnGameFiberBlocking();
+                bool scanCompleted = DataController.RefreshCachedNearbyVehiclesOnGameFiberBlocking(900);
+                if (!scanCompleted)
+                    ExtraResponseHeaders = new List<(string name, string value)> { ("X-MdtPro-Nearby-Scan", "deferred") };
                 var cached = DataController.GetCachedNearbyVehicles(limit);
                 var nearbyVehicles = cached.Select(x => new {
                     x.LicensePlate,
@@ -122,7 +125,7 @@ namespace MDTPro.ServerAPI {
                 if (vehicleData == null && !string.IsNullOrEmpty(licensePlateOrVin) && !wantContextOnly)
                     vehicleData = DataController.GetVehicleByPlateOrVin(licensePlateOrVin);
                 if (vehicleData == null && !string.IsNullOrEmpty(licensePlateOrVin) && !wantContextOnly)
-                    vehicleData = DataController.TryResolveVehicleFromLiveWorldByPlateOrVinBlocking(licensePlateOrVin);
+                    vehicleData = DataController.TryResolveVehicleFromLiveWorldByPlateOrVinBlocking(licensePlateOrVin, 500);
 
                 if (vehicleData != null && vehicleData.CDFVehicleData != null)
                     DataController.MergeBOLOsFromStubByPlate(vehicleData);
@@ -211,7 +214,7 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/json";
             } else if (path == "playerLocation") {
-                DataController.RefreshMdtLocationOnGameFiberBlocking(1500);
+                DataController.RefreshMdtLocationOnGameFiberBlocking(350);
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.MdtPreferredLocation));
                 status = 200;
                 contentType = "text/json";
