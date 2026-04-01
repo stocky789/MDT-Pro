@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -180,9 +181,22 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
 
         filtered = sortIdx switch
         {
-            1 => filtered.OrderByDescending(c => c.Value<int?>("RepeatOffenderScore") ?? 0).ToList(),
-            2 => filtered.OrderByDescending(c => c.Value<int?>("ShortYear") ?? 0).ToList(),
-            _ => filtered.OrderByDescending(c => c["LastUpdatedUtc"]?.ToString() ?? "").ToList()
+            1 => filtered
+                .OrderByDescending(c => c.Value<int?>("RepeatOffenderScore") ?? 0)
+                .ThenByDescending(CourtRecencySortUtc)
+                .ThenByDescending(CourtCaseNumberSequence)
+                .ThenBy(c => c["Number"]?.ToString() ?? "", StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            2 => filtered
+                .OrderByDescending(c => c.Value<int?>("ShortYear") ?? 0)
+                .ThenByDescending(CourtCaseNumberSequence)
+                .ThenBy(c => c["Number"]?.ToString() ?? "", StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            _ => filtered
+                .OrderByDescending(CourtRecencySortUtc)
+                .ThenByDescending(CourtCaseNumberSequence)
+                .ThenBy(c => c["Number"]?.ToString() ?? "", StringComparer.OrdinalIgnoreCase)
+                .ToList()
         };
 
         foreach (var c in filtered)
@@ -1152,6 +1166,53 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
             Margin = new Thickness(0, 6, 0, 0)
         });
         return sp;
+    }
+
+    /// <summary>Primary instant for docket ordering when <c>LastUpdatedUtc</c> is missing on legacy rows (ties were leaving SQLite order random).</summary>
+    static DateTime CourtRecencySortUtc(JObject c)
+    {
+        if (TryCourtTokenUtc(c["LastUpdatedUtc"], out var u)) return u;
+        if (TryCourtTokenUtc(c["CreatedAtUtc"], out u)) return u;
+        if (TryCourtTokenUtc(c["HearingDateUtc"], out u)) return u;
+        if (TryCourtTokenUtc(c["ResolveAtUtc"], out u)) return u;
+        return DateTime.MinValue;
+    }
+
+    static bool TryCourtTokenUtc(JToken? t, out DateTime utc)
+    {
+        utc = default;
+        if (t == null || t.Type == JTokenType.Null) return false;
+        if (t.Type == JTokenType.Date)
+        {
+            var dt = t.Value<DateTime>();
+            utc = NormalizeUtc(dt);
+            return true;
+        }
+
+        var s = t.ToString();
+        if (string.IsNullOrWhiteSpace(s)) return false;
+        if (!NativeMdtFormat.TryParseMdtDateTime(s, out var parsed)) return false;
+        utc = NormalizeUtc(parsed);
+        return true;
+    }
+
+    static DateTime NormalizeUtc(DateTime dt) =>
+        dt.Kind switch
+        {
+            DateTimeKind.Utc => dt,
+            DateTimeKind.Local => dt.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(dt, DateTimeKind.Utc)
+        };
+
+    /// <summary>Trailing segment of docket numbers like <c>26-000007</c> so same two-digit year still sorts deterministically.</summary>
+    static int CourtCaseNumberSequence(JObject c)
+    {
+        var num = c["Number"]?.ToString() ?? "";
+        var i = num.LastIndexOf('-');
+        if (i < 0 || i >= num.Length - 1) return int.MinValue;
+        return int.TryParse(num.AsSpan(i + 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var seq)
+            ? seq
+            : int.MinValue;
     }
 
     Grid KvGrid((string label, string value)[] rows)
