@@ -59,8 +59,12 @@ namespace MDTPro.EventListeners {
                 Location = new Location(callout.CalloutPosition);
                 Coords[0] = callout.CalloutPosition.X;
                 Coords[1] = callout.CalloutPosition.Y;
-                // LSPDFR handle reflects the live acceptance state; some CI/LSPDFR callout instances report a stale property at display time.
-                AcceptanceState = handle != null ? LspdFunc.GetCalloutAcceptanceState(handle) : callout.AcceptanceState;
+                // For Callout Interface scripts, LSPDFR's handle-based state often reads as already "responded" on display
+                // even though the player has not accepted in CI yet — use the callout instance (CI/LSPDFR) for the initial MDT state.
+                // For other callouts, prefer the handle when available; some instances report a stale callout.AcceptanceState at display time.
+                AcceptanceState = callout.ScriptInfo is CalloutInterfaceAPI.CalloutInterfaceAttribute
+                    ? callout.AcceptanceState
+                    : (handle != null ? LspdFunc.GetCalloutAcceptanceState(handle) : callout.AcceptanceState);
                 DisplayedTime = DateTime.Now;
             }
         }

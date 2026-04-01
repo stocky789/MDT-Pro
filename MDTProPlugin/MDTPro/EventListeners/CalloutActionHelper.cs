@@ -64,7 +64,11 @@ namespace MDTPro.EventListeners {
 
         static CalloutActionOutcome TryAccept(LHandle handle) {
             var state = LspdFunc.GetCalloutAcceptanceState(handle);
-            if (state != CalloutAcceptanceState.Pending)
+            var callout = CalloutHandleResolver.TryGetCallout(handle);
+            // Match CalloutEvents: CI callouts can report a false "already responded" on the LSPDFR handle while the instance is still pending.
+            var ciStillPending = callout?.ScriptInfo is CalloutInterfaceAPI.CalloutInterfaceAttribute
+                && callout.AcceptanceState == CalloutAcceptanceState.Pending;
+            if (state != CalloutAcceptanceState.Pending && !ciStillPending)
                 return new CalloutActionOutcome { Result = CalloutActionResult.BadState, Message = "Callout is not waiting for acceptance (already accepted or finished)." };
             LspdFunc.AcceptPendingCallout(handle);
             return new CalloutActionOutcome { Result = CalloutActionResult.Ok, Message = "Accepted." };
