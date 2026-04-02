@@ -30,7 +30,7 @@ namespace MDTPro.Utility {
                     pedHandle = holder.Handle;
             }
             if (!pedHandle.HasValue)
-                pedHandle = DataController.GetRecentlyIdentifiedPedHandle(pedName);
+                pedHandle = DataController.GetRecentlyIdentifiedPedHandle(pedName, pedData?.Birthday);
 
             if (!pedHandle.HasValue) {
                 if (pedData == null) {
