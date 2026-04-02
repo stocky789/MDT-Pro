@@ -4,6 +4,14 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
+## [0.9.8.3] — 2026-04-02
+
+### Bug Fixes
+
+- **Person Search — ID photo (requires further testing)** — Wrong portraits have been reported for a long time and past fixes haven’t nailed it for everyone. This build **tries another approach**: when the MDT has **date of birth**, it uses that to tell same-name records apart, and when you search it **may** prefer pedestrians **near you** or at a **recent traffic stop** so the picture isn’t only driven by a stale or shared name.
+
+---
+
 ## [0.9.8.2] — 2026-03-30
 
 ### Bug Fixes

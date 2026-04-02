@@ -205,6 +205,12 @@ namespace MDTPro.Setup {
         /// <summary>When true, log MDT location resolution (player position, STP stop scene, postal/street/area/county strings) to MDTPro.log on change or every 30s. Use when taskbar/report location is blank or wrong.</summary>
         public bool locationDebugLogging = false;
 
+        /// <summary>When true, log Person Search portrait refresh (model name/hash changes, handle-map misses, DOB mismatches). Off by default.</summary>
+        public bool pedPortraitDebugLogging = false;
+
+        /// <summary>Max distance (meters) from the player when scanning nearby peds to refresh catalogue portrait for Person Search.</summary>
+        public float pedPortraitNearbyScanRadiusMeters = 40f;
+
         /// <summary>Backup Quick Actions: Auto (Policing Redefined BackupAPI if present, else Ultimate Backup), PolicingRedefined, or UltimateBackup.</summary>
         public string integrationBackupProvider = "Auto";
 

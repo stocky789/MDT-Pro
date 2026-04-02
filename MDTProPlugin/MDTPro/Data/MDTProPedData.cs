@@ -5,6 +5,7 @@ using System.Reflection;
 using Rage;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using static MDTPro.Setup.SetupController;
 using static MDTPro.Utility.CitationArrestHelper;
@@ -212,6 +213,9 @@ namespace MDTPro.Data {
         /// <summary>Copies CDF-backed display fields from another row (e.g. <c>new MDTProPedData(ped)</c>) onto this record. Does not copy citations, arrests, identification history, incarceration, deceased flags, or times stopped.</summary>
         internal void CopyCdfMirroredDisplayFieldsFrom(MDTProPedData liveRead) {
             if (liveRead == null) return;
+            uint prevHash = ModelHash;
+            string prevName = ModelName;
+            bool prevPortraitOk = PedPortraitModelHelper.IsSuitableForCatalogueIdPhoto(prevName) && (prevHash != 0 || !string.IsNullOrEmpty(prevName));
             Name = liveRead.Name;
             FirstName = liveRead.FirstName;
             LastName = liveRead.LastName;
@@ -235,6 +239,11 @@ namespace MDTPro.Data {
             FishingPermitExpiration = liveRead.FishingPermitExpiration;
             HuntingPermitStatus = liveRead.HuntingPermitStatus;
             HuntingPermitExpiration = liveRead.HuntingPermitExpiration;
+            bool livePortraitOk = PedPortraitModelHelper.IsSuitableForCatalogueIdPhoto(ModelName) && (ModelHash != 0 || !string.IsNullOrEmpty(ModelName));
+            if (!livePortraitOk && prevPortraitOk) {
+                ModelHash = prevHash;
+                ModelName = prevName;
+            }
             TryParseNameIntoFirstLast();
         }
 
@@ -297,6 +306,50 @@ namespace MDTPro.Data {
         public class IdentificationEntry {
             public string Type;
             public string Timestamp;
+        }
+
+        /// <summary>Removes mod-integration suffixes from stored ID history for MDT display (Person Search, Recent IDs). SQLite may still hold legacy values.</summary>
+        internal static string FormatIdentificationTypeForMdtDisplay(string type) {
+            if (string.IsNullOrWhiteSpace(type)) return type;
+            string t = type.TrimEnd();
+            for (;;) {
+                if (t.EndsWith(" (STP)", StringComparison.OrdinalIgnoreCase)) {
+                    t = t.Substring(0, t.Length - 6).TrimEnd();
+                    continue;
+                }
+                if (t.Length >= 5 && t.EndsWith("(STP)", StringComparison.OrdinalIgnoreCase)) {
+                    t = t.Substring(0, t.Length - 5).TrimEnd();
+                    continue;
+                }
+                if (t.EndsWith(" STP", StringComparison.OrdinalIgnoreCase)) {
+                    t = t.Substring(0, t.Length - 4).TrimEnd();
+                    continue;
+                }
+                break;
+            }
+            return t;
+        }
+
+        private static string IdentificationTypeCoalesceKey(string type) {
+            string d = FormatIdentificationTypeForMdtDisplay(type);
+            if (string.IsNullOrEmpty(d)) return "";
+            return d.Replace("'", "").Replace("\"", "").Trim().ToLowerInvariant();
+        }
+
+        internal static bool IsDriverLicenseIdentificationType(string type) =>
+            IdentificationTypeCoalesceKey(type) == "driverslicense";
+
+        internal static bool IsVehiclePaperworkIdentificationType(string type) {
+            string k = IdentificationTypeCoalesceKey(type);
+            return k == "insurance" || k == "registration";
+        }
+
+        internal static bool TryParseIdentificationTimestampUtc(string iso, out DateTime utc) {
+            utc = default;
+            if (string.IsNullOrEmpty(iso)) return false;
+            if (!DateTime.TryParse(iso, null, DateTimeStyles.RoundtripKind, out DateTime dt)) return false;
+            utc = dt.Kind == DateTimeKind.Utc ? dt : dt.ToUniversalTime();
+            return true;
         }
 
         /// <summary>Apply persistent (SQLite) identity onto current ped. For string/identity fields, only overwrite when source has a value so we do not replace good CDF/current data with nulls from an old DB record.</summary>
