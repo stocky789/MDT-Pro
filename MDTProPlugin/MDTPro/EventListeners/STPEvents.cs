@@ -158,7 +158,7 @@ namespace MDTPro.EventListeners {
                     if (eventName == "askPassengerIdEvent") {
                         // RAM + search UX only; SQLite vehicle row when registration/insurance is run (see ped-side STP handlers).
                         DataController.ResolveVehicleAndDriverForStop(veh, persistToSql: false);
-                        DataController.AddIdentificationEventForVehicleOccupantsStp(veh, "Occupant ID (STP)");
+                        DataController.AddIdentificationEventForVehicleOccupantsStp(veh, "Occupant ID");
                     } else if (eventName == "searchVehicleEvent") {
                         DataController.ResolveVehicleAndDriverForStop(veh, persistToSql: false);
                         DataController.CaptureVehicleSearchItems(veh);
@@ -209,14 +209,14 @@ namespace MDTPro.EventListeners {
 
                 if (eventName == "askRegistrationEvent" || eventName == "askInsuranceEvent") {
                     DataController.ResolvePedForReEncounter(ped, persistToSql: false);
-                    DataController.AddIdentificationEvent(ped, eventName == "askRegistrationEvent" ? "Registration (STP)" : "Insurance (STP)");
+                    DataController.AddIdentificationEvent(ped, eventName == "askRegistrationEvent" ? "Registration" : "Insurance");
                     TryAssociateVehicleForStoppedPed(ped, persistVehicleToSql: true);
                     return;
                 }
 
                 if (eventName == "askIdEvent") {
                     DataController.ResolvePedForReEncounter(ped, persistToSql: false);
-                    DataController.AddIdentificationEvent(ped, "Identification (STP)");
+                    DataController.AddIdentificationEvent(ped, "State ID");
                     TryAssociateVehicleForStoppedPed(ped, persistVehicleToSql: false);
                     return;
                 }
@@ -241,7 +241,7 @@ namespace MDTPro.EventListeners {
 
                 if (eventName == "performCPREvent") {
                     DataController.ResolvePedForReEncounter(ped, persistToSql: false);
-                    DataController.AddIdentificationEvent(ped, "CPR (STP)");
+                    DataController.AddIdentificationEvent(ped, "CPR");
                     return;
                 }
             } catch (Exception ex) {

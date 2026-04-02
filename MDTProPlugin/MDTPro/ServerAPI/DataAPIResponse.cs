@@ -12,6 +12,18 @@ using System.Web;
 
 namespace MDTPro.ServerAPI {
     internal class DataAPIResponse : APIResponse {
+        /// <summary>Strip mod suffixes from serialized ped JSON so Person Search / context ped never show " (STP)" in ID history.</summary>
+        private static void FormatIdentificationHistoryTypesForMdt(JObject jo) {
+            if (jo == null) return;
+            if (!(jo["IdentificationHistory"] is JArray arr)) return;
+            foreach (JToken token in arr) {
+                if (token is JObject entry && entry["Type"]?.Type == JTokenType.String) {
+                    string raw = entry.Value<string>("Type");
+                    entry["Type"] = MDTProPedData.FormatIdentificationTypeForMdtDisplay(raw);
+                }
+            }
+        }
+
         internal DataAPIResponse(HttpListenerRequest req) : base(null) {
             string path = req.Url.AbsolutePath.Substring("/data/".Length);
             if (string.IsNullOrEmpty(path)) return;
@@ -69,7 +81,7 @@ namespace MDTPro.ServerAPI {
 
                 Database.SaveSearchHistoryEntry("ped", name, pedData?.Name);
                 if (pedData != null) {
-                    DataController.TryRefreshPedModelFromLiveWorld(pedData, name, reversedName);
+                    DataController.RefreshPedPortraitForPersonSearchBlocking(pedData, name, reversedName);
                     DataController.TryRefreshSupervisionFromLiveWorld(pedData, name, reversedName);
                     DataController.KeepPedInDatabase(pedData);
                     if (MDTProPedData.IsMinimalIdentity(pedData)) {
@@ -80,6 +92,7 @@ namespace MDTPro.ServerAPI {
                 if (pedData != null) {
                     var cases = DataController.GetCourtCasesForPedName(pedData.Name);
                     var jo = JObject.Parse(JsonConvert.SerializeObject(pedData));
+                    FormatIdentificationHistoryTypesForMdt(jo);
                     jo["CourtCases"] = JArray.FromObject(cases ?? new System.Collections.Generic.List<CourtData>());
                     buffer = Encoding.UTF8.GetBytes(jo.ToString(Formatting.None));
                 } else {
@@ -95,6 +108,7 @@ namespace MDTPro.ServerAPI {
                     DataController.TryRefreshSupervisionFromLiveWorld(pedData, ctxName, ctxReversed);
                     var ctxCases = DataController.GetCourtCasesForPedName(pedData.Name);
                     var ctxJo = JObject.Parse(JsonConvert.SerializeObject(pedData));
+                    FormatIdentificationHistoryTypesForMdt(ctxJo);
                     ctxJo["CourtCases"] = JArray.FromObject(ctxCases ?? new System.Collections.Generic.List<CourtData>());
                     buffer = Encoding.UTF8.GetBytes(ctxJo.ToString(Formatting.None));
                 } else {
@@ -361,7 +375,7 @@ namespace MDTPro.ServerAPI {
                     .Select(p => new { p.Name, Latest = p.IdentificationHistory[0], p.IsDeceased })
                     .OrderByDescending(x => x.Latest.Timestamp)
                     .Take(8)
-                    .Select(x => new { x.Name, x.Latest.Type, x.Latest.Timestamp, x.IsDeceased });
+                    .Select(x => new { x.Name, Type = MDTProPedData.FormatIdentificationTypeForMdtDisplay(x.Latest.Type), x.Latest.Timestamp, x.IsDeceased });
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(recentIds));
                 status = 200;
                 contentType = "text/json";
