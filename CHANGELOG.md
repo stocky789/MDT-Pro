@@ -4,7 +4,7 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
-## [0.9.9.0] — 2026-03-29
+## [0.9.9.0] — 2026-04-14
 
 ### Major Features
 
