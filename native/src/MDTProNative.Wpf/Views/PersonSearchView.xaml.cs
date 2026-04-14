@@ -370,7 +370,13 @@ public partial class PersonSearchView : UserControl, IMdtBoundView
         }
 
         var pedPhotoGen = _searchGen;
-        DetailPanel.Children.Add(CreatePedCataloguePhotoChrome(p["ModelName"]?.ToString(), pedPhotoGen));
+        DetailPanel.Children.Add(CreatePedCataloguePhotoChrome(
+            p["ModelName"]?.ToString(),
+            ReadPortraitVariantInt(p["PortraitVariantDrawable"]),
+            ReadPortraitVariantInt(p["PortraitVariantTexture"]),
+            ReadPortraitVariantInt(p["PortraitFaceDrawable"]),
+            ReadPortraitVariantInt(p["PortraitFaceTexture"]),
+            pedPhotoGen));
 
         var pedForNewReports = p["Name"]?.ToString()?.Trim() ?? "";
         if (pedForNewReports.Length > 0)
@@ -451,7 +457,21 @@ public partial class PersonSearchView : UserControl, IMdtBoundView
         DetailScroller.ScrollToVerticalOffset(0);
     }
 
-    Border CreatePedCataloguePhotoChrome(string? modelName, int gen)
+    static int? ReadPortraitVariantInt(JToken? t)
+    {
+        if (t == null || t.Type == JTokenType.Null || t.Type == JTokenType.Undefined) return null;
+        try
+        {
+            int v = t.Value<int>();
+            return v >= 0 ? v : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    Border CreatePedCataloguePhotoChrome(string? modelName, int? portraitHairDrawable, int? portraitHairTexture, int? portraitFaceDrawable, int? portraitFaceTexture, int gen)
     {
         var outer = new Border
         {
@@ -464,6 +484,7 @@ public partial class PersonSearchView : UserControl, IMdtBoundView
             CornerRadius = new CornerRadius(2),
             ClipToBounds = true
         };
+        // Match web MDT .pedIdPhotoImg: face-crop bundle only, cover + center (no full-body zoom).
         var img = new Image
         {
             Stretch = Stretch.UniformToFill,
@@ -492,11 +513,11 @@ public partial class PersonSearchView : UserControl, IMdtBoundView
         outer.Child = grid;
 
         var http = _connection?.Http;
-        _ = ApplyPedCataloguePhotoAsync(img, ph, http, modelName, gen);
+        _ = ApplyPedCataloguePhotoAsync(img, ph, http, modelName, portraitHairDrawable, portraitHairTexture, portraitFaceDrawable, portraitFaceTexture, gen);
         return outer;
     }
 
-    async Task ApplyPedCataloguePhotoAsync(Image img, TextBlock ph, MdtHttpClient? http, string? modelName, int gen)
+    async Task ApplyPedCataloguePhotoAsync(Image img, TextBlock ph, MdtHttpClient? http, string? modelName, int? portraitHairDrawable, int? portraitHairTexture, int? portraitFaceDrawable, int? portraitFaceTexture, int gen)
     {
         if (!NativeCatalogueImageLoader.IsPedPortraitModelSuitable(modelName))
         {
@@ -513,7 +534,7 @@ public partial class PersonSearchView : UserControl, IMdtBoundView
         System.Windows.Media.Imaging.BitmapImage? bmp = null;
         try
         {
-            bmp = await NativeCatalogueImageLoader.LoadPedIdPhotoAsync(http, modelName).ConfigureAwait(false);
+            bmp = await NativeCatalogueImageLoader.LoadPedIdPhotoAsync(http, modelName, portraitHairDrawable, portraitHairTexture, portraitFaceDrawable, portraitFaceTexture).ConfigureAwait(false);
         }
         catch
         {
@@ -532,7 +553,7 @@ public partial class PersonSearchView : UserControl, IMdtBoundView
             else
             {
                 ph.Visibility = Visibility.Visible;
-                ph.Text = "No ID catalogue photo\n(not in MDT bundle or FiveM docs)";
+                ph.Text = "No ID catalogue photo\n(not in MDT bundle)";
                 img.Visibility = Visibility.Collapsed;
             }
         });

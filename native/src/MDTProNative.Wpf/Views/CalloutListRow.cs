@@ -48,10 +48,11 @@ public sealed class CalloutListRow
         return 0;
     }
 
+    /// <summary>LSPDFR <c>CalloutAcceptanceState</c>: 0 = Pending (shown as Open in CAD), 1 = Responded, …</summary>
     public static string StatusLabelFor(int state) => state switch
     {
-        0 => "Pending",
-        1 => "Accepted",
+        0 => "Open",
+        1 => "Responded",
         2 => "En route",
         3 => "Finished",
         _ => "—"

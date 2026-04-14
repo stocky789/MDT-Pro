@@ -51,8 +51,6 @@ public partial class DashboardView : UserControl, IMdtBoundView
         if (_connection != null)
             _connection.CalloutsUpdated -= OnCalloutsUpdated;
         _connection = connection;
-        if (_connection != null)
-            _connection.CalloutsUpdated += OnCalloutsUpdated;
         if (_connection?.Http == null)
         {
             _lastCallouts = null;
@@ -60,7 +58,10 @@ public partial class DashboardView : UserControl, IMdtBoundView
             DetailText.Text = "";
             CadStatusReadout.Text = "—";
             RefreshActionButtons();
+            return;
         }
+        _connection.CalloutsUpdated += OnCalloutsUpdated;
+        _connection.ReplayLastCallouts(OnCalloutsUpdated);
     }
 
     void OnCalloutsUpdated(JArray? list, int count, string? cadUnitStatus)
@@ -113,13 +114,11 @@ public partial class DashboardView : UserControl, IMdtBoundView
             BtnAccept.IsEnabled = false;
             BtnEnRoute.IsEnabled = false;
             BtnGps.IsEnabled = false;
-            BtnSendCi.IsEnabled = false;
             return;
         }
         BtnAccept.IsEnabled = row.AcceptanceState == 0;
         BtnEnRoute.IsEnabled = row.AcceptanceState == 1;
         BtnGps.IsEnabled = true;
-        BtnSendCi.IsEnabled = true;
     }
 
     CalloutListRow? SelectedRow() => CalloutList.SelectedItem as CalloutListRow;
@@ -180,38 +179,6 @@ public partial class DashboardView : UserControl, IMdtBoundView
                 MdtShellEvents.LogCad(action + ": " + (jo?["error"]?.ToString() ?? text));
         }
         catch (Exception ex) { MdtShellEvents.LogCad(action + " error: " + ex.Message); }
-    }
-
-    async void SendToCalloutInterface_Click(object sender, RoutedEventArgs e)
-    {
-        var http = _connection?.Http;
-        var row = SelectedRow();
-        var msg = CalloutMessageDraft.Text?.Trim() ?? "";
-        if (http == null || row == null)
-        {
-            MdtShellEvents.LogCad("Send to CI: connect and select a callout.");
-            return;
-        }
-        if (string.IsNullOrEmpty(msg))
-        {
-            MdtShellEvents.LogCad("Send to CI: enter a message.");
-            return;
-        }
-        try
-        {
-            var body = JsonConvert.SerializeObject(new { action = "sendMessage", calloutId = row.Id, message = msg });
-            var (_, text) = await http.PostActionAsync("calloutAction", body);
-            var jo = ParseJsonLoose(text);
-            var ok = jo?["success"]?.Value<bool>() == true;
-            if (ok)
-            {
-                MdtShellEvents.LogCad("Message sent to Callout Interface.");
-                CalloutMessageDraft.Clear();
-            }
-            else
-                MdtShellEvents.LogCad("Send to CI: " + (jo?["error"]?.ToString() ?? text));
-        }
-        catch (Exception ex) { MdtShellEvents.LogCad("Send to CI error: " + ex.Message); }
     }
 
     static JObject? ParseJsonLoose(string? text)

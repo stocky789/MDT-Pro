@@ -50,7 +50,7 @@ namespace MDTPro.EventListeners {
             var act = (action ?? "").Trim().ToLowerInvariant();
             switch (act) {
                 case "accept":
-                    return TryAccept(handle);
+                    return TryAccept(calloutId, handle);
                 case "enroute":
                 case "en_route":
                     return TryEnRoute(handle);
@@ -62,24 +62,27 @@ namespace MDTPro.EventListeners {
             }
         }
 
-        static CalloutActionOutcome TryAccept(LHandle handle) {
-            var state = LspdFunc.GetCalloutAcceptanceState(handle);
+        static CalloutActionOutcome TryAccept(string calloutId, LHandle handle) {
+            CalloutEvents.TryGetCalloutInformation(calloutId, out var tracked);
+            if (tracked?.FinishedTime != null)
+                return new CalloutActionOutcome { Result = CalloutActionResult.BadState, Message = "Callout has already finished." };
             var callout = CalloutHandleResolver.TryGetCallout(handle);
-            // Match CalloutEvents: CI callouts can report a false "already responded" on the LSPDFR handle while the instance is still pending.
-            var ciStillPending = callout?.ScriptInfo is CalloutInterfaceAPI.CalloutInterfaceAttribute
-                && callout.AcceptanceState == CalloutAcceptanceState.Pending;
-            if (state != CalloutAcceptanceState.Pending && !ciStillPending)
+            var effective = CalloutEvents.GetCiAwareAcceptanceState(handle, callout);
+            // Must match what clients use for the Accept button (serialized ClientAcceptanceState); never 409 while MDT still shows Open (Pending).
+            bool mdtShowsAccept = tracked == null || tracked.ClientAcceptanceState == CalloutAcceptanceState.Pending;
+            if (!mdtShowsAccept && tracked != null && tracked.LspdfrAcceptanceExposedToMdt && effective != CalloutAcceptanceState.Pending)
                 return new CalloutActionOutcome { Result = CalloutActionResult.BadState, Message = "Callout is not waiting for acceptance (already accepted or finished)." };
             LspdFunc.AcceptPendingCallout(handle);
+            CalloutEvents.MarkLspdfrAcceptanceExposedForCalloutId(calloutId);
             return new CalloutActionOutcome { Result = CalloutActionResult.Ok, Message = "Accepted." };
         }
 
         static CalloutActionOutcome TryEnRoute(LHandle handle) {
-            var state = LspdFunc.GetCalloutAcceptanceState(handle);
+            var callout = CalloutHandleResolver.TryGetCallout(handle);
+            var state = CalloutEvents.GetCiAwareAcceptanceState(handle, callout);
             if (state == CalloutAcceptanceState.Pending)
                 return new CalloutActionOutcome { Result = CalloutActionResult.BadState, Message = "Accept the callout first." };
             try {
-                var callout = CalloutHandleResolver.TryGetCallout(handle);
                 if (callout == null)
                     return new CalloutActionOutcome { Result = CalloutActionResult.Error, Message = "Could not resolve callout from handle." };
                 var t = callout.GetType();
@@ -106,7 +109,7 @@ namespace MDTPro.EventListeners {
                 return new CalloutActionOutcome { Result = CalloutActionResult.Error, Message = "CalloutInterface is not available in-game." };
             try {
                 // CI’s log expects the same Callout instance its API resolves from the handle; LSPDFR’s object can fail SendMessage.
-                var callout = CiApi.GetCalloutFromHandle(handle) ?? CalloutHandleResolver.TryGetCallout(handle);
+                var callout = CalloutHandleResolver.TryGetCalloutFromCalloutInterfaceOnly(handle) ?? CalloutHandleResolver.TryGetCallout(handle);
                 if (callout == null)
                     return new CalloutActionOutcome { Result = CalloutActionResult.Error, Message = "Could not resolve callout from handle." };
                 CiApi.SendMessage(callout, message.Trim());

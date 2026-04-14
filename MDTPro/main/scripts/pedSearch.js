@@ -56,13 +56,20 @@ searchInput.addEventListener('input', function () {
 })
 
 /**
- * ID photo in Person Search is a catalogue still for the ped *model* (shared by many NPCs). CDF/PR do not expose mugshot textures.
- * Order: bundled MDTPro/images/peds (served as /image/peds/...) then FiveM docs CDN (webp then png).
- * There is no fuzzy match: only exact model name URLs. Wrong faces usually mean wrong ModelName on the record or catalogue vs in-world variation.
- * Keep in sync with plugin PedPortraitModelHelper: never load catalogue art for animals/props (e.g. a_c_seagull).
+ * ID photo: try face slot (PortraitFace*) then hair (PortraitVariant*) if different pair — many bracket catalogues key d/t to face. Then {model}, {model}__0_0 (.png fallbacks). No CDN.
+ * Supports legacy stored <c>[spawn][d][t]</c> in ModelName (same as ReportsPlus-style filenames) by resolving spawn + optional variant when JSON portrait ints are missing.
+ * Keep in sync with plugin PedPortraitModelHelper / NativeCatalogueImageLoader.
  */
+const _bracketPedCatalogueRe = /^\s*\[([^\]]+)\]\s*\[(\d+)\]\s*\[(\d+)\]\s*$/
+
+function canonPedCatalogueSpawnName (raw) {
+  const t = (raw || '').trim()
+  const m = t.match(_bracketPedCatalogueRe)
+  return m ? m[1].trim().toLowerCase() : t.toLowerCase()
+}
+
 function isCataloguePortraitModelSuitable (modelName) {
-  const n = (modelName || '').trim().toLowerCase()
+  const n = canonPedCatalogueSpawnName(modelName)
   if (n.length < 3) return false
   if (n === 'null' || n === 'undefined') return false
   if (n.startsWith('a_c_')) return false
@@ -97,13 +104,44 @@ function setPedIdPhoto (photoImg, photoPlaceholder, response) {
     if (!stalePhoto()) showPedIdPhotoUnavailable(photoImg, photoPlaceholder)
     return
   }
-  const modelName = modelNameRaw.toLowerCase()
+  const modelName = canonPedCatalogueSpawnName(modelNameRaw)
+  let bracketD = null
+  let bracketT = null
+  const bm = modelNameRaw.match(_bracketPedCatalogueRe)
+  if (bm) {
+    bracketD = parseInt(bm[2], 10)
+    bracketT = parseInt(bm[3], 10)
+    if (!Number.isFinite(bracketD) || !Number.isFinite(bracketT) || bracketD < 0 || bracketT < 0) {
+      bracketD = bracketT = null
+    }
+  }
   const candidates = []
+  const seenDt = new Set()
+  const pushVariant = (d, t) => {
+    if (typeof d !== 'number' || typeof t !== 'number' || !Number.isFinite(d) || !Number.isFinite(t) || d < 0 || t < 0) return
+    const key = `${d}_${t}`
+    if (seenDt.has(key)) return
+    seenDt.add(key)
+    candidates.push(`/image/peds/${modelName}__${d}_${t}.webp`)
+    candidates.push(`/image/peds/${modelName}__${d}_${t}.png`)
+  }
+  const hd = response.PortraitVariantDrawable
+  const ht = response.PortraitVariantTexture
+  let fd = response.PortraitFaceDrawable
+  let ft = response.PortraitFaceTexture
+  if (bracketD != null && bracketT != null) {
+    fd = fd ?? bracketD
+    ft = ft ?? bracketT
+  }
   if (modelName) {
+    pushVariant(fd, ft)
+    if (fd !== hd || ft !== ht) pushVariant(hd, ht)
     candidates.push(`/image/peds/${modelName}.webp`)
     candidates.push(`/image/peds/${modelName}.png`)
-    candidates.push(`https://docs.fivem.net/peds/${modelName}.webp`)
-    candidates.push(`https://docs.fivem.net/peds/${modelName}.png`)
+    if (!seenDt.has('0_0')) {
+      candidates.push(`/image/peds/${modelName}__0_0.webp`)
+      candidates.push(`/image/peds/${modelName}__0_0.png`)
+    }
   }
   if (candidates.length === 0) {
     if (!stalePhoto()) showPedIdPhotoUnavailable(photoImg, photoPlaceholder)
@@ -346,7 +384,7 @@ async function performSearch(query) {
 
   document.querySelector('.searchResponseWrapper').classList.remove('hidden')
 
-  // ID photo: use FiveM ped model image when ModelName is available (vanilla GTA peds)
+  // ID photo: bundled /image/peds/{model}.webp|.png when ModelName is suitable
   const photoImg = document.getElementById('pedIdPhotoImg')
   const photoPlaceholder = document.querySelector('.pedIdPhotoPlaceholder')
   setPedIdPhoto(photoImg, photoPlaceholder, response)

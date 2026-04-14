@@ -1,18 +1,19 @@
-# MDT Pro — builds the full mod into Release\ (plugin DLL + MDTPro web + dependencies),
-# then mirrors that drop into Native Release\ and publishes the Windows MDC desktop app there.
+# MDT Pro — builds the full mod into Release\ (plugin DLL + MDTPro web + native desktop + dependencies),
+# publishes the Windows MDC app into Release\MDTProNative (so OpenIV installs it to the GTA V root),
+# then mirrors Release\ into Native Release\.
 # Run from repo root: .\build.ps1
 #
 # Options:
 #   .\build.ps1                    Clean rebuild (wipes Release, full build; Native Release\ rebuilt at end)
 #   .\build.ps1 -Incremental       Faster build (no wipe, incremental)
-#   .\build.ps1 -SkipWindowsApp    Build mod only; skip native WPF publish (still mirrors Release → Native Release)
+#   .\build.ps1 -SkipWindowsApp    Build mod only; no MDTProNative\ in Release/OIV (still mirrors Release → Native Release)
 #   .\build.ps1 -Deploy            Build then copy to GTA V (use -GamePath if not default)
 #   .\build.ps1 -Deploy -GamePath "D:\Games\GTA V"
 #   GamePath is also used to copy DamageTrackingFramework.dll into Release (required for injury reports; or use References\DamageTrackingFramework.dll).
 #   OpenIV packages (install + uninstall) are always created in Release\ (and copied to Native Release\).
 #
 # Native Release\ layout:
-#   Same contents as Release\ (game mod, .oiv, README, LICENSE) plus MDTProNative\ (win-x64 published desktop app).
+#   Mirror of Release\ (game mod, MDTPro\, MDTProNative\, .oiv, README, LICENSE).
 
 param(
     [switch]$Incremental,
@@ -30,7 +31,7 @@ $release = Join-Path $root 'Release'
 $nativeReleaseDir = Join-Path $root 'Native Release'
 $legacyReleasesDir = Join-Path $root 'Releases'
 $nativeWpfProj = Join-Path $root 'native\src\MDTProNative.Wpf\MDTProNative.Wpf.csproj'
-$nativePublishDir = Join-Path $nativeReleaseDir 'MDTProNative'
+$nativePublishInRelease = Join-Path $release 'MDTProNative'
 $dllDestDir = Join-Path $release 'plugins\lspdfr'
 $dllDest = Join-Path $dllDestDir 'MDTPro.dll'
 $mdtSource = Join-Path $root 'MDTPro'
@@ -41,6 +42,20 @@ function Get-DotNetProjectAssemblyName {
     $m = Select-String -Path $ProjectPath -Pattern '<AssemblyName>\s*([^<]+?)\s*</AssemblyName>' -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($m) { return $m.Matches.Groups[1].Value.Trim() }
     return [System.IO.Path]::GetFileNameWithoutExtension($ProjectPath)
+}
+
+# Out-File -Encoding UTF8 uses no BOM on Windows PowerShell 5.1; Notepad then reads as ANSI and mangles bullets (â€¢). BOM makes UTF-8 explicit.
+function Write-TextFileUtf8Bom {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$Content
+    )
+    $parent = Split-Path -Parent -Path $Path
+    if (-not [string]::IsNullOrEmpty($parent) -and -not (Test-Path -LiteralPath $parent)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+    $enc = New-Object System.Text.UTF8Encoding $true
+    [System.IO.File]::WriteAllText($Path, $Content, $enc)
 }
 
 # SQLite dependency paths - check multiple locations:
@@ -196,6 +211,71 @@ Or run from a clean clone: dotnet restore MDTProPlugin\MDTPro.sln ; .\build.ps1
     exit 1
 }
 
+# 6c) MDT Pro Native (Windows MDC) — publish into Release\MDTProNative so OpenIV / manual install match GTA V layout (folder next to MDTPro\).
+$nativeAppExeName = $null
+if (-not $SkipWindowsApp) {
+    if (-not (Test-Path $nativeWpfProj)) {
+        Write-Error "Native WPF project not found: $nativeWpfProj"
+        exit 1
+    }
+    Write-Host "Publishing MDT Pro Native into Release\MDTProNative..."
+    if (Test-Path $nativePublishInRelease) {
+        Remove-Item -Path $nativePublishInRelease -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $nativePublishInRelease -Force | Out-Null
+    $publishArgs = @(
+        'publish', $nativeWpfProj,
+        '-c', 'Release',
+        '-r', 'win-x64',
+        '--self-contained', 'true',
+        '-p:PublishSingleFile=false',
+        '-o', $nativePublishInRelease,
+        '-v', 'minimal'
+    )
+    dotnet @publishArgs
+    if ($LASTEXITCODE -ne 0) { Write-Error "Native WPF publish failed."; exit $LASTEXITCODE }
+    Write-Host "  -> $nativePublishInRelease (win-x64, self-contained)"
+
+    $nativeAppExeName = "$(Get-DotNetProjectAssemblyName $nativeWpfProj).exe"
+    $nativeAppExePath = Join-Path $nativePublishInRelease $nativeAppExeName
+    if (-not (Test-Path -LiteralPath $nativeAppExePath)) {
+        $firstExe = Get-ChildItem -Path $nativePublishInRelease -Filter '*.exe' -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notlike 'createdump.exe' } |
+            Select-Object -First 1
+        if ($firstExe) { $nativeAppExeName = $firstExe.Name }
+    }
+
+    $nativeReadme = Join-Path $nativePublishInRelease 'README.txt'
+    $nativeReadmeBody = @"
+MDT Pro — Native MDC (Windows desktop)
+========================================
+
+This folder is the published Windows desktop MDC terminal. It talks to the same HTTP/WebSocket
+API as the in-game browser MDT (your LSPDFR plugin must be running and on duty).
+
+  1. Start GTA V, go on duty; note the MDT URL/port (default http://127.0.0.1:9000).
+  2. Run $nativeAppExeName (from this folder).
+  3. Enter the same host and port, then Connect.
+
+When installed via OpenIV, this folder lives next to MDTPro\ in your GTA V directory.
+
+Requires the WebView2 Runtime for Settings → embedded customization page (usually already installed with Edge). Reports and most modules are native WPF.
+
+The game mod, OpenIV packages, and full install notes are in the parent release folder.
+
+License: EPL-2.0 — see LICENSE next to README in the release.
+"@
+    Write-TextFileUtf8Bom -Path $nativeReadme -Content $nativeReadmeBody
+    Write-Host "  -> $nativeReadme"
+} else {
+    if (Test-Path $nativePublishInRelease) {
+        Remove-Item -Path $nativePublishInRelease -Recurse -Force
+        Write-Host "  Removed Release\MDTProNative (skipped native desktop: -SkipWindowsApp)"
+    } else {
+        Write-Host "  (skipped native desktop: -SkipWindowsApp)"
+    }
+}
+
 # 7) Deploy to game if requested
 if ($Deploy) {
     $pluginsDest = Join-Path $GamePath 'plugins\LSPDFR'
@@ -223,6 +303,14 @@ if ($Deploy) {
         Copy-Item -Path $sqliteInteropSource -Destination $gameRootX64 -Force
     }
 
+    $nativeSrc = Join-Path $releaseRoot 'MDTProNative'
+    if (Test-Path -LiteralPath $nativeSrc) {
+        $nativeGameDest = Join-Path $GamePath 'MDTProNative'
+        if (Test-Path $nativeGameDest) { Remove-Item $nativeGameDest -Recurse -Force }
+        Copy-Item -Path $nativeSrc -Destination $nativeGameDest -Recurse -Force
+        Write-Host "  -> $nativeGameDest (MDT Pro Native)"
+    }
+
     # Restore user data
     if (Test-Path $dataBackup) { Copy-Item $dataBackup (Join-Path $mdtProDest 'data') -Recurse -Force; Remove-Item $dataBackup -Recurse -Force }
     Write-Host "Deployed to $GamePath"
@@ -245,34 +333,81 @@ if ($Deploy) {
     if (Test-Path $oivDir) { Remove-Item $oivDir -Recurse -Force }
     New-Item -ItemType Directory -Path $oivContent -Force | Out-Null
 
-    # Content structure for OIV - use Release folder as single source of truth
-    # (ensures OIV contains exactly what we validated and deployed)
-    $pluginsOiv = Join-Path $oivContent 'plugins\LSPDFR'
-    New-Item -ItemType Directory -Path $pluginsOiv -Force | Out-Null
-    Copy-Item -Path $dllDest -Destination (Join-Path $pluginsOiv 'MDTPro.dll') -Force
-    Copy-Item -Path $newtonsoftInRelease -Destination (Join-Path $pluginsOiv 'Newtonsoft.Json.dll') -Force
-    Copy-Item -Path $sqliteInRelease -Destination (Join-Path $oivContent 'System.Data.SQLite.dll') -Force
-    $x64Oiv = Join-Path $oivContent 'x64'
-    New-Item -ItemType Directory -Path $x64Oiv -Force | Out-Null
-    Copy-Item -Path $interopInRelease -Destination (Join-Path $x64Oiv 'SQLite.Interop.dll') -Force
-    Copy-Item -Path $mdtDest -Destination (Join-Path $oivContent 'MDTPro') -Recurse -Force
-
-    # Generate assembly.xml add and delete commands for MDTPro folder (OIV uses forward slashes)
-    $mdtAdds = @()
-    $mdtDeletes = @()
-    Get-ChildItem -Path (Join-Path $oivContent 'MDTPro') -Recurse -File | ForEach-Object {
-        $rel = $_.FullName.Substring($oivContent.Length + 1).Replace('\', '/')
-        $mdtAdds += "    <add source=`"$rel`">$rel</add>"
-        $mdtDeletes += "    <delete>$rel</delete>"
+    # Content = full game payload from Release (same layout as manual install / -Deploy).
+    # Excludes distribution-only files so OpenIV drops match the release folder.
+    function Test-ReleaseItemExcludedFromOiv {
+        param([string]$Name)
+        if ($Name -eq 'README.txt' -or $Name -eq 'LICENSE') { return $true }
+        if ($Name -match '\.oiv$') { return $true }
+        if ($Name -eq 'oivBuild' -or $Name -eq 'oivUninstall') { return $true }
+        return $false
     }
 
-    $pluginAdds = "    <add source=`"plugins/LSPDFR/MDTPro.dll`">plugins/LSPDFR/MDTPro.dll</add>`n    <add source=`"plugins/LSPDFR/Newtonsoft.Json.dll`">plugins/LSPDFR/Newtonsoft.Json.dll</add>"
-    $contentXml = @"
-$pluginAdds
-    <add source="System.Data.SQLite.dll">System.Data.SQLite.dll</add>
-    <add source="x64/SQLite.Interop.dll">x64/SQLite.Interop.dll</add>
-$($mdtAdds -join "`n")
-"@
+    Get-ChildItem -LiteralPath $releaseRoot -Force | ForEach-Object {
+        if (Test-ReleaseItemExcludedFromOiv $_.Name) { return }
+        $dest = Join-Path $oivContent $_.Name
+        if ($_.PSIsContainer) {
+            Copy-Item -LiteralPath $_.FullName -Destination $dest -Recurse -Force
+        } else {
+            Copy-Item -LiteralPath $_.FullName -Destination $dest -Force
+        }
+    }
+
+    # LSPDFR expects plugins\LSPDFR (caps). Build output uses plugins\lspdfr — normalize for the package.
+    # NTFS is case-insensitive: renaming lspdfr -> LSPDFR in one step is a no-op; use a temp name.
+    $oivPlugins = Join-Path $oivContent 'plugins'
+    if (Test-Path -LiteralPath $oivPlugins) {
+        $low = Join-Path $oivPlugins 'lspdfr'
+        $hi = Join-Path $oivPlugins 'LSPDFR'
+        if (Test-Path -LiteralPath $low) {
+            $actual = (Get-Item -LiteralPath $low).Name
+            if ($actual -cne 'LSPDFR') {
+                $tmp = Join-Path $oivPlugins '_mdt_oiv_lspdfr_tmp'
+                if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Recurse -Force }
+                Rename-Item -LiteralPath $low -NewName '_mdt_oiv_lspdfr_tmp'
+                Rename-Item -LiteralPath $tmp -NewName 'LSPDFR'
+            }
+        }
+    }
+
+    # assembly.xml <add> for every file under content/ (paths relative to GTA V folder)
+    $allAddLines = [System.Collections.Generic.List[string]]::new()
+    Get-ChildItem -LiteralPath $oivContent -Recurse -File | ForEach-Object {
+        $rel = $_.FullName.Substring($oivContent.Length).TrimStart([char[]]@('\', '/')).Replace('\', '/')
+        if ([string]::IsNullOrEmpty($rel)) { return }
+        $allAddLines.Add("    <add source=`"$rel`">$rel</add>")
+    }
+    $contentXml = $allAddLines -join "`n"
+
+    # Uninstaller: remove everything under MDTPro/ from the mirrored tree, plus MDT Pro plugin files only.
+    $mdtDeletes = [System.Collections.Generic.List[string]]::new()
+    $mdtFolderOiv = Join-Path $oivContent 'MDTPro'
+    if (Test-Path -LiteralPath $mdtFolderOiv) {
+        Get-ChildItem -LiteralPath $mdtFolderOiv -Recurse -File | ForEach-Object {
+            $rel = $_.FullName.Substring($oivContent.Length).TrimStart([char[]]@('\', '/')).Replace('\', '/')
+            if (-not [string]::IsNullOrEmpty($rel)) { $mdtDeletes.Add("    <delete>$rel</delete>") }
+        }
+    }
+
+    $pluginMdtDeletes = [System.Collections.Generic.List[string]]::new()
+    $pluginsLspdfrOiv = Join-Path $oivContent 'plugins\LSPDFR'
+    if (Test-Path -LiteralPath $pluginsLspdfrOiv) {
+        Get-ChildItem -LiteralPath $pluginsLspdfrOiv -File | Where-Object { $_.Name -like 'MDTPro*' } | ForEach-Object {
+            $pluginMdtDeletes.Add("    <delete>plugins/LSPDFR/$($_.Name)</delete>")
+        }
+    }
+    if ($pluginMdtDeletes.Count -eq 0) {
+        $pluginMdtDeletes.Add('    <delete>plugins/LSPDFR/MDTPro.dll</delete>')
+    }
+
+    $nativeDeletes = [System.Collections.Generic.List[string]]::new()
+    $nativeFolderOiv = Join-Path $oivContent 'MDTProNative'
+    if (Test-Path -LiteralPath $nativeFolderOiv) {
+        Get-ChildItem -LiteralPath $nativeFolderOiv -Recurse -File | ForEach-Object {
+            $rel = $_.FullName.Substring($oivContent.Length).TrimStart([char[]]@('\', '/')).Replace('\', '/')
+            if (-not [string]::IsNullOrEmpty($rel)) { $nativeDeletes.Add("    <delete>$rel</delete>") }
+        }
+    }
 
     $assemblyXml = @"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -320,7 +455,7 @@ $contentXml
     if (Test-Path (Join-Path $oivDir 'icon.png')) { $oivItems += Join-Path $oivDir 'icon.png' }
     Compress-Archive -Path $oivItems -DestinationPath $oivZip -CompressionLevel Optimal -Force
     Rename-Item -Path $oivZip -NewName (Split-Path $oivOut -Leaf) -Force
-    Write-Host "  -> $oivOut (OpenIV package)"
+    Write-Host "  -> $oivOut (OpenIV package, $($allAddLines.Count) files mapped to game folder paths)"
 
     # Create uninstaller OIV package (delete commands only; unique GUID)
     # ONLY remove MDT Pro files. Do NOT remove shared dependencies (SQLite, Newtonsoft.Json, DamageTrackingFramework)
@@ -337,8 +472,9 @@ $contentXml
         'MDTPro/data/reports/incidentReports.json', 'MDTPro/data/reports/citationReports.json', 'MDTPro/data/reports/arrestReports.json'
     ) | ForEach-Object { "    <delete>$_</delete>" }
     $deleteXml = @"
-    <delete>plugins/LSPDFR/MDTPro.dll</delete>
+$($pluginMdtDeletes -join "`n")
 $($mdtDeletes -join "`n")
+$($nativeDeletes -join "`n")
 $($runtimeDeletes -join "`n")
 "@
     $uninstallAssembly = @"
@@ -355,7 +491,7 @@ $($runtimeDeletes -join "`n")
       <displayName>stocky789</displayName>
     </author>
     <description footerLink="https://www.lcpdfr.com/downloads/gta5mods/scripts/53627-mdtpro" footerLinkTitle="LCPDFR">
-      <![CDATA[Removes only MDT Pro (plugin DLL and MDTPro folder). Leaves shared dependencies (SQLite, Newtonsoft.Json, DamageTrackingFramework) so other mods keep working. For a full purge, manually delete the MDTPro folder and any dependencies if no other mod needs them.]]>
+      <![CDATA[Removes MDT Pro (plugin DLL, MDTPro web folder, and MDTProNative desktop app folder). Leaves shared dependencies (SQLite, Newtonsoft.Json, DamageTrackingFramework) so other mods keep working. For a full purge, manually delete leftover folders and any dependencies if no other mod needs them.]]>
     </description>
     <largeDescription displayName="GitHub" footerLink="https://github.com/stocky789/MDT-Pro" footerLinkTitle="GitHub">
       <![CDATA[Source code and releases: https://github.com/stocky789/MDT-Pro]]>
@@ -393,7 +529,7 @@ $deleteXml
 
 # README with install instructions (always)
 $readmePath = Join-Path $release 'README.txt'
-@"
+$releaseReadmeBody = @"
 MDT Pro — install & requirements
 =================================
 
@@ -426,24 +562,28 @@ REQUIREMENTS (install these before MDT Pro)
 
 OPENIV INSTALL (recommended)
 -----------------------------
-  • MDTPro-*.oiv          — Install package. OpenIV: Edit mode, drag the .oiv onto OpenIV, or
-                           Tools → Package Installer, then install into the game folder.
-  • MDTPro-*-Uninstall.oiv — Removes MDT Pro via OpenIV. For a full cleanup you may still delete the
-                           MDTPro folder manually if needed.
+  • MDTPro-*.oiv          — Installs the same folder layout as this release (everything below except
+                           README.txt, LICENSE, and the .oiv files). Paths match the GTA V directory
+                           (plugins\LSPDFR, MDTPro\, MDTProNative\, game root DLLs, x64\, etc.).
+  • MDTPro-*-Uninstall.oiv — Removes MDT Pro plugin files, the MDTPro web folder, and MDTProNative\;
+                           leaves SQLite and Newtonsoft.Json so other mods can keep using them. Extra
+                           DLLs you merged into plugins\LSPDFR are not removed by the uninstaller.
 
 
 MANUAL INSTALL (no OpenIV)
 --------------------------
 Copy into your GTA V folder (the folder that contains GTA5.exe). Do NOT copy the .oiv files into the game.
 
-Merge these paths:
+Copy everything from this release except README.txt, LICENSE, and *.oiv — preserve paths. Typical layout:
 
   From this release                    Into your GTA V folder
   -------------------------            ------------------------
-  plugins\lspdfr\MDTPro.dll            plugins\LSPDFR\MDTPro.dll
-  plugins\lspdfr\Newtonsoft.Json.dll   plugins\LSPDFR\Newtonsoft.Json.dll
+  plugins\lspdfr\  (all files)         plugins\LSPDFR\  (merge; LSPDFR is the usual folder name)
   MDTPro\  (entire folder)             MDTPro\
+  MDTProNative\  (entire folder)       MDTProNative\  (Windows desktop MDC; omitted if you used -SkipWindowsApp)
   System.Data.SQLite.dll               (GTA V root, next to GTA5.exe)
+  Newtonsoft.Json.dll (if at release   (GTA V root, only if present in your release zip)
+   root)
   x64\SQLite.Interop.dll               x64\SQLite.Interop.dll
 
 SQLite: System.Data.SQLite.dll MUST be in the game root (not only under plugins). The native loader uses
@@ -455,6 +595,7 @@ FIRST RUN & USE
   1. Start the game, go on duty with LSPDFR.
   2. MDT Pro shows notification(s) with addresses such as http://127.0.0.1:9000 (default port 9000).
   3. Open that URL in a browser (Chrome / Brave recommended). Addresses are also in MDTPro\ipAddresses.txt.
+     Or run MDTProNative\MDTPro.exe (desktop MDC) and connect to the same host/port.
 
   Another device (phone, tablet, PC) cannot connect: usually Windows Firewall on the game PC — add an
   inbound rule for the port you use (9000 by default), or change the port under Customization → Config.
@@ -462,7 +603,7 @@ FIRST RUN & USE
 
 UPDATING
 --------
-  Overwrite the plugin DLLs, MDTPro folder, and SQLite files with the new release. Your existing
+  Overwrite the plugin DLLs, MDTPro, MDTProNative, and SQLite files with the new release. Your existing
   MDTPro\data\ and MDTPro\config.json are kept if you do not delete the MDTPro folder outright.
 
 
@@ -481,7 +622,8 @@ License
 -------
 MDT Pro is licensed under the Eclipse Public License 2.0 (EPL-2.0). Full text: LICENSE in this folder.
 Some default data files may be under the MIT License; see the project repository for details.
-"@ | Out-File -FilePath $readmePath -Encoding UTF8
+"@
+Write-TextFileUtf8Bom -Path $readmePath -Content $releaseReadmeBody
 Write-Host "  -> $readmePath (install instructions)"
 
 # EPL-2.0: include license text with release distributions
@@ -492,8 +634,8 @@ if (Test-Path $licenseSrc) {
     Write-Host "  -> $licenseDest (EPL-2.0)"
 }
 
-# 9) Mirror Release → Native Release (distribution folder) + Windows MDC app
-Write-Host "Staging Native Release\ (mirror of Release + native desktop)..."
+# 9) Mirror Release → Native Release (full distribution folder; MDTProNative already built in Release\)
+Write-Host "Staging Native Release\ (mirror of Release\)..."
 if (Test-Path $legacyReleasesDir) {
     Write-Host "  Removing legacy Releases\ (output is now Native Release\ only)..."
     Remove-Item -Path $legacyReleasesDir -Recurse -Force
@@ -505,70 +647,17 @@ New-Item -ItemType Directory -Path $nativeReleaseDir -Force | Out-Null
 Get-ChildItem -Path $release -Force | ForEach-Object {
     Copy-Item -Path $_.FullName -Destination (Join-Path $nativeReleaseDir $_.Name) -Recurse -Force
 }
-Write-Host "  -> $nativeReleaseDir\ (game mod + OpenIV packages + README)"
-
-if (-not $SkipWindowsApp) {
-    if (-not (Test-Path $nativeWpfProj)) {
-        Write-Error "Native WPF project not found: $nativeWpfProj"
-        exit 1
-    }
-    Write-Host "Publishing MDT Pro Native (Windows MDC)..."
-    if (Test-Path $nativePublishDir) {
-        Remove-Item -Path $nativePublishDir -Recurse -Force
-    }
-    New-Item -ItemType Directory -Path $nativePublishDir -Force | Out-Null
-    $publishArgs = @(
-        'publish', $nativeWpfProj,
-        '-c', 'Release',
-        '-r', 'win-x64',
-        '--self-contained', 'true',
-        '-p:PublishSingleFile=false',
-        '-o', $nativePublishDir,
-        '-v', 'minimal'
-    )
-    dotnet @publishArgs
-    if ($LASTEXITCODE -ne 0) { Write-Error "Native WPF publish failed."; exit $LASTEXITCODE }
-    Write-Host "  -> $nativePublishDir (win-x64, self-contained)"
-
-    $nativeAppExeName = "$(Get-DotNetProjectAssemblyName $nativeWpfProj).exe"
-    $nativeAppExePath = Join-Path $nativePublishDir $nativeAppExeName
-    if (-not (Test-Path -LiteralPath $nativeAppExePath)) {
-        $firstExe = Get-ChildItem -Path $nativePublishDir -Filter '*.exe' -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -notlike 'createdump.exe' } |
-            Select-Object -First 1
-        if ($firstExe) { $nativeAppExeName = $firstExe.Name }
-    }
-
-    $nativeReadme = Join-Path $nativePublishDir 'README.txt'
-    @"
-MDT Pro — Native MDC (Windows desktop)
-========================================
-
-This folder is the published Windows desktop MDC terminal. It talks to the same HTTP/WebSocket
-API as the in-game browser MDT (your LSPDFR plugin must be running and on duty).
-
-  1. Start GTA V, go on duty; note the MDT URL/port (default http://127.0.0.1:9000).
-  2. Run $nativeAppExeName.
-  3. Enter the same host and port, then Connect.
-
-Requires the WebView2 Runtime for Settings → embedded customization page (usually already installed with Edge). Reports and most modules are native WPF.
-
-The game mod, OpenIV packages, and full install notes are in the parent Native Release\ folder next to this folder.
-
-License: EPL-2.0 — see LICENSE in Native Release\.
-"@ | Out-File -FilePath $nativeReadme -Encoding UTF8
-    Write-Host "  -> $nativeReadme"
-}
-else {
-    Write-Host "  (skipped native desktop: -SkipWindowsApp)"
-}
+Write-Host "  -> $nativeReleaseDir\ (mirror of Release\, includes MDTProNative when built)"
 
 Write-Host "Done. Full mod release: $release"
 Write-Host "  Release\plugins\lspdfr\MDTPro.dll"
 Write-Host "  Release\System.Data.SQLite.dll (GTA V root)"
 Write-Host "  Release\x64\SQLite.Interop.dll (GTA V root\x64)"
 Write-Host "  Release\MDTPro\"
+if (-not $SkipWindowsApp -and $nativeAppExeName) {
+    Write-Host "  Release\MDTProNative\$nativeAppExeName"
+}
 Write-Host "Distribution copy (mod + desktop): $nativeReleaseDir"
-if (-not $SkipWindowsApp) {
+if (-not $SkipWindowsApp -and $nativeAppExeName) {
     Write-Host "  Native Release\MDTProNative\$nativeAppExeName"
 }

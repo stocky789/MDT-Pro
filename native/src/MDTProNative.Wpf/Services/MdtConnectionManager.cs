@@ -15,6 +15,10 @@ public sealed class MdtConnectionManager : IAsyncDisposable
     MdtWebSocketSession? _wsTime;
     MdtWebSocketSession? _wsLocation;
     MdtWebSocketSession? _wsCallouts;
+    /// <summary>Last <c>calloutEvent</c> payload so views that subscribe after navigation still populate (deep clone; safe to hold).</summary>
+    JArray? _lastCalloutsSnapshot;
+    int _lastCalloutCount;
+    string? _lastCadUnitStatus;
 
     public MdtConnectionManager(Dispatcher dispatcher) => _dispatcher = dispatcher;
 
@@ -76,8 +80,22 @@ public sealed class MdtConnectionManager : IAsyncDisposable
         var count = list?.Count ?? 0;
         var cad = root["cadUnitStatus"]?.ToString();
         if (string.IsNullOrWhiteSpace(cad)) cad = null;
+        _lastCalloutsSnapshot = list == null ? null : (JArray)list.DeepClone();
+        _lastCalloutCount = count;
+        _lastCadUnitStatus = cad;
         _dispatcher.BeginInvoke(() => CalloutsUpdated?.Invoke(list, count, cad));
         EmitLog($"calloutEvent: {count} active");
+    }
+
+    /// <summary>Replays the last callout WebSocket payload to <paramref name="handler"/> (e.g. Overview subscribes after the user was on another tab).</summary>
+    public void ReplayLastCallouts(Action<JArray?, int, string?> handler)
+    {
+        if (_http == null) return;
+        void Fire() => handler(_lastCalloutsSnapshot, _lastCalloutCount, _lastCadUnitStatus);
+        if (_dispatcher.CheckAccess())
+            Fire();
+        else
+            _dispatcher.Invoke(Fire);
     }
 
     void EmitLog(string line) => _dispatcher.BeginInvoke(() => Log?.Invoke(line));
@@ -90,6 +108,9 @@ public sealed class MdtConnectionManager : IAsyncDisposable
         _http?.Dispose();
         _http = null;
         Endpoint = null;
+        _lastCalloutsSnapshot = null;
+        _lastCalloutCount = 0;
+        _lastCadUnitStatus = null;
         _ = _dispatcher.BeginInvoke(() =>
         {
             TimeUpdated?.Invoke("—");
