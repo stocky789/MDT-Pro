@@ -1,6 +1,6 @@
 /**
- * ALPR plugin – subscribes to ALPR hits from the in-game scanner and shows popups.
- * Requires ALPR to be enabled in-game (config.alprEnabled).
+ * ALPR plugin – subscribes to ALPR hits over WebSocket and shows popups.
+ * Hits may come from Callout Interface (config.alprWebToastsFromCalloutInterface) and/or the built-in scanner (alprWebToastsFromScanner + alprEnabled).
  */
 ;(function () {
   function escapeHtml(s) {
@@ -101,12 +101,14 @@
     try {
       const res = await fetch('/config')
       const config = await res.json()
-      if (config && config.alprEnabled === false) {
-        const lang = (typeof getLanguage === 'function') ? await getLanguage() : {}
-        const msg = (lang && lang.alpr && lang.alpr.inGameNotEnabled) || 'In-game ALPR is not enabled.'
-        if (typeof showNotification === 'function') {
-          showNotification(msg, 'warning', -1)
-        }
+      if (!config || config.alprEnabled !== false) return
+      // Browser toasts from the built-in scan loop require in-game ALPR; CI-only mode does not.
+      const webFromScanner = config.alprWebToastsFromScanner === true
+      if (!webFromScanner) return
+      const lang = (typeof getLanguage === 'function') ? await getLanguage() : {}
+      const msg = (lang && lang.alpr && lang.alpr.inGameNotEnabled) || 'In-game ALPR is not enabled.'
+      if (typeof showNotification === 'function') {
+        showNotification(msg, 'warning', -1)
       }
     } catch (_) { /* config fetch failed, skip heads-up */ }
   }

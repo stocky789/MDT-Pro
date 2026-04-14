@@ -4,6 +4,7 @@ using MDTPro.Utility;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
 using System.Net;
@@ -25,7 +26,7 @@ namespace MDTPro.ServerAPI {
         }
 
         internal DataAPIResponse(HttpListenerRequest req) : base(null) {
-            string path = req.Url.AbsolutePath.Substring("/data/".Length);
+            string path = req.Url.AbsolutePath.Substring("/data/".Length).TrimEnd('/');
             if (string.IsNullOrEmpty(path)) return;
             else if (path == "peds") {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.PedDatabase));
@@ -36,15 +37,13 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/json";
             } else if (path == "nearbyVehicles") {
-                string body = Helper.GetRequestPostData(req);
-                int limit = 5;
-                if (int.TryParse(body, out int parsedLimit)) {
-                    limit = parsedLimit;
-                }
+                int limit = Helper.ParsePostBodyAsPositiveInt(Helper.GetRequestPostData(req), 8);
                 if (limit < 1) limit = 1;
                 if (limit > 20) limit = 20;
 
-                DataController.RefreshCachedNearbyVehiclesOnGameFiberBlocking();
+                bool scanCompleted = DataController.RefreshCachedNearbyVehiclesOnGameFiberBlocking(900);
+                if (!scanCompleted)
+                    ExtraResponseHeaders = new List<(string name, string value)> { ("X-MdtPro-Nearby-Scan", "deferred") };
                 var cached = DataController.GetCachedNearbyVehicles(limit);
                 var nearbyVehicles = cached.Select(x => new {
                     x.LicensePlate,
@@ -57,8 +56,7 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/json";
             } else if (path == "specificPed") {
-                string body = Helper.GetRequestPostData(req);
-                string name = !string.IsNullOrEmpty(body) ? body.Trim() : "";
+                string name = Helper.GetRequestBodyAsString(req)?.Trim() ?? "";
                 string reversedName = string.Join(" ", name.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Reverse());
 
                 // Prefer context ped when it matches the search name (person in front of you just got ID)
@@ -141,7 +139,7 @@ namespace MDTPro.ServerAPI {
                 if (vehicleData == null && !string.IsNullOrEmpty(licensePlateOrVin) && !wantContextOnly)
                     vehicleData = DataController.GetVehicleByPlateOrVin(licensePlateOrVin);
                 if (vehicleData == null && !string.IsNullOrEmpty(licensePlateOrVin) && !wantContextOnly)
-                    vehicleData = DataController.TryResolveVehicleFromLiveWorldByPlateOrVinBlocking(licensePlateOrVin);
+                    vehicleData = DataController.TryResolveVehicleFromLiveWorldByPlateOrVinBlocking(licensePlateOrVin, 500);
 
                 if (vehicleData != null && vehicleData.CDFVehicleData != null)
                     DataController.MergeBOLOsFromStubByPlate(vehicleData);
@@ -174,6 +172,15 @@ namespace MDTPro.ServerAPI {
                 status = 200;
             } else if (path == "officerInformation") {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.OfficerInformation));
+                contentType = "text/json";
+                status = 200;
+            } else if (path == "reportBranding") {
+                var q = HttpUtility.ParseQueryString(req.Url.Query ?? "");
+                string reportType = q["reportType"]?.Trim();
+                var branding = ReportBrandingResolver.BuildResponse(
+                    string.IsNullOrEmpty(reportType) ? null : reportType,
+                    DataController.OfficerInformation);
+                buffer = Encoding.UTF8.GetBytes(branding.ToString(Formatting.None));
                 contentType = "text/json";
                 status = 200;
             } else if (path == "officerInformationData") {
@@ -221,7 +228,7 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/json";
             } else if (path == "playerLocation") {
-                DataController.RefreshMdtLocationOnGameFiberBlocking(1500);
+                DataController.RefreshMdtLocationOnGameFiberBlocking(350);
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.MdtPreferredLocation));
                 status = 200;
                 contentType = "text/json";
@@ -230,7 +237,7 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/plain";
             } else if (path == "searchHistory") {
-                string body = Helper.GetRequestPostData(req);
+                string body = Helper.GetRequestBodyAsString(req)?.Trim() ?? "";
                 string type = !string.IsNullOrEmpty(body) ? body : "ped";
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(Database.LoadSearchHistory(type)));
                 status = 200;
@@ -480,6 +487,11 @@ namespace MDTPro.ServerAPI {
                     var cit = DataController.CitationReports?.FirstOrDefault(r => r.Id == tid);
                     if (cit != null) {
                         summaries.Add(new { id = cit.Id, type = "citation", typeLabel = "Citation", date = cit.TimeStamp.ToString("yyyy-MM-dd"), subtitle = cit.OffenderPedName });
+                        continue;
+                    }
+                    var arrRep = DataController.arrestReports?.FirstOrDefault(r => r.Id == tid);
+                    if (arrRep != null) {
+                        summaries.Add(new { id = arrRep.Id, type = "arrest", typeLabel = "Arrest", date = arrRep.TimeStamp.ToString("yyyy-MM-dd"), subtitle = arrRep.OffenderPedName });
                         continue;
                     }
                     var tra = DataController.TrafficIncidentReports?.FirstOrDefault(r => r.Id == tid);

@@ -71,7 +71,7 @@ function buildNarcoticsCheatsheetContent () {
   ])))
   const scheduleNote = document.createElement('p')
   scheduleNote.className = 'narcoticsCheatsheetNote'
-  scheduleNote.textContent = '* Cannabis scheduling vs retail rules vary by jurisdiction; treat as a controlled substance for illicit sale/possession in RP as your server prefers.'
+  scheduleNote.textContent = '* Cannabis scheduling vs retail rules vary by jurisdiction; treat as a controlled substance for illicit sale/possession per applicable local rules.'
   container.querySelector('.narcoticsCheatsheetSection:last-child').appendChild(scheduleNote)
 
   // ─── Drug → Schedule Quick Reference ───────────────────────────────

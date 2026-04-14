@@ -90,6 +90,96 @@ function getRecentIds() {
     .map(p => ({ Name: p.Name, Type: p.IdentificationHistory[0].Type, Timestamp: p.IdentificationHistory[0].Timestamp }));
 }
 
+/** Shared document titles for all report types (matches ReportBrandingResolver.AddStandardReportDocumentTitles). */
+function standardReportDocumentTitles() {
+  return {
+    propertyEvidenceTitle: 'Property & Evidence Receipt',
+    incidentTitle: 'General Incident Report (IR)',
+    citationTitle: 'Uniform Traffic Citation — Violation Notice',
+    arrestTitle: 'Arrest & Booking Report',
+    impoundTitle: 'Vehicle Tow / Impound Report',
+    trafficIncidentTitle: 'Traffic Collision Report (TCR)',
+    injuryTitle: 'Injury / Medical Incident Report',
+  };
+}
+
+/** Dev stub for plugin /data/reportBranding (shape matches ReportBrandingResolver). */
+function getMockReportBranding(reportType) {
+  const titles = standardReportDocumentTitles();
+  const catalog = {
+    regional_crime_lab: {
+      id: 'regional_crime_lab',
+      leftColumn: 'San Andreas Regional Crime Laboratory\nEvidence Receiving — Los Santos County\nP.O. Box 1200, Los Santos, SA 90001\nPhone: (555) 555-0100  Fax: (555) 555-0101',
+      centerTitle: 'SARL',
+      rightTitle: 'San Andreas Regional Crime Laboratory\nEvidence Receipt',
+      footer: 'Regional lab intake — dev server mock.',
+      sealBadgeFile: 'sagov-badge.png',
+      ...titles,
+    },
+    lssd_coroner: {
+      id: 'lssd_coroner',
+      leftColumn: 'County of Los Santos\nDepartment of Coroner\nStrawberry, Los Santos, SA',
+      centerTitle: 'CORONER',
+      rightTitle: 'County of Los Santos\nForensic Evidence Receipt',
+      footer: 'Coroner / ME-adjacent — dev mock.',
+      sealBadgeFile: 'lssd-badge.png',
+      ...titles,
+    },
+    lssd_patrol: {
+      id: 'lssd_patrol',
+      leftColumn: "Los Santos County Sheriff's Department\nPatrol Operations\nLos Santos County, San Andreas",
+      centerTitle: 'LSSD',
+      rightTitle: "Los Santos County Sheriff's Department\nOfficial Report",
+      footer: 'Sheriff patrol — dev mock.',
+      sealBadgeFile: 'lssd-badge.png',
+      ...titles,
+    },
+    bcso_patrol: {
+      id: 'bcso_patrol',
+      leftColumn: "Blaine County Sheriff's Office\nPatrol Division\nBlaine County, San Andreas",
+      centerTitle: 'BCSO',
+      rightTitle: "Blaine County Sheriff's Office\nOfficial Report",
+      footer: 'BCSO patrol — dev mock.',
+      sealBadgeFile: 'bcso-badge.png',
+      ...titles,
+    },
+    lspd_submission: {
+      id: 'lspd_submission',
+      leftColumn: 'Los Santos Police Department\nEvidence Control / Submission Desk',
+      centerTitle: 'LSPD',
+      rightTitle: 'LSPD Evidence Submission Cover\n(Regional lab testing)',
+      footer: 'LSPD submitting agency — dev mock.',
+      sealBadgeFile: 'lspd-badge.png',
+      ...titles,
+    },
+    fib_adjacent: {
+      id: 'fib_adjacent',
+      leftColumn: 'Federal Investigation Bureau\nLos Santos Field Office',
+      centerTitle: 'FIB',
+      rightTitle: 'Federal Evidence Receipt\n(Controlled routing)',
+      footer: 'Federal-adjacent — dev mock.',
+      sealBadgeFile: 'fib-badge.png',
+      ...titles,
+    },
+    humane_adjacent: {
+      id: 'humane_adjacent',
+      leftColumn: 'Humane Labs and Research (cover)\nBlaine County, SA',
+      centerTitle: 'HLR',
+      rightTitle: 'Specialized Technical Evidence Receipt',
+      footer: 'Humane-adjacent — dev mock.',
+      sealBadgeFile: 'sagov-badge.png',
+      ...titles,
+    },
+  };
+  void reportType;
+  const activeTemplateId = 'regional_crime_lab';
+  return {
+    catalog,
+    activeTemplateId,
+    activeTemplate: catalog[activeTemplateId],
+  };
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -515,6 +605,13 @@ const server = http.createServer((req, res) => {
   } else if (url === '/data/recentIds') {
     send(res, 200, JSON.stringify(getRecentIds()), 'application/json');
     return;
+  } else if (url === '/data/reportBranding') {
+    let reportType = null;
+    try {
+      reportType = new URL(req.url || '', 'http://localhost').searchParams.get('reportType');
+    } catch (_) {}
+    send(res, 200, JSON.stringify(getMockReportBranding(reportType)), 'application/json');
+    return;
   } else if (url === '/data/impoundReports' || url === '/data/trafficIncidentReports' || url === '/data/injuryReports' || url === '/data/propertyEvidenceReports' || url === '/data/propertyEvidenceReceiptReports') {
     send(res, 200, '[]', 'application/json');
     return;
@@ -567,7 +664,7 @@ const server = http.createServer((req, res) => {
     return;
   } else if (req.method === 'POST' && url === '/data/nearbyVehicles') {
     readBody(req).then(body => {
-      const limit = Math.min(20, Math.max(1, parseInt(body, 10) || 5));
+      const limit = Math.min(20, Math.max(1, parseInt(body, 10) || 8));
       const list = placeholderVehicles.slice(0, limit).map(v => ({
         LicensePlate: v.LicensePlate,
         ModelDisplayName: v.ModelDisplayName,
@@ -575,7 +672,7 @@ const server = http.createServer((req, res) => {
         IsStolen: v.IsStolen,
       }));
       send(res, 200, JSON.stringify(list), 'application/json');
-    }).catch(() => send(res, 200, JSON.stringify(placeholderVehicles.slice(0, 5)), 'application/json'));
+    }).catch(() => send(res, 200, JSON.stringify(placeholderVehicles.slice(0, 8)), 'application/json'));
     return;
   } else if (req.method === 'POST' && url === '/data/vehicleSearchByPlate') {
     readBody(req).then(body => {

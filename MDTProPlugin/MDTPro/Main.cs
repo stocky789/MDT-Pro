@@ -27,7 +27,8 @@ namespace MDTPro {
 
         public override void Finally() {
             try {
-                CalloutEvents.RemoveCalloutCiHandlers();
+                CalloutEvents.RemoveCalloutEventHandlers();
+                ALPR.CiAlprWebToastBridge.Stop();
                 STPEvents.UnsubscribeAll();
                 PREvents.UnsubscribeAll();
                 CDFEvents.UnsubscribeAll();
@@ -41,6 +42,7 @@ namespace MDTPro {
             ALPR.ALPRController.Stop();
             Data.DataController.EndCurrentShift();
             Server.Stop();
+            GameFiberHttpBridge.Stop();
             Data.Database.Close();
             ClearCache();
             RageNotification.Show(GetLanguage().inGame.unloaded, RageNotification.NotificationType.Info);
@@ -52,7 +54,9 @@ namespace MDTPro {
                 UI.CitationHandoffKeybind.Stop();
                 StpCitationHandoffQueue.Clear();
                 ALPR.ALPRController.Stop();
+                ALPR.CiAlprWebToastBridge.Stop();
                 Server.Stop();
+                GameFiberHttpBridge.Stop();
                 return;
             }
             {
@@ -103,6 +107,9 @@ namespace MDTPro {
                         Server.Stop();
                         GameFiber.Wait(400);
 
+                        GameFiberHttpBridge.Start();
+                        GameFiber.Wait(50);
+
                         Thread serverThread = new Thread(Server.Start) {
                             IsBackground = true
                         };
@@ -119,7 +126,8 @@ namespace MDTPro {
                         Log($"PR: {usePR}", true, usePR ? LogSeverity.Info : LogSeverity.Warning);
                         Log($"STP: {useSTP}", true, useSTP ? LogSeverity.Info : LogSeverity.Warning);
 
-                        if (useCI) CalloutEvents.AddCalloutEventWithCI();
+                        // Always track callouts via LSPDFR events; resolve Callout from LSPDFR API first (Callout Interface alone can break after CI updates).
+                        CalloutEvents.AddCalloutEventHandlers();
 
                         if (ModIntegration.SubscribedPolicingRedefinedStopEvents) {
                             PREvents.SubscribeToPREvents();
@@ -141,8 +149,8 @@ namespace MDTPro {
                         if (!string.IsNullOrWhiteSpace(menuKeyStr) && Enum.TryParse<Keys>(menuKeyStr.Trim(), true, out parsedKey))
                             UI.SettingsMenu.MenuKey = parsedKey;
 
-                        // StopThePed-path citation menu + keybind only when Policing Redefined is not loaded (PR uses GiveCitationToPed / ped menu).
-                        if (!Main.usePR && ModIntegration.StpPluginLoaded) {
+                        // MDT Pro citation handoff menu + keybind when PR is not issuing tickets (native RAGENativeUI; works without StopThePed.dll name detection).
+                        if (!Main.usePR) {
                             string handoffKeyStr = ReadIniValue(iniPath, "MDTPro", "CitationHandoffKey");
                             if (!string.IsNullOrWhiteSpace(handoffKeyStr) && Enum.TryParse<Keys>(handoffKeyStr.Trim(), true, out Keys handoffKey))
                                 UI.CitationHandoffKeybind.HandoffKey = handoffKey;
@@ -153,6 +161,7 @@ namespace MDTPro {
                         }
 
                         ALPR.ALPRController.Start();
+                        ALPR.CiAlprWebToastBridge.Start();
                         UI.SettingsMenu.Start();
 
                         var cfg = GetConfig();

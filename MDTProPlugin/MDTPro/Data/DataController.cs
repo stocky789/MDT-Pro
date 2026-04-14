@@ -303,6 +303,8 @@ namespace MDTPro.Data {
         /// <summary>Cached on game thread for /data/nearbyVehicles so the HTTP handler never touches game entities. Built from a live world scan (not only vehicleDatabase) so plates appear even when CDF has not registered vehicles yet.</summary>
         internal static List<CachedNearbyVehicleEntry> CachedNearbyVehicles = new List<CachedNearbyVehicleEntry>();
         private static readonly object _cachedNearbyLock = new object();
+        /// <summary>Serializes HTTP <c>/data/nearbyVehicles</c> refreshes so concurrent native/browser requests do not interleave Populate/Update on overlapping game fibers.</summary>
+        private static readonly object _httpNearbyRefreshLock = new object();
         internal struct CachedNearbyVehicleEntry {
             public string LicensePlate;
             public string ModelDisplayName;
@@ -317,23 +319,25 @@ namespace MDTPro.Data {
         }
 
         /// <summary>HTTP runs on the pool; refresh nearby-vehicle cache on the game fiber before Vehicle Search reads it (same idea as <see cref="RefreshMdtLocationOnGameFiberBlocking"/>).</summary>
-        internal static void RefreshCachedNearbyVehiclesOnGameFiberBlocking(int timeoutMs = 2000) {
+        /// <returns><c>true</c> if the game fiber finished the scan; <c>false</c> on timeout or setup failure (common when GTA V is unfocused and the frame loop is paused).</returns>
+        internal static bool RefreshCachedNearbyVehiclesOnGameFiberBlocking(int timeoutMs = 4500) {
             try {
-                var done = new ManualResetEventSlim(false);
-                GameFiber.StartNew(() => {
+                if (!GameFiberHttpBridge.TryExecuteBlocking(() => {
                     try {
                         UpdateCachedNearbyVehicles(fullWorldScan: true);
                     } catch (Exception ex) {
                         Helper.Log($"RefreshCachedNearbyVehiclesOnGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
-                    } finally {
-                        try { done.Set(); } catch { /* ignore */ }
                     }
-                }, "mdtpro-nearby-veh-refresh");
-                bool ok = done.Wait(timeoutMs);
-                if (!ok)
+                }, timeoutMs, out var caught)) {
                     Helper.Log("RefreshCachedNearbyVehiclesOnGameFiberBlocking: timed out (game paused or overloaded).", false, Helper.LogSeverity.Warning);
+                    return false;
+                }
+                if (caught != null)
+                    Helper.Log($"RefreshCachedNearbyVehiclesOnGameFiberBlocking: {caught.Message}", false, Helper.LogSeverity.Warning);
+                return caught == null;
             } catch (Exception ex) {
                 Helper.Log($"RefreshCachedNearbyVehiclesOnGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
+                return false;
             }
         }
 
@@ -354,19 +358,16 @@ namespace MDTPro.Data {
             if (string.IsNullOrWhiteSpace(plateOrVin)) return null;
             MDTProVehicleData found = null;
             try {
-                var done = new ManualResetEventSlim(false);
                 string q = plateOrVin.Trim();
-                GameFiber.StartNew(() => {
+                if (!GameFiberHttpBridge.TryExecuteBlocking(() => {
                     try {
                         found = TryFindLiveWorldVehicleDataForPlateOrVin(q);
                     } catch (Exception ex) {
                         Helper.Log($"TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
-                    } finally {
-                        try { done.Set(); } catch { /* ignore */ }
                     }
-                }, "mdtpro-specific-veh-resolve");
-                if (!done.Wait(timeoutMs))
+                }, timeoutMs, out _)) {
                     Helper.Log("TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: timed out (game paused or overloaded).", false, Helper.LogSeverity.Warning);
+                }
             } catch (Exception ex) {
                 Helper.Log($"TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
@@ -376,18 +377,17 @@ namespace MDTPro.Data {
         /// <summary>HTTP/WebSocket run on the thread pool; schedule <see cref="UpdatePlayerLocation"/> on the game fiber then wait so reads are not stale or never filled.</summary>
         internal static void RefreshMdtLocationOnGameFiberBlocking(int timeoutMs = 1500) {
             try {
-                var done = new ManualResetEventSlim(false);
-                GameFiber.StartNew(() => {
+                bool ran = GameFiberHttpBridge.TryExecuteBlocking(() => {
                     try {
                         UpdatePlayerLocation();
                     } catch (Exception ex) {
                         Helper.Log($"RefreshMdtLocationOnGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
-                    } finally {
-                        try { done.Set(); } catch { /* ignore */ }
                     }
-                }, "mdtpro-loc-refresh");
-                if (!done.Wait(timeoutMs))
+                }, timeoutMs, out var caught);
+                if (!ran)
                     Helper.Log("RefreshMdtLocationOnGameFiberBlocking: timed out (game paused or overloaded).", false, Helper.LogSeverity.Warning);
+                if (caught != null)
+                    Helper.Log($"RefreshMdtLocationOnGameFiberBlocking: {caught.Message}", false, Helper.LogSeverity.Warning);
             } catch (Exception ex) {
                 Helper.Log($"RefreshMdtLocationOnGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
@@ -481,6 +481,7 @@ namespace MDTPro.Data {
         /// <param name="fullWorldScan">When true (Vehicle Search HTTP refresh), also walk <see cref="World.GetAllVehicles"/> within range so the list is not empty if <see cref="Ped.GetNearbyVehicles"/> omits traffic.</param>
         private static void UpdateCachedNearbyVehicles(bool fullWorldScan) {
             var list = new List<CachedNearbyVehicleEntry>();
+            int withDist = 0;
             if (Main.Player != null && Main.Player.Exists()) {
                 try {
                     int scanCount = SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles;
@@ -489,7 +490,6 @@ namespace MDTPro.Data {
                     var bestByPlate = new Dictionary<string, CachedNearbyVehicleEntry>(StringComparer.OrdinalIgnoreCase);
                     NearbyVehicleScanStats stNearby = default;
                     NearbyVehicleScanStats stWorld = default;
-                    int worldIterations = 0;
 
                     Vehicle[] nearby = Main.Player.GetNearbyVehicles(scanCount);
                     if (nearby != null) {
@@ -498,11 +498,12 @@ namespace MDTPro.Data {
                     }
 
                     if (fullWorldScan) {
+                        // Scan the full streamed vehicle pool (no early break). A cap on iteration count
+                        // skipped cars that were "later" in enumeration order, so the closest N plates were
+                        // wrong once Take(limit) ran — e.g. nothing within ~15m while farther cars appeared.
                         const float maxWorldScanMeters = 95f;
                         try {
                             foreach (Vehicle v in World.GetAllVehicles()) {
-                                worldIterations++;
-                                if (worldIterations > 2048) break;
                                 if (v == null || !v.Exists()) continue;
                                 float d;
                                 try { d = Main.Player.DistanceTo(v); } catch { continue; }
@@ -514,12 +515,19 @@ namespace MDTPro.Data {
                         }
                     }
 
-                    list = bestByPlate.Values.OrderBy(x => x.Distance ?? float.MaxValue).ToList();
+                    list = bestByPlate.Values
+                        .OrderBy(x => x.Distance ?? float.MaxValue)
+                        .ThenBy(x => x.LicensePlate ?? "", StringComparer.OrdinalIgnoreCase)
+                        .ToList();
                 } catch (Exception ex) {
                     Helper.Log($"UpdateCachedNearbyVehicles: {ex.Message}", false, Helper.LogSeverity.Warning);
                 }
             }
+            withDist = list.Count(e => e.Distance.HasValue);
             lock (_cachedNearbyLock) {
+                // When reads yield rows but no usable distances (e.g. paused/unfocused), keep the last good snapshot.
+                if (withDist == 0 && list.Count > 0 && CachedNearbyVehicles != null && CachedNearbyVehicles.Count > 0)
+                    return;
                 CachedNearbyVehicles = list;
             }
         }
@@ -546,11 +554,8 @@ namespace MDTPro.Data {
             }
 
             const float maxWorldScanMeters = 95f;
-            int worldIterations = 0;
             try {
                 foreach (Vehicle v in World.GetAllVehicles()) {
-                    worldIterations++;
-                    if (worldIterations > 2048) break;
                     if (v == null || !v.Exists()) continue;
                     float d;
                     try { d = Main.Player.DistanceTo(v); } catch { continue; }
@@ -745,15 +750,6 @@ namespace MDTPro.Data {
         }
 
         private static void SetVehicleDatabase() {
-            lock (_vehicleDbLock) {
-                if (vehicleDatabase.Count > SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles * SetupController.GetConfig().databaseLimitMultiplier) {
-                    List<MDTProVehicleData> keysToRemove = vehicleDatabase.Take(SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles).ToList();
-                    foreach (MDTProVehicleData key in keysToRemove) {
-                        if (keepInVehicleDatabase.Any(x => x.LicensePlate == key.LicensePlate)) continue;
-                        vehicleDatabase.Remove(key);
-                    }
-                }
-            }
             PopulateVehicleDatabase();
         }
 
@@ -773,14 +769,19 @@ namespace MDTPro.Data {
         internal static MDTProVehicleData GetVehicleByLicensePlate(string plate) {
             if (string.IsNullOrWhiteSpace(plate)) return null;
             string key = plate.Trim();
+            string norm = NormalizeVehiclePlateKey(key);
             lock (_vehicleDbLock) {
-                var v = vehicleDatabase.FirstOrDefault(x => string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase));
+                var v = vehicleDatabase.FirstOrDefault(x =>
+                    string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase)
+                    || (!string.IsNullOrEmpty(norm) && !string.IsNullOrEmpty(x.LicensePlate) && NormalizeVehiclePlateKey(x.LicensePlate) == norm));
                 if (v != null) return v;
-                return keepInVehicleDatabase.FirstOrDefault(x => string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase));
+                return keepInVehicleDatabase.FirstOrDefault(x =>
+                    string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase)
+                    || (!string.IsNullOrEmpty(norm) && !string.IsNullOrEmpty(x.LicensePlate) && NormalizeVehiclePlateKey(x.LicensePlate) == norm));
             }
         }
 
-        /// <summary>Look up vehicle by plate or VIN. Checks both vehicleDatabase and keepInVehicleDatabase.</summary>
+        /// <summary>Look up vehicle by plate or VIN. Checks both vehicleDatabase and keepInVehicleDatabase. Plate matching ignores spaces/case; VIN ignores spaces and hyphens.</summary>
         internal static MDTProVehicleData GetVehicleByPlateOrVin(string plateOrVin) {
             if (string.IsNullOrWhiteSpace(plateOrVin)) return null;
             string key = plateOrVin.Trim();
@@ -1428,6 +1429,10 @@ namespace MDTPro.Data {
             } catch (Exception ex) {
                 Helper.Log($"AddIdentificationEvent CDF sync: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
+            // Re-apply portrait from the ped this event used (after CDF merge) so StopThePed license/ID always matches the in-world model and components.
+            PedPortraitModelHelper.AssignPortraitFromPedIfSuitable(ped, pedData);
+            KeepPedInDatabase(pedData);
+            Database.SavePed(pedData);
         }
 
         /// <summary>StopThePed passenger ID flow supplies a vehicle; record ID history for the driver when possible.</summary>
@@ -1608,6 +1613,23 @@ namespace MDTPro.Data {
             currentShiftData.reports.Add(reportId);
         }
 
+        /// <summary>Unions <see cref="ArrestReport.AttachedReportIds"/> onto a pending docket. When the arrest is not the case primary, its report id is added as an exhibit.</summary>
+        private static void MergeArrestExhibitsIntoPendingCourtCase(CourtData courtCase, ArrestReport arrestReport) {
+            if (courtCase == null || arrestReport == null) return;
+            courtCase.AttachedReportIds ??= new List<string>();
+            if (arrestReport.AttachedReportIds != null) {
+                foreach (string rid in arrestReport.AttachedReportIds) {
+                    if (string.IsNullOrWhiteSpace(rid)) continue;
+                    if (!courtCase.AttachedReportIds.Contains(rid))
+                        courtCase.AttachedReportIds.Add(rid);
+                }
+            }
+            if (!string.Equals(courtCase.ReportId, arrestReport.Id, StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(arrestReport.Id)
+                && !courtCase.AttachedReportIds.Contains(arrestReport.Id))
+                courtCase.AttachedReportIds.Add(arrestReport.Id);
+        }
+
         internal static void AddReport(Report report) {
             if (report is CitationReport citationReport) {
                 if (!string.IsNullOrEmpty(citationReport.OffenderPedName)) {
@@ -1636,10 +1658,16 @@ namespace MDTPro.Data {
 
                 int index = citationReports.FindIndex(x => x.Id == citationReport.Id);
                 CitationReport existingCitation = index >= 0 ? citationReports[index] as CitationReport : null;
-                bool wasAlreadyClosed = existingCitation?.Status == ReportStatus.Closed;
-                bool newlyClosed = citationReport.Status == ReportStatus.Closed && citationReport.Charges != null && citationReport.Charges.Count > 0 && !wasAlreadyClosed;
+                // Issue handoff when closing with charges and a final amount has not been recorded yet.
+                // Covers: Open→Closed, first save, and "saved closed before charges were added" (wasAlreadyClosed but FinalAmount still null).
+                bool closedWithCharges = citationReport.Status == ReportStatus.Closed
+                    && citationReport.Charges != null
+                    && citationReport.Charges.Count > 0;
+                bool handoutNotYetFinalized = !citationReport.FinalAmount.HasValue
+                    && (existingCitation == null || !existingCitation.FinalAmount.HasValue);
+                bool shouldIssueCitationHandoff = closedWithCharges && handoutNotYetFinalized;
 
-                if (newlyClosed) {
+                if (shouldIssueCitationHandoff) {
                     // Set FinalAmount once when the citation becomes closed; do not recalculate on later saves.
                     var chargesToHand = (citationReport.Charges ?? Enumerable.Empty<CitationReport.Charge>())
                         .Where(charge => charge != null)
@@ -1695,92 +1723,150 @@ namespace MDTPro.Data {
                     if (vehicleDataToAdd != null) KeepVehicleInDatabase(vehicleDataToAdd);
                 }
 
+                // Pending arrest with a docket # — union exhibit IDs onto that pending case (native / MDT can add evidence before close-for-court).
+                if (arrestReport.Status == ReportStatus.Pending && !string.IsNullOrWhiteSpace(arrestReport.CourtCaseNumber)) {
+                    string pendingCcn = arrestReport.CourtCaseNumber.Trim();
+                    lock (_courtDatabaseLock) {
+                        CourtData pendingCase = courtDatabase.FirstOrDefault(x => x != null && string.Equals(x.Number, pendingCcn, StringComparison.Ordinal));
+                        if (pendingCase != null
+                            && pendingCase.Status == 0
+                            && !string.IsNullOrEmpty(arrestReport.OffenderPedName)
+                            && !string.IsNullOrEmpty(pendingCase.PedName)
+                            && string.Equals(pendingCase.PedName, arrestReport.OffenderPedName, StringComparison.OrdinalIgnoreCase)) {
+                            MergeArrestExhibitsIntoPendingCourtCase(pendingCase, arrestReport);
+                            RecalculateCourtCaseEvidence(pendingCase);
+                            Database.SaveCourtCase(pendingCase);
+                            Helper.LogArrestCourtVerbose($"AddReport(arrest): pending save synced exhibits to docket {pendingCase.Number} for arrest {arrestReport.Id}");
+                        }
+                    }
+                }
+
                 // Only create/update court case when arrest is Closed. Pending = collecting evidence (attach reports).
                 if (arrestReport.Status == ReportStatus.Closed) {
                     Helper.LogArrestCourtVerbose($"AddReport(arrest): entering Closed branch for report {arrestReport.Id}");
                     lock (_courtDatabaseLock) {
-                        string courtCaseNumber = arrestReport.CourtCaseNumber ?? AllocateCourtCaseNumberUnderLock();
-                        // Web UI can send a stale CourtCaseNumber (e.g. recycled DOM / wrong dataset). If that # is already another docket, we used to skip Add entirely — no new case, arrest still "closed for court".
-                        CourtData holder = courtDatabase.FirstOrDefault(x => x != null && string.Equals(x.Number, courtCaseNumber, StringComparison.Ordinal));
-                        if (holder != null && !string.Equals(holder.ReportId, arrestReport.Id, StringComparison.Ordinal)) {
-                            Helper.Log(
-                                $"[MDTPro] Arrest {arrestReport.Id}: case # {courtCaseNumber} is already docket for report {holder.ReportId} (defendant {holder.PedName ?? "?"}); allocating a new number.",
-                                false,
-                                Helper.LogSeverity.Warning);
-                            courtCaseNumber = AllocateCourtCaseNumberUnderLock();
-                        }
-                        arrestReport.CourtCaseNumber = courtCaseNumber;
-                        Helper.LogArrestCourtVerbose($"AddReport(arrest): court case number={courtCaseNumber}, in-memory court count={courtDatabase.Count}");
+                        string requested = arrestReport.CourtCaseNumber?.Trim();
+                        string courtCaseNumber = string.IsNullOrEmpty(requested)
+                            ? AllocateCourtCaseNumberUnderLock()
+                            : requested;
 
-                        CourtData courtData = new CourtData(
-                            arrestReport.OffenderPedName,
-                            courtCaseNumber,
-                            arrestReport.Id,
-                            int.Parse(DateTime.Now.ToString("yy"))
-                        );
+                        CourtData existingByNumber = courtDatabase.FirstOrDefault(x => x != null && string.Equals(x.Number, courtCaseNumber, StringComparison.Ordinal));
+                        bool courtRowHandled = false;
 
-                        if (arrestReport.AttachedReportIds != null && arrestReport.AttachedReportIds.Count > 0) {
-                            courtData.AttachedReportIds.AddRange(arrestReport.AttachedReportIds);
-                        }
-
-                        foreach (ArrestReport.Charge charge in arrestReport.Charges ?? Enumerable.Empty<ArrestReport.Charge>()) {
-                            if (charge == null) continue;
-                            int minDays = charge.minDays;
-                            int? maxDays = charge.maxDays;
-                            int? time;
-                            int rangeMin;
-                            int? rangeMax;
-                            if (maxDays == null) {
-                                // Life sentence charge: either life or a range (minDays to minDays*2)
-                                if (Helper.GetRandomInt(0, 1) == 0) {
-                                    time = Helper.GetRandomInt(minDays, Math.Max(minDays, minDays * 2));
-                                    rangeMin = minDays;
-                                    rangeMax = Math.Max(minDays, minDays * 2);
-                                } else {
-                                    time = null;
-                                    rangeMin = 0;
-                                    rangeMax = null; // Life
-                                }
+                        if (existingByNumber != null && existingByNumber.Status == 0) {
+                            bool sameDefendant = !string.IsNullOrEmpty(arrestReport.OffenderPedName)
+                                && !string.IsNullOrEmpty(existingByNumber.PedName)
+                                && string.Equals(existingByNumber.PedName, arrestReport.OffenderPedName, StringComparison.OrdinalIgnoreCase);
+                            if (sameDefendant) {
+                                arrestReport.CourtCaseNumber = existingByNumber.Number;
+                                MergeArrestExhibitsIntoPendingCourtCase(existingByNumber, arrestReport);
+                                RecalculateCourtCaseEvidence(existingByNumber);
+                                Database.SaveCourtCase(existingByNumber);
+                                courtRowHandled = true;
+                                Helper.LogArrestCourtVerbose(
+                                    $"AddReport(arrest): merged exhibits into pending docket {existingByNumber.Number} for arrest {arrestReport.Id} (case primary report {existingByNumber.ReportId})");
                             } else {
-                                // Store base min for severity; roll at resolution
-                                time = minDays;
-                                rangeMin = minDays;
-                                rangeMax = maxDays;
+                                string conflictDocket = existingByNumber.Number;
+                                courtCaseNumber = AllocateCourtCaseNumberUnderLock();
+                                arrestReport.CourtCaseNumber = courtCaseNumber;
+                                existingByNumber = null;
+                                Helper.Log(
+                                    $"[MDTPro] Arrest {arrestReport.Id}: case # {requested} defendant mismatch vs docket {conflictDocket}; allocating {courtCaseNumber}.",
+                                    false,
+                                    Helper.LogSeverity.Warning);
                             }
-                            courtData.AddCharge(
-                                new CourtData.Charge(
-                                    charge.name,
-                                    Helper.GetRandomInt(charge.minFine, charge.maxFine),
-                                    time,
-                                    charge.isArrestable,
-                                    rangeMin,
-                                    rangeMax
-                                )
-                            );
+                        } else if (existingByNumber != null && existingByNumber.Status != 0) {
+                            if (string.Equals(existingByNumber.ReportId, arrestReport.Id, StringComparison.Ordinal)) {
+                                arrestReport.CourtCaseNumber = existingByNumber.Number;
+                                courtRowHandled = true;
+                                Helper.LogArrestCourtVerbose(
+                                    $"AddReport(arrest): closed re-save for primary {arrestReport.Id}; docket {existingByNumber.Number} already resolved — not mutating exhibits");
+                            } else {
+                                courtCaseNumber = AllocateCourtCaseNumberUnderLock();
+                                arrestReport.CourtCaseNumber = courtCaseNumber;
+                                existingByNumber = null;
+                                Helper.Log(
+                                    $"[MDTPro] Arrest {arrestReport.Id}: case # {requested} is resolved; allocating new docket {courtCaseNumber}.",
+                                    false,
+                                    Helper.LogSeverity.Warning);
+                            }
+                        } else {
+                            arrestReport.CourtCaseNumber = courtCaseNumber;
                         }
 
-                        courtData.EvidenceUseOfForce = arrestReport.UseOfForce != null && !string.IsNullOrEmpty(arrestReport.UseOfForce.Type);
-                        BuildCourtCaseMetadata(courtData, arrestReport.OffenderPedName, arrestReport.Location);
-                        ApplyRepeatOffenderSentencing(courtData);
+                        if (!courtRowHandled) {
+                            Helper.LogArrestCourtVerbose($"AddReport(arrest): court case number={courtCaseNumber}, in-memory court count={courtDatabase.Count}");
 
-                        if (!courtDatabase.Any(x => x.Number == courtCaseNumber)) {
-                            if (courtDatabase.Count > SetupController.GetConfig().courtDatabaseMaxEntries) {
-                                string evicted = courtDatabase[0]?.Number;
-                                Database.DeleteCourtCase(courtDatabase[0].Number);
-                                courtDatabase.RemoveAt(0);
-                                Helper.LogArrestCourtVerbose($"AddReport(arrest): evicted oldest case {evicted} (max entries reached)");
+                            CourtData courtData = new CourtData(
+                                arrestReport.OffenderPedName,
+                                courtCaseNumber,
+                                arrestReport.Id,
+                                int.Parse(DateTime.Now.ToString("yy"))
+                            );
+
+                            if (arrestReport.AttachedReportIds != null && arrestReport.AttachedReportIds.Count > 0) {
+                                courtData.AttachedReportIds.AddRange(arrestReport.AttachedReportIds);
                             }
-                            courtDatabase.Add(courtData);
-                            Helper.LogArrestCourtVerbose($"AddReport(arrest): added case {courtCaseNumber} to list; calling Database.SaveCourtCase (defendant={courtData.PedName}, reportId={courtData.ReportId})");
-                            // Persist here so a later Find/Save in the HTTP handler is not the only path (avoids lost cases if lookup races).
-                            Database.SaveCourtCase(courtData);
-                            Helper.Log(
-                                $"[MDTPro] Court case {courtCaseNumber} created for arrest {arrestReport.Id} (defendant {arrestReport.OffenderPedName ?? "?"}).",
-                                false,
-                                Helper.LogSeverity.Info);
-                            Helper.LogArrestCourtVerbose($"AddReport(arrest): Database.SaveCourtCase finished for {courtCaseNumber}");
-                        } else {
-                            Helper.LogArrestCourtVerbose($"AddReport(arrest): SKIPPED add — case number {courtCaseNumber} already in courtDatabase (re-save or duplicate?)");
+
+                            foreach (ArrestReport.Charge charge in arrestReport.Charges ?? Enumerable.Empty<ArrestReport.Charge>()) {
+                                if (charge == null) continue;
+                                int minDays = charge.minDays;
+                                int? maxDays = charge.maxDays;
+                                int? time;
+                                int rangeMin;
+                                int? rangeMax;
+                                if (maxDays == null) {
+                                    // Life sentence charge: either life or a range (minDays to minDays*2)
+                                    if (Helper.GetRandomInt(0, 1) == 0) {
+                                        time = Helper.GetRandomInt(minDays, Math.Max(minDays, minDays * 2));
+                                        rangeMin = minDays;
+                                        rangeMax = Math.Max(minDays, minDays * 2);
+                                    } else {
+                                        time = null;
+                                        rangeMin = 0;
+                                        rangeMax = null; // Life
+                                    }
+                                } else {
+                                    // Store base min for severity; roll at resolution
+                                    time = minDays;
+                                    rangeMin = minDays;
+                                    rangeMax = maxDays;
+                                }
+                                courtData.AddCharge(
+                                    new CourtData.Charge(
+                                        charge.name,
+                                        Helper.GetRandomInt(charge.minFine, charge.maxFine),
+                                        time,
+                                        charge.isArrestable,
+                                        rangeMin,
+                                        rangeMax
+                                    )
+                                );
+                            }
+
+                            courtData.EvidenceUseOfForce = arrestReport.UseOfForce != null && !string.IsNullOrEmpty(arrestReport.UseOfForce.Type);
+                            BuildCourtCaseMetadata(courtData, arrestReport.OffenderPedName, arrestReport.Location);
+                            ApplyRepeatOffenderSentencing(courtData);
+
+                            if (!courtDatabase.Any(x => x.Number == courtCaseNumber)) {
+                                if (courtDatabase.Count > SetupController.GetConfig().courtDatabaseMaxEntries) {
+                                    string evicted = courtDatabase[0]?.Number;
+                                    Database.DeleteCourtCase(courtDatabase[0].Number);
+                                    courtDatabase.RemoveAt(0);
+                                    Helper.LogArrestCourtVerbose($"AddReport(arrest): evicted oldest case {evicted} (max entries reached)");
+                                }
+                                courtDatabase.Add(courtData);
+                                Helper.LogArrestCourtVerbose($"AddReport(arrest): added case {courtCaseNumber} to list; calling Database.SaveCourtCase (defendant={courtData.PedName}, reportId={courtData.ReportId})");
+                                // Persist here so a later Find/Save in the HTTP handler is not the only path (avoids lost cases if lookup races).
+                                Database.SaveCourtCase(courtData);
+                                Helper.Log(
+                                    $"[MDTPro] Court case {courtCaseNumber} created for arrest {arrestReport.Id} (defendant {arrestReport.OffenderPedName ?? "?"}).",
+                                    false,
+                                    Helper.LogSeverity.Info);
+                                Helper.LogArrestCourtVerbose($"AddReport(arrest): Database.SaveCourtCase finished for {courtCaseNumber}");
+                            } else {
+                                Helper.LogArrestCourtVerbose($"AddReport(arrest): SKIPPED add — case number {courtCaseNumber} already in courtDatabase after merge path (unexpected)");
+                            }
                         }
                     }
                 } else {
@@ -1897,7 +1983,13 @@ namespace MDTPro.Data {
             if (existingPed == null) return;
             try {
                 if (liveSnapshot.ModelHash != 0) existingPed.ModelHash = liveSnapshot.ModelHash;
-                if (!string.IsNullOrEmpty(liveSnapshot.ModelName)) existingPed.ModelName = liveSnapshot.ModelName;
+                if (!string.IsNullOrEmpty(liveSnapshot.ModelName)) {
+                    existingPed.ModelName = liveSnapshot.ModelName;
+                    existingPed.PortraitVariantDrawable = liveSnapshot.PortraitVariantDrawable;
+                    existingPed.PortraitVariantTexture = liveSnapshot.PortraitVariantTexture;
+                    existingPed.PortraitFaceDrawable = liveSnapshot.PortraitFaceDrawable;
+                    existingPed.PortraitFaceTexture = liveSnapshot.PortraitFaceTexture;
+                }
                 if (existingPed.CDFPedData != null)
                     ReconcilePedCdfBackedFieldsWithLiveSnapshot(existingPed, liveSnapshot);
                 else {
@@ -1996,7 +2088,13 @@ namespace MDTPro.Data {
                         existingPed.IsOnProbation = mdtProPedData.IsOnProbation;
                         existingPed.IsOnParole = mdtProPedData.IsOnParole;
                         if (mdtProPedData.ModelHash != 0) existingPed.ModelHash = mdtProPedData.ModelHash;
-                        if (!string.IsNullOrEmpty(mdtProPedData.ModelName)) existingPed.ModelName = mdtProPedData.ModelName;
+                        if (!string.IsNullOrEmpty(mdtProPedData.ModelName)) {
+                            existingPed.ModelName = mdtProPedData.ModelName;
+                            existingPed.PortraitVariantDrawable = mdtProPedData.PortraitVariantDrawable;
+                            existingPed.PortraitVariantTexture = mdtProPedData.PortraitVariantTexture;
+                            existingPed.PortraitFaceDrawable = mdtProPedData.PortraitFaceDrawable;
+                            existingPed.PortraitFaceTexture = mdtProPedData.PortraitFaceTexture;
+                        }
                         existingPed.LicenseStatus = mdtProPedData.LicenseStatus;
                         existingPed.LicenseExpiration = mdtProPedData.LicenseExpiration;
                         existingPed.WeaponPermitStatus = mdtProPedData.WeaponPermitStatus;
@@ -2156,9 +2254,7 @@ namespace MDTPro.Data {
             } catch { /* entity disposed */ }
             if (live == null) {
                 try {
-                    int n = 0;
                     foreach (Vehicle v in World.GetAllVehicles()) {
-                        if (++n > 2048) break;
                         if (v == null || !v.Exists()) continue;
                         string plate = TryResolveLiveVehiclePlate(v, out _);
                         if (string.IsNullOrEmpty(plate) || NormalizeVehiclePlateKey(plate) != want) continue;
@@ -2187,16 +2283,13 @@ namespace MDTPro.Data {
                 if (GameFiber.CanSleepNow) {
                     result = TryRefreshVehicleDocumentsFromLiveWorldExecute(vehicleData);
                 } else {
-                    var done = new ManualResetEventSlim(false);
-                    GameFiber.StartNew(() => {
-                        try {
-                            result = TryRefreshVehicleDocumentsFromLiveWorldExecute(vehicleData);
-                        } finally {
-                            try { done.Set(); } catch { /* ignore */ }
-                        }
-                    }, "mdtpro-stp-vehicle-docs");
-                    if (!done.Wait(2500))
+                    if (!GameFiberHttpBridge.TryExecuteBlocking(() => {
+                        result = TryRefreshVehicleDocumentsFromLiveWorldExecute(vehicleData);
+                    }, 2500, out var docEx)) {
                         Helper.Log("TryRefreshVehicleDocumentsFromLiveWorld: timed out waiting for game fiber (paused game?).", false, Helper.LogSeverity.Warning);
+                    } else if (docEx != null) {
+                        Helper.Log($"TryRefreshVehicleDocumentsFromLiveWorld: {docEx.Message}", false, Helper.LogSeverity.Warning);
+                    }
                 }
             } catch (Exception ex) {
                 Helper.Log($"TryRefreshVehicleDocumentsFromLiveWorld: {ex.Message}", false, Helper.LogSeverity.Warning);
@@ -2383,22 +2476,25 @@ namespace MDTPro.Data {
             if (!PedPortraitModelHelper.TryGetPortraitModelFromPed(ped, out uint mh, out string mn)) return false;
             string oldN = pedData.ModelName;
             uint oldH = pedData.ModelHash;
+            int? oldD = pedData.PortraitVariantDrawable;
+            int? oldT = pedData.PortraitVariantTexture;
+            int? oldFd = pedData.PortraitFaceDrawable;
+            int? oldFt = pedData.PortraitFaceTexture;
             pedData.ModelHash = mh;
             pedData.ModelName = mn;
-            if (oldN != mn || oldH != mh)
-                LogPedPortraitDebug($"Portrait ({sourceTag}): '{pedData.Name}' model {oldN ?? "(null)"} -> {mn} (hash {oldH}->{mh})");
+            PedPortraitModelHelper.AssignPortraitVariationFromPed(ped, pedData);
+            if (oldN != mn || oldH != mh || oldD != pedData.PortraitVariantDrawable || oldT != pedData.PortraitVariantTexture
+                || oldFd != pedData.PortraitFaceDrawable || oldFt != pedData.PortraitFaceTexture)
+                LogPedPortraitDebug($"Portrait ({sourceTag}): '{pedData.Name}' model {oldN ?? "(null)"} -> {mn} (hash {oldH}->{mh}) hair {oldD},{oldT}->{pedData.PortraitVariantDrawable},{pedData.PortraitVariantTexture} face {oldFd},{oldFt}->{pedData.PortraitFaceDrawable},{pedData.PortraitFaceTexture}");
             return true;
         }
 
-        /// <summary>Game thread only: refresh catalogue portrait from Holder, recent-ID handle map, then nearby peds.</summary>
+        /// <summary>Game thread only: refresh catalogue portrait from recent ID, context holder, row Holder, then closest nearby name match.</summary>
         private static bool TryRefreshPedModelFromLiveWorldOnGameThread(MDTProPedData pedData, string searchName, string reversedSearchName) {
             if (pedData == null) return false;
             try {
-                if (pedData.Holder != null && pedData.Holder.IsValid()) {
-                    if (TryApplyPortraitFromPed(pedData, pedData.Holder, "holder"))
-                        return true;
-                }
                 string dob = pedData.Birthday;
+                // 1) Just-identified handle map — strongest signal for "the ped in front of you"
                 foreach (string key in new[] { searchName, reversedSearchName, pedData.Name }) {
                     if (string.IsNullOrWhiteSpace(key)) continue;
                     var handleOpt = GetRecentlyIdentifiedPedHandle(key.Trim(), dob);
@@ -2410,6 +2506,21 @@ namespace MDTPro.Data {
                             return true;
                     } catch { }
                 }
+                // 2) Last context ped with same name + valid holder (player still engaged with this identity)
+                try {
+                    MDTProPedData ctx = GetContextPedIfValid();
+                    if (ctx != null && ctx.Holder != null && ctx.Holder.IsValid() && !string.IsNullOrWhiteSpace(ctx.Name)
+                        && string.Equals(ctx.Name.Trim(), pedData.Name.Trim(), StringComparison.OrdinalIgnoreCase)) {
+                        if (TryApplyPortraitFromPed(pedData, ctx.Holder, "contextHolder"))
+                            return true;
+                    }
+                } catch { }
+                // 3) In-memory row holder
+                if (pedData.Holder != null && pedData.Holder.IsValid()) {
+                    if (TryApplyPortraitFromPed(pedData, pedData.Holder, "holder"))
+                        return true;
+                }
+                // 4) Nearby: prefer closest matching name (pool order is arbitrary)
                 if (TryRefreshPedPortraitFromNearbyPeds(pedData, searchName, reversedSearchName))
                     return true;
             } catch { }
@@ -2444,16 +2555,28 @@ namespace MDTPro.Data {
                     if (!string.IsNullOrWhiteSpace(reversedSearchName) && string.Equals(fullName.Trim(), reversedSearchName.Trim(), StringComparison.OrdinalIgnoreCase)) return true;
                     return false;
                 }
+                var nearbyMatches = new List<(Ped ped, float dist)>();
                 foreach (Ped q in nearby) {
                     if (q == null || !q.IsValid() || q == player) continue;
+                    float dist;
                     try {
-                        float dist = (q.Position - scanOrigin).Length();
+                        dist = (q.Position - scanOrigin).Length();
                         if (dist > rMax) continue;
                     } catch { continue; }
                     string liveName = null;
                     try { liveName = q.GetPedData()?.FullName; } catch { }
+                    if (string.IsNullOrWhiteSpace(liveName)) {
+                        try {
+                            var persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(q);
+                            if (persona != null && !string.IsNullOrEmpty(persona.FullName)) liveName = persona.FullName;
+                        } catch { }
+                    }
                     if (string.IsNullOrWhiteSpace(liveName)) continue;
                     if (!NameMatchesSearchKeys(liveName.Trim())) continue;
+                    nearbyMatches.Add((q, dist));
+                }
+                nearbyMatches.Sort((a, b) => a.dist.CompareTo(b.dist));
+                foreach (var (q, _) in nearbyMatches) {
                     if (TryApplyPortraitFromPed(pedData, q, "nearbyScan"))
                         return true;
                 }
@@ -2461,26 +2584,32 @@ namespace MDTPro.Data {
             return false;
         }
 
-        /// <summary>HTTP/WebSocket: run portrait refresh on the game fiber so entity APIs are safe, then return.</summary>
-        internal static void RefreshPedPortraitForPersonSearchBlocking(MDTProPedData pedData, string searchName, string reversedSearchName, int timeoutMs = 2000) {
+        /// <summary>HTTP/WebSocket: run portrait refresh on the <see cref="GameFiberHttpBridge"/> fiber (same as nearby vehicles / plate resolve) so work still schedules when GTA is paused, alt-tabbed, or throttling one-off fibers. On timeout, queues a deferred refresh for when the frame loop resumes.</summary>
+        internal static void RefreshPedPortraitForPersonSearchBlocking(MDTProPedData pedData, string searchName, string reversedSearchName, int timeoutMs = 4000) {
             if (pedData == null) return;
             try {
-                if (GameFiber.CanSleepNow) {
-                    TryRefreshPedModelFromLiveWorldOnGameThread(pedData, searchName, reversedSearchName);
-                    return;
-                }
-                var done = new ManualResetEventSlim(false);
-                GameFiber.StartNew(() => {
+                if (!GameFiberHttpBridge.TryExecuteBlocking(() => {
                     try {
                         TryRefreshPedModelFromLiveWorldOnGameThread(pedData, searchName, reversedSearchName);
                     } catch (Exception ex) {
                         Helper.Log($"RefreshPedPortraitForPersonSearchBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
-                    } finally {
-                        try { done.Set(); } catch { /* ignore */ }
                     }
-                }, "mdtpro-ped-portrait-search");
-                if (!done.Wait(timeoutMs))
-                    Helper.Log("RefreshPedPortraitForPersonSearchBlocking: timed out (game paused or overloaded).", false, Helper.LogSeverity.Warning);
+                }, timeoutMs, out var caught)) {
+                    Helper.Log("RefreshPedPortraitForPersonSearchBlocking: timed out (game paused or overloaded). Portrait refresh queued for when the game thread runs again.", false, Helper.LogSeverity.Warning);
+                    var pd = pedData;
+                    var sn = searchName;
+                    var rn = reversedSearchName;
+                    GameFiberHttpBridge.EnqueueFireAndForget(() => {
+                        try {
+                            if (TryRefreshPedModelFromLiveWorldOnGameThread(pd, sn, rn))
+                                KeepPedInDatabase(pd);
+                        } catch (Exception ex) {
+                            Helper.Log($"RefreshPedPortraitForPersonSearchBlocking (deferred): {ex.Message}", false, Helper.LogSeverity.Warning);
+                        }
+                    });
+                } else if (caught != null) {
+                    Helper.Log($"RefreshPedPortraitForPersonSearchBlocking: {caught.Message}", false, Helper.LogSeverity.Warning);
+                }
             } catch (Exception ex) {
                 Helper.Log($"RefreshPedPortraitForPersonSearchBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
@@ -6916,8 +7045,16 @@ namespace MDTPro.Data {
         private static OfficerInformationData GetOfficerInformation() {
             LSPD_First_Response.Engine.Scripting.Entities.Persona persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(Main.Player);
 
+            string scriptName = null;
+            try {
+                scriptName = LSPD_First_Response.Mod.API.Functions.GetCurrentAgencyScriptName();
+            } catch {
+                /* ignore */
+            }
+
             OfficerInformationData result = new OfficerInformationData {
-                agency = Helper.GetAgencyNameFromScriptName(LSPD_First_Response.Mod.API.Functions.GetCurrentAgencyScriptName()) ?? LSPD_First_Response.Mod.API.Functions.GetCurrentAgencyScriptName(),
+                agency = Helper.GetAgencyNameFromScriptName(scriptName) ?? scriptName,
+                agencyScriptName = scriptName,
                 firstName = persona.Forename,
                 lastName = persona.Surname,
                 callSign = DependencyCheck.IsIPTCommonAvailable() ? Helper.GetCallSignFromIPTCommon() : null

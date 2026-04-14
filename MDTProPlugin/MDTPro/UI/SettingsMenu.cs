@@ -94,8 +94,8 @@ namespace MDTPro.UI {
             _pool.Add(_mainMenu);
 
             var cfg = GetConfig();
-            _alprEnabledItem = new UIMenuCheckboxItem("Enable ALPR", cfg != null && cfg.alprEnabled,
-                "Turn automatic license plate reading and HUD on or off. Only active when on duty and in a police vehicle.");
+            _alprEnabledItem = new UIMenuCheckboxItem("Enable ALPR (MDT scanner + HUD)", cfg != null && cfg.alprEnabled,
+                "Built-in plate scan and on-screen panel (on duty, police vehicle). Browser ALPR popups can use Callout Interface without turning this on.");
             _mainMenu.AddItem(_alprEnabledItem);
 
             _alprEnabledItem.CheckboxEvent += (sender, @checked) => {
@@ -373,18 +373,25 @@ namespace MDTPro.UI {
                 return;
             }
 
-            try {
-                if (enabled) {
-                    ALPRController.Start();
-                    RageNotification.Show("ALPR ~g~enabled~s~. Plate scanning and HUD will run when on duty in a police vehicle.", RageNotification.NotificationType.Success);
-                } else {
-                    ALPRController.Stop();
-                    RageNotification.Show("ALPR ~r~disabled~s~.", RageNotification.NotificationType.Info);
+            // Defer Start/Stop to the next fiber tick — starting/aborting scan fibers from NativeUI checkbox callbacks can crash RPH.
+            bool wantEnabled = enabled;
+            GameFiber.StartNew(() => {
+                try {
+                    GameFiber.Yield();
+                    var c = GetConfig();
+                    if (c == null || c.alprEnabled != wantEnabled) return;
+                    if (wantEnabled) {
+                        ALPRController.Start();
+                        RageNotification.Show("ALPR ~g~enabled~s~. Plate scanning and HUD will run when on duty in a police vehicle.", RageNotification.NotificationType.Success);
+                    } else {
+                        ALPRController.Stop();
+                        RageNotification.Show("ALPR ~r~disabled~s~.", RageNotification.NotificationType.Info);
+                    }
+                } catch (System.Exception ex) {
+                    Helper.Log($"SettingsMenu ApplyAlprEnabled (apply): {ex.Message}", true, Helper.LogSeverity.Error);
+                    RageNotification.ShowError("Setting saved but ALPR could not be updated.");
                 }
-            } catch (System.Exception ex) {
-                Helper.Log($"SettingsMenu ApplyAlprEnabled (apply): {ex.Message}", true, Helper.LogSeverity.Error);
-                RageNotification.ShowError("Setting saved but ALPR could not be updated.");
-            }
+            });
         }
 
         private static void MenuLoop() {

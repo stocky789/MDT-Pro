@@ -1,0 +1,16 @@
+{
+  "name": "mdt-pro-tooling",
+  "private": true,
+  "description": "Dev-only scripts for MDT Pro (ped portrait pipeline, dev-server). Not shipped to end users.",
+  "scripts": {
+    "ped:fetch": "node scripts/fetchPedCatalogueImages.mjs",
+    "ped:portraits": "node scripts/processPedPortraitCatalogue.mjs",
+    "ped:build-catalogue": "node scripts/processPedPortraitCatalogue.mjs --clean && node scripts/fetchPedCatalogueImages.mjs && node scripts/processPedPortraitCatalogue.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "sharp": "^0.33.5"
+  }
+}

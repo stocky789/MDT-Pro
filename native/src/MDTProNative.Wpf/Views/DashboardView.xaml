@@ -1,0 +1,109 @@
+<UserControl x:Class="MDTProNative.Wpf.Views.DashboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:MDTProNative.Wpf.Views">
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Global CAD / unit status (broadcast to all callout WebSocket clients) -->
+        <Border Grid.Row="0" Style="{StaticResource CadSectionBorder}" Padding="10,8" Margin="0,0,0,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="UNIT / CAD STATUS" Style="{StaticResource CadSectionTitle}" Margin="0,0,0,4" />
+                    <TextBlock x:Name="CadStatusReadout"
+                               Text="—"
+                               Foreground="{StaticResource CadText}"
+                               FontSize="13"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="Shown on the callout channel for browser MDT and this app. Does not change LSPDFR on-duty state."
+                               Style="{StaticResource CadLabelMuted}"
+                               FontSize="11"
+                               Margin="0,4,0,0"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Vertical" MinWidth="220" Margin="12,0,0,0">
+                    <ComboBox x:Name="CadPresetCombo" Margin="0,0,0,6" />
+                    <TextBox x:Name="CadCustomStatus"
+                             MinHeight="26"
+                             Margin="0,0,0,6"
+                             ToolTip="Optional — overrides preset when not empty" />
+                    <Button Content="SET STATUS"
+                            Style="{StaticResource CadAccentButton}"
+                            Click="SetCadStatus_Click" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="DashboardSidebarColumn" Width="300" MinWidth="220" />
+                <ColumnDefinition Width="6" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource CadSectionBorder}" Padding="10">
+                <DockPanel LastChildFill="True">
+                    <TextBlock DockPanel.Dock="Top" Text="ACTIVE CALLOUTS" Style="{StaticResource CadSectionTitle}" Margin="0,0,0,8" />
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="Select a call. Accept uses LSPDFR. En route uses the callout instance when the API exposes it; otherwise use the in-game Callout Interface."
+                               Style="{StaticResource CadLabelMuted}"
+                               TextWrapping="Wrap"
+                               FontSize="11"
+                               Margin="0,0,0,8" />
+                    <ListBox x:Name="CalloutList"
+                             Style="{StaticResource CadListBox}"
+                             SelectionChanged="CalloutList_OnSelectionChanged"
+                             ItemContainerStyle="{StaticResource CadLogListBoxItem}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type views:CalloutListRow}">
+                                <StackPanel Margin="0,4">
+                                    <TextBlock Text="{Binding Headline}" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource CadText}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding LocationLine}" FontSize="11" Foreground="{StaticResource CadMuted}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                        <Border Background="#1E2A3D" CornerRadius="2" Padding="6,2" Margin="0,0,6,0">
+                                            <TextBlock Text="{Binding PriorityLabel}" FontSize="10" Foreground="{StaticResource CadSubTabActiveText}" FontFamily="{StaticResource CadFontMono}" />
+                                        </Border>
+                                        <Border Background="#243044" CornerRadius="2" Padding="6,2">
+                                            <TextBlock Text="{Binding StatusLabel}" FontSize="10" Foreground="{StaticResource CadText}" FontFamily="{StaticResource CadFontMono}" />
+                                        </Border>
+                                    </StackPanel>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <GridSplitter x:Name="DashboardSplitter"
+                          Grid.Column="1"
+                          Width="6"
+                          HorizontalAlignment="Stretch"
+                          ResizeDirection="Columns"
+                          ResizeBehavior="PreviousAndNext"
+                          Background="{StaticResource CadBorder}" />
+
+            <Border Grid.Column="2" Style="{StaticResource CadSectionBorder}" Padding="10">
+                <DockPanel LastChildFill="True">
+                    <TextBlock DockPanel.Dock="Top" Text="CALLOUT DETAIL" Style="{StaticResource CadSectionTitle}" Margin="0,0,0,8" />
+                    <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                        <UniformGrid Columns="3" Margin="0,0,0,0">
+                            <Button x:Name="BtnAccept" Content="ACCEPT" Style="{StaticResource CadAccentButton}" Margin="0,0,4,0" Click="Accept_Click" />
+                            <Button x:Name="BtnEnRoute" Content="EN ROUTE" Style="{StaticResource CadAccentButton}" Margin="4,0,4,0" Click="EnRoute_Click" />
+                            <Button x:Name="BtnGps" Content="SET GPS" Margin="4,0,0,0" Click="SetWaypoint_Click" />
+                        </UniformGrid>
+                    </StackPanel>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <TextBlock x:Name="DetailText" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource CadText}" />
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -88,7 +88,7 @@ body {
   background-color: var(--color-background);
 }
 
-/* Inner clip so local (/image/peds/) and remote catalogue URLs get identical face framing */
+/* Inner clip for bundled face-crop portraits (/image/peds/) */
 .pedIdPhotoFaceCrop {
   position: absolute;
   inset: 0;
@@ -97,16 +97,12 @@ body {
 }
 
 .pedIdPhotoImg {
-  /* Fill crop box, then scale from top-center so the head fills the ID slot (same look for bundled + CDN) */
   position: absolute;
-  top: 0;
-  left: 50%;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 50% 0%;
-  transform: translateX(-50%) scale(2.45);
-  transform-origin: 50% 0;
+  object-position: center center;
   display: block;
 }
 

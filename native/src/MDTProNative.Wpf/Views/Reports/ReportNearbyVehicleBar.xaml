@@ -1,0 +1,64 @@
+<UserControl x:Class="MDTProNative.Wpf.Views.Reports.ReportNearbyVehicleBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border BorderBrush="{StaticResource ReportDocInkBrush}"
+            BorderThickness="1"
+            Padding="8,6"
+            Background="{StaticResource ReportDocFieldFill}"
+            SnapsToDevicePixels="True">
+        <StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" MinWidth="120" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="Scene vehicle"
+                           VerticalAlignment="Center"
+                           Margin="0,0,10,0"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource ReportDocInkBrush}" />
+                <ComboBox x:Name="NearbyCombo"
+                          Grid.Column="1"
+                          VerticalAlignment="Center"
+                          Margin="0,0,8,0"
+                          Style="{StaticResource ReportDocCombo}"
+                          ToolTip="Nearby world vehicles (CDF). Refresh rescans; Apply loads full plate / owner / VIN." />
+                <Button x:Name="RefreshBtn"
+                        Grid.Column="2"
+                        Content="REFRESH"
+                        Style="{StaticResource CadRailOutlineButton}"
+                        Padding="10,4"
+                        Margin="0,0,6,0"
+                        ToolTip="Rescan nearby vehicles from the game world." />
+                <Button x:Name="ContextBtn"
+                        Grid.Column="3"
+                        Content="CONTEXT"
+                        Style="{StaticResource CadRailOutlineButton}"
+                        Padding="10,4"
+                        Margin="0,0,6,0"
+                        ToolTip="Use the current in-game context vehicle (e.g. Stop The Ped / last stopped vehicle)." />
+                <Button x:Name="ApplyBtn"
+                        Grid.Column="4"
+                        Content="APPLY"
+                        Style="{StaticResource CadButton}"
+                        Padding="12,4"
+                        ToolTip="Fill report fields from the selected row (or first in list) using live CDF data." />
+            </Grid>
+            <TextBlock x:Name="HintText"
+                       TextWrapping="Wrap"
+                       FontSize="10"
+                       Foreground="{StaticResource ReportDocInkBrush}"
+                       Margin="0,6,0,0"
+                       Text="Connect to the game, refresh, pick a unit, then Apply — same data as Vehicle MDC. If the list stays empty while alt-tabbed, focus GTA V briefly (live scan runs on the game thread)." />
+            <TextBlock x:Name="StatusText"
+                       TextWrapping="Wrap"
+                       FontSize="10"
+                       Margin="0,2,0,0"
+                       Visibility="Collapsed" />
+        </StackPanel>
+    </Border>
+</UserControl>

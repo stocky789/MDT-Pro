@@ -5,11 +5,7 @@ async function getOfficerInformationSection(
   const language = await getLanguage()
 
   const title = document.createElement('div')
-  if (isList) {
-    title.classList.add('searchResponseSectionTitle')
-  } else {
-    title.classList.add('title')
-  }
+  title.classList.add('title')
   title.innerHTML = language.reports.sections.officerInformation.title
 
   const firstName = document.createElement('div')
@@ -113,7 +109,6 @@ async function getOfficerInformationSection(
 
   const sectionWrapper = document.createElement('div')
   sectionWrapper.classList.add('section')
-  if (isList) sectionWrapper.classList.add('searchResponseWrapper')
 
   sectionWrapper.appendChild(title)
   sectionWrapper.appendChild(inputWrapper)

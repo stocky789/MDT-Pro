@@ -1,0 +1,56 @@
+<UserControl x:Class="MDTProNative.Wpf.Views.Reports.ReportDocumentHeader"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="0,0,0,12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" MinWidth="160" />
+            <ColumnDefinition Width="100" />
+            <ColumnDefinition Width="*" MinWidth="200" />
+        </Grid.ColumnDefinitions>
+        <TextBlock x:Name="BrandingLeftColumn"
+                   Grid.Column="0"
+                   Style="{StaticResource ReportDocLabel}"
+                   TextWrapping="Wrap"
+                   LineHeight="16" />
+        <Border x:Name="SealBorder"
+                Grid.Column="1"
+                Width="72"
+                Height="72"
+                CornerRadius="36"
+                BorderThickness="0"
+                Background="#E8F4FC"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Margin="4,0"
+                ClipToBounds="True">
+            <Grid>
+                <Image x:Name="SealImage"
+                       Stretch="Uniform"
+                       Margin="0"
+                       RenderOptions.BitmapScalingMode="HighQuality"
+                       Visibility="Collapsed" />
+                <TextBlock x:Name="BrandingCenterTitle"
+                           TextAlignment="Center"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center"
+                           FontWeight="Bold"
+                           FontSize="11"
+                           Foreground="{StaticResource ReportDocInkBrush}"
+                           TextWrapping="Wrap"
+                           Margin="4" />
+            </Grid>
+        </Border>
+        <StackPanel Grid.Column="2" Margin="8,0,0,0">
+            <TextBlock x:Name="DocumentTitleBlock"
+                       FontWeight="Bold"
+                       FontSize="13"
+                       TextWrapping="Wrap"
+                       Foreground="{StaticResource ReportDocInkBrush}" />
+            <TextBlock x:Name="BrandingRightTitle"
+                       Margin="0,4,0,0"
+                       Style="{StaticResource ReportDocLabel}"
+                       TextWrapping="Wrap"
+                       LineHeight="16" />
+        </StackPanel>
+    </Grid>
+</UserControl>

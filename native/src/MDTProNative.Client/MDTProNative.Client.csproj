@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\MDTProNative.Core\MDTProNative.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\MDTPro\defaults\citationOptions.json">
+      <LogicalName>MDTProNative.Client.defaults.citationOptions.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\..\..\MDTPro\defaults\arrestOptions.json">
+      <LogicalName>MDTProNative.Client.defaults.arrestOptions.json</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

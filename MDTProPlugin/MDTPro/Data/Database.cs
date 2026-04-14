@@ -16,7 +16,7 @@ namespace MDTPro.Data {
         private static SQLiteConnection connection;
         private static readonly object dbLock = new object();
 
-        private const int CurrentSchemaVersion = 30;
+        private const int CurrentSchemaVersion = 32;
 
         /// <summary>Reads an INTEGER column from SQLite as uint. SQLite returns INTEGER as Int64; values outside uint range are clamped to 0.</summary>
         private static uint ReadUInt32FromReader(object value) {
@@ -83,6 +83,10 @@ namespace MDTPro.Data {
                     LastName                TEXT,
                     ModelHash               INTEGER NOT NULL DEFAULT 0,
                     ModelName               TEXT,
+                    PortraitVariantDrawable INTEGER,
+                    PortraitVariantTexture  INTEGER,
+                    PortraitFaceDrawable      INTEGER,
+                    PortraitFaceTexture       INTEGER,
                     Birthday                TEXT,
                     Gender                  TEXT,
                     Address                 TEXT,
@@ -968,6 +972,20 @@ namespace MDTPro.Data {
                     Helper.Log("Database migrated to schema version 30 (ped_evidence_cache)");
                 } catch { }
             }
+            if (fromVersion < 31) {
+                try {
+                    using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN PortraitVariantDrawable INTEGER", connection)) { cmd.ExecuteNonQuery(); }
+                    using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN PortraitVariantTexture INTEGER", connection)) { cmd.ExecuteNonQuery(); }
+                    Helper.Log("Database migrated to schema version 31 (peds portrait variant d/t for bundled catalogue filenames)");
+                } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            }
+            if (fromVersion < 32) {
+                try {
+                    using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN PortraitFaceDrawable INTEGER", connection)) { cmd.ExecuteNonQuery(); }
+                    using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN PortraitFaceTexture INTEGER", connection)) { cmd.ExecuteNonQuery(); }
+                    Helper.Log("Database migrated to schema version 32 (peds portrait face slot d/t for second catalogue filename try)");
+                } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            }
 
             SetSchemaVersion(CurrentSchemaVersion);
         }
@@ -979,6 +997,10 @@ namespace MDTPro.Data {
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN Status INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN ModelHash INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN ModelName TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN PortraitVariantDrawable INTEGER", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN PortraitVariantTexture INTEGER", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN PortraitFaceDrawable INTEGER", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN PortraitFaceTexture INTEGER", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN IncarceratedUntil TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN IsJuryTrial INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN JurySize INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
@@ -1076,11 +1098,14 @@ namespace MDTPro.Data {
                 foreach (var ped in peds) {
                     ped.Citations = LoadPedCitations(ped.Name);
                     ped.Arrests = LoadPedArrests(ped.Name);
+                    bool portraitNormalized = PedPortraitModelHelper.NormalizeStoredPortraitRow(ped);
                     if (PedPortraitModelHelper.StripInvalidPortraitModelIfNeeded(ped)) {
                         if (MDTProPedData.IsMinimalIdentity(ped))
                             ClearPedPortraitModelColumns(ped.Name);
                         else
                             SavePed(ped);
+                    } else if (portraitNormalized && !MDTProPedData.IsMinimalIdentity(ped)) {
+                        SavePed(ped);
                     }
                 }
 
@@ -1095,6 +1120,10 @@ namespace MDTPro.Data {
                 LastName = reader["LastName"] as string,
                 ModelHash = reader["ModelHash"] is DBNull ? 0 : (uint)Convert.ToInt64(reader["ModelHash"]),
                 ModelName = reader["ModelName"] as string,
+                PortraitVariantDrawable = PortraitVariantNullableFromReader(reader, "PortraitVariantDrawable"),
+                PortraitVariantTexture = PortraitVariantNullableFromReader(reader, "PortraitVariantTexture"),
+                PortraitFaceDrawable = PortraitVariantNullableFromReader(reader, "PortraitFaceDrawable"),
+                PortraitFaceTexture = PortraitVariantNullableFromReader(reader, "PortraitFaceTexture"),
                 Birthday = reader["Birthday"] as string,
                 Gender = reader["Gender"] as string,
                 Address = reader["Address"] as string,
@@ -1209,6 +1238,8 @@ namespace MDTPro.Data {
                                     vehicle.BOLOs = null;
                                 }
                             }
+
+                            GtaVVehicleMakeModelCatalog.TryEnrichFromSpawnName(vehicle.ModelName, vehicle);
 
                             vehicles.Add(vehicle);
                         }
@@ -1343,6 +1374,13 @@ namespace MDTPro.Data {
                 int ordinal = reader.GetOrdinal(columnName);
                 return reader.IsDBNull(ordinal) ? (int?)null : Convert.ToInt32(reader[ordinal]);
             } catch { return null; }
+        }
+
+        /// <summary>Non-negative portrait variant indices only; invalid/legacy negatives become null.</summary>
+        private static int? PortraitVariantNullableFromReader(SQLiteDataReader reader, string columnName) {
+            int? v = ReaderOptionalIntNull(reader, columnName);
+            if (!v.HasValue) return null;
+            return v.Value >= 0 ? v : (int?)null;
         }
 
         internal static OfficerInformationData LoadOfficerInformation() {
@@ -1781,7 +1819,7 @@ namespace MDTPro.Data {
             lock (dbLock) {
                 if (connection == null) return;
                 using (var cmd = new SQLiteCommand(
-                    "UPDATE peds SET ModelHash = 0, ModelName = NULL WHERE Name = @Name", connection)) {
+                    "UPDATE peds SET ModelHash = 0, ModelName = NULL, PortraitVariantDrawable = NULL, PortraitVariantTexture = NULL, PortraitFaceDrawable = NULL, PortraitFaceTexture = NULL WHERE Name = @Name", connection)) {
                     cmd.Parameters.AddWithValue("@Name", pedName);
                     cmd.ExecuteNonQuery();
                 }
@@ -1824,7 +1862,7 @@ namespace MDTPro.Data {
         private static void SavePedInternal(MDTProPedData ped, SQLiteTransaction transaction) {
             using (var cmd = new SQLiteCommand(@"
                 INSERT OR REPLACE INTO peds (
-                    Name, FirstName, LastName, ModelHash, ModelName, Birthday, Gender, Address,
+                    Name, FirstName, LastName, ModelHash, ModelName, PortraitVariantDrawable, PortraitVariantTexture, PortraitFaceDrawable, PortraitFaceTexture, Birthday, Gender, Address,
                     IsInGang, AdvisoryText, TimesStopped, IsWanted, WarrantText,
                     IsOnProbation, IsOnParole, LicenseStatus, LicenseExpiration,
                     WeaponPermitStatus, WeaponPermitExpiration, WeaponPermitType,
@@ -1832,7 +1870,7 @@ namespace MDTPro.Data {
                     HuntingPermitStatus, HuntingPermitExpiration, IncarceratedUntil,
                     IdentificationHistory, IsDeceased, DeceasedAt
                 ) VALUES (
-                    @Name, @FirstName, @LastName, @ModelHash, @ModelName, @Birthday, @Gender, @Address,
+                    @Name, @FirstName, @LastName, @ModelHash, @ModelName, @PortraitVariantDrawable, @PortraitVariantTexture, @PortraitFaceDrawable, @PortraitFaceTexture, @Birthday, @Gender, @Address,
                     @IsInGang, @AdvisoryText, @TimesStopped, @IsWanted, @WarrantText,
                     @IsOnProbation, @IsOnParole, @LicenseStatus, @LicenseExpiration,
                     @WeaponPermitStatus, @WeaponPermitExpiration, @WeaponPermitType,
@@ -1845,6 +1883,10 @@ namespace MDTPro.Data {
                 cmd.Parameters.AddWithValue("@LastName", (object)ped.LastName ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@ModelHash", ped.ModelHash);
                 cmd.Parameters.AddWithValue("@ModelName", (object)ped.ModelName ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@PortraitVariantDrawable", (object)ped.PortraitVariantDrawable ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@PortraitVariantTexture", (object)ped.PortraitVariantTexture ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@PortraitFaceDrawable", (object)ped.PortraitFaceDrawable ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@PortraitFaceTexture", (object)ped.PortraitFaceTexture ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@Birthday", (object)ped.Birthday ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@Gender", (object)ped.Gender ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@Address", (object)ped.Address ?? DBNull.Value);

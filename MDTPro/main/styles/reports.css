@@ -865,12 +865,13 @@ body {
   margin-top: 8px;
 }
 
-/* Property and Evidence Receipt section */
+/* Property and Evidence Receipt section (always rendered inside .report-document — paper colors, not theme vars) */
 .propertyEvidenceSection .propertyEvidenceSubsectionTitle {
   font-size: 14px;
   font-weight: 600;
   margin-top: 16px;
   margin-bottom: 8px;
+  color: #0f0f0f;
 }
 
 .propertyEvidenceSection .propertyEvidenceRecentIdsList {
@@ -919,8 +920,8 @@ body {
 .propertyEvidenceSection .propertyEvidenceSubjectsList .chargeWrapper,
 .propertyEvidenceSection .propertyEvidenceDrugsList .chargeWrapper,
 .propertyEvidenceSection .propertyEvidenceFirearmsList .chargeWrapper {
-  background-color: var(--color-surface-elevated);
-  border: 1px solid var(--color-border);
+  background-color: #fdebdf;
+  border: 1px solid #000;
   border-radius: 3px;
   padding: 8px 10px;
   font-size: 14px;
@@ -928,12 +929,13 @@ body {
   flex-direction: row;
   align-items: center;
   gap: 8px;
+  color: #0f0f0f;
 }
 
 .propertyEvidenceSection .chargeWrapper .chargeName {
   flex: 1;
   min-width: 0;
-  color: var(--color-text-primary);
+  color: #0f0f0f;
   font-weight: 600;
 }
 
@@ -950,8 +952,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  fill: var(--color-text-primary);
-  color: var(--color-text-primary);
+  fill: #0f0f0f;
+  color: #0f0f0f;
   font-size: 18px;
   line-height: 1;
 }
@@ -983,7 +985,7 @@ body {
 .propertyEvidenceSection .propertyEvidenceOtherRow label {
   font-size: 13px;
   font-weight: 500;
-  color: var(--color-text-primary-dimmed);
+  color: #0f0f0f;
   display: block;
   margin-bottom: 0;
 }
@@ -1001,4 +1003,69 @@ body {
 .arrestSection .arrestChargeScheduleFilterRow,
 .arrestSection .arrestNarcoticScheduleFilter {
   display: none !important;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  html,
+  body {
+    overflow: visible !important;
+    height: auto !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  .listPage,
+  .createPage {
+    padding: 0 !important;
+    background: #fff !important;
+    overflow: visible !important;
+  }
+
+  .listWrapper {
+    display: block !important;
+    grid-template-columns: none !important;
+    gap: 0 !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  .listPage > .buttonWrapper,
+  .listPage .typeSelector,
+  .listPage .reportsList,
+  .listPage .reportsList .listElement,
+  .listPage .reportsList .filter {
+    display: none !important;
+  }
+
+  .listPage .listWrapper .reportInformation,
+  .createPage .listWrapper .reportInformation {
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  .listPage .listWrapper .reportInformation.hidden {
+    display: none !important;
+  }
+
+  .createPage.hidden {
+    display: none !important;
+  }
 }

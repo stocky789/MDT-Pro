@@ -1,0 +1,227 @@
+<UserControl x:Class="MDTProNative.Wpf.Views.Reports.Forms.TrafficIncidentReportForm"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:reports="clr-namespace:MDTProNative.Wpf.Views.Reports">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel x:Name="ReportEditorToolbar" Grid.Row="0" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal">
+                <Button x:Name="ExportPdfBtn" Content="EXPORT PDF…" Style="{StaticResource CadRailOutlineButton}" Padding="12,6" Margin="0,0,8,0" />
+                <TextBlock x:Name="BrandingTemplateHint"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource CadText}"
+                           FontSize="11"
+                           Text="" />
+            </StackPanel>
+            <reports:ReportNearbyVehicleBar x:Name="NearbyVehicleBar" Margin="0,8,0,0" />
+        </StackPanel>
+
+        <ScrollViewer x:Name="DocumentBodyScroll"
+                      Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <Border x:Name="DocumentPrintRoot"
+                    TextElement.Foreground="{StaticResource ReportDocInkBrush}"
+                    Background="{StaticResource ReportDocPaperBrush}"
+                    BorderBrush="{StaticResource ReportDocInkBrush}"
+                    BorderThickness="1"
+                    Padding="18"
+                    MaxWidth="920"
+                    HorizontalAlignment="Left">
+                <StackPanel>
+                    <reports:ReportDocumentHeader x:Name="DocHeader" />
+
+                    <TextBlock Text="General" Style="{StaticResource ReportDocSectionTitle}" />
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Report ID" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" VerticalAlignment="Center" />
+                        <Grid Grid.Row="0" Grid.Column="1" Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="GeneralIdBox" Grid.Column="0" Style="{StaticResource ReportDocTextBox}" Margin="0,0,8,0" />
+                            <Button x:Name="CopyReportIdBtn"
+                                    Grid.Column="1"
+                                    Content="COPY"
+                                    Style="{StaticResource CadRailOutlineButton}"
+                                    Padding="10,4"
+                                    VerticalAlignment="Center"
+                                    ToolTip="Copy report ID to clipboard" />
+                        </Grid>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Short year" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
+                        <TextBox x:Name="GeneralShortYearBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,6" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Date" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
+                        <DatePicker x:Name="GeneralDatePicker"
+                                    Grid.Row="2"
+                                    Grid.Column="1"
+                                    Margin="0,0,0,6"
+                                    Style="{StaticResource ReportDocDatePicker}" />
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Time" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,6" />
+                        <TextBox x:Name="GeneralTimeBox" Grid.Row="3" Grid.Column="1" Style="{StaticResource ReportDocTextBox}" Margin="0,0,0,6" ToolTip="HH:mm or HH:mm:ss" />
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Status" Style="{StaticResource ReportDocLabel}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                        <ComboBox x:Name="StatusCombo" Grid.Row="4" Grid.Column="1" Style="{StaticResource ReportDocCombo}">
+                            <ComboBoxItem Content="Closed" />
+                            <ComboBoxItem Content="Open" />
+                            <ComboBoxItem Content="Canceled" />
+                            <ComboBoxItem Content="Pending" />
+                        </ComboBox>
+                    </Grid>
+                    <TextBlock Text="Notes" Style="{StaticResource ReportDocLabel}" />
+                    <TextBox x:Name="NotesBox"
+                             Style="{StaticResource ReportDocTextBox}"
+                             MinHeight="56"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             Margin="0,4,0,10" />
+
+                    <TextBlock Text="Officer" Style="{StaticResource ReportDocSectionTitle}" />
+                    <UniformGrid Columns="2" Margin="0,0,0,10">
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="First name" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OffFirstBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Last name" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OffLastBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="Badge #" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OffBadgeBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Rank" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OffRankBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="Call sign" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OffCallBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Agency" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="OffAgencyBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </UniformGrid>
+
+                    <TextBlock Text="Location" Style="{StaticResource ReportDocSectionTitle}" />
+                    <UniformGrid Columns="2" Margin="0,0,0,10">
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="Area" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="LocAreaBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Street" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="LocStreetBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,6">
+                            <TextBlock Text="County" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="LocCountyBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Postal" Style="{StaticResource ReportDocLabel}" />
+                            <TextBox x:Name="LocPostalBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </UniformGrid>
+
+                    <TextBlock Text="Traffic incident" Style="{StaticResource ReportDocSectionTitle}" />
+                    <TextBlock Text="Drivers (one per line)" Style="{StaticResource ReportDocLabel}" />
+                    <Grid Margin="0,4,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="DriverNamesBox"
+                                 Grid.Column="0"
+                                 Style="{StaticResource ReportDocTextBox}"
+                                 MinHeight="64"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 Margin="0,0,8,0" />
+                        <Button x:Name="CopyDriverNamesBtn"
+                                Grid.Column="1"
+                                Content="COPY"
+                                Style="{StaticResource CadRailOutlineButton}"
+                                Padding="10,4"
+                                VerticalAlignment="Top"
+                                Margin="0,4,0,0"
+                                ToolTip="Copy driver names to clipboard" />
+                    </Grid>
+                    <TextBlock Text="Passengers (one per line)" Style="{StaticResource ReportDocLabel}" />
+                    <TextBox x:Name="PassengerNamesBox"
+                             Style="{StaticResource ReportDocTextBox}"
+                             MinHeight="64"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             Margin="0,4,0,8" />
+                    <TextBlock Text="Pedestrians (one per line)" Style="{StaticResource ReportDocLabel}" />
+                    <TextBox x:Name="PedestrianNamesBox"
+                             Style="{StaticResource ReportDocTextBox}"
+                             MinHeight="64"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             Margin="0,4,0,8" />
+                    <TextBlock Text="Vehicle plates (one per line)" Style="{StaticResource ReportDocLabel}" />
+                    <Grid Margin="0,4,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="VehiclePlatesBox"
+                                 Grid.Column="0"
+                                 Style="{StaticResource ReportDocTextBox}"
+                                 MinHeight="64"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 Margin="0,0,8,0" />
+                        <Button x:Name="CopyVehiclePlatesBtn"
+                                Grid.Column="1"
+                                Content="COPY"
+                                Style="{StaticResource CadRailOutlineButton}"
+                                Padding="10,4"
+                                VerticalAlignment="Top"
+                                Margin="0,4,0,0"
+                                ToolTip="Copy vehicle plates to clipboard" />
+                    </Grid>
+                    <TextBlock Text="Vehicle models (one per line)" Style="{StaticResource ReportDocLabel}" />
+                    <TextBox x:Name="VehicleModelsBox"
+                             Style="{StaticResource ReportDocTextBox}"
+                             MinHeight="64"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             Margin="0,4,0,8" />
+                    <CheckBox x:Name="InjuryReportedCheck" Content="Injury reported" Margin="0,0,0,8" Foreground="{StaticResource ReportDocInkBrush}" />
+                    <TextBlock Text="Injury details" Style="{StaticResource ReportDocLabel}" />
+                    <TextBox x:Name="InjuryDetailsBox"
+                             Style="{StaticResource ReportDocTextBox}"
+                             MinHeight="48"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             Margin="0,4,0,8" />
+                    <TextBlock Text="Collision type" Style="{StaticResource ReportDocLabel}" />
+                    <TextBox x:Name="CollisionTypeBox" Style="{StaticResource ReportDocTextBox}" Margin="0,4,0,0" />
+
+                    <TextBlock x:Name="BrandingFooter"
+                               TextWrapping="Wrap"
+                               FontSize="10"
+                               Foreground="{StaticResource ReportDocInkBrush}"
+                               Margin="0,16,0,0" />
+                </StackPanel>
+            </Border>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

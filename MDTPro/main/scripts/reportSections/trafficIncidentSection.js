@@ -2,12 +2,11 @@ async function getTrafficIncidentSection (data = {}, isList = false) {
   const language = await getLanguage()
   const section = document.createElement('div')
   section.classList.add('section', 'trafficIncidentSection')
-  if (isList) section.classList.add('searchResponseWrapper')
 
   const labels = language.reports?.sections?.trafficIncident || {}
 
   const title = document.createElement('div')
-  title.classList.add(isList ? 'searchResponseSectionTitle' : 'title')
+  title.classList.add('title')
   title.innerHTML = labels.title || 'Traffic Incident Details'
 
   section.appendChild(title)

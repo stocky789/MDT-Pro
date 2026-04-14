@@ -1,15 +1,17 @@
 using MDTPro.Data;
 using MDTPro.Data.Reports;
+using MDTPro.EventListeners;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using MDTPro.Setup;
 using MDTPro.Utility;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Threading;
-using Rage;
 
 namespace MDTPro.ServerAPI {
     internal class PostAPIResponse : APIResponse {
@@ -37,7 +39,7 @@ namespace MDTPro.ServerAPI {
             if (string.IsNullOrEmpty(path)) return;
 
             if (path.Equals("alprClear", StringComparison.OrdinalIgnoreCase)) {
-                Rage.GameFiber.StartNew(() => ALPR.ALPRController.Clear());
+                GameFiberHttpBridge.EnqueueFireAndForget(() => ALPR.ALPRController.Clear());
                 buffer = Encoding.UTF8.GetBytes("OK");
                 contentType = "text/plain";
                 status = 200;
@@ -47,22 +49,64 @@ namespace MDTPro.ServerAPI {
             if (path.Equals("calloutAction", StringComparison.OrdinalIgnoreCase)) {
                 string bodyCallout = Helper.GetRequestPostData(req);
                 string action = null;
+                string calloutId = null;
+                string sendMessage = null;
                 if (!string.IsNullOrEmpty(bodyCallout)) {
                     try {
-                        var data = Newtonsoft.Json.JsonConvert.DeserializeAnonymousType(bodyCallout, new { action = (string)null });
+                        var data = JsonConvert.DeserializeAnonymousType(bodyCallout, new { action = (string)null, calloutId = (string)null, message = (string)null });
                         action = data?.action?.Trim().ToLowerInvariant();
+                        calloutId = data?.calloutId?.Trim();
+                        sendMessage = data?.message;
                     } catch { }
                 }
-                if (action != "accept" && action != "enroute") {
-                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "action must be 'accept' or 'enRoute'." }));
+                if (string.IsNullOrEmpty(calloutId)) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "calloutId is required (from the active callout list)." }));
                     contentType = "application/json";
                     status = 400;
                     return;
                 }
-                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new {
-                    success = false,
-                    error = "CalloutInterface and LSPDFR do not expose an API to accept callouts or set status (En Route) programmatically. Use the in-game Callout Interface to accept and respond to callouts."
-                }));
+                var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "accept", "enroute", "en_route", "sendmessage", "send_message" };
+                if (string.IsNullOrEmpty(action) || !allowed.Contains(action)) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "action must be 'accept', 'enRoute', or 'sendMessage' (optional message)." }));
+                    contentType = "application/json";
+                    status = 400;
+                    return;
+                }
+                var outcome = CalloutActionHelper.RunOnGameThread(action, calloutId, sendMessage);
+                bool ok = outcome.Result == CalloutActionHelper.CalloutActionResult.Ok;
+                int httpStatus = outcome.Result switch {
+                    CalloutActionHelper.CalloutActionResult.Ok => 200,
+                    CalloutActionHelper.CalloutActionResult.NotFound => 404,
+                    CalloutActionHelper.CalloutActionResult.BadState => 409,
+                    _ => 500
+                };
+                buffer = Encoding.UTF8.GetBytes(ok
+                    ? JsonConvert.SerializeObject(new { success = true })
+                    : JsonConvert.SerializeObject(new { success = false, error = outcome.Message }));
+                contentType = "application/json";
+                status = httpStatus;
+                return;
+            }
+
+            if (path.Equals("cadUnitStatus", StringComparison.OrdinalIgnoreCase)) {
+                string bodyCad = Helper.GetRequestPostData(req);
+                string statusText = null;
+                if (!string.IsNullOrEmpty(bodyCad)) {
+                    try {
+                        var data = JsonConvert.DeserializeAnonymousType(bodyCad, new { status = (string)null });
+                        statusText = data?.status?.Trim();
+                    } catch { }
+                }
+                if (string.IsNullOrEmpty(statusText)) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "status is required (e.g. 10-8, 10-97, Traffic stop)." }));
+                    contentType = "application/json";
+                    status = 400;
+                    return;
+                }
+                CalloutEvents.CadUnitStatus = statusText;
+                CalloutInterfaceCadPublisher.TryPublishCadUnitStatus(statusText);
+                WebSocketHandler.BroadcastCalloutPayload();
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = true }));
                 contentType = "application/json";
                 status = 200;
                 return;
@@ -143,13 +187,27 @@ namespace MDTPro.ServerAPI {
                 contentType = "text/plain";
                 status = 200;
             } else if (path == "updateOfficerInformationData") {
-                DataController.OfficerInformationData = JsonConvert.DeserializeObject<OfficerInformationData>(body);
-
-                Database.SaveOfficerInformation(DataController.OfficerInformationData);
-
-                buffer = Encoding.UTF8.GetBytes("OK");
-                contentType = "text/plain";
-                status = 200;
+                try {
+                    OfficerInformationData parsed = ParseOfficerInformationPostBody(body);
+                    if (parsed == null) {
+                        buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid officer information JSON." }));
+                        contentType = "application/json";
+                        status = 400;
+                        return;
+                    }
+                    DataController.OfficerInformationData = parsed;
+                    Database.SaveOfficerInformation(parsed);
+                    buffer = Encoding.UTF8.GetBytes("OK");
+                    contentType = "text/plain";
+                    status = 200;
+                } catch (Exception ex) {
+                    Utility.Helper.Log($"[updateOfficerInformationData] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
+                    try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] updateOfficerInformationData:\n{Helper.SanitizeExceptionForLog(ex)}"); } catch { }
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
+                    contentType = "application/json";
+                    status = 500;
+                    return;
+                }
             } else if (path == "modifyCurrentShift") {
                 if (body == "start") {
                     DataController.StartCurrentShift();
@@ -216,10 +274,9 @@ namespace MDTPro.ServerAPI {
                     Helper.LogArrestCourtVerbose(
                         $"HTTP createArrestReport: Id={report.Id}, Status={(int)report.Status}, Offender={report.OffenderPedName ?? "?"}, Charges={report.Charges?.Count ?? 0}, CourtCaseNo(before)={report.CourtCaseNumber ?? "(none)"} — queueing game fiber");
 
-                    // RPH / CDF / ped sync expect the game fiber. HTTP uses ThreadPool — running here caused silent failures or deadlocks for arrest→court.
+                    // RPH / CDF / ped sync expect the game fiber. HTTP uses ThreadPool — run on the shared bridge so work is not lost when script ticks stall (pause / alt-tab).
                     Exception fiberError = null;
-                    var gate = new ManualResetEventSlim(false);
-                    GameFiber.StartNew(() => {
+                    if (!GameFiberHttpBridge.TryExecuteBlocking(() => {
                         try {
                             Helper.LogArrestCourtVerbose($"GameFiber createArrestReport: start AddReport for {report.Id}");
                             DataController.AddReport(report);
@@ -239,17 +296,16 @@ namespace MDTPro.ServerAPI {
                         } catch (Exception ex) {
                             fiberError = ex;
                             Helper.LogArrestCourtVerbose($"GameFiber createArrestReport: EXCEPTION {ex.GetType().Name}: {ex.Message}");
-                        } finally {
-                            gate.Set();
                         }
-                    });
-                    if (!gate.Wait(TimeSpan.FromSeconds(45))) {
-                        Utility.Helper.Log("[createArrestReport] TIMEOUT waiting 45s for game fiber (arrest not saved on game thread).", true, Utility.Helper.LogSeverity.Warning);
-                        buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Timed out waiting for game thread to save arrest (is the game paused or loading?)." }));
+                    }, Timeout.Infinite, out var bridgeErr)) {
+                        Utility.Helper.Log("[createArrestReport] Game fiber bridge stopped before arrest save could run.", true, Utility.Helper.LogSeverity.Warning);
+                        buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "MDT Pro server is stopping; try saving the arrest again after going on duty." }));
                         contentType = "application/json";
-                        status = 500;
+                        status = 503;
                         return;
                     }
+                    if (bridgeErr != null)
+                        fiberError = fiberError ?? bridgeErr;
                     Helper.LogArrestCourtVerbose("HTTP createArrestReport: game fiber finished");
                     if (fiberError != null) throw fiberError;
 
@@ -756,6 +812,57 @@ namespace MDTPro.ServerAPI {
                     status = 400;
                 }
             }
+        }
+
+        /// <summary>Parses POST JSON from browser/native MDT; tolerates empty strings and numeric badge variants; keeps <see cref="OfficerInformationData.agencyScriptName"/> when the client omits it.</summary>
+        private static OfficerInformationData ParseOfficerInformationPostBody(string body) {
+            if (string.IsNullOrWhiteSpace(body)) return null;
+            JObject jo;
+            try {
+                jo = JObject.Parse(body);
+            } catch {
+                return null;
+            }
+
+            string prevScript = DataController.OfficerInformationData?.agencyScriptName;
+
+            static string OptionalString(JToken t) {
+                if (t == null || t.Type == JTokenType.Null) return null;
+                string s = t.Type == JTokenType.String ? t.Value<string>() : t.ToString();
+                return string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+            }
+
+            static int? OptionalBadge(JToken t) {
+                if (t == null || t.Type == JTokenType.Null) return null;
+                if (t.Type == JTokenType.Integer) return t.Value<int>();
+                if (t.Type == JTokenType.Float) {
+                    double d = t.Value<double>();
+                    if (double.IsNaN(d) || double.IsInfinity(d)) return null;
+                    long r = (long)Math.Round(d);
+                    if (r < int.MinValue || r > int.MaxValue) return null;
+                    return (int)r;
+                }
+                if (t.Type == JTokenType.String) {
+                    string s = t.Value<string>()?.Trim();
+                    if (string.IsNullOrEmpty(s)) return null;
+                    return int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out int v) ? v : (int?)null;
+                }
+                return null;
+            }
+
+            string agencyScriptName = prevScript;
+            if (jo.TryGetValue("agencyScriptName", StringComparison.OrdinalIgnoreCase, out JToken scriptTok))
+                agencyScriptName = OptionalString(scriptTok);
+
+            return new OfficerInformationData {
+                firstName = OptionalString(jo["firstName"]),
+                lastName = OptionalString(jo["lastName"]),
+                rank = OptionalString(jo["rank"]),
+                callSign = OptionalString(jo["callSign"]),
+                agency = OptionalString(jo["agency"]),
+                agencyScriptName = agencyScriptName,
+                badgeNumber = OptionalBadge(jo["badgeNumber"]),
+            };
         }
 
         /// <summary>True if reportId exists and is an incident, injury, citation, traffic incident, or impound report (attachable as evidence).</summary>

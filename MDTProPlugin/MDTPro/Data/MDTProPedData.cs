@@ -20,6 +20,12 @@ namespace MDTPro.Data {
         public string LastName;
         public uint ModelHash;
         public string ModelName;
+        /// <summary>Hair (ped component 2) drawable/texture for <c>{model}__{d}_{t}.webp</c>; clients try this pair before face.</summary>
+        public int? PortraitVariantDrawable;
+        public int? PortraitVariantTexture;
+        /// <summary>Face (ped component 0) drawable/texture for a second <c>{model}__{d}_{t}.webp</c> try when catalogue art is keyed by face slot.</summary>
+        public int? PortraitFaceDrawable;
+        public int? PortraitFaceTexture;
         public string Birthday;
         public string Gender;
         public string Address;
@@ -90,8 +96,12 @@ namespace MDTPro.Data {
             LastName = CDFPedData.Lastname;
             ModelHash = 0;
             ModelName = null;
+            PortraitVariantDrawable = null;
+            PortraitVariantTexture = null;
+            PortraitFaceDrawable = null;
+            PortraitFaceTexture = null;
             if (Holder != null && Holder.IsValid())
-                PedPortraitModelHelper.TryGetPortraitModelFromPed(Holder, out ModelHash, out ModelName);
+                PedPortraitModelHelper.AssignPortraitFromPedIfSuitable(Holder, this);
             Birthday = CDFPedData.Birthday.ToString("s");
             Gender = CDFPedData.Gender.ToString();
             IsWanted = CDFPedData.Wanted;
@@ -183,7 +193,7 @@ namespace MDTPro.Data {
             FirstName = CDFPedData.Firstname;
             LastName = CDFPedData.Lastname;
             if (Holder != null && Holder.IsValid())
-                PedPortraitModelHelper.TryGetPortraitModelFromPed(Holder, out ModelHash, out ModelName);
+                PedPortraitModelHelper.AssignPortraitFromPedIfSuitable(Holder, this);
             Birthday = CDFPedData.Birthday.ToString("s");
             Gender = CDFPedData.Gender.ToString();
             IsWanted = CDFPedData.Wanted;
@@ -215,12 +225,20 @@ namespace MDTPro.Data {
             if (liveRead == null) return;
             uint prevHash = ModelHash;
             string prevName = ModelName;
+            int? prevD = PortraitVariantDrawable;
+            int? prevT = PortraitVariantTexture;
+            int? prevFd = PortraitFaceDrawable;
+            int? prevFt = PortraitFaceTexture;
             bool prevPortraitOk = PedPortraitModelHelper.IsSuitableForCatalogueIdPhoto(prevName) && (prevHash != 0 || !string.IsNullOrEmpty(prevName));
             Name = liveRead.Name;
             FirstName = liveRead.FirstName;
             LastName = liveRead.LastName;
             ModelHash = liveRead.ModelHash;
             ModelName = liveRead.ModelName;
+            PortraitVariantDrawable = liveRead.PortraitVariantDrawable;
+            PortraitVariantTexture = liveRead.PortraitVariantTexture;
+            PortraitFaceDrawable = liveRead.PortraitFaceDrawable;
+            PortraitFaceTexture = liveRead.PortraitFaceTexture;
             Birthday = liveRead.Birthday;
             Gender = liveRead.Gender;
             Address = liveRead.Address;
@@ -243,6 +261,10 @@ namespace MDTPro.Data {
             if (!livePortraitOk && prevPortraitOk) {
                 ModelHash = prevHash;
                 ModelName = prevName;
+                PortraitVariantDrawable = prevD;
+                PortraitVariantTexture = prevT;
+                PortraitFaceDrawable = prevFd;
+                PortraitFaceTexture = prevFt;
             }
             TryParseNameIntoFirstLast();
         }
@@ -298,7 +320,11 @@ namespace MDTPro.Data {
                 }
                 ModelHash = 0;
                 ModelName = null;
-                PedPortraitModelHelper.TryGetPortraitModelFromPed(Holder, out ModelHash, out ModelName);
+                PortraitVariantDrawable = null;
+                PortraitVariantTexture = null;
+                PortraitFaceDrawable = null;
+                PortraitFaceTexture = null;
+                PedPortraitModelHelper.AssignPortraitFromPedIfSuitable(Holder, this);
             } catch { /* LSPDFR not available or ped invalid */ }
             TryParseNameIntoFirstLast();
         }

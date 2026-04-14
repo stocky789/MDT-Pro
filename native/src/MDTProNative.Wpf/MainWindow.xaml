@@ -1,0 +1,880 @@
+<Window x:Class="MDTProNative.Wpf.MainWindow"
+
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+
+        Title="MDTPro — MDC Terminal"
+
+        Icon="{StaticResource MdtProLogoImage}"
+
+        MinHeight="640" MinWidth="1100"
+
+        Height="780" Width="1320"
+
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <Style x:Key="CadRightRailSubTabButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="VerticalAlignment" Value="Bottom" />
+            <Setter Property="FontFamily" Value="{StaticResource CadFontCondensed}" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="2,2,0,0"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <DockPanel LastChildFill="True">
+
+        <!-- CAD footer: dispatch-style status + link lamp -->
+
+        <Border DockPanel.Dock="Bottom"
+
+                Background="{StaticResource CadStatusBar}"
+
+                BorderBrush="{StaticResource CadBorder}"
+
+                BorderThickness="0,1,0,0"
+
+                Padding="12,6">
+
+            <Grid>
+
+                <TextBlock x:Name="FooterSummaryText"
+
+                           FontFamily="{StaticResource CadFontMono}"
+
+                           FontSize="11"
+
+                           Foreground="{StaticResource CadAccent}"
+
+                           VerticalAlignment="Center"
+
+                           Text="NO ACTIVE SESSION" />
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+
+                    <TextBlock x:Name="ConnStateText"
+
+                               FontFamily="{StaticResource CadFontCondensed}"
+
+                               FontSize="11"
+
+                               FontWeight="Bold"
+
+                               Foreground="{StaticResource CadUrgent}"
+
+                               VerticalAlignment="Center"
+
+                               Margin="0,0,8,0"
+
+                               Text="OFFLINE" />
+
+                    <Ellipse x:Name="ConnLamp"
+
+                             Width="10" Height="10"
+
+                             VerticalAlignment="Center"
+
+                             Fill="{StaticResource CadUrgent}"
+
+                             Stroke="#FF5C2A22"
+
+                             StrokeThickness="1"
+
+                             RenderTransformOrigin="0.5,0.5">
+
+                        <Ellipse.RenderTransform>
+
+                            <ScaleTransform x:Name="ConnLampScale" ScaleX="1" ScaleY="1" />
+
+                        </Ellipse.RenderTransform>
+
+                        <Ellipse.Effect>
+
+                            <DropShadowEffect Color="#FFE74C3C" BlurRadius="8" ShadowDepth="0" Opacity="0.85" />
+
+                        </Ellipse.Effect>
+
+                    </Ellipse>
+
+                    <Button x:Name="SoundMuteBtn"
+
+                            Content="Mute"
+
+                            Style="{StaticResource CadButton}"
+
+                            FontSize="10"
+
+                            FontFamily="{StaticResource CadFontCondensed}"
+
+                            FontWeight="Bold"
+
+                            Padding="8,4"
+
+                            MinWidth="58"
+
+                            Margin="14,0,0,0"
+
+                            VerticalAlignment="Center"
+
+                            Click="SoundMuteBtn_OnClick"
+
+                            ToolTip="Mute or unmute all MDC sound effects (clicks, saves, court chime, CAD tones). Saved on this computer." />
+
+                </StackPanel>
+
+            </Grid>
+
+        </Border>
+
+
+
+        <Grid Background="{StaticResource CadBg}">
+
+            <Grid.RowDefinitions>
+
+                <RowDefinition Height="Auto" />
+
+                <RowDefinition Height="*" />
+
+            </Grid.RowDefinitions>
+
+
+
+            <!-- Top tab strip: + DASHBOARD + connected module tabs (one row, CAD reference) -->
+
+            <Border Grid.Row="0"
+
+                    Background="{StaticResource CadTabStripDeep}"
+
+                    BorderBrush="{StaticResource CadBorder}"
+
+                    BorderThickness="0,0,0,1"
+
+                    Padding="8,6,8,0">
+
+                <DockPanel LastChildFill="True" VerticalAlignment="Bottom">
+
+                    <StackPanel DockPanel.Dock="Left"
+
+                                Orientation="Horizontal"
+
+                                VerticalAlignment="Bottom"
+
+                                Margin="0,0,8,0">
+
+                        <Image Width="32" Height="32"
+
+                               Margin="0,0,10,2"
+
+                               VerticalAlignment="Bottom"
+
+                               Source="{StaticResource MdtProLogoImage}"
+
+                               RenderOptions.BitmapScalingMode="HighQuality"
+
+                               SnapsToDevicePixels="True" />
+
+                        <Button x:Name="HomeModuleBtn"
+
+                                Content="+ DASHBOARD"
+
+                                Style="{StaticResource CadTabLeadButton}"
+
+                                Click="HomeModuleBtn_OnClick"
+
+                                ToolTip="Open Dashboard module" />
+
+                        <StackPanel Orientation="Vertical" VerticalAlignment="Bottom" Margin="12,0,0,2">
+
+                            <TextBlock Text="MDT PRO" FontFamily="{StaticResource CadFontCondensed}" FontSize="9" Foreground="#FF7A8A9E" />
+
+                            <TextBlock x:Name="TerminalOperatorLabel"
+
+                                       FontFamily="{StaticResource CadFontMono}"
+
+                                       FontSize="11"
+
+                                       Foreground="{StaticResource CadSubTabActiveText}"
+
+                                       Text="—"
+
+                                       TextTrimming="CharacterEllipsis"
+
+                                       MaxWidth="180" />
+
+                        </StackPanel>
+
+                    </StackPanel>
+
+                    <ListBox x:Name="NavList"
+
+                             Background="Transparent"
+
+                             BorderThickness="0"
+
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+
+                             ScrollViewer.VerticalScrollBarVisibility="Disabled"
+
+                             VerticalAlignment="Bottom"
+
+                             VerticalContentAlignment="Bottom"
+
+                             SelectionChanged="NavList_OnSelectionChanged"
+
+                             ItemContainerStyle="{StaticResource CadModuleTabListBoxItem}">
+
+                        <ListBox.ItemsPanel>
+
+                            <ItemsPanelTemplate>
+
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" />
+
+                            </ItemsPanelTemplate>
+
+                        </ListBox.ItemsPanel>
+
+                        <ListBox.ItemTemplate>
+
+                            <DataTemplate>
+
+                                <TextBlock Text="{Binding Title}"
+
+                                           FontFamily="{StaticResource CadFontCondensed}"
+
+                                           FontSize="11" />
+
+                            </DataTemplate>
+
+                        </ListBox.ItemTemplate>
+
+                    </ListBox>
+
+                </DockPanel>
+
+            </Border>
+
+
+
+            <!-- Main CAD workspace: orange rail | content + log | related panel -->
+
+            <Grid Grid.Row="1">
+
+                <Grid.ColumnDefinitions>
+
+                    <ColumnDefinition x:Name="MainActionsColumn" Width="168" MinWidth="120" />
+
+                    <ColumnDefinition Width="6" />
+
+                    <ColumnDefinition Width="*" MinWidth="320" />
+
+                    <ColumnDefinition Width="6" />
+
+                    <ColumnDefinition x:Name="MainRelatedColumn" Width="272" MinWidth="200" />
+
+                </Grid.ColumnDefinitions>
+
+
+
+                <!-- Left: primary actions -->
+
+                <Border Grid.Column="0"
+
+                        Background="{StaticResource CadStatusBar}"
+
+                        BorderBrush="{StaticResource CadBorder}"
+
+                        BorderThickness="0,0,1,0"
+
+                        Padding="8,10,8,10">
+
+                    <DockPanel LastChildFill="True">
+
+                        <TextBlock DockPanel.Dock="Top"
+
+                                   Text="ACTIONS"
+
+                                   Foreground="{StaticResource CadSubTabActiveText}"
+
+                                   FontFamily="{StaticResource CadFontCondensed}"
+
+                                   FontSize="11"
+
+                                   FontWeight="Bold"
+
+                                   Margin="2,0,0,10" />
+
+                        <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+
+                            <TextBlock Text="REN#"
+
+                                       Style="{StaticResource CadFieldLabel}"
+
+                                       Margin="0,0,0,2" />
+
+                            <Border Background="{StaticResource CadElevated}"
+
+                                    BorderBrush="{StaticResource CadBorder}"
+
+                                    BorderThickness="1"
+
+                                    CornerRadius="3"
+
+                                    Padding="8,6"
+
+                                    Margin="0,0,0,10">
+
+                                <TextBlock Text="—"
+
+                                           FontFamily="{StaticResource CadFontMono}"
+
+                                           FontSize="11"
+
+                                           Foreground="{StaticResource CadMuted}"
+
+                                           HorizontalAlignment="Center" />
+
+                            </Border>
+
+                        </StackPanel>
+
+                        <StackPanel>
+
+                            <Button x:Name="QuickPanicBtn"
+
+                                    Content="PANIC"
+
+                                    Style="{StaticResource CadPrimaryActionButton}"
+
+                                    Click="QuickPanic_Click"
+
+                                    Margin="0,0,0,6"
+
+                                    ToolTip="Request panic backup" />
+
+                            <Button x:Name="QuickBackupBtn"
+
+                                    Content="BACKUP…"
+
+                                    Style="{StaticResource CadPrimaryActionButton}"
+
+                                    Click="QuickBackup_Click"
+
+                                    Margin="0,0,0,6"
+
+                                    ToolTip="Backup menu (matches web)" />
+
+                            <Button x:Name="QuickAlprBtn"
+
+                                    Content="CLEAR ALPR"
+
+                                    Style="{StaticResource CadPrimaryActionButton}"
+
+                                    Click="QuickAlpr_Click"
+
+                                    Margin="0,0,0,6" />
+
+                            <Button Content="NOTEPAD"
+
+                                    Style="{StaticResource CadPrimaryActionButton}"
+
+                                    Click="QuickNotepad_Click"
+
+                                    Margin="0,0,0,6" />
+
+                            <Button Content="DRUGS REF"
+
+                                    Style="{StaticResource CadPrimaryActionButton}"
+
+                                    Click="QuickNarcotics_Click"
+
+                                    Margin="0,0,0,6"
+
+                                    ToolTip="Narcotics field reference" />
+
+                            <Border Height="1" Background="{StaticResource CadBorder}" Margin="0,4,0,12" />
+
+                            <Button Content="OFFICER"
+
+                                    Style="{StaticResource CadPrimaryActionButtonMuted}"
+
+                                    Click="QuickOfficer_Click"
+
+                                    Margin="0,0,0,6" />
+
+                            <Button Content="SETTINGS"
+
+                                    Style="{StaticResource CadPrimaryActionButtonMuted}"
+
+                                    Click="QuickSettings_Click"
+
+                                    ToolTip="Version + open config in browser" />
+
+                        </StackPanel>
+
+                    </DockPanel>
+
+                </Border>
+
+                <GridSplitter x:Name="MainLeftRailSplitter"
+
+                              Grid.Column="1"
+
+                              Width="6"
+
+                              HorizontalAlignment="Stretch"
+
+                              ResizeDirection="Columns"
+
+                              ResizeBehavior="PreviousAndNext"
+
+                              Background="{StaticResource CadBorder}" />
+
+
+
+                <!-- Center: module + CAD message log -->
+
+                <Grid Grid.Column="2">
+
+                    <Grid.RowDefinitions>
+
+                        <RowDefinition Height="*" MinHeight="120" />
+
+                        <RowDefinition x:Name="CadLogSplitterRow" Height="6" />
+
+                        <RowDefinition x:Name="CadLogRow" Height="168" MinHeight="80" />
+
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0"
+
+                            Background="{StaticResource CadBg}"
+
+                            BorderBrush="{StaticResource CadBorder}"
+
+                            BorderThickness="0,0,1,0">
+
+                        <ContentControl x:Name="ContentHost" Opacity="1" />
+
+                    </Border>
+
+                    <GridSplitter x:Name="CadLogRowSplitter"
+
+                                  Grid.Row="1"
+
+                                  Height="6"
+
+                                  HorizontalAlignment="Stretch"
+
+                                  VerticalAlignment="Stretch"
+
+                                  ResizeDirection="Rows"
+
+                                  ResizeBehavior="PreviousAndNext"
+
+                                  Background="{StaticResource CadBorder}" />
+
+                    <Border x:Name="CadLogPanel"
+
+                            Grid.Row="2"
+
+                            Background="{StaticResource CadPanel}"
+
+                            BorderBrush="{StaticResource CadBorder}"
+
+                            BorderThickness="0,1,1,0"
+
+                            Padding="8,6">
+
+                        <DockPanel LastChildFill="True">
+
+                            <DockPanel DockPanel.Dock="Top" LastChildFill="False" Margin="0,0,0,6">
+
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+
+                                    <Button x:Name="CadLogExpandBtn"
+
+                                            Content="▲"
+
+                                            Width="28"
+
+                                            Height="22"
+
+                                            Padding="0"
+
+                                            FontSize="11"
+
+                                            Margin="4,0,0,0"
+
+                                            Style="{StaticResource CadButton}"
+
+                                            ToolTip="Expand CAD log"
+
+                                            Click="CadLogExpand_Click" />
+
+                                    <Button x:Name="CadLogCollapseBtn"
+
+                                            Content="▼"
+
+                                            Width="28"
+
+                                            Height="22"
+
+                                            Padding="0"
+
+                                            FontSize="11"
+
+                                            Margin="4,0,0,0"
+
+                                            Style="{StaticResource CadButton}"
+
+                                            ToolTip="Minimize CAD log"
+
+                                            Click="CadLogCollapse_Click" />
+
+                                </StackPanel>
+
+                                <TextBlock Text="CAD MESSAGE LOG"
+
+                                           Style="{StaticResource CadPanelHeader}"
+
+                                           VerticalAlignment="Center" />
+
+                            </DockPanel>
+
+                            <ListBox x:Name="MessageLog"
+
+                                     Style="{StaticResource CadListBox}"
+
+                                     FontFamily="{StaticResource CadFontMono}"
+
+                                     FontSize="11"
+
+                                     ItemContainerStyle="{StaticResource CadLogListBoxItem}" />
+
+                        </DockPanel>
+
+                    </Border>
+
+                </Grid>
+
+                <GridSplitter x:Name="MainRightRailSplitter"
+
+                              Grid.Column="3"
+
+                              Width="6"
+
+                              HorizontalAlignment="Stretch"
+
+                              ResizeDirection="Columns"
+
+                              ResizeBehavior="PreviousAndNext"
+
+                              Background="{StaticResource CadBorder}" />
+
+
+
+                <!-- Right: related / system (officer + link + situation) -->
+
+                <Border Grid.Column="4"
+
+                        Background="{StaticResource CadPanel}"
+
+                        BorderBrush="{StaticResource CadBorder}"
+
+                        BorderThickness="0,0,0,0"
+
+                        Padding="10,10,10,10">
+
+                    <DockPanel LastChildFill="True">
+
+                        <Border DockPanel.Dock="Top"
+
+                                Background="#FF0A1018"
+
+                                BorderBrush="{StaticResource CadBorder}"
+
+                                BorderThickness="0,0,0,1"
+
+                                Padding="0,0,0,0"
+
+                                Margin="0,0,0,10">
+
+                            <StackPanel Orientation="Horizontal">
+
+                                <Button x:Name="RightRailTabRelated"
+
+                                        Style="{StaticResource CadRightRailSubTabButton}"
+
+                                        Content="RELATED DATA"
+
+                                        Click="RightRailTab_Click" />
+
+                                <Button x:Name="RightRailTabCadLog"
+
+                                        Style="{StaticResource CadRightRailSubTabButton}"
+
+                                        Content="CAD LOG"
+
+                                        Margin="4,0,0,0"
+
+                                        Click="RightRailTab_Click" />
+
+                                <Button x:Name="RightRailTabCallouts"
+
+                                        Style="{StaticResource CadRightRailSubTabButton}"
+
+                                        Content="CALLOUTS (0)"
+
+                                        Margin="4,0,0,0"
+
+                                        Click="RightRailTab_Click" />
+
+                            </StackPanel>
+
+                        </Border>
+
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+
+                            <Grid>
+
+                                <StackPanel x:Name="RightRailRelatedPanel">
+
+                            <TextBlock Text="ASSOCIATED OFFICER" Style="{StaticResource CadSectionTitle}" />
+
+                            <Border Style="{StaticResource CadSectionBorder}" Padding="8,8" Margin="0,0,0,12">
+
+                                <Grid>
+
+                                    <Grid.ColumnDefinitions>
+
+                                        <ColumnDefinition Width="72" />
+
+                                        <ColumnDefinition Width="*" MinWidth="120" />
+
+                                    </Grid.ColumnDefinitions>
+
+                                    <Grid.RowDefinitions>
+
+                                        <RowDefinition Height="Auto" />
+
+                                        <RowDefinition Height="Auto" />
+
+                                        <RowDefinition Height="Auto" />
+
+                                        <RowDefinition Height="Auto" />
+
+                                        <RowDefinition Height="Auto" />
+
+                                        <RowDefinition Height="Auto" />
+
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="FIRST" Style="{StaticResource CadFieldLabel}" Margin="0,0,0,4" />
+
+                                    <TextBlock x:Name="OfFirst" Grid.Row="0" Grid.Column="1" Style="{StaticResource CadSidebarReadout}" Text="—" TextTrimming="CharacterEllipsis" Margin="0,0,0,4" />
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="LAST" Style="{StaticResource CadFieldLabel}" Margin="0,0,0,4" />
+
+                                    <TextBlock x:Name="OfLast" Grid.Row="1" Grid.Column="1" Style="{StaticResource CadSidebarReadout}" Text="—" TextTrimming="CharacterEllipsis" Margin="0,0,0,4" />
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="BADGE" Style="{StaticResource CadFieldLabel}" Margin="0,0,0,4" />
+
+                                    <TextBlock x:Name="OfBadge" Grid.Row="2" Grid.Column="1" Style="{StaticResource CadSidebarReadout}" Text="—" Margin="0,0,0,4" />
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="RANK" Style="{StaticResource CadFieldLabel}" Margin="0,0,0,4" />
+
+                                    <TextBlock x:Name="OfRank" Grid.Row="3" Grid.Column="1" Style="{StaticResource CadSidebarReadout}" Text="—" TextWrapping="Wrap" Margin="0,0,0,4" />
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="CALL" Style="{StaticResource CadFieldLabel}" Margin="0,0,0,4" />
+
+                                    <TextBlock x:Name="OfCall" Grid.Row="4" Grid.Column="1" Style="{StaticResource CadSidebarReadout}" Text="—" TextWrapping="Wrap" Margin="0,0,0,4" />
+
+                                    <TextBlock Grid.Row="5" Grid.Column="0" Text="DEPT" Style="{StaticResource CadFieldLabel}" />
+
+                                    <TextBlock x:Name="OfDept" Grid.Row="5" Grid.Column="1" Style="{StaticResource CadSidebarReadout}" Text="—" TextWrapping="Wrap" />
+
+                                </Grid>
+
+                            </Border>
+
+
+
+                            <TextBlock Text="SYSTEM / LINK" Style="{StaticResource CadSectionTitle}" />
+
+                            <Border Style="{StaticResource CadSectionBorder}" Padding="8,8" Margin="0,0,0,12">
+
+                                <StackPanel>
+
+                                    <TextBlock Text="HOST" Style="{StaticResource CadFieldLabel}" Margin="0,0,0,2" />
+
+                                    <TextBox x:Name="HostBox" Style="{StaticResource CadTextBox}" Text="127.0.0.1" Margin="0,0,0,8" />
+
+                                    <TextBlock Text="PORT" Style="{StaticResource CadFieldLabel}" Margin="0,0,0,2" />
+
+                                    <TextBox x:Name="PortBox" Style="{StaticResource CadTextBox}" Text="9000" Margin="0,0,0,8" />
+
+                                    <UniformGrid Columns="2" Margin="0,0,0,0">
+
+                                        <Button x:Name="ConnectBtn" Content="CONNECT" Style="{StaticResource CadAccentButton}" Click="Connect_Click" Margin="0,0,4,0" Padding="10,6" />
+
+                                        <Button x:Name="DisconnectBtn" Content="DISCONNECT" Style="{StaticResource CadButton}" Click="Disconnect_Click" IsEnabled="False" Margin="4,0,0,0" Padding="10,6" />
+
+                                    </UniformGrid>
+
+                                </StackPanel>
+
+                            </Border>
+
+
+
+                            <TextBlock Text="SITUATION" Style="{StaticResource CadSectionTitle}" />
+
+                            <Border Style="{StaticResource CadSectionBorder}" Padding="8,8">
+
+                                <StackPanel>
+
+                                    <DockPanel Margin="0,0,0,6">
+
+                                        <TextBlock DockPanel.Dock="Left" Text="TIME" Style="{StaticResource CadFieldLabel}" Width="72" />
+
+                                        <TextBlock x:Name="StatusTime" Style="{StaticResource CadSidebarReadout}" Text="—" TextTrimming="CharacterEllipsis" />
+
+                                    </DockPanel>
+
+                                    <DockPanel Margin="0,0,0,6">
+
+                                        <TextBlock DockPanel.Dock="Left" Text="LOCATION" Style="{StaticResource CadFieldLabel}" Width="72" />
+
+                                        <TextBlock x:Name="StatusLocation"
+
+                                                   Style="{StaticResource CadSidebarReadout}"
+
+                                                   Text="—"
+
+                                                   TextTrimming="CharacterEllipsis"
+
+                                                   TextWrapping="Wrap" />
+
+                                    </DockPanel>
+
+                                    <DockPanel Margin="0,0,0,6">
+
+                                        <TextBlock DockPanel.Dock="Left" Text="UNIT" Style="{StaticResource CadFieldLabel}" Width="72" />
+
+                                        <TextBlock x:Name="StatusUnit" Style="{StaticResource CadSidebarReadout}" Text="—" />
+
+                                    </DockPanel>
+
+                                    <DockPanel>
+
+                                        <TextBlock DockPanel.Dock="Left" Text="CALLOUTS" Style="{StaticResource CadFieldLabel}" Width="72" />
+
+                                        <TextBlock x:Name="StatusCallouts" Style="{StaticResource CadSidebarReadout}" Text="—" />
+
+                                    </DockPanel>
+
+                                </StackPanel>
+
+                            </Border>
+
+                                </StackPanel>
+
+                                <StackPanel x:Name="RightRailCadLogPanel" Visibility="Collapsed">
+
+                                    <TextBlock Text="CAD MESSAGE LOG" Style="{StaticResource CadSectionTitle}" />
+
+                                    <Border Style="{StaticResource CadSectionBorder}" Padding="8,8">
+
+                                        <ListBox x:Name="RightRailMessageLog"
+
+                                                 Style="{StaticResource CadListBox}"
+
+                                                 FontFamily="{StaticResource CadFontMono}"
+
+                                                 FontSize="11"
+
+                                                 Height="320"
+
+                                                 ItemContainerStyle="{StaticResource CadLogListBoxItem}" />
+
+                                    </Border>
+
+                                </StackPanel>
+
+                                <StackPanel x:Name="RightRailCalloutsPanel" Visibility="Collapsed">
+
+                                    <TextBlock Text="ACTIVE CALLOUTS" Style="{StaticResource CadSectionTitle}" />
+
+                                    <Border Style="{StaticResource CadSectionBorder}" Padding="8,8">
+
+                                        <DockPanel LastChildFill="True">
+
+                                            <TextBlock x:Name="RightRailCalloutDetail"
+
+                                                       DockPanel.Dock="Bottom"
+
+                                                       Style="{StaticResource CadLabelMuted}"
+
+                                                       TextWrapping="Wrap"
+
+                                                       FontSize="11"
+
+                                                       Margin="0,8,0,0" />
+
+                                            <ListBox x:Name="RightRailCalloutList"
+
+                                                     Style="{StaticResource CadListBox}"
+
+                                                     FontFamily="{StaticResource CadFontMono}"
+
+                                                     FontSize="12"
+
+                                                     MinHeight="160"
+
+                                                     MaxHeight="280"
+
+                                                     SelectionChanged="RightRailCalloutList_OnSelectionChanged"
+
+                                                     ItemContainerStyle="{StaticResource CadLogListBoxItem}" />
+
+                                        </DockPanel>
+
+                                    </Border>
+
+                                </StackPanel>
+
+                            </Grid>
+
+                        </ScrollViewer>
+
+                    </DockPanel>
+
+                </Border>
+
+            </Grid>
+
+        </Grid>
+
+    </DockPanel>
+
+</Window>
+
+

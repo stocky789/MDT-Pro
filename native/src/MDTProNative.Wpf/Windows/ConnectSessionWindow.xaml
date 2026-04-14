@@ -1,0 +1,61 @@
+<Window x:Class="MDTProNative.Wpf.Windows.ConnectSessionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MDTPro — Connect"
+        Icon="{StaticResource MdtProLogoImage}"
+        Width="520" Height="560"
+        MinWidth="440" MinHeight="480"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="{StaticResource CadBg}"
+        Foreground="{StaticResource CadText}">
+    <DockPanel Margin="20">
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,16,0,0">
+            <CheckBox x:Name="RememberCheck" Content="Remember display name and game PC address on this computer"
+                      Foreground="{StaticResource CadText}" Margin="0,0,0,12" IsChecked="True" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Exit" Style="{StaticResource CadButton}" MinWidth="100" Margin="0,0,8,0" Click="Exit_Click" />
+                <Button x:Name="ConnectBtn" Content="Connect" Style="{StaticResource CadAccentButton}" MinWidth="120" Click="Connect_Click" IsDefault="True" />
+            </StackPanel>
+        </StackPanel>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <Image Width="72" Height="72" HorizontalAlignment="Center" Margin="0,0,0,12"
+                       Source="{StaticResource MdtProLogoImage}"
+                       RenderOptions.BitmapScalingMode="HighQuality"
+                       SnapsToDevicePixels="True" />
+                <TextBlock Text="CONNECT TO MDT PRO" FontFamily="{StaticResource CadFontMono}" FontSize="14" Foreground="{StaticResource CadAccent}" Margin="0,0,0,8" />
+                <TextBlock TextWrapping="Wrap" Foreground="{StaticResource CadMuted}" Margin="0,0,0,16"
+                           Text="Point this app at the Windows PC running GTA / LSPDFR with MDT Pro. That machine’s IP (or hostname) and port must be reachable from here — typically the LAN address shown in the in-game MDT notification, not “localhost”, when you use another computer." />
+
+                <TextBlock Text="Officer / terminal display name" Style="{StaticResource CadLabelMuted}" Margin="0,0,0,4" />
+                <TextBox x:Name="OfficerNameBox" Style="{StaticResource CadTextBox}" Margin="0,0,0,4"
+                         ToolTip="How you want this workstation labeled in the title bar (any text)." />
+                <TextBlock TextWrapping="Wrap" Foreground="{StaticResource CadMuted}" FontSize="11" Margin="0,0,0,14"
+                           Text="This is only for your own terminal. It is not sent to the game as authentication." />
+
+                <TextBlock Text="Password" Style="{StaticResource CadLabelMuted}" Margin="0,0,0,4" />
+                <PasswordBox x:Name="PasswordBox" Margin="0,0,0,4" Padding="8,6"
+                             FontFamily="{StaticResource CadFontMono}" FontSize="12"
+                             Background="{StaticResource CadPanel}" Foreground="{StaticResource CadText}"
+                             BorderBrush="{StaticResource CadBorder}" />
+                <TextBlock TextWrapping="Wrap" Foreground="{StaticResource CadMuted}" FontSize="11" Margin="0,0,0,16"
+                           Text="The MDT Pro game plugin does not check a password over the network today. This field is optional and is not saved or sent anywhere — it is here so the screen matches how you expect to sign in, and for possible future remote access controls." />
+
+                <Border Background="{StaticResource CadElevated}" BorderBrush="{StaticResource CadBorder}" BorderThickness="1" Padding="12" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="Game PC (required)" FontWeight="SemiBold" Margin="0,0,0,10" />
+                        <TextBlock Text="IP address or hostname" Style="{StaticResource CadLabelMuted}" Margin="0,0,0,4" />
+                        <TextBox x:Name="HostBox" Style="{StaticResource CadTextBox}" Margin="0,0,0,10" />
+                        <TextBlock Text="Port" Style="{StaticResource CadLabelMuted}" Margin="0,0,0,4" />
+                        <TextBox x:Name="PortBox" Style="{StaticResource CadTextBox}" Width="100" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock TextWrapping="Wrap" Foreground="{StaticResource CadMuted}" FontSize="11"
+                           Text="Firewall: on the game PC, allow inbound TCP on the MDT port (default 9000) so other machines on the network can connect." />
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

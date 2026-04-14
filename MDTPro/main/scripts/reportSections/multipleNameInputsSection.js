@@ -7,11 +7,7 @@ async function getMultipleNameInputsSection(
   list = []
 ) {
   const titleEl = document.createElement('div')
-  if (isList) {
-    titleEl.classList.add('searchResponseSectionTitle')
-  } else {
-    titleEl.classList.add('title')
-  }
+  titleEl.classList.add('title')
   titleEl.innerHTML = title
 
   const inputWrapper = document.createElement('div')
@@ -118,7 +114,6 @@ async function getMultipleNameInputsSection(
   const sectionWrapper = document.createElement('div')
   sectionWrapper.classList.add('section')
   sectionWrapper.dataset.title = title
-  if (isList) sectionWrapper.classList.add('searchResponseWrapper')
 
   sectionWrapper.appendChild(titleEl)
   sectionWrapper.appendChild(inputWrapper)

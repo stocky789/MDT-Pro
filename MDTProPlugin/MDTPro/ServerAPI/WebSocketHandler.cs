@@ -18,6 +18,7 @@ namespace MDTPro.ServerAPI {
     internal class WebSocketHandler {
         private static readonly List<WebSocket> WebSockets = new List<WebSocket>();
         private static readonly HashSet<WebSocket> AlprSubscribers = new HashSet<WebSocket>();
+        private static readonly HashSet<WebSocket> CalloutSubscribers = new HashSet<WebSocket>();
         private static readonly object WebSocketLock = new Object();
         private static readonly Dictionary<WebSocket, CancellationTokenSource> IntervalTokens = new Dictionary<WebSocket, CancellationTokenSource>();
 
@@ -82,11 +83,12 @@ namespace MDTPro.ServerAPI {
                                 DataController.ShiftHistoryUpdated += shiftHistoryHandler;
                                 break;
                             case "calloutEvent":
-                                SendData(webSocket, JsonConvert.SerializeObject(new { callouts = CalloutEvents.CalloutList }), clientMsg).Wait();
+                                lock (WebSocketLock) { CalloutSubscribers.Add(webSocket); }
+                                SendData(webSocket, BuildCalloutPayloadJson(), clientMsg).Wait();
 
                                 calloutEventHandler = (calloutInfo) => {
                                     if (webSocket.State != WebSocketState.Open || !Server.RunServer) return;
-                                    SendData(webSocket, JsonConvert.SerializeObject(new { callouts = CalloutEvents.CalloutList }), clientMsg).Wait();
+                                    SendData(webSocket, BuildCalloutPayloadJson(), clientMsg).Wait();
                                 };
                                 CalloutEvents.OnCalloutEvent += calloutEventHandler;
                                 break;
@@ -104,6 +106,7 @@ namespace MDTPro.ServerAPI {
                     lock (WebSocketLock) {
                         WebSockets.Remove(webSocket);
                         AlprSubscribers.Remove(webSocket);
+                        CalloutSubscribers.Remove(webSocket);
                         if (IntervalTokens.TryGetValue(webSocket, out var cts)) {
                             try { cts.Cancel(); } catch { }
                             IntervalTokens.Remove(webSocket);
@@ -128,7 +131,7 @@ namespace MDTPro.ServerAPI {
                         string responseMsg;
                         switch (clientMsg) {
                             case "playerLocation":
-                                DataController.RefreshMdtLocationOnGameFiberBlocking(800);
+                                DataController.RefreshMdtLocationOnGameFiberBlocking(250);
                                 responseMsg = JsonConvert.SerializeObject(DataController.MdtPreferredLocation);
 
                                 if (responseMsg != lastLocationJson) {
@@ -169,6 +172,28 @@ namespace MDTPro.ServerAPI {
             });
         }
 
+        internal static string BuildCalloutPayloadJson() {
+            return JsonConvert.SerializeObject(new {
+                callouts = CalloutEvents.CalloutList,
+                cadUnitStatus = CalloutEvents.CadUnitStatus ?? ""
+            });
+        }
+
+        /// <summary>Pushes the latest callout list + CAD unit status to all <c>calloutEvent</c> subscribers (e.g. after <c>POST /post/cadUnitStatus</c>).</summary>
+        internal static void BroadcastCalloutPayload() {
+            string inner = BuildCalloutPayloadJson();
+            string msg = $"{{\"response\":{inner},\"request\":\"calloutEvent\"}}";
+            byte[] bytes = Encoding.UTF8.GetBytes(msg);
+            lock (WebSocketLock) {
+                foreach (var ws in new List<WebSocket>(CalloutSubscribers)) {
+                    try {
+                        if (ws.State == WebSocketState.Open)
+                            ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, System.Threading.CancellationToken.None);
+                    } catch { }
+                }
+            }
+        }
+
         private static async Task SendData(WebSocket webSocket, string data, string clientMsg, CancellationToken token = default) {
             string responseMsg = $"{{ \"response\": {data}, \"request\": \"{clientMsg}\" }}";
 
@@ -187,6 +212,7 @@ namespace MDTPro.ServerAPI {
                 plate = hit.Plate,
                 owner = hit.Owner,
                 modelDisplayName = hit.ModelDisplayName,
+                vehicleColor = hit.VehicleColor,
                 flags = hit.Flags ?? new System.Collections.Generic.List<string>(),
                 timeScanned = hit.TimeScanned.ToString("o")
             });
@@ -210,6 +236,7 @@ namespace MDTPro.ServerAPI {
                 }
                 IntervalTokens.Clear();
                 AlprSubscribers.Clear();
+                CalloutSubscribers.Clear();
 
                 webSocketsArr = WebSockets.ToArray();
                 WebSockets.Clear();

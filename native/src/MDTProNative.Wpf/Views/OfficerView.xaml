@@ -1,0 +1,90 @@
+<UserControl x:Class="MDTProNative.Wpf.Views.OfficerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:MDTProNative.Wpf.Views"
+             xmlns:cad="clr-namespace:MDTProNative.Wpf.Views.Controls">
+    <Grid>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+        <StackPanel>
+            <TextBlock Text="OFFICER PROFILE" FontFamily="{StaticResource CadFontMono}" FontSize="13" Foreground="{StaticResource CadAccent}" Margin="0,0,0,12" />
+
+            <!-- Same logical sections as web overlay.officerProfile -->
+            <Border Style="{StaticResource CadSectionBorder}" Padding="14" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="OFFICER INFORMATION" Style="{StaticResource CadSectionTitle}" Margin="0,0,0,10" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140" /><ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="140" /><ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="First name" Style="{StaticResource CadLabelMuted}" Margin="0,0,8,8" VerticalAlignment="Center" />
+                        <TextBox x:Name="First" Grid.Row="0" Grid.Column="1" Style="{StaticResource CadTextBox}" Margin="0,0,16,8" />
+                        <TextBlock Grid.Row="0" Grid.Column="2" Text="Last name" Style="{StaticResource CadLabelMuted}" Margin="0,0,8,8" VerticalAlignment="Center" />
+                        <TextBox x:Name="Last" Grid.Row="0" Grid.Column="3" Style="{StaticResource CadTextBox}" Margin="0,0,0,8" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Badge #" Style="{StaticResource CadLabelMuted}" Margin="0,0,8,8" VerticalAlignment="Center" />
+                        <TextBox x:Name="Badge" Grid.Row="1" Grid.Column="1" Style="{StaticResource CadTextBox}" Margin="0,0,16,8" />
+                        <TextBlock Grid.Row="1" Grid.Column="2" Text="Rank" Style="{StaticResource CadLabelMuted}" Margin="0,0,8,8" VerticalAlignment="Center" />
+                        <TextBox x:Name="Rank" Grid.Row="1" Grid.Column="3" Style="{StaticResource CadTextBox}" Margin="0,0,0,8" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Call sign" Style="{StaticResource CadLabelMuted}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                        <TextBox x:Name="CallSign" Grid.Row="2" Grid.Column="1" Style="{StaticResource CadTextBox}" Margin="0,0,16,0" />
+                        <TextBlock Grid.Row="2" Grid.Column="2" Text="Department" Style="{StaticResource CadLabelMuted}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                        <TextBox x:Name="Agency" Grid.Row="2" Grid.Column="3" Style="{StaticResource CadTextBox}" />
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                        <Button Content="Fill from game" Style="{StaticResource CadButton}" Click="FillFromGame_Click" Margin="0,0,8,0" ToolTip="Loads live officer data from the game session into this profile (same as the browser MDT)." />
+                        <Button Content="Save" Style="{StaticResource CadAccentButton}" Click="Save_Click" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CadSectionBorder}" Padding="14" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="CURRENT SHIFT" Style="{StaticResource CadSectionTitle}" Margin="0,0,0,10" />
+                    <TextBlock x:Name="ShiftStartText" FontFamily="{StaticResource CadFontMono}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                    <TextBlock x:Name="ShiftDurationText" FontFamily="{StaticResource CadFontMono}" Foreground="{StaticResource CadAccent}" Margin="0,0,0,12" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="StartShiftBtn" Content="Start shift" Style="{StaticResource CadAccentButton}" Click="StartShift_Click" Margin="0,0,8,0" />
+                        <Button x:Name="EndShiftBtn" Content="End shift" Style="{StaticResource CadButton}" Click="EndShift_Click" IsEnabled="False" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <views:ShiftHistoryView x:Name="ShiftHistory" Margin="0,0,0,12" />
+
+            <Border Style="{StaticResource CadSectionBorder}" Padding="14">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,10">
+                        <Button DockPanel.Dock="Right" Content="Refresh stats" Style="{StaticResource CadButton}" Click="RefreshMetrics_Click" Padding="10,4" />
+                        <TextBlock Text="CAREER STATISTICS" Style="{StaticResource CadSectionTitle}" VerticalAlignment="Center" Margin="0" />
+                    </DockPanel>
+                    <UniformGrid Columns="2" Margin="0,4,0,0">
+                        <TextBlock Text="Total shifts" Style="{StaticResource CadLabelMuted}" Margin="0,4" />
+                        <TextBlock x:Name="MShifts" FontFamily="{StaticResource CadFontMono}" Margin="0,4" />
+                        <TextBlock Text="Avg shift duration" Style="{StaticResource CadLabelMuted}" Margin="0,4" />
+                        <TextBlock x:Name="MAvgDur" FontFamily="{StaticResource CadFontMono}" Margin="0,4" />
+                        <TextBlock Text="Incident reports" Style="{StaticResource CadLabelMuted}" Margin="0,4" />
+                        <TextBlock x:Name="MInc" FontFamily="{StaticResource CadFontMono}" Margin="0,4" />
+                        <TextBlock Text="Citations" Style="{StaticResource CadLabelMuted}" Margin="0,4" />
+                        <TextBlock x:Name="MCit" FontFamily="{StaticResource CadFontMono}" Margin="0,4" />
+                        <TextBlock Text="Arrests" Style="{StaticResource CadLabelMuted}" Margin="0,4" />
+                        <TextBlock x:Name="MArr" FontFamily="{StaticResource CadFontMono}" Margin="0,4" />
+                        <TextBlock Text="Total reports" Style="{StaticResource CadLabelMuted}" Margin="0,4" />
+                        <TextBlock x:Name="MTot" FontFamily="{StaticResource CadFontMono}" Margin="0,4" />
+                        <TextBlock Text="Reports per shift" Style="{StaticResource CadLabelMuted}" Margin="0,4" />
+                        <TextBlock x:Name="MPer" FontFamily="{StaticResource CadFontMono}" Margin="0,4" />
+                    </UniformGrid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+    <cad:MdtBusyOverlay x:Name="ModuleBusy"
+                        Panel.ZIndex="80"
+                        VerticalAlignment="Stretch"
+                        HorizontalAlignment="Stretch" />
+    </Grid>
+</UserControl>

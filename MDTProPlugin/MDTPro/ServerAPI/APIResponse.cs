@@ -3,6 +3,7 @@ using MDTPro.Plugins;
 using MDTPro.Setup;
 using MDTPro.Utility;
 using Newtonsoft.Json;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Text;
@@ -12,6 +13,8 @@ namespace MDTPro.ServerAPI {
         internal byte[] buffer = Encoding.UTF8.GetBytes("404 - Not found");
         internal int status = 404;
         internal string contentType = "text/plain";
+        /// <summary>Optional custom headers (e.g. <c>X-MdtPro-Nearby-Scan</c> when the game fiber could not run).</summary>
+        internal List<(string name, string value)> ExtraResponseHeaders;
 
         internal APIResponse(HttpListenerRequest req) {
             if (req == null) return;

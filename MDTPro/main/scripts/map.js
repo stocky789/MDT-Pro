@@ -176,10 +176,14 @@ let _activeRouteNodeEvents = null
   calloutEventWs.onopen = () => calloutEventWs.send('calloutEvent')
 
   calloutEventWs.onmessage = (event) => {
-    const data = JSON.parse(event.data).response
-    destinationCoords = data.Coords
-
-    if (data.AcceptanceState != 2) destinationCoords = null
+    const payload = JSON.parse(event.data).response
+    const list = payload?.callouts ?? (payload?.Coords ? [payload] : [])
+    const data = list[0]
+    destinationCoords = data?.Coords
+    const ac = data?.AcceptanceState ?? data?.acceptanceState
+    const st = ac != null && ac !== '' ? Number(ac) : 0
+    const state = Number.isFinite(st) ? st : 0
+    if (state !== 2) destinationCoords = null
   }
 
   if (config.mapDrawPostalCodeSet) {
