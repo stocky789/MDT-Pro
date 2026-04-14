@@ -50,5 +50,14 @@ namespace MDTPro.Utility {
             if (c != null) return c;
             return GetCiGetCalloutFromHandle()(handle);
         }
+
+        /// <summary>
+        /// Calls only Callout Interface’s <c>GetCalloutFromHandle</c> (no LSPDFR resolution). Uses the same reflection path as <see cref="TryGetCallout"/> so a mismatched
+        /// <c>CalloutInterfaceAPI.dll</c> does not throw <see cref="MissingMethodException"/> when the method was added in a newer API than the one in the game folder.
+        /// </summary>
+        internal static Callout TryGetCalloutFromCalloutInterfaceOnly(LHandle handle) {
+            if (handle == null) return null;
+            return GetCiGetCalloutFromHandle()(handle);
+        }
     }
 }

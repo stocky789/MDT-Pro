@@ -92,7 +92,7 @@ wireCalloutCadPanel()
 
 function getCalloutStatusLabel(state, language) {
   const statusLabels = language.callout?.status || {}
-  if (state === 0) return statusLabels.pending || 'Pending'
+  if (state === 0) return statusLabels.pending || 'Open'
   if (state === 1) return statusLabels.responded || 'Responded'
   if (state === 2) return statusLabels.enRoute || 'En Route'
   if (state === 3) return statusLabels.finished || 'Finished'
@@ -103,21 +103,6 @@ function renderCalloutCard(data, index, language, config) {
   const state = normalizeCalloutAcceptanceState(data)
   const statusLabel = getCalloutStatusLabel(state, language)
   const address = `${(data.Location?.Postal || '').trim()} ${(data.Location?.Street || '').trim()}`.trim() || '—'
-  const hasId = !!data.Id
-  const ciLabel = language.callout?.actions?.sendToCi || 'Send to Callout Interface'
-  const ciPh =
-    language.callout?.actions?.sendToCiPlaceholder ||
-    'Message for the in-game CI log (no color codes; newlines OK)'
-  const ciBlock = hasId
-    ? `
-        <div class="calloutCiSend">
-          <span class="calloutCiSendLabel">${ciLabel.replace(/</g, '&lt;')}</span>
-          <textarea class="calloutCiTextarea" aria-label="${escapeHtmlAttr(ciLabel)}" placeholder="${escapeHtmlAttr(ciPh)}"></textarea>
-          <div class="calloutCiActions">
-            <button type="button" class="calloutActionBtn calloutSendCiBtn" data-action="sendCi">${ciLabel.replace(/</g, '&lt;')}</button>
-          </div>
-        </div>`
-    : ''
   return `
     <div class="calloutCard ${index === 0 ? 'calloutCard-expanded' : ''}" data-index="${index}">
       <button type="button" class="calloutCardHeader" aria-expanded="${index === 0}">
@@ -162,7 +147,6 @@ function renderCalloutCard(data, index, language, config) {
           ${state === 0 ? `<button type="button" class="calloutActionBtn calloutAcceptBtn" data-action="accept">${language.callout?.actions?.accept || 'Accept'}</button>` : ''}
           ${state === 1 ? `<button type="button" class="calloutActionBtn calloutEnRouteBtn" data-action="enRoute">${language.callout?.status?.enRoute || 'En Route'}</button>` : ''}
         </div>
-        ${ciBlock}
       </div>
     </div>
   `
@@ -309,46 +293,6 @@ calloutEventWs.onmessage = async (event) => {
         return
       }
       await postCalloutAction({ action, calloutId }, language)
-    })
-  })
-
-  containerEl.querySelectorAll('.calloutSendCiBtn').forEach((btn) => {
-    btn.addEventListener('click', async function () {
-      const card = this.closest('.calloutCard')
-      const idx = parseInt(card?.dataset?.index ?? '-1', 10)
-      const data = callouts[idx]
-      const calloutId = data?.Id
-      const ta = card?.querySelector('.calloutCiTextarea')
-      const message = ta?.value?.trim() ?? ''
-      if (!calloutId) {
-        if (typeof showNotification === 'function') {
-          showNotification('Callout id missing — update MDT Pro plugin / refresh.', 'warning')
-        }
-        return
-      }
-      if (!message) {
-        if (typeof showNotification === 'function') {
-          showNotification(language.callout?.actions?.error || 'Enter a message.', 'warning')
-        }
-        return
-      }
-      const res = await fetch('/post/calloutAction', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'sendMessage', calloutId, message }),
-      })
-      let json = {}
-      try {
-        json = await res.json()
-      } catch {
-        json = {}
-      }
-      if (json.success && typeof showNotification === 'function') {
-        showNotification(language.callout?.actions?.sendToCiSuccess || 'Message sent.', 'checkMark')
-        if (ta) ta.value = ''
-      } else if (typeof showNotification === 'function') {
-        showNotification(json.error || `Send failed (${res.status})`, 'warning')
-      }
     })
   })
 }

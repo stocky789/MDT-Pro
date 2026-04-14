@@ -1,5 +1,6 @@
 /**
- * Downloads vanilla GTA V ped catalogue stills from docs.fivem.net into MDTPro/images/peds/.
+ * Maintainer-only: downloads full-body ped stills from docs.fivem.net into MDTPro/images/peds/.
+ * The game/browser MDT does not load these URLs at runtime — run scripts/processPedPortraitCatalogue.mjs after to face-crop into the final bundle.
  * Model names are parsed from FiveM's official docs repo (ped-models.md).
  *
  * Run from repo root: node scripts/fetchPedCatalogueImages.mjs

@@ -47,8 +47,7 @@
                                 Width="72"
                                 Height="72"
                                 CornerRadius="36"
-                                BorderBrush="{StaticResource ReportDocInkBrush}"
-                                BorderThickness="2"
+                                BorderThickness="0"
                                 Background="#E8F4FC"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Top"
@@ -57,7 +56,7 @@
                             <Grid>
                                 <Image x:Name="PropertySealImage"
                                        Stretch="Uniform"
-                                       Margin="6"
+                                       Margin="0"
                                        RenderOptions.BitmapScalingMode="HighQuality"
                                        Visibility="Collapsed" />
                                 <TextBlock x:Name="BrandingCenterTitle"

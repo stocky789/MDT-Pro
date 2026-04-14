@@ -888,13 +888,10 @@ namespace MDTPro.Setup {
                 public string accept = "Accept";
                 public string success = "Status updated.";
                 public string error = "Action failed.";
-                public string sendToCi = "Send to Callout Interface";
-                public string sendToCiSuccess = "Message sent to Callout Interface.";
-                public string sendToCiPlaceholder = "Message for the in-game CI log (no color codes; newlines OK)";
             }
 
             public class Status {
-                public string pending = "Pending";
+                public string pending = "Open";
                 public string responded = "Responded";
                 public string enRoute = "En Route";
                 public string finished = "Finished";

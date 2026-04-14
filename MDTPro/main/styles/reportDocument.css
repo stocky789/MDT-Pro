@@ -65,6 +65,13 @@
   font-family: 'Segoe UI', Tahoma, sans-serif;
   font-size: 13px;
   line-height: 1.35;
+  /* Native date/time/select widgets match light fields */
+  color-scheme: light;
+}
+
+.standardReportDocumentShell .report-document,
+.propertyEvidenceDocumentShell .report-document {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 /* Citation / arrest charge rows live under .report-document-body but use theme-colored rules in reports.css */
@@ -125,7 +132,6 @@
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  border: 2px solid #000;
   background: #e8f4fc;
   display: flex;
   align-items: center;
@@ -141,7 +147,7 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 6px;
+  padding: 0;
   display: none;
   box-sizing: border-box;
 }
@@ -277,6 +283,141 @@
 .createPage .reportInformation .report-document .report-document-body .section .inputWrapper > div label,
 .listPage .reportInformation .report-document .report-document-body .section .inputWrapper > div label {
   color: #0f0f0f;
+}
+
+/*
+ * General Information status toggles: global button.selected uses translucent accent fill + theme light text.
+ * On white paper that reads as pale cream + grey label (very low contrast). Match form fields + solid selected state.
+ */
+.report-document-body .statusInput button {
+  background-color: var(--mdt-report-field);
+  border: 1px solid #000;
+  color: var(--mdt-report-ink);
+}
+
+.report-document-body .statusInput button:not(:disabled):hover {
+  color: var(--mdt-report-ink);
+  border-color: #000;
+  background-color: #f2dcc8;
+}
+
+.report-document-body .statusInput button:focus {
+  border-color: #000;
+  /* Gold focus ring aligned with default --color-accent; avoids color-mix for older WebViews */
+  box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.45);
+}
+
+.report-document-body .statusInput button.selected {
+  background-color: var(--color-accent, #c9a227);
+  color: #0f0f0f;
+  border-color: #000;
+  font-weight: 700;
+}
+
+.report-document-body .statusInput button.selected:not(:disabled):hover {
+  background-color: var(--color-accent-dimmed, #b89220);
+  color: #0f0f0f;
+}
+
+/* Section headings: theme borders are faint on white */
+.report-document-body .section > .title,
+.report-document .propertyEvidenceSection > .title {
+  color: var(--mdt-report-ink) !important;
+  border-bottom-color: #000 !important;
+}
+
+.report-document-body .section:not(:first-child) > .title {
+  border-top-color: #000 !important;
+}
+
+/* In-form action buttons (theme chrome is illegible on paper) */
+.report-document .report-document-body button:not(.reportDocToolbarButton):not(.deleteChargeButton),
+.report-document .propertyEvidenceSection button:not(.reportDocToolbarButton):not(.deleteChargeButton) {
+  background-color: var(--mdt-report-field);
+  border: 1px solid #000;
+  color: var(--mdt-report-ink);
+  font-weight: 600;
+}
+
+.report-document .report-document-body button:not(.reportDocToolbarButton):not(.deleteChargeButton):not(:disabled):hover,
+.report-document .propertyEvidenceSection button:not(.reportDocToolbarButton):not(.deleteChargeButton):not(:disabled):hover {
+  color: var(--mdt-report-ink);
+  border-color: #000;
+  background-color: #f2dcc8;
+}
+
+.report-document .report-document-body button:not(.reportDocToolbarButton):not(.deleteChargeButton):focus,
+.report-document .propertyEvidenceSection button:not(.reportDocToolbarButton):not(.deleteChargeButton):focus {
+  border-color: #000;
+  box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.45);
+}
+
+.report-document .report-document-body button:not(.reportDocToolbarButton):not(.deleteChargeButton):disabled,
+.report-document .propertyEvidenceSection button:not(.reportDocToolbarButton):not(.deleteChargeButton):disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  color: #3a3a3a;
+}
+
+.report-document-body .impoundNearbyList .impoundNearbyItem.stolen:not(:disabled) {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.report-document-body .section .notesTextarea {
+  background-color: var(--mdt-report-field) !important;
+  border: 1px solid #000 !important;
+  color: var(--mdt-report-ink) !important;
+  border-radius: 3px;
+}
+
+.report-document-body .section .notesTextarea:focus {
+  border-color: #000 !important;
+  box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.35);
+}
+
+.report-document-body input::placeholder,
+.report-document-body textarea::placeholder,
+.report-document .propertyEvidenceSection input::placeholder,
+.report-document .propertyEvidenceSection textarea::placeholder {
+  color: #4a4a4a;
+  opacity: 1;
+}
+
+.report-document input:disabled,
+.report-document textarea:disabled,
+.report-document select:disabled {
+  color: #333;
+  -webkit-text-fill-color: #333;
+  opacity: 1;
+  background: #ede5dc;
+  border-color: #000;
+}
+
+/* Injury / impound / use-of-force labels still used theme dimmed text */
+.report-document-body .injurySection .injuryRecentIdsRow label,
+.report-document-body .impoundSection .impoundNearbyLabel,
+.report-document-body .impoundSection .impoundRecentIdsRow label,
+.report-document-body .useOfForceSection .useOfForceRow label,
+.report-document-body .useOfForceSection .useOfForceTypeRow > label,
+.report-document-body .useOfForceSection .useOfForceInjuryRow label {
+  color: var(--mdt-report-ink);
+}
+
+/* Charge picker: hover/focus used theme accent (washed out on cream rows) */
+.report-document .section.citationSection .optionsWrapper details > summary:hover,
+.report-document .section.arrestSection .optionsWrapper details > summary:hover,
+.report-document .section.citationSection .optionsWrapper details > summary:focus,
+.report-document .section.arrestSection .optionsWrapper details > summary:focus {
+  color: var(--mdt-report-ink) !important;
+}
+
+.report-document .section.citationSection .optionsWrapper details > button:hover,
+.report-document .section.arrestSection .optionsWrapper details > button:hover,
+.report-document .section.citationSection .optionsWrapper details > button:focus,
+.report-document .section.arrestSection .optionsWrapper details > button:focus {
+  color: var(--mdt-report-ink) !important;
+  border-color: #000 !important;
 }
 
 .report-doc-auth-bar {

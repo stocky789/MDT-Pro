@@ -36,7 +36,7 @@ public sealed class MdtHttpClient : IDisposable
 
     public void Dispose() => _http.Dispose();
 
-    /// <summary>GET binary asset when present (e.g. <c>image/peds/mp_m_freemode_01.webp</c>); returns null on 404 or failure.</summary>
+    /// <summary>GET binary asset when present (e.g. bundled ped portrait <c>image/peds/mp_m_freemode_01.webp</c>); returns null on 404 or failure.</summary>
     public async Task<byte[]?> GetOptionalBytesAsync(string relativePath, CancellationToken cancellationToken = default)
     {
         var rel = relativePath.Trim().Replace('\\', '/').TrimStart('/');
