@@ -4,6 +4,31 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
+## [0.9.9.0] — 2026-03-29
+
+### Major Features
+
+- **Native Windows MDT** — Optional **Windows desktop app** that talks to the same MDT session as the in-game/browser MDT (dashboard, person and vehicle search, firearms, BOLO, shift/court, map, officer profile, **full report writing** in proper forms—handy on a second monitor). It ships **with the same release** as the plugin: the download zip (for example **MDTPro v0.9.9.0-beta**) includes the **Native Release** output **alongside** the rest of MDT Pro, so you still **copy the whole package** into your **MDT Pro** folder like always. The **OIV installer** also installs the full package, native app included—everything ends up under your **MDT Pro** folder together, not as a separate product you install somewhere else.
+- **Reports overhaul** — Reports got a major refresh, especially **property/evidence** and related types: **document-style** layout, headers/branding, easier editing (tables and labeled fields instead of big text blocks), **recent IDs** helpers, and **print / export** where the native app supports it. The in-browser MDT gets the same document look and tools where it applies.
+
+### Minor Features
+
+- **Callouts (dashboard)** — Callout details use a clearer, dispatch-style layout (call, location, narrative, and so on). Callout behaviour overall is still a work in progress; see **Other** below.
+- **Native person editor** — License state and permit fields use **dropdowns** where it makes sense so editing a person matches the rest of the MDT.
+- **Local PED Images** — PED Model images are now loaded from a local database rather than online - providing better support for offline play and better optimization.
+
+### Bug Fixes
+
+- **Person Search — ID photos** — Portraits load from **bundled images** shipped with the resource (no outside image site). The MDT tries harder to pick the **right face/hair look** when that data exists, and portrait refresh is **more reliable** when the game is paused or you’re alt-tabbed. **Note:** Wrong or missing photos can still happen; see **Other** below.
+
+### Other
+
+- **Callouts — known issue** — Callouts are **still buggy**. **Accepting a callout from the MDT still does not work** in this version; I am actively working on a solution to this but it is holding up development at this stage so unfortunately we need to release, yet again no support for it. 
+
+- **PED portraits — known issue** — ID photos can **still be missing or wrong**. Matching portraits to the right ped isn’t fully reliable yet. Still narrowing down if this is a bug with the persistence / SQL system or something else.
+
+---
+
 ## [0.9.8.3] — 2026-04-02
 
 ### Bug Fixes

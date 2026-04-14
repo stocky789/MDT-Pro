@@ -1,0 +1,65 @@
+<UserControl x:Class="MDTProNative.Wpf.Views.FirearmsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:cad="clr-namespace:MDTProNative.Wpf.Views.Controls">
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Border Grid.Row="0" Style="{StaticResource CadModuleChromeBorder}" Padding="10" Margin="0,0,0,8">
+            <DockPanel LastChildFill="True">
+                <Button x:Name="SearchBtn" DockPanel.Dock="Right" Content="SEARCH" Style="{StaticResource CadPrimaryActionButton}" Margin="8,0,0,0" />
+                <TextBox x:Name="QueryBox"
+                         Style="{StaticResource CadTextBoxCadField}"
+                         VerticalContentAlignment="Center"
+                         ToolTip="Serial number (lookup) or owner name (registered weapons for that subject)" />
+            </DockPanel>
+        </Border>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="FirearmsSidebarColumn" Width="280" MinWidth="220" />
+                <ColumnDefinition Width="6" />
+                <ColumnDefinition Width="*" MinWidth="280" />
+            </Grid.ColumnDefinitions>
+            <DockPanel Grid.Column="0" LastChildFill="True">
+                <TextBlock DockPanel.Dock="Top" Text="RECENT WEAPONS" Style="{StaticResource CadSectionTitle}" />
+                <TextBlock DockPanel.Dock="Top"
+                           x:Name="RecentEmptyHint"
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource CadMuted}"
+                           FontSize="11"
+                           Margin="0,4,0,8"
+                           Text="No recent firearm records."
+                           Visibility="Collapsed" />
+                <ListBox x:Name="RecentList"
+                         Style="{StaticResource CadListBox}"
+                         ItemContainerStyle="{StaticResource CadSidebarListBoxItem}"
+                         Margin="0,4,0,0" />
+            </DockPanel>
+            <GridSplitter x:Name="FirearmsSplitter"
+                          Grid.Column="1"
+                          Width="6"
+                          HorizontalAlignment="Stretch"
+                          ResizeDirection="Columns"
+                          ResizeBehavior="PreviousAndNext"
+                          Background="{StaticResource CadBorder}" />
+            <Border Grid.Column="2" Style="{StaticResource CadModuleChromeBorder}" Padding="12">
+                <ScrollViewer x:Name="DetailScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="DetailPanel">
+                        <TextBlock x:Name="DetailPlaceholder"
+                                   TextWrapping="Wrap"
+                                   Foreground="{StaticResource CadMuted}"
+                                   FontSize="12"
+                                   Text="Enter a serial or owner name, or select a recent weapon. Serial lookup tries the registry first; owner search lists all registered weapons for that name." />
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+        <cad:MdtBusyOverlay x:Name="ModuleBusy"
+                            Grid.RowSpan="2"
+                            Panel.ZIndex="100"
+                            VerticalAlignment="Stretch"
+                            HorizontalAlignment="Stretch" />
+    </Grid>
+</UserControl>

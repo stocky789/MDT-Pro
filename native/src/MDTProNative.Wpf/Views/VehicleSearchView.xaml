@@ -1,0 +1,174 @@
+<UserControl x:Class="MDTProNative.Wpf.Views.VehicleSearchView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:cad="clr-namespace:MDTProNative.Wpf.Views.Controls">
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Border Grid.Row="0" Style="{StaticResource CadModuleChromeBorder}" Padding="10" Margin="0,0,0,8">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button x:Name="SearchBtn" Content="SEARCH" Style="{StaticResource CadPrimaryActionButton}" Margin="8,0,0,0" />
+                    <Button x:Name="ContextVehBtn" Content="CONTEXT VEH" Style="{StaticResource CadRailOutlineButton}" Margin="8,0,0,0" />
+                    <Button x:Name="RefreshNearbyBtn" Content="REFRESH NEARBY" Style="{StaticResource CadRailOutlineButton}" Margin="8,0,0,0" />
+                </StackPanel>
+                <TextBox x:Name="QueryBox"
+                         Style="{StaticResource CadTextBoxCadField}"
+                         VerticalContentAlignment="Center"
+                         ToolTip="License plate, VIN, or CONTEXT VEH for the vehicle in range" />
+            </DockPanel>
+        </Border>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="VehicleSidebarColumn" Width="280" MinWidth="220" />
+                <ColumnDefinition Width="6" />
+                <ColumnDefinition Width="*" MinWidth="280" />
+            </Grid.ColumnDefinitions>
+            <Grid x:Name="VehicleSidebarInnerGrid" Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition x:Name="VehicleTopListRow" Height="*" MinHeight="60" />
+                    <RowDefinition Height="6" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition x:Name="VehicleBottomListRow" Height="*" MinHeight="60" />
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Text="NEARBY VEHICLES" Style="{StaticResource CadSectionTitle}" />
+                <TextBlock Grid.Row="0"
+                           x:Name="NearbyEmptyHint"
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource CadMuted}"
+                           FontSize="11"
+                           Margin="0,22,0,0"
+                           Text="No vehicles detected nearby."
+                           Visibility="Collapsed" />
+                <ListBox x:Name="NearbyList"
+                         Grid.Row="1"
+                         Style="{StaticResource CadListBox}"
+                         ItemContainerStyle="{StaticResource CadSidebarListBoxItem}"
+                         Margin="0,4,0,10" />
+                <GridSplitter Grid.Row="2"
+                              Height="6"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch"
+                              ResizeDirection="Rows"
+                              ResizeBehavior="PreviousAndNext"
+                              Background="{StaticResource CadBorder}"
+                              x:Name="VehicleSidebarSplitter" />
+                <DockPanel Grid.Row="3" LastChildFill="False" Margin="0,0,0,4">
+                    <Button x:Name="ClearVehHistoryBtn"
+                            DockPanel.Dock="Right"
+                            Content="CLEAR HISTORY"
+                            Style="{StaticResource CadRailOutlineButton}"
+                            VerticalAlignment="Center"
+                            Padding="8,2" />
+                    <TextBlock Text="RECENT SEARCHES" Style="{StaticResource CadSectionTitle}" VerticalAlignment="Center" />
+                </DockPanel>
+                <ListBox x:Name="HistoryList"
+                         Grid.Row="4"
+                         Style="{StaticResource CadListBox}"
+                         ItemContainerStyle="{StaticResource CadSidebarListBoxItem}"
+                         Margin="0,4,0,0" />
+            </Grid>
+            <GridSplitter x:Name="VehicleMainSplitter"
+                          Grid.Column="1"
+                          Width="6"
+                          HorizontalAlignment="Stretch"
+                          ResizeDirection="Columns"
+                          ResizeBehavior="PreviousAndNext"
+                          Background="{StaticResource CadBorder}" />
+            <Border Grid.Column="2" Style="{StaticResource CadModuleChromeBorder}" Padding="12">
+                <DockPanel LastChildFill="True">
+                    <TabControl x:Name="VehicleDetailTabs"
+                                Background="{StaticResource CadPanel}"
+                                BorderBrush="{StaticResource CadAccentDim}">
+                        <TabControl.Resources>
+                            <Style TargetType="TabItem" BasedOn="{StaticResource CadSubTabItem}" />
+                        </TabControl.Resources>
+                        <TabItem Header="SUMMARY">
+                            <ScrollViewer x:Name="DetailScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,8,0,0">
+                                <StackPanel x:Name="DetailPanel">
+                                    <TextBlock x:Name="DetailPlaceholder"
+                                               TextWrapping="Wrap"
+                                               Foreground="{StaticResource CadMuted}"
+                                               FontSize="12"
+                                               Text="Search by plate or VIN, pick a nearby vehicle, or use CONTEXT VEH. Data matches the in-game MDC. The nearby list is built on the game thread: if GTA V is paused or in the background, alt-tab into the game briefly (or disable Pause on focus loss) before Refresh." />
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+                        <TabItem Header="EDIT FORM">
+                            <DockPanel Margin="0,8,0,0" LastChildFill="True">
+                                <TextBlock DockPanel.Dock="Top"
+                                           TextWrapping="Wrap"
+                                           Foreground="{StaticResource CadMuted}"
+                                           FontSize="11"
+                                           Margin="0,0,0,8"
+                                           Text="Structured fields for this vehicle record. Add or review BOLOs from Summary. Saving requires the vehicle in the world." />
+                                <Button x:Name="SaveVehicleFormBtn"
+                                        DockPanel.Dock="Bottom"
+                                        Content="SAVE VEHICLE FROM FORM"
+                                        Style="{StaticResource CadPrimaryActionButton}"
+                                        HorizontalAlignment="Left"
+                                        Margin="0,12,0,0" />
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="150" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Plate" Style="{StaticResource CadFieldLabel}" Margin="0,4,8,4" VerticalAlignment="Center" />
+                                        <TextBox x:Name="VehFormPlate" Grid.Row="0" Grid.Column="1" Style="{StaticResource CadTextBoxCadField}" Margin="0,2,0,2" />
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Model name" Style="{StaticResource CadFieldLabel}" Margin="0,4,8,4" VerticalAlignment="Center" />
+                                        <TextBox x:Name="VehFormModelName" Grid.Row="1" Grid.Column="1" Style="{StaticResource CadTextBoxCadField}" Margin="0,2,0,2" />
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Display name" Style="{StaticResource CadFieldLabel}" Margin="0,4,8,4" VerticalAlignment="Center" />
+                                        <TextBox x:Name="VehFormModelDisplay" Grid.Row="2" Grid.Column="1" Style="{StaticResource CadTextBoxCadField}" Margin="0,2,0,2" />
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Stolen" Style="{StaticResource CadFieldLabel}" Margin="0,4,8,4" VerticalAlignment="Center" />
+                                        <CheckBox x:Name="VehFormStolen" Grid.Row="3" Grid.Column="1" Content="Reported stolen" Margin="0,6,0,6" Foreground="{StaticResource CadText}" />
+                                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Owner" Style="{StaticResource CadFieldLabel}" Margin="0,4,8,4" VerticalAlignment="Center" />
+                                        <TextBox x:Name="VehFormOwner" Grid.Row="4" Grid.Column="1" Style="{StaticResource CadTextBoxCadField}" Margin="0,2,0,2" />
+                                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Color" Style="{StaticResource CadFieldLabel}" Margin="0,4,8,4" VerticalAlignment="Center" />
+                                        <TextBox x:Name="VehFormColor" Grid.Row="5" Grid.Column="1" Style="{StaticResource CadTextBoxCadField}" Margin="0,2,0,2" />
+                                        <TextBlock Grid.Row="6" Grid.Column="0" Text="VIN status" Style="{StaticResource CadFieldLabel}" Margin="0,4,8,4" VerticalAlignment="Center" />
+                                        <TextBox x:Name="VehFormVinStatus" Grid.Row="6" Grid.Column="1" Style="{StaticResource CadTextBoxCadField}" Margin="0,2,0,2" />
+                                        <TextBlock Grid.Row="7" Grid.Column="0" Text="Make" Style="{StaticResource CadFieldLabel}" Margin="0,4,8,4" VerticalAlignment="Center" />
+                                        <TextBox x:Name="VehFormMake" Grid.Row="7" Grid.Column="1" Style="{StaticResource CadTextBoxCadField}" Margin="0,2,0,2" />
+                                        <TextBlock Grid.Row="8" Grid.Column="0" Text="Model" Style="{StaticResource CadFieldLabel}" Margin="0,4,8,4" VerticalAlignment="Center" />
+                                        <TextBox x:Name="VehFormModel" Grid.Row="8" Grid.Column="1" Style="{StaticResource CadTextBoxCadField}" Margin="0,2,0,2" />
+                                        <TextBlock Grid.Row="9" Grid.Column="0" Text="Primary color" Style="{StaticResource CadFieldLabel}" Margin="0,4,8,4" VerticalAlignment="Center" />
+                                        <TextBox x:Name="VehFormPriColor" Grid.Row="9" Grid.Column="1" Style="{StaticResource CadTextBoxCadField}" Margin="0,2,0,2" />
+                                        <TextBlock Grid.Row="10" Grid.Column="0" Text="Secondary color" Style="{StaticResource CadFieldLabel}" Margin="0,4,8,4" VerticalAlignment="Center" />
+                                        <TextBox x:Name="VehFormSecColor" Grid.Row="10" Grid.Column="1" Style="{StaticResource CadTextBoxCadField}" Margin="0,2,0,2" />
+                                        <TextBlock Grid.Row="11" Grid.Column="0" Text="VIN" Style="{StaticResource CadFieldLabel}" Margin="0,4,8,4" VerticalAlignment="Center" />
+                                        <TextBox x:Name="VehFormVin" Grid.Row="11" Grid.Column="1" Style="{StaticResource CadTextBoxCadField}" Margin="0,2,0,2" />
+                                        <TextBlock Grid.Row="12" Grid.Column="0" Text="Registration" Style="{StaticResource CadFieldLabel}" Margin="0,4,8,4" VerticalAlignment="Center" />
+                                        <TextBox x:Name="VehFormRegStatus" Grid.Row="12" Grid.Column="1" Style="{StaticResource CadTextBoxCadField}" Margin="0,2,0,2" />
+                                        <TextBlock Grid.Row="13" Grid.Column="0" Text="Reg. expires" Style="{StaticResource CadFieldLabel}" Margin="0,4,8,4" VerticalAlignment="Center" />
+                                        <TextBox x:Name="VehFormRegExp" Grid.Row="13" Grid.Column="1" Style="{StaticResource CadTextBoxCadField}" Margin="0,2,0,2" />
+                                        <TextBlock Grid.Row="14" Grid.Column="0" Text="Insurance" Style="{StaticResource CadFieldLabel}" Margin="0,4,8,4" VerticalAlignment="Center" />
+                                        <TextBox x:Name="VehFormInsStatus" Grid.Row="14" Grid.Column="1" Style="{StaticResource CadTextBoxCadField}" Margin="0,2,0,2" />
+                                        <TextBlock Grid.Row="15" Grid.Column="0" Text="Ins. expires" Style="{StaticResource CadFieldLabel}" Margin="0,4,8,4" VerticalAlignment="Center" />
+                                        <TextBox x:Name="VehFormInsExp" Grid.Row="15" Grid.Column="1" Style="{StaticResource CadTextBoxCadField}" Margin="0,2,0,2" />
+                                    </Grid>
+                                </ScrollViewer>
+                            </DockPanel>
+                        </TabItem>
+                    </TabControl>
+                </DockPanel>
+            </Border>
+        </Grid>
+        <cad:MdtBusyOverlay x:Name="ModuleBusy"
+                            Grid.RowSpan="2"
+                            Panel.ZIndex="100"
+                            VerticalAlignment="Stretch"
+                            HorizontalAlignment="Stretch" />
+    </Grid>
+</UserControl>

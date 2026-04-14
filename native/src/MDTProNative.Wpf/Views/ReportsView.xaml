@@ -1,0 +1,156 @@
+<UserControl x:Class="MDTProNative.Wpf.Views.ReportsView"
+
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+
+             xmlns:cad="clr-namespace:MDTProNative.Wpf.Views.Controls">
+
+    <Grid Margin="8">
+
+    <DockPanel LastChildFill="True">
+
+        <Border DockPanel.Dock="Top" Style="{StaticResource CadModuleChromeBorder}" Padding="10" Margin="0,0,0,8">
+
+            <DockPanel LastChildFill="True">
+
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+
+                    <Button x:Name="RefreshBtn" Content="REFRESH LIST" Style="{StaticResource CadRailOutlineButton}" Margin="8,0,0,0" />
+
+                    <Button x:Name="NewBtn" Content="NEW REPORT" Style="{StaticResource CadRailOutlineButton}" Margin="8,0,0,0" />
+
+                    <Button x:Name="SaveBtn" Content="SAVE TO MDT" Style="{StaticResource CadPrimaryActionButton}" Margin="8,0,0,0" />
+
+                </StackPanel>
+
+                <WrapPanel VerticalAlignment="Center">
+
+                    <TextBlock Text="TYPE" Style="{StaticResource CadFieldLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+
+                    <ComboBox x:Name="CategoryCombo"
+
+                              MinWidth="260"
+
+                              Style="{StaticResource CadComboBox}"
+
+                              VerticalAlignment="Center"
+
+                              DisplayMemberPath="Label"
+
+                              SelectedValuePath="TypeKey" />
+
+                </WrapPanel>
+
+            </DockPanel>
+
+        </Border>
+
+        <TextBlock DockPanel.Dock="Top"
+
+                   TextWrapping="Wrap"
+
+                   Foreground="{StaticResource CadMuted}"
+
+                   FontSize="11"
+
+                   Margin="0,0,0,8"
+
+                   Text="Stay ONLINE. Choose TYPE → NEW REPORT → edit the form → SAVE TO MDT. Select a list row to load an existing report." />
+
+        <Grid x:Name="ReportsBodyGrid">
+
+            <Grid.ColumnDefinitions>
+
+                <ColumnDefinition x:Name="ReportsSidebarColumn" Width="280" MinWidth="220" />
+
+                <ColumnDefinition Width="6" />
+
+                <ColumnDefinition Width="*" MinWidth="320" />
+
+            </Grid.ColumnDefinitions>
+
+            <DockPanel Grid.Column="0" LastChildFill="True">
+
+                <TextBlock DockPanel.Dock="Top" Text="SAVED REPORTS" Style="{StaticResource CadSectionTitle}" Margin="0,0,0,6" />
+
+                <ListBox x:Name="ReportList"
+
+                         Style="{StaticResource CadListBox}"
+
+                         ItemContainerStyle="{StaticResource CadSidebarListBoxItem}"
+
+                         DisplayMemberPath="Display" />
+
+            </DockPanel>
+
+            <GridSplitter x:Name="ReportsSplitter"
+
+                          Grid.Column="1"
+
+                          Width="6"
+
+                          HorizontalAlignment="Stretch"
+
+                          ResizeDirection="Columns"
+
+                          ResizeBehavior="PreviousAndNext"
+
+                          Background="{StaticResource CadBorder}" />
+
+            <Border Grid.Column="2" Style="{StaticResource CadModuleChromeBorder}" Padding="10">
+
+                <DockPanel LastChildFill="True">
+
+                    <TextBlock x:Name="EditorHint"
+
+                               DockPanel.Dock="Top"
+
+                               TextWrapping="Wrap"
+
+                               Foreground="{StaticResource CadMuted}"
+
+                               FontSize="11"
+
+                               Margin="0,0,0,8"
+
+                               Text="Select a report or create a new draft." />
+
+                    <ScrollViewer x:Name="FormScrollViewer"
+
+                                  VerticalScrollBarVisibility="Auto"
+
+                                  HorizontalScrollBarVisibility="Disabled"
+
+                                  Margin="0,8,0,0"
+
+                                  MinHeight="240"
+
+                                  Visibility="Collapsed"
+
+                                  Background="{StaticResource CadPanel}">
+
+                        <ContentControl x:Name="FormHost" MinHeight="200" />
+
+                    </ScrollViewer>
+
+                </DockPanel>
+
+            </Border>
+
+        </Grid>
+
+    </DockPanel>
+
+    <cad:MdtBusyOverlay x:Name="ModuleBusy"
+
+                        Panel.ZIndex="50"
+
+                        VerticalAlignment="Stretch"
+
+                        HorizontalAlignment="Stretch" />
+
+    </Grid>
+
+</UserControl>
+

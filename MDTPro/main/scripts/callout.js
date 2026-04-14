@@ -1,14 +1,98 @@
 ;(async function () {
   const config = await getConfig()
   if (config.updateDomWithLanguageOnLoad) await updateDomWithLanguage('callout')
+  await applyCalloutCadPlaceholders()
 })()
 
 const calloutEventWs = new WebSocket(`ws://${location.host}/ws`)
 calloutEventWs.onopen = () => calloutEventWs.send('calloutEvent')
 
+const CAD_PRESETS = [
+  { value: '10-8 | Available', label: '10-8 — Available' },
+  { value: '10-97 | En route', label: '10-97 — En route' },
+  { value: '10-23 | On scene', label: '10-23 — On scene' },
+  { value: '10-95 | Traffic stop', label: '10-95 — Traffic stop' },
+  { value: '10-7 | Out of service', label: '10-7 — Out of service' },
+  { value: '10-6 | Busy', label: '10-6 — Busy' },
+]
+
+function escapeHtmlAttr(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+/** Coerce plugin JSON (Pascal/camel, string/number) to LSPDFR CalloutAcceptanceState int. */
+function normalizeCalloutAcceptanceState(data) {
+  const v = data?.AcceptanceState ?? data?.acceptanceState
+  if (v == null || v === '') return 0
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+
+function updateCadUnitReadout(text) {
+  const el = document.getElementById('cadUnitStatusReadout')
+  if (!el) return
+  const t = text != null ? String(text).trim() : ''
+  el.textContent = t.length ? t : '—'
+}
+
+async function applyCalloutCadPlaceholders() {
+  const language = await getLanguage()
+  const input = document.getElementById('cadUnitCustomInput')
+  if (input)
+    input.placeholder =
+      language.callout?.static?.cad?.customPlaceholder || 'Custom status (overrides preset when filled)'
+}
+
+function wireCalloutCadPanel() {
+  const btn = document.getElementById('cadUnitSetStatusBtn')
+  const sel = document.getElementById('cadUnitPresetSelect')
+  if (!btn || !sel || btn.dataset.wired === '1') return
+  btn.dataset.wired = '1'
+  sel.innerHTML = CAD_PRESETS.map(
+    (p) => `<option value="${escapeHtmlAttr(p.value)}">${escapeHtmlAttr(p.label)}</option>`,
+  ).join('')
+
+  btn.addEventListener('click', async () => {
+    const language = await getLanguage()
+    const input = document.getElementById('cadUnitCustomInput')
+    const custom = input?.value?.trim() ?? ''
+    const status = custom || sel.value
+    if (!status) {
+      if (typeof showNotification === 'function') {
+        showNotification(language.callout?.actions?.error || 'Action failed.', 'warning')
+      }
+      return
+    }
+    try {
+      const res = await fetch('/post/cadUnitStatus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (json.success && typeof showNotification === 'function') {
+        showNotification(
+          language.callout?.static?.cad?.statusUpdated || 'Unit status updated.',
+          'checkMark',
+        )
+      } else if (typeof showNotification === 'function') {
+        showNotification(json.error || `HTTP ${res.status}`, 'warning')
+      }
+    } catch (e) {
+      if (typeof showNotification === 'function') showNotification(String(e.message || e), 'warning')
+    }
+  })
+}
+
+wireCalloutCadPanel()
+
 function getCalloutStatusLabel(state, language) {
   const statusLabels = language.callout?.status || {}
-  if (state === 0) return statusLabels.pending || 'Pending'
+  if (state === 0) return statusLabels.pending || 'Open'
   if (state === 1) return statusLabels.responded || 'Responded'
   if (state === 2) return statusLabels.enRoute || 'En Route'
   if (state === 3) return statusLabels.finished || 'Finished'
@@ -16,7 +100,7 @@ function getCalloutStatusLabel(state, language) {
 }
 
 function renderCalloutCard(data, index, language, config) {
-  const state = data.AcceptanceState
+  const state = normalizeCalloutAcceptanceState(data)
   const statusLabel = getCalloutStatusLabel(state, language)
   const address = `${(data.Location?.Postal || '').trim()} ${(data.Location?.Street || '').trim()}`.trim() || '—'
   return `
@@ -68,10 +152,31 @@ function renderCalloutCard(data, index, language, config) {
   `
 }
 
+async function postCalloutAction(body, language) {
+  const res = await fetch('/post/calloutAction', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  let json = {}
+  try {
+    json = await res.json()
+  } catch {
+    json = {}
+  }
+  if (json.success && typeof showNotification === 'function') {
+    showNotification(language.callout?.actions?.success || 'Status updated.', 'checkMark')
+  } else if (typeof showNotification === 'function') {
+    showNotification(json.error || `Request failed (${res.status})`, 'warning')
+  }
+}
+
 calloutEventWs.onmessage = async (event) => {
   const language = await getLanguage()
   const config = await getConfig()
   const payload = JSON.parse(event.data).response
+  updateCadUnitReadout(payload?.cadUnitStatus)
+
   const callouts = payload?.callouts ?? (payload?.Location ? [payload] : [])
   const emptyEl = document.getElementById('calloutEmpty')
   const containerEl = document.getElementById('calloutCardsContainer')
@@ -140,7 +245,7 @@ calloutEventWs.onmessage = async (event) => {
     if (data.FinishedTime) {
       metaParts.push(`${language.callout?.calloutInfo?.finishedTime || 'Finished'}: ${new Date(data.FinishedTime).toLocaleString()}`)
     }
-    card.querySelector('.calloutMetaVal').innerHTML = metaParts.map(p => `<div class="calloutMetaRow">${p}</div>`).join('') || ''
+    card.querySelector('.calloutMetaVal').innerHTML = metaParts.map((p) => `<div class="calloutMetaRow">${p}</div>`).join('') || ''
   }
 
   containerEl.querySelectorAll('.calloutCardHeader').forEach((btn) => {
@@ -163,10 +268,13 @@ calloutEventWs.onmessage = async (event) => {
       const res = await fetch('/post/setGpsWaypoint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x: data.Coords[0], y: data.Coords[1] })
+        body: JSON.stringify({ x: data.Coords[0], y: data.Coords[1] }),
       })
       if (res.ok && typeof showNotification === 'function') {
         showNotification(language.callout?.actions?.gpsSuccess || 'GPS set to callout.', 'checkMark')
+      } else if (typeof showNotification === 'function') {
+        const t = await res.text().catch(() => '')
+        showNotification(t || `GPS failed (${res.status})`, 'warning')
       }
     })
   })
@@ -174,17 +282,17 @@ calloutEventWs.onmessage = async (event) => {
   containerEl.querySelectorAll('.calloutAcceptBtn, .calloutEnRouteBtn').forEach((btn) => {
     btn.addEventListener('click', async function () {
       const action = this.dataset.action
-      const res = await fetch('/post/calloutAction', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action })
-      })
-      const json = await res.json().catch(() => ({}))
-      if (json.success && typeof showNotification === 'function') {
-        showNotification(language.callout?.actions?.success || 'Status updated.', 'checkMark')
-      } else if (json?.error && typeof showNotification === 'function') {
-        showNotification(json.error, 'warning')
+      const card = this.closest('.calloutCard')
+      const idx = parseInt(card?.dataset?.index ?? '-1', 10)
+      const data = callouts[idx]
+      const calloutId = data?.Id
+      if (!calloutId) {
+        if (typeof showNotification === 'function') {
+          showNotification('Callout id missing — update MDT Pro plugin / refresh.', 'warning')
+        }
+        return
       }
+      await postCalloutAction({ action, calloutId }, language)
     })
   })
 }

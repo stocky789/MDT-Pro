@@ -1,0 +1,703 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- CAD / MDC terminal — dense law-enforcement console palette -->
+    <Color x:Key="CadBgColor">#FF0A0F16</Color>
+    <Color x:Key="CadPanelColor">#FF1A2533</Color>
+    <Color x:Key="CadElevatedColor">#FF243447</Color>
+    <Color x:Key="CadBorderColor">#FF344256</Color>
+    <Color x:Key="CadTextColor">#FFE8EEF4</Color>
+    <Color x:Key="CadMutedColor">#FF9AA8B8</Color>
+    <Color x:Key="CadAccentColor">#FF4A90E2</Color>
+    <Color x:Key="CadAccentDimColor">#FF3568A8</Color>
+    <Color x:Key="CadOrangeColor">#FFF7A823</Color>
+    <Color x:Key="CadUrgentColor">#FFE74C3C</Color>
+    <Color x:Key="CadStatusBarColor">#FF080C12</Color>
+    <Color x:Key="CadOnlineColor">#FF2ECC71</Color>
+    <Color x:Key="CadNavSelectedColor">#FF4A90E2</Color>
+    <Color x:Key="CadTabBarColor">#FF0D1520</Color>
+    <Color x:Key="CadHighlightTextColor">#FFFFF59D</Color>
+    <!-- CAD event-tab strip (reference: bright blue active, dark inactive, no gaps) -->
+    <Color x:Key="CadTabStripDeepColor">#FF050910</Color>
+    <Color x:Key="CadTabInactiveBgColor">#FF121C2A</Color>
+    <Color x:Key="CadTabInactiveBorderColor">#FF1F2D40</Color>
+    <Color x:Key="CadTabActiveBgColor">#FF1E88E5</Color>
+    <Color x:Key="CadTabActiveBgGlowColor">#FF2196F3</Color>
+    <!-- Primary rail buttons: amber / gold with dark type (reference CAD) -->
+    <Color x:Key="CadAmberGoldColor">#FFF0B429</Color>
+    <Color x:Key="CadAmberGoldHoverColor">#FFFFCA4D</Color>
+    <Color x:Key="CadAmberGoldPressedColor">#FFC89410</Color>
+    <Color x:Key="CadRailDarkTypeColor">#FF0A0D12</Color>
+    <!-- Right-rail “active sub-tab” highlight -->
+    <Color x:Key="CadSubTabActiveBgColor">#33FFD54A</Color>
+    <Color x:Key="CadSubTabActiveTextColor">#FFFFE566</Color>
+
+    <SolidColorBrush x:Key="CadBg" Color="{StaticResource CadBgColor}" />
+    <SolidColorBrush x:Key="CadPanel" Color="{StaticResource CadPanelColor}" />
+    <SolidColorBrush x:Key="CadElevated" Color="{StaticResource CadElevatedColor}" />
+    <SolidColorBrush x:Key="CadBorder" Color="{StaticResource CadBorderColor}" />
+    <SolidColorBrush x:Key="CadText" Color="{StaticResource CadTextColor}" />
+    <SolidColorBrush x:Key="CadMuted" Color="{StaticResource CadMutedColor}" />
+    <SolidColorBrush x:Key="CadAccent" Color="{StaticResource CadAccentColor}" />
+    <SolidColorBrush x:Key="CadAccentDim" Color="{StaticResource CadAccentDimColor}" />
+    <SolidColorBrush x:Key="CadOrange" Color="{StaticResource CadOrangeColor}" />
+    <SolidColorBrush x:Key="CadUrgent" Color="{StaticResource CadUrgentColor}" />
+    <SolidColorBrush x:Key="CadStatusBar" Color="{StaticResource CadStatusBarColor}" />
+    <SolidColorBrush x:Key="CadOnline" Color="{StaticResource CadOnlineColor}" />
+    <SolidColorBrush x:Key="CadNavSelected" Color="{StaticResource CadNavSelectedColor}" />
+    <SolidColorBrush x:Key="CadTabBar" Color="{StaticResource CadTabBarColor}" />
+    <SolidColorBrush x:Key="CadHighlightText" Color="{StaticResource CadHighlightTextColor}" />
+    <SolidColorBrush x:Key="CadTabStripDeep" Color="{StaticResource CadTabStripDeepColor}" />
+    <SolidColorBrush x:Key="CadTabInactiveBg" Color="{StaticResource CadTabInactiveBgColor}" />
+    <SolidColorBrush x:Key="CadTabInactiveBorder" Color="{StaticResource CadTabInactiveBorderColor}" />
+    <SolidColorBrush x:Key="CadTabActiveBg" Color="{StaticResource CadTabActiveBgColor}" />
+    <SolidColorBrush x:Key="CadTabActiveBgGlow" Color="{StaticResource CadTabActiveBgGlowColor}" />
+    <SolidColorBrush x:Key="CadAmberGold" Color="{StaticResource CadAmberGoldColor}" />
+    <SolidColorBrush x:Key="CadRailDarkType" Color="{StaticResource CadRailDarkTypeColor}" />
+    <SolidColorBrush x:Key="CadSubTabActiveBg" Color="{StaticResource CadSubTabActiveBgColor}" />
+    <SolidColorBrush x:Key="CadSubTabActiveText" Color="{StaticResource CadSubTabActiveTextColor}" />
+    <!-- Person/vehicle CDF status semantics; matches browser MDT root.css success, warning, and error tokens -->
+    <SolidColorBrush x:Key="CadSemanticSuccess" Color="#FF34D399" />
+    <SolidColorBrush x:Key="CadSemanticWarning" Color="#FFFBBF24" />
+    <SolidColorBrush x:Key="CadSemanticDanger" Color="#FFF87171" />
+
+    <FontFamily x:Key="CadFontMono">Consolas</FontFamily>
+    <FontFamily x:Key="CadFontUi">Segoe UI Semibold</FontFamily>
+    <FontFamily x:Key="CadFontCondensed">Segoe UI Semibold</FontFamily>
+
+    <Style TargetType="Window">
+        <Setter Property="Background" Value="{StaticResource CadBg}" />
+        <Setter Property="Foreground" Value="{StaticResource CadText}" />
+        <Setter Property="FontFamily" Value="Segoe UI" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+    </Style>
+
+    <!-- Section chrome (reuse on panels) -->
+    <Style x:Key="CadSectionBorder" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource CadPanel}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CadBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="1" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <!-- Commercial CAD: panel edge reads as blue rule on dark navy -->
+    <Style x:Key="CadModuleChromeBorder" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource CadPanel}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CadAccentDim}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="1" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <Style x:Key="CadSectionTitle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource CadOrange}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Margin" Value="0,0,0,6" />
+        <Setter Property="FontFamily" Value="{StaticResource CadFontCondensed}" />
+    </Style>
+
+    <!-- Large gold event-style band (CAD reference: EVENT #…) -->
+    <Style x:Key="CadEventBandTitle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource CadOrange}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontFamily" Value="{StaticResource CadFontCondensed}" />
+        <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+
+    <Style x:Key="CadPanelHeader" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource CadOrange}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontFamily" Value="{StaticResource CadFontCondensed}" />
+    </Style>
+
+    <Style x:Key="CadFieldLabel" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource CadOrange}" />
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- Right-rail / sidebar data values: high contrast on CadPanel (avoid inheriting muted tints). -->
+    <Style x:Key="CadSidebarReadout" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource CadText}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontFamily" Value="Segoe UI" />
+        <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+    </Style>
+
+    <Style x:Key="CadTextBox" TargetType="TextBox">
+        <Setter Property="Background" Value="{StaticResource CadElevated}" />
+        <Setter Property="Foreground" Value="{StaticResource CadText}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CadBorder}" />
+        <Setter Property="CaretBrush" Value="{StaticResource CadAccent}" />
+        <Setter Property="Padding" Value="8,5" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="SelectionBrush" Value="{StaticResource CadAccentDim}" />
+    </Style>
+
+    <!-- CAD log / narrative field: higher-contrast rule (reference: thin light edge) -->
+    <Style x:Key="CadTextBoxCadField" TargetType="TextBox" BasedOn="{StaticResource CadTextBox}">
+        <Setter Property="BorderBrush" Value="#FF5A6B80" />
+    </Style>
+
+    <!-- ComboBox default template pulls OS chrome (often light) while Window.Foreground is light — unreadable. -->
+    <Style x:Key="CadComboBoxItem" TargetType="ComboBoxItem">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource CadText}" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBoxItem">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource CadElevated}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#FF1E3A5C" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{StaticResource CadMuted}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CadComboBox" TargetType="ComboBox">
+        <Setter Property="Background" Value="{StaticResource CadElevated}" />
+        <Setter Property="Foreground" Value="{StaticResource CadText}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CadAccentDim}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="8,5" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="ItemContainerStyle" Value="{StaticResource CadComboBoxItem}" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+        <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBox">
+                    <Grid SnapsToDevicePixels="True">
+                        <Border x:Name="MainBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter x:Name="ContentSite"
+                                                  Grid.Column="0"
+                                                  Margin="{TemplateBinding Padding}"
+                                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                  IsHitTestVisible="False"
+                                                  Content="{TemplateBinding SelectionBoxItem}"
+                                                  ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                  ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                                  TextElement.Foreground="{TemplateBinding Foreground}" />
+                                <Path Grid.Column="1"
+                                      Width="8"
+                                      Height="5"
+                                      Margin="0,0,10,0"
+                                      VerticalAlignment="Center"
+                                      Fill="{StaticResource CadMuted}"
+                                      Stretch="Uniform"
+                                      Data="M 0,0 L 4,5 L 8,0 Z" />
+                                <ToggleButton x:Name="DropDownToggle"
+                                              Grid.ColumnSpan="2"
+                                              Focusable="False"
+                                              FocusVisualStyle="{x:Null}"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                              ClickMode="Press" />
+                            </Grid>
+                        </Border>
+                        <Popup x:Name="PART_Popup"
+                               AllowsTransparency="True"
+                               Focusable="False"
+                               IsOpen="{TemplateBinding IsDropDownOpen}"
+                               Placement="Bottom"
+                               PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                               PopupAnimation="Fade"
+                               VerticalOffset="1">
+                            <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                    MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                                    Background="{StaticResource CadPanel}"
+                                    BorderBrush="{StaticResource CadAccentDim}"
+                                    BorderThickness="1"
+                                    SnapsToDevicePixels="True">
+                                <ScrollViewer Margin="0"
+                                              CanContentScroll="True"
+                                              HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
+                                              VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"
+                                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CadButton" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource CadElevated}" />
+        <Setter Property="Foreground" Value="{StaticResource CadText}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CadBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="14,6" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="1"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource CadAccent}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource CadBorder}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.42" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CadAccentButton" TargetType="Button" BasedOn="{StaticResource CadButton}">
+        <Setter Property="Background" Value="#FF1E4A7A" />
+        <Setter Property="BorderBrush" Value="{StaticResource CadAccent}" />
+        <Setter Property="Foreground" Value="{StaticResource CadText}" />
+    </Style>
+
+    <!-- Primary CAD rail: solid amber + dark type (commercial CAD reference) -->
+    <Style x:Key="CadPrimaryActionButton" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource CadAmberGold}" />
+        <Setter Property="Foreground" Value="{StaticResource CadRailDarkType}" />
+        <Setter Property="BorderBrush" Value="#FFC89410" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontFamily" Value="{StaticResource CadFontCondensed}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="3"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#FFFFCA4D" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#FFC89410" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Outlined amber (reference: “CLEAR TICKET” style secondary actions) -->
+    <Style x:Key="CadRailOutlineButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource CadOrange}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CadOrange}" />
+        <Setter Property="BorderThickness" Value="2" />
+        <Setter Property="Padding" Value="12,9" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontFamily" Value="{StaticResource CadFontCondensed}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="3"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#22F7A823" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#33F7A823" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CadPrimaryActionButtonMuted" TargetType="Button" BasedOn="{StaticResource CadRailOutlineButton}" />
+
+    <Style x:Key="CadTabLeadButton" TargetType="Button">
+        <Setter Property="MinHeight" Value="34" />
+        <Setter Property="Background" Value="{StaticResource CadTabActiveBgGlow}" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="BorderBrush" Value="{StaticResource CadTabActiveBg}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="16,8" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontFamily" Value="{StaticResource CadFontCondensed}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Margin" Value="0,0,6,0" />
+        <Setter Property="VerticalAlignment" Value="Bottom" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="4,4,0,0"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#FF42A5F5" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource CadTabActiveBg}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CadLabelMuted" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource CadMuted}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="CadListBox" TargetType="ListBox">
+        <Setter Property="Background" Value="{StaticResource CadPanel}" />
+        <Setter Property="Foreground" Value="{StaticResource CadText}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CadAccentDim}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <!-- Sidebar lists: gold rail on selection (CAD reference left rail) -->
+    <Style x:Key="CadSidebarListBoxItem" TargetType="ListBoxItem">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0,1" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="Outer" Background="Transparent" SnapsToDevicePixels="True">
+                        <Grid>
+                            <Border x:Name="AccentBar" Width="3" HorizontalAlignment="Left" Background="Transparent" />
+                            <ContentPresenter Margin="10,6,8,6" />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Outer" Property="Background" Value="{StaticResource CadElevated}" />
+                            <Setter TargetName="AccentBar" Property="Background" Value="{StaticResource CadAmberGold}" />
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsSelected" Value="False" />
+                                <Condition Property="IsMouseOver" Value="True" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Outer" Property="Background" Value="#FF121A24" />
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Vertical nav (legacy / child views) -->
+    <Style x:Key="CadNavListBoxItem" TargetType="ListBoxItem">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0,1" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="Outer" Background="Transparent" SnapsToDevicePixels="True">
+                        <Grid>
+                            <Border x:Name="AccentBar" Width="3" HorizontalAlignment="Left" Background="Transparent" />
+                            <ContentPresenter Margin="14,9,10,9" />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Outer" Property="Background" Value="{StaticResource CadPanel}" />
+                            <Setter TargetName="AccentBar" Property="Background" Value="{StaticResource CadOrange}" />
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsSelected" Value="False" />
+                                <Condition Property="IsMouseOver" Value="True" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Outer" Property="Background" Value="#FF121A24" />
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Top module tabs: connected CAD event tabs (bright active / dark inactive, shared edges) -->
+    <Style x:Key="CadModuleTabListBoxItem" TargetType="ListBoxItem">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Foreground" Value="#FFC5D0E0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0,0,-1,0" />
+        <Setter Property="MinHeight" Value="34" />
+        <Setter Property="VerticalAlignment" Value="Bottom" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="Bd"
+                            Background="{StaticResource CadTabInactiveBg}"
+                            BorderBrush="{StaticResource CadTabInactiveBorder}"
+                            BorderThickness="1,1,1,0"
+                            CornerRadius="4,4,0,0"
+                            Padding="16,8"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource CadTabActiveBgGlow}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource CadTabActiveBg}" />
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="1,1,1,0" />
+                            <Setter Property="Foreground" Value="White" />
+                            <Setter Property="FontWeight" Value="Bold" />
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsSelected" Value="False" />
+                                <Condition Property="IsMouseOver" Value="True" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Bd" Property="Background" Value="#FF1A2838" />
+                            <Setter Property="Foreground" Value="{StaticResource CadText}" />
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CadLogListBoxItem" TargetType="ListBoxItem">
+        <Setter Property="Padding" Value="4,2" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+    </Style>
+
+    <Style TargetType="CheckBox">
+        <Setter Property="Foreground" Value="{StaticResource CadText}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+    </Style>
+
+    <Style x:Key="CadDataGridColumnHeader" TargetType="DataGridColumnHeader">
+        <Setter Property="Background" Value="{StaticResource CadStatusBar}" />
+        <Setter Property="Foreground" Value="#FFAAB4C0" />
+        <Setter Property="BorderBrush" Value="{StaticResource CadBorder}" />
+        <Setter Property="BorderThickness" Value="0,0,1,1" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+    </Style>
+
+    <Style TargetType="DataGrid">
+        <Setter Property="Background" Value="{StaticResource CadPanel}" />
+        <Setter Property="Foreground" Value="{StaticResource CadText}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CadBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="RowBackground" Value="{StaticResource CadPanel}" />
+        <Setter Property="AlternatingRowBackground" Value="{StaticResource CadElevated}" />
+        <Setter Property="GridLinesVisibility" Value="Horizontal" />
+        <Setter Property="HorizontalGridLinesBrush" Value="#FF1F2633" />
+        <Setter Property="HeadersVisibility" Value="Column" />
+        <Setter Property="ColumnHeaderStyle" Value="{StaticResource CadDataGridColumnHeader}" />
+        <Setter Property="RowHeaderWidth" Value="0" />
+        <Setter Property="FontFamily" Value="Segoe UI" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="SelectionMode" Value="Single" />
+        <Setter Property="SelectionUnit" Value="FullRow" />
+        <Setter Property="CanUserAddRows" Value="False" />
+        <Setter Property="CanUserDeleteRows" Value="False" />
+    </Style>
+
+    <Style TargetType="DataGridCell">
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridCell">
+                    <Border Padding="{TemplateBinding Padding}" Background="Transparent">
+                        <ContentPresenter VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="#FF1E3A5C" />
+                <Setter Property="Foreground" Value="{StaticResource CadText}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style TargetType="TabControl">
+        <Setter Property="Background" Value="{StaticResource CadPanel}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CadBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Border Background="{StaticResource CadStatusBar}"
+                                BorderBrush="{StaticResource CadBorder}"
+                                BorderThickness="0,0,0,1"
+                                Padding="4,4,4,0">
+                            <TabPanel IsItemsHost="True" />
+                        </Border>
+                        <Border Grid.Row="1" Background="{StaticResource CadPanel}" Padding="0">
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              Margin="0"
+                                              ContentSource="SelectedContent" />
+                        </Border>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="TabItem">
+        <Setter Property="Foreground" Value="{StaticResource CadMuted}" />
+        <Setter Property="Padding" Value="14,7" />
+        <Setter Property="Margin" Value="0,0,4,0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                    <Border x:Name="Bd"
+                            Background="Transparent"
+                            BorderThickness="0,0,0,2"
+                            BorderBrush="Transparent"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource CadAccent}" />
+                            <Setter Property="Foreground" Value="{StaticResource CadText}" />
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsSelected" Value="False" />
+                                <Condition Property="IsMouseOver" Value="True" />
+                            </MultiTrigger.Conditions>
+                            <Setter Property="Foreground" Value="{StaticResource CadText}" />
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Sub-tabs like RELATED DATA / EVENT LOG: gold active rule, blue idle -->
+    <Style x:Key="CadSubTabItem" TargetType="TabItem">
+        <Setter Property="Foreground" Value="#FFC5D0E0" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="14,8" />
+        <Setter Property="Margin" Value="0,0,2,0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                    <Border x:Name="Bd"
+                            Background="Transparent"
+                            BorderThickness="0,0,0,3"
+                            BorderBrush="Transparent"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource CadSubTabActiveText}" />
+                            <Setter Property="Foreground" Value="{StaticResource CadSubTabActiveText}" />
+                            <Setter Property="FontWeight" Value="Bold" />
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsSelected" Value="False" />
+                                <Condition Property="IsMouseOver" Value="True" />
+                            </MultiTrigger.Conditions>
+                            <Setter Property="Foreground" Value="{StaticResource CadText}" />
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</ResourceDictionary>

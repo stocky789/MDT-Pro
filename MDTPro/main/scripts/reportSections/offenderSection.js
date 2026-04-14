@@ -6,11 +6,7 @@ async function getOffenderSection(
   const language = await getLanguage()
 
   const title = document.createElement('div')
-  if (isList) {
-    title.classList.add('searchResponseSectionTitle')
-  } else {
-    title.classList.add('title')
-  }
+  title.classList.add('title')
   title.innerHTML = language.reports.sections.offender.title
 
   const pedName = document.createElement('div')
@@ -60,9 +56,6 @@ async function getOffenderSection(
   vehicleLicensePlate.appendChild(vehicleLicensePlateLabel)
   vehicleLicensePlate.appendChild(vehicleLicensePlateInput)
 
-  pedName.appendChild(pedNameLabel)
-  pedName.appendChild(pedNameInput)
-
   const inputWrapper = document.createElement('div')
   inputWrapper.classList.add('inputWrapper')
   inputWrapper.classList.add('grid')
@@ -72,7 +65,6 @@ async function getOffenderSection(
 
   const sectionWrapper = document.createElement('div')
   sectionWrapper.classList.add('section')
-  if (isList) sectionWrapper.classList.add('searchResponseWrapper')
 
   sectionWrapper.appendChild(title)
   sectionWrapper.appendChild(inputWrapper)

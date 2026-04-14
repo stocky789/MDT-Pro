@@ -2,10 +2,9 @@ async function getUseOfForceSection (data = {}, isList = false) {
   const language = await getLanguage()
   const section = document.createElement('div')
   section.classList.add('section', 'useOfForceSection')
-  if (isList) section.classList.add('searchResponseWrapper')
 
   const title = document.createElement('div')
-  title.classList.add(isList ? 'searchResponseSectionTitle' : 'title')
+  title.classList.add('title')
   title.innerHTML = language.reports?.sections?.useOfForce?.title || 'Use of Force'
 
   const typeRow = document.createElement('div')

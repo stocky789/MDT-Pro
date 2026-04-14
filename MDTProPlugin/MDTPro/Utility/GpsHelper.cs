@@ -6,7 +6,7 @@ namespace MDTPro.Utility {
     internal static class GpsHelper {
         /// <summary>Sets the in-game map waypoint at (x, y). Uses HUD::SET_NEW_WAYPOINT. Runs on game fiber.</summary>
         internal static void SetWaypoint(float x, float y) {
-            GameFiber.StartNew(() => {
+            GameFiberHttpBridge.EnqueueFireAndForget(() => {
                 try {
                     NativeFunction.Natives.SET_NEW_WAYPOINT(x, y);
                 } catch (System.Exception ex) {
