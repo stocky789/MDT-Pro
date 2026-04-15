@@ -145,12 +145,16 @@ namespace MDTPro.Utility {
         /// <summary>Extract string from request body. Handles both JSON string ("...") and plain text for Content-Type: application/json.</summary>
         internal static string GetRequestBodyAsString(HttpListenerRequest req) {
             string body = GetRequestPostData(req);
-            if (string.IsNullOrEmpty(body)) return "";
-            body = body.Trim();
+            return NormalizePlainOrJsonString(body);
+        }
+
+        /// <summary>Trims POST body and unwraps a JSON string value (<c>"start"</c>) so callers can accept plain <c>start</c> or JSON from clients.</summary>
+        internal static string NormalizePlainOrJsonString(string raw) {
+            if (string.IsNullOrEmpty(raw)) return "";
+            string body = raw.Trim();
             if (body.Length >= 2 && body[0] == '"' && body[body.Length - 1] == '"') {
-                try { return JsonConvert.DeserializeObject<string>(body) ?? ""; } catch {
-                    // Avoid searching for a literal "Name" including quote chars if JSON unescape fails.
-                    return body.Substring(1, body.Length - 2);
+                try { return JsonConvert.DeserializeObject<string>(body)?.Trim() ?? ""; } catch {
+                    return body.Substring(1, body.Length - 2).Trim();
                 }
             }
             return body;

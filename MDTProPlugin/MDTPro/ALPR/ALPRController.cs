@@ -1,10 +1,9 @@
-using CalloutInterfaceAPI;
-using CalloutInterfaceAPI.Records;
 using CommonDataFramework.Modules.VehicleDatabase;
 using MDTPro.Data;
 using MDTPro.ServerAPI;
 using MDTPro.Setup;
 using MDTPro.Utility;
+using MDTPro.ALPR.Sensors;
 using Rage;
 using System;
 using System.Collections.Generic;
@@ -16,30 +15,50 @@ namespace MDTPro.ALPR {
     /// <summary>
     /// Coordinates ALPR scanning, flag detection, and broadcasting to HUD/WebSocket.
     /// Registration/insurance flags follow live CDF vehicle documents only (same source as Callout Interface), not null/empty string heuristics or SQLite snapshots.
+    /// Owner driver-license alerts use CDF on the vehicle owner (same backing as Person Search), not LSPDFR Persona.
+    /// Alert hits (stolen, BOLO, wanted, paperwork, etc.) are randomly throttled with <see cref="AlprDefaults.TerminalAlertFlagRollChanceMin"/>–max per scan; lone NO DATA reads are not rolled.
     /// </summary>
     internal static class ALPRController {
         private static GameFiber _scanFiber;
         private static readonly HashSet<string> AlertedPlates = new HashSet<string>();
         private static readonly Dictionary<string, DateTime> PlateCooldown = new Dictionary<string, DateTime>();
         private static readonly object Lock = new object();
-        private static readonly TimeSpan CurrentHitHoldDuration = TimeSpan.FromSeconds(30);
+        /// <summary>Wall-clock hold for stolen/BOLO/wanted detail promotion.</summary>
+        private const int DisplayedHitHoldSecondsSevere = 45;
+        /// <summary>Longer hold for registration/insurance/DL hits so the operator can read the detail pane.</summary>
+        private const int DisplayedHitHoldSecondsPaperwork = 60;
         private static DateTime _currentHitHoldUntilUtc = DateTime.MinValue;
-        /// <summary>Reused each scan to avoid per-frame allocations (scan fiber only).</summary>
-        private static readonly List<(Vehicle vehicle, float distance)> InConeAndRangeBuffer = new List<(Vehicle, float)>(16);
-
-        private const int ScanIntervalMs = 2000;
-        private const float ScanRangeMeters = 50f;
-        private const float ReadRangeMeters = 40f;
-        private const float ConeAngleDegrees = 22f;
+        private static int _displayedHitHoldTotalSeconds = DisplayedHitHoldSecondsSevere;
+        private static readonly AlprSessionState TerminalSession = new AlprSessionState();
+        private static Blip _flagBlip;
+        private static string _lastSensorFlashId = "";
+        private static DateTime _lastSensorFlashUtc = DateTime.MinValue;
+        private static int _scanLoopCount;
+        private static DateTime _lastSeverePromotionUtc = DateTime.MinValue;
+        private static readonly Random AlertFlagRollRng = new Random();
 
         internal static ALPRHit CurrentHit { get; private set; }
         internal static bool IsRunning { get; private set; }
         /// <summary>Cached by the scan loop so the HUD can read it from RawFrameRender without calling natives.</summary>
         internal static bool IsInPoliceVehicleCached { get; private set; }
 
+        internal static AlprSessionState TerminalState => TerminalSession;
+
+        internal static IReadOnlyList<AlprTerminalRow> GetTerminalRowsSnapshot() {
+            int mx = AlprDefaults.TerminalMaxRows;
+            if (mx <= 0) mx = 7;
+            return TerminalSession.GetRowsSnapshot(mx);
+        }
+
+        internal static bool IsTerminalSensorFlashActive(string sensorId) {
+            if (string.IsNullOrEmpty(sensorId)) return false;
+            return string.Equals(sensorId, _lastSensorFlashId, StringComparison.OrdinalIgnoreCase)
+                && (DateTime.UtcNow - _lastSensorFlashUtc).TotalMilliseconds < 220;
+        }
+
         private static readonly object StartLock = new object();
 
-        /// <summary>Web ALPR toast dedupe window (scanner + Callout Interface). Reads config each time so menu/file edits apply without restart.</summary>
+        /// <summary>Web ALPR toast dedupe window for the built-in scanner. Reads config each time so file edits apply without restart.</summary>
         private static int GetConfiguredWebToastPlateCooldownSeconds() {
             var cfg = GetConfig();
             int sec = cfg?.alprWebToastPlateCooldownSeconds ?? 0;
@@ -76,6 +95,9 @@ namespace MDTPro.ALPR {
             ALPRHUD.Stop();
             CurrentHit = null;
             _currentHitHoldUntilUtc = DateTime.MinValue;
+            _lastSeverePromotionUtc = DateTime.MinValue;
+            TerminalSession.Clear();
+            TryDeleteFlagBlip();
             lock (Lock) {
                 AlertedPlates.Clear();
                 PlateCooldown.Clear();
@@ -86,39 +108,41 @@ namespace MDTPro.ALPR {
         internal static void Clear() {
             CurrentHit = null;
             _currentHitHoldUntilUtc = DateTime.MinValue;
+            _lastSeverePromotionUtc = DateTime.MinValue;
+            TerminalSession.Clear();
+            TryDeleteFlagBlip();
             lock (Lock) {
                 AlertedPlates.Clear();
                 PlateCooldown.Clear();
             }
         }
 
-        private static void ScanLoop() {
-            int loopCount = 0;
+        private static int ClampAdvancedTickMs() {
+            int t = AlprDefaults.AdvancedTickMs;
+            if (t < 40) t = 40;
+            if (t > 250) t = 250;
+            return t;
+        }
 
-            int intervalMs = 2000;
-            // Do not require Server.RunServer here: it stays false until the HTTP thread finishes its startup delay,
-            // so the scan fiber would terminate immediately if started in the same on-duty block as the server thread.
+        private static void ScanLoop() {
+            _scanLoopCount = 0;
             while (IsRunning) {
+                Config cfg = null;
                 try {
                     ExpireDisplayedHitIfNeeded();
-                    var cfg = GetConfig();
+                    cfg = GetConfig();
                     if (cfg == null || !cfg.alprEnabled) {
                         GameFiber.Sleep(1000);
                         continue;
                     }
-                    intervalMs = ScanIntervalMs;
-                    int cooldownSec = GetConfiguredWebToastPlateCooldownSeconds();
-                    const int maxReadPerCycle = 3;
-                    int maxVehicles = Math.Min(16, Math.Max(5, cfg.maxNumberOfNearbyPedsOrVehicles + 2));
-                    float scanRangeMeters = ScanRangeMeters;
-                    float readRangeMeters = ReadRangeMeters;
-                    float coneAngleDeg = ConeAngleDegrees;
 
-                    // ALPR only works when: (1) enabled in settings, (2) on duty (Start/Stop in Main), (3) in police vehicle
+                    int sleepMs = ClampAdvancedTickMs();
+
                     if (Main.Player == null || !Main.Player.Exists()) {
                         CurrentHit = null;
                         _currentHitHoldUntilUtc = DateTime.MinValue;
-                        GameFiber.Sleep(intervalMs);
+                        GameFiber.Sleep(sleepMs);
+                        _scanLoopCount++;
                         continue;
                     }
 
@@ -128,288 +152,133 @@ namespace MDTPro.ALPR {
                     if (!inPoliceVehicle) {
                         CurrentHit = null;
                         _currentHitHoldUntilUtc = DateTime.MinValue;
-                        GameFiber.Sleep(intervalMs);
+                        TryDeleteFlagBlip();
+                        GameFiber.Sleep(sleepMs);
+                        _scanLoopCount++;
                         continue;
                     }
 
-                    Vehicle[] nearby = Main.Player.GetNearbyVehicles(maxVehicles);
-                    if (nearby == null || nearby.Length == 0) {
-                        GameFiber.Sleep(intervalMs);
-                        continue;
-                    }
-
-                    if (loopCount > 0 && loopCount % 30 == 0)
+                    if (_scanLoopCount > 0 && _scanLoopCount % 30 == 0) {
                         PruneExpiredCooldowns();
-
-                    // Vehicles in cone up to scanRangeMeters; we will process up to 3 within read range (closest first)
-                    InConeAndRangeBuffer.Clear();
-                    Vector3 cruiserPos = playerVehicle.Position;
-                    Vector3 forward = playerVehicle.ForwardVector;
-                    forward.Z = 0f;
-                    if (forward.LengthSquared() < 0.0001f) forward = new Vector3(0f, 1f, 0f);
-                    else forward = Vector3.Normalize(forward);
-
-                    foreach (Vehicle v in nearby) {
-                        if (v == null || !v.Exists()) continue;
-                        if (v == playerVehicle) continue;
-                        Vector3 platePos = GetPlatePositionFacingCruiser(v, cruiserPos);
-                        float dist = cruiserPos.DistanceTo(platePos);
-                        if (dist > scanRangeMeters) continue;
-                        if (!IsInCone(cruiserPos, forward, platePos, coneAngleDeg)) continue;
-                        string p = v.LicensePlate?.Trim();
-                        if (string.IsNullOrEmpty(p)) continue;
-                        InConeAndRangeBuffer.Add((v, dist));
+                        TerminalSession.Prune(AlprDefaults.TerminalMaxRows, AlprDefaults.TerminalHistoryMinutes);
                     }
 
-                    // Sort by distance and take up to 3 vehicles within read range
-                    SortBufferByDistance(InConeAndRangeBuffer);
-                    int processed = 0;
-
-                    for (int i = 0; i < InConeAndRangeBuffer.Count && processed < maxReadPerCycle; i++) {
-                        var (toScan, dist) = InConeAndRangeBuffer[i];
-                        if (dist > readRangeMeters) continue;
-
-                        string plate = toScan.LicensePlate?.Trim();
-                        if (string.IsNullOrEmpty(plate)) continue;
-
-                        string plateKey = plate.ToUpperInvariant();
-                        try {
-                            ALPRHit hit = BuildAlprHitForWebFromVehicle(toScan);
-                            if (hit == null) continue;
-
-                            bool shouldAlert;
-                            lock (Lock) {
-                                shouldAlert = !AlertedPlates.Contains(plateKey);
-                                if (shouldAlert) {
-                                    AlertedPlates.Add(plateKey);
-                                    PlateCooldown[plateKey] = DateTime.UtcNow.AddSeconds(cooldownSec);
-                                }
-                            }
-
-                            // Only show full vehicle info when there is at least one alert flag (stolen, no insurance, etc.). Otherwise HUD shows "Scanning".
-                            if (HasAlertFlags(hit) && ShouldReplaceDisplayedHit(hit)) {
-                                SetDisplayedHit(hit);
-                                if (shouldAlert)
-                                    PlayAlprHitSound();
-                            }
-                            processed++;
-
-                            if (shouldAlert)
-                                TryEnqueueWebToastFromScanner(hit);
-                        } catch (Exception ex) {
-                            Log($"ALPR scan skip vehicle {plate}: {ex.Message}", false, LogSeverity.Warning);
-                        }
-                    }
+                    RunAdvancedScan(cfg, playerVehicle);
                 } catch (Exception ex) {
                     Log($"ALPR scan error: {ex.Message}", false, LogSeverity.Error);
                 }
 
-                loopCount++;
-                GameFiber.Sleep(intervalMs);
+                _scanLoopCount++;
+                GameFiber.Sleep(ClampAdvancedTickMs());
             }
         }
 
-        /// <summary>Builds an <see cref="ALPRHit"/> from a live vehicle using the same CDF/MDT flag rules as the scan loop (for web toasts / Callout Interface bridge).</summary>
-        internal static ALPRHit BuildAlprHitForWebFromVehicle(Vehicle toScan) {
-            if (toScan == null || !toScan.Exists()) return null;
-            string plate = toScan.LicensePlate?.Trim();
-            if (string.IsNullOrEmpty(plate)) return null;
-
-            MDTProVehicleData vd = new MDTProVehicleData(toScan);
-            MDTProVehicleData dbVehicle = DataController.GetVehicleByLicensePlate(plate);
-            List<string> flags;
-            string owner;
-            string modelDisplayName;
-
-            if (vd.CDFVehicleData?.Owner != null) {
-                flags = BuildFlagsFromLiveCdfVehicle(vd, dbVehicle);
-                modelDisplayName = vd.ModelDisplayName ?? vd.ModelName ?? "";
-                owner = (dbVehicle != null && !string.IsNullOrEmpty(dbVehicle.Owner))
-                    ? dbVehicle.Owner
-                    : (vd.Owner ?? "");
-            } else {
-                if (dbVehicle != null) {
-                    flags = BuildFlagsPersistedVehicleOnly(dbVehicle);
-                    owner = dbVehicle.Owner ?? "—";
-                    modelDisplayName = dbVehicle.ModelDisplayName ?? dbVehicle.ModelName ?? "";
-                } else {
-                    flags = new List<string> { "Not in database" };
-                    owner = "—";
-                    modelDisplayName = "";
-                }
-                if (string.IsNullOrEmpty(modelDisplayName))
-                    modelDisplayName = GetModelDisplayName(toScan);
-            }
-
-            if (string.IsNullOrEmpty(modelDisplayName))
-                modelDisplayName = GetModelDisplayName(toScan);
-
-            // MDT DB can mark stolen while live CDF on the entity has not yet (or never) reflected it — keep parity with CI/MDT vehicle lookup.
-            if (dbVehicle != null && dbVehicle.IsStolen && flags != null && !flags.Any(f => string.Equals(f, "Stolen", StringComparison.OrdinalIgnoreCase)))
-                flags.Add("Stolen");
-
-            string vehicleColor = GetVehicleColorDisplay(vd, dbVehicle);
-
-            return new ALPRHit {
-                Plate = vd.LicensePlate ?? plate,
-                Owner = owner,
-                ModelDisplayName = modelDisplayName,
-                VehicleColor = vehicleColor,
-                Flags = flags,
-                TimeScanned = DateTime.Now
-            };
-        }
-
-        /// <summary>Queues a web ALPR toast from the built-in scanner when <see cref="Config.alprWebToastsFromScanner"/> is enabled.</summary>
-        internal static void TryEnqueueWebToastFromScanner(ALPRHit hit) {
-            if (hit == null) return;
-            var cfg = GetConfig();
-            if (cfg == null || !cfg.alprWebToastsFromScanner) return;
-            var copy = hit;
-            System.Threading.ThreadPool.QueueUserWorkItem(_ => WebSocketHandler.BroadcastALPRHit(copy));
-        }
-
-        /// <summary>Queues a web ALPR toast from Callout Interface plate checks; shares plate cooldown with the scanner.</summary>
-        internal static void TryEnqueueWebToastFromCalloutInterface(ALPRHit hit) {
-            if (hit == null) return;
-            var cfg = GetConfig();
-            if (cfg == null || !cfg.alprWebToastsFromCalloutInterface) return;
-            if (!HasAlertFlags(hit)) return;
-
-            string plateKey = (hit.Plate ?? "").Trim().ToUpperInvariant();
-            if (string.IsNullOrEmpty(plateKey)) return;
-
-            // Scan loop normally prunes cooldowns; when built-in ALPR is off (CI-only toasts), this path must prune or each plate only ever alerts once per session.
-            PruneExpiredCooldowns();
+        private static void RunAdvancedScan(Config cfg, Vehicle playerVehicle) {
+            int maxV = Math.Min(AlprDefaults.MaxNearbyVehiclesScanCap, Math.Min(16, Math.Max(5, cfg.maxNumberOfNearbyPedsOrVehicles + 2)));
+            List<PlateReadResult> reads = PlateSensorController.EvaluateTick(playerVehicle, maxV, 1f);
+            if (reads == null || reads.Count == 0) return;
 
             int cooldownSec = GetConfiguredWebToastPlateCooldownSeconds();
-            bool shouldWeb;
-            lock (Lock) {
-                shouldWeb = !AlertedPlates.Contains(plateKey);
-                if (shouldWeb) {
-                    AlertedPlates.Add(plateKey);
-                    PlateCooldown[plateKey] = DateTime.UtcNow.AddSeconds(cooldownSec);
+
+            foreach (PlateReadResult read in reads) {
+                Vehicle v = read.Target;
+                if (v == null || !v.Exists()) continue;
+                string plate = v.LicensePlate?.Trim();
+                if (string.IsNullOrEmpty(plate)) continue;
+                string plateKey = plate.ToUpperInvariant();
+                try {
+                    ALPRHit hit = BuildAlprHitForWebFromVehicle(v);
+                    if (hit == null) continue;
+                    bool interesting = AlprHitBuilder.HasInterestingFlagsExcludingNotInDatabase(hit);
+                    if (interesting && !RollAlertFlagReadPasses())
+                        continue;
+                    string compact = AlprHitBuilder.BuildCompactSummary(hit);
+                    bool severe = AlprHitBuilder.HasSevereAlertForPromotion(hit);
+                    bool paperworkHold = AlprHitBuilder.HasPaperworkOrLicenseAlert(hit);
+                    TerminalSession.RecordRead(plateKey, hit, read.Sensor.Id, compact);
+                    _lastSensorFlashId = read.Sensor.Id;
+                    _lastSensorFlashUtc = DateTime.UtcNow;
+
+                    if (severe || paperworkHold) {
+                        int holdSec = severe ? DisplayedHitHoldSecondsSevere : DisplayedHitHoldSecondsPaperwork;
+                        TryPromoteOrRefreshDisplayedHit(hit, holdSec, severe);
+                    }
+
+                    if (!severe)
+                        continue;
+
+                    bool plateFresh;
+                    lock (Lock) {
+                        plateFresh = !AlertedPlates.Contains(plateKey);
+                    }
+                    if (!plateFresh)
+                        continue;
+
+                    var nowUtc = DateTime.UtcNow;
+                    if ((nowUtc - _lastSeverePromotionUtc).TotalSeconds < AlprDefaults.MinSecondsBetweenSeverePromotions)
+                        continue;
+
+                    lock (Lock) {
+                        if (AlertedPlates.Contains(plateKey))
+                            continue;
+                        AlertedPlates.Add(plateKey);
+                        PlateCooldown[plateKey] = nowUtc.AddSeconds(cooldownSec);
+                    }
+
+                    _lastSeverePromotionUtc = nowUtc;
+
+                    if (AlprDefaults.PlaySoundOnFlaggedHit)
+                        PlayAlprHitSound();
+                    TryEnqueueWebToastFromScanner(hit);
+                    if (AlprDefaults.BlipOnFlaggedHit)
+                        TryAttachFlagBlip(v);
+                } catch (Exception ex) {
+                    Log($"ALPR advanced skip {plate}: {ex.Message}", false, LogSeverity.Warning);
                 }
             }
-            if (!shouldWeb) return;
+        }
 
+        /// <summary>Random gate for any flagged read (stolen, BOLO, paperwork, etc.); not used for lone &quot;Not in database&quot; hits.</summary>
+        private static bool RollAlertFlagReadPasses() {
+            double min = AlprDefaults.TerminalAlertFlagRollChanceMin;
+            double max = AlprDefaults.TerminalAlertFlagRollChanceMax;
+            if (max <= min)
+                return AlertFlagRollRng.NextDouble() < min;
+            double threshold = min + AlertFlagRollRng.NextDouble() * (max - min);
+            return AlertFlagRollRng.NextDouble() < threshold;
+        }
+
+        private static void TryAttachFlagBlip(Vehicle v) {
+            try {
+                TryDeleteFlagBlip();
+                if (v == null || !v.Exists()) return;
+                _flagBlip = v.AttachBlip();
+                _flagBlip.Sprite = BlipSprite.PointOfInterest;
+                try { _flagBlip.Color = System.Drawing.Color.Red; } catch { /* RPH blip color API differences */ }
+            } catch { /* ignore */ }
+        }
+
+        private static void TryDeleteFlagBlip() {
+            try {
+                if (_flagBlip != null && _flagBlip.Exists()) {
+                    _flagBlip.Delete();
+                    _flagBlip = null;
+                }
+            } catch {
+                _flagBlip = null;
+            }
+        }
+
+        /// <summary>Builds an <see cref="ALPRHit"/> from a live vehicle using the same CDF/MDT flag rules as the scan loop.</summary>
+        internal static ALPRHit BuildAlprHitForWebFromVehicle(Vehicle toScan) {
+            return AlprHitBuilder.BuildFromVehicle(toScan);
+        }
+
+        /// <summary>Queues a web/native MDT ALPR toast from the built-in scanner (same WebSocket path as the browser plugin).</summary>
+        internal static void TryEnqueueWebToastFromScanner(ALPRHit hit) {
+            if (hit == null || !AlprHitBuilder.HasSevereAlertForPromotion(hit)) return;
             var copy = hit;
             System.Threading.ThreadPool.QueueUserWorkItem(_ => WebSocketHandler.BroadcastALPRHit(copy));
-        }
-
-        /// <summary>
-        /// Merges Callout Interface <see cref="VehicleRecord"/> fields from <see cref="CalloutInterfaceAPI.Events.OnPlateCheck"/> into a hit built from the live entity.
-        /// CI’s computer lookup sets <see cref="VehicleRecord.RegistrationStatus"/> / <see cref="VehicleRecord.InsuranceStatus"/>; the entity-only path only reads CDF documents on the vehicle and often misses what CI shows.
-        /// Document flags from the entity build are replaced with CI’s statuses; stolen/BOLO/MDT flags are kept.
-        /// </summary>
-        internal static void MergeCalloutInterfacePlateCheckIntoHit(ALPRHit hit, VehicleRecord record) {
-            if (hit == null || record == null) return;
-            if (hit.Flags == null) hit.Flags = new List<string>();
-
-            // Drop CDF-derived registration/insurance labels so the plate-check record (same source as CI UI) is authoritative.
-            hit.Flags.RemoveAll(f =>
-                string.Equals(f, "Registration expired", StringComparison.Ordinal)
-                || string.Equals(f, "No registration", StringComparison.Ordinal)
-                || string.Equals(f, "Insurance expired", StringComparison.Ordinal)
-                || string.Equals(f, "No insurance", StringComparison.Ordinal));
-
-            AppendCalloutInterfaceDocumentFlags(hit.Flags, record.RegistrationStatus, record.InsuranceStatus);
-
-            try {
-                if (record.OwnerPersona != null && record.OwnerPersona.Wanted && !hit.Flags.Contains("Owner wanted"))
-                    hit.Flags.Add("Owner wanted");
-            } catch {
-                /* Persona API differences */
-            }
-
-            if ((string.IsNullOrEmpty(hit.Owner) || string.Equals(hit.Owner, "—", StringComparison.Ordinal))
-                && !string.IsNullOrEmpty(record.OwnerName) && !string.Equals(record.OwnerName, "Unknown", StringComparison.OrdinalIgnoreCase))
-                hit.Owner = record.OwnerName;
-
-            string ciModel = $"{record.Make} {record.Model}".Trim();
-            if (string.IsNullOrEmpty(hit.ModelDisplayName) && !string.IsNullOrEmpty(ciModel)
-                && !string.Equals(ciModel, "Unknown Unknown", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(ciModel, "Unknown", StringComparison.OrdinalIgnoreCase))
-                hit.ModelDisplayName = ciModel;
-
-            if (string.IsNullOrEmpty(hit.VehicleColor) && !string.IsNullOrEmpty(record.Color)
-                && !string.Equals(record.Color, "Unknown", StringComparison.OrdinalIgnoreCase))
-                hit.VehicleColor = record.Color.Trim();
-
-            string recordPlate = record.LicensePlate?.Trim();
-            if (!string.IsNullOrEmpty(recordPlate) && !string.Equals(recordPlate, "Unknown", StringComparison.OrdinalIgnoreCase))
-                hit.Plate = recordPlate;
-        }
-
-        /// <summary>Builds an <see cref="ALPRHit"/> from a Callout Interface <see cref="VehicleRecord"/> when the entity is missing or unusable (same flag labels as the scanner).</summary>
-        internal static ALPRHit BuildAlprHitFromCalloutInterfaceVehicleRecord(VehicleRecord record) {
-            if (record == null) return null;
-            string plate = record.LicensePlate?.Trim();
-            if (string.IsNullOrEmpty(plate) || string.Equals(plate, "Unknown", StringComparison.OrdinalIgnoreCase))
-                return null;
-
-            MDTProVehicleData dbVehicle = DataController.GetVehicleByLicensePlate(plate);
-            var flags = new List<string>();
-            if (dbVehicle != null)
-                flags.AddRange(BuildFlagsPersistedVehicleOnly(dbVehicle));
-            else
-                flags.Add("Not in database");
-
-            AppendCalloutInterfaceDocumentFlags(flags, record.RegistrationStatus, record.InsuranceStatus);
-
-            try {
-                if (record.OwnerPersona != null && record.OwnerPersona.Wanted && !flags.Contains("Owner wanted"))
-                    flags.Add("Owner wanted");
-            } catch {
-                /* Persona API differences */
-            }
-
-            string owner = "—";
-            if (dbVehicle != null && !string.IsNullOrEmpty(dbVehicle.Owner))
-                owner = dbVehicle.Owner;
-            else if (!string.IsNullOrEmpty(record.OwnerName) && !string.Equals(record.OwnerName, "Unknown", StringComparison.OrdinalIgnoreCase))
-                owner = record.OwnerName;
-
-            string modelDisplayName = $"{record.Make} {record.Model}".Trim();
-            if (string.IsNullOrEmpty(modelDisplayName)
-                || string.Equals(modelDisplayName, "Unknown Unknown", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(modelDisplayName, "Unknown", StringComparison.OrdinalIgnoreCase))
-                modelDisplayName = dbVehicle != null ? (dbVehicle.ModelDisplayName ?? dbVehicle.ModelName ?? "") : "";
-
-            string vehicleColor = null;
-            if (!string.IsNullOrEmpty(record.Color) && !string.Equals(record.Color, "Unknown", StringComparison.OrdinalIgnoreCase))
-                vehicleColor = record.Color.Trim();
-            if (string.IsNullOrEmpty(vehicleColor))
-                vehicleColor = GetVehicleColorDisplay(null, dbVehicle);
-
-            return new ALPRHit {
-                Plate = plate,
-                Owner = owner,
-                ModelDisplayName = modelDisplayName ?? "",
-                VehicleColor = vehicleColor,
-                Flags = flags,
-                TimeScanned = DateTime.Now
-            };
-        }
-
-        private static void AppendCalloutInterfaceDocumentFlags(List<string> flags, VehicleDocumentStatus registration, VehicleDocumentStatus insurance) {
-            if (flags == null) return;
-            if (registration == VehicleDocumentStatus.Expired) flags.Add("Registration expired");
-            else if (registration == VehicleDocumentStatus.None) flags.Add("No registration");
-            if (insurance == VehicleDocumentStatus.Expired) flags.Add("Insurance expired");
-            else if (insurance == VehicleDocumentStatus.None) flags.Add("No insurance");
-        }
-
-        /// <summary>True if the hit has at least one real alert flag (stolen, no insurance, etc.), not just "Not in database".</summary>
-        private static bool HasAlertFlags(ALPRHit hit) {
-            if (hit?.Flags == null || hit.Flags.Count == 0) return false;
-            foreach (string f in hit.Flags) {
-                if (string.IsNullOrEmpty(f)) continue;
-                if (string.Equals(f.Trim(), "Not in database", StringComparison.OrdinalIgnoreCase))
-                    continue;
-                return true;
-            }
-            return false;
         }
 
         private static void PlayAlprHitSound() {
@@ -417,190 +286,6 @@ namespace MDTPro.ALPR {
                 Rage.Native.NativeFunction.Natives.PLAY_SOUND_FRONTEND(-1, "SELECT", "HUD_FRONTEND_DEFAULT_SOUNDSET", false);
             } catch {
                 // Ignore if native fails (e.g. different RPH version)
-            }
-        }
-
-        /// <summary>Builds a short color string for the ALPR HUD (e.g. "Black / White") from vehicle or DB data.</summary>
-        private static string GetVehicleColorDisplay(MDTProVehicleData vd, MDTProVehicleData dbVehicle) {
-            string primary = null;
-            string secondary = null;
-            if (vd != null && (vd.PrimaryColor != null || vd.SecondaryColor != null || vd.PrimaryColorSpecific != null || vd.SecondaryColorSpecific != null)) {
-                primary = !string.IsNullOrWhiteSpace(vd.PrimaryColor) ? vd.PrimaryColor.Trim() : vd.PrimaryColorSpecific?.Trim();
-                secondary = !string.IsNullOrWhiteSpace(vd.SecondaryColor) ? vd.SecondaryColor.Trim() : vd.SecondaryColorSpecific?.Trim();
-            }
-            if ((primary == null || secondary == null) && dbVehicle != null) {
-                if (string.IsNullOrEmpty(primary))
-                    primary = !string.IsNullOrWhiteSpace(dbVehicle.PrimaryColor) ? dbVehicle.PrimaryColor.Trim() : dbVehicle.PrimaryColorSpecific?.Trim();
-                if (string.IsNullOrEmpty(secondary))
-                    secondary = !string.IsNullOrWhiteSpace(dbVehicle.SecondaryColor) ? dbVehicle.SecondaryColor.Trim() : dbVehicle.SecondaryColorSpecific?.Trim();
-            }
-            if (!string.IsNullOrEmpty(primary) && !string.IsNullOrEmpty(secondary))
-                return primary + " / " + secondary;
-            if (!string.IsNullOrEmpty(primary)) return primary;
-            if (!string.IsNullOrEmpty(secondary)) return secondary;
-            if (vd?.Color != null && !string.IsNullOrWhiteSpace(vd.Color)) return vd.Color.Trim();
-            if (dbVehicle?.Color != null && !string.IsNullOrWhiteSpace(dbVehicle.Color)) return dbVehicle.Color.Trim();
-            return null;
-        }
-
-        /// <summary>ALPR when CDF has an owner: stolen/BOLO/wanted plus registration/insurance from CDF document objects only.</summary>
-        private static List<string> BuildFlagsFromLiveCdfVehicle(MDTProVehicleData vd, MDTProVehicleData dbVehicle) {
-            var flags = new List<string>();
-            if (vd != null && vd.IsStolen)
-                flags.Add("Stolen");
-            if (DataController.HasActiveBOLOs(vd) || (dbVehicle != null && DataController.HasActiveBOLOs(dbVehicle)))
-                flags.Add("BOLO");
-
-            VehicleData cdf = vd?.CDFVehicleData;
-            if (cdf != null) {
-                AppendCdfRegistrationInsuranceFlags(flags, cdf);
-                if (cdf.Owner?.Wanted == true)
-                    flags.Add("Owner wanted");
-            }
-
-            return flags;
-        }
-
-        /// <summary>No live CDF owner: stolen/BOLO from MDT persistence only — do not show reg/insurance (would not match Callout Interface).</summary>
-        private static List<string> BuildFlagsPersistedVehicleOnly(MDTProVehicleData dbVehicle) {
-            var flags = new List<string>();
-            if (dbVehicle == null) return flags;
-            if (dbVehicle.IsStolen)
-                flags.Add("Stolen");
-            if (DataController.HasActiveBOLOs(dbVehicle))
-                flags.Add("BOLO");
-            return flags;
-        }
-
-        /// <summary>Uses CDF Registration/Insurance entities when present; never infers violations from missing or blank strings on MDTProVehicleData.</summary>
-        private static void AppendCdfRegistrationInsuranceFlags(List<string> flags, VehicleData cdf) {
-            if (cdf == null) return;
-            try {
-                if (cdf.Registration != null)
-                    AppendOneCdfDocumentFlags(flags, cdf.Registration, "Registration expired", "No registration");
-            } catch { /* CDF version differences */ }
-            try {
-                if (cdf.Insurance != null)
-                    AppendOneCdfDocumentFlags(flags, cdf.Insurance, "Insurance expired", "No insurance");
-            } catch { }
-        }
-
-        private static void AppendOneCdfDocumentFlags(List<string> flags, object document, string expiredLabel, string invalidLabel) {
-            if (document == null || flags == null) return;
-            string statusStr = null;
-            DateTime? expiration = null;
-            try {
-                var stProp = document.GetType().GetProperty("Status");
-                if (stProp != null)
-                    statusStr = stProp.GetValue(document)?.ToString();
-                var expProp = document.GetType().GetProperty("ExpirationDate");
-                if (expProp != null) {
-                    object ev = expProp.GetValue(document);
-                    if (ev is DateTime dt) expiration = dt;
-                }
-            } catch {
-                return;
-            }
-
-            if (DocumentStatusImpliesExpired(statusStr, expiration)) {
-                flags.Add(expiredLabel);
-                return;
-            }
-            if (IsSuspendedRevokedOrNoneStatus(statusStr))
-                flags.Add(invalidLabel);
-        }
-
-        private static bool DocumentStatusImpliesExpired(string status, DateTime? expirationDate) {
-            if (!string.IsNullOrEmpty(status) && string.Equals(status, "Expired", StringComparison.OrdinalIgnoreCase))
-                return true;
-            if (expirationDate.HasValue && expirationDate.Value.Date < DateTime.UtcNow.Date) {
-                if (string.IsNullOrEmpty(status) || string.Equals(status, "Valid", StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-            return false;
-        }
-
-        private static bool IsSuspendedRevokedOrNoneStatus(string status) {
-            if (string.IsNullOrEmpty(status)) return false;
-            return string.Equals(status, "Suspended", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(status, "Revoked", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(status, "None", StringComparison.OrdinalIgnoreCase);
-        }
-
-        /// <summary>Sorts the buffer in place by distance (closest first).</summary>
-        private static void SortBufferByDistance(List<(Vehicle vehicle, float distance)> buffer) {
-            if (buffer == null || buffer.Count <= 1) return;
-            for (int i = 0; i < buffer.Count - 1; i++) {
-                int minIdx = i;
-                float minDist = buffer[i].distance;
-                for (int j = i + 1; j < buffer.Count; j++) {
-                    if (buffer[j].distance < minDist) {
-                        minDist = buffer[j].distance;
-                        minIdx = j;
-                    }
-                }
-                if (minIdx != i) {
-                    var t = buffer[i];
-                    buffer[i] = buffer[minIdx];
-                    buffer[minIdx] = t;
-                }
-            }
-        }
-
-        /// <summary>Gets localized display name for the vehicle model (used when CDF has no owner data).</summary>
-        private static string GetModelDisplayName(Vehicle v) {
-            if (v == null || !v.Exists()) return "";
-            try {
-                string raw = Rage.Native.NativeFunction.Natives.GET_DISPLAY_NAME_FROM_VEHICLE_MODEL<string>(v.Model.Hash);
-                return string.IsNullOrEmpty(raw) ? "" : Game.GetLocalizedString(raw);
-            } catch {
-                return v.Model.Name ?? "";
-            }
-        }
-
-        /// <summary>Returns true if target position is within the given cone (horizontal angle) in front of the cruiser.</summary>
-        private static bool IsInCone(Vector3 cruiserPos, Vector3 forwardHorizontal, Vector3 targetPos, float coneAngleDegrees) {
-            Vector3 toTarget = targetPos - cruiserPos;
-            toTarget.Z = 0f;
-            if (toTarget.LengthSquared() < 0.0001f) return true;
-            toTarget = Vector3.Normalize(toTarget);
-            float dot = Vector3.Dot(forwardHorizontal, toTarget);
-            float angleDeg = (float)(Math.Acos(Math.Max(-1f, Math.Min(1f, dot))) * (180.0 / Math.PI));
-            return angleDeg <= coneAngleDegrees;
-        }
-
-        /// <summary>Gets the world position of the license plate facing the cruiser (front or rear). Uses bone positions when available; otherwise approximates from vehicle center and facing. This ensures both front and rear plates can be read.</summary>
-        private static Vector3 GetPlatePositionFacingCruiser(Vehicle vehicle, Vector3 cruiserPos) {
-            try {
-                Vector3 vPos = vehicle.Position;
-                Vector3 vFwd = vehicle.ForwardVector;
-                vFwd.Z = 0f;
-                if (vFwd.LengthSquared() < 0.0001f) return vPos;
-                vFwd = Vector3.Normalize(vFwd);
-
-                Vector3 toCruiser = cruiserPos - vPos;
-                toCruiser.Z = 0f;
-                if (toCruiser.LengthSquared() < 0.0001f) return vPos;
-                toCruiser = Vector3.Normalize(toCruiser);
-
-                // Rear plate faces backward (-vFwd); we see it when we're behind (toCruiser aligns with +vFwd)
-                bool cruiserBehind = Vector3.Dot(toCruiser, vFwd) > 0.2f;
-                // Front plate faces forward (+vFwd); we see it when we're in front (toCruiser aligns with -vFwd)
-                bool cruiserInFront = Vector3.Dot(toCruiser, vFwd) < -0.2f;
-
-                float offset = 2f;
-                if (cruiserBehind) {
-                    int rearIdx = vehicle.GetBoneIndex("numberplate");
-                    if (rearIdx < 0) rearIdx = vehicle.GetBoneIndex("bumper_r");
-                    return rearIdx >= 0 ? vehicle.GetBonePosition(rearIdx) : vPos + vFwd * offset;
-                }
-                if (cruiserInFront) {
-                    int frontIdx = vehicle.GetBoneIndex("bumper_f");
-                    return frontIdx >= 0 ? vehicle.GetBonePosition(frontIdx) : vPos - vFwd * offset;
-                }
-                return vPos;
-            } catch {
-                return vehicle.Position;
             }
         }
 
@@ -622,21 +307,48 @@ namespace MDTPro.ALPR {
             return CurrentHit != null && DateTime.UtcNow < _currentHitHoldUntilUtc;
         }
 
-        private static bool ShouldReplaceDisplayedHit(ALPRHit candidate) {
-            if (candidate == null) return false;
-            if (CurrentHit == null) return true;
-            if (!IsDisplayedHitHeld()) return true;
+        /// <summary>True while the detail pane should show a live hold countdown (HUD uses this instead of guessing from list rows).</summary>
+        internal static bool IsDetailHoldVisible() => IsDisplayedHitHeld();
 
-            // While locked, only replace a non-flagged display with a flagged one.
-            // This preserves a stable HUD but still promotes important hits immediately.
-            bool currentHasFlags = CurrentHit.HasFlags;
-            bool candidateHasFlags = candidate.HasFlags;
-            return !currentHasFlags && candidateHasFlags;
+        static string NormalizePlateKey(string plate) {
+            return string.IsNullOrWhiteSpace(plate) ? "" : plate.Trim().ToUpperInvariant();
         }
 
-        private static void SetDisplayedHit(ALPRHit hit) {
+        /// <summary>
+        /// Updates <see cref="CurrentHit"/> without flicker: same plate refreshes data and extends hold; different plate waits for hold to end
+        /// unless the candidate is severe and the current detail is only paperwork.
+        /// </summary>
+        private static void TryPromoteOrRefreshDisplayedHit(ALPRHit hit, int holdTotalSeconds, bool candidateIsSevere) {
+            if (hit == null) return;
+            int hold = Math.Max(5, holdTotalSeconds);
+            string nextKey = NormalizePlateKey(hit.Plate);
+            if (string.IsNullOrEmpty(nextKey)) return;
+
+            if (CurrentHit != null && IsDisplayedHitHeld()) {
+                string curKey = NormalizePlateKey(CurrentHit.Plate);
+                if (!string.IsNullOrEmpty(curKey) && curKey == nextKey) {
+                    CurrentHit = hit;
+                    _displayedHitHoldTotalSeconds = Math.Max(_displayedHitHoldTotalSeconds, hold);
+                    _currentHitHoldUntilUtc = DateTime.UtcNow.AddSeconds(_displayedHitHoldTotalSeconds);
+                    return;
+                }
+                if (candidateIsSevere && !AlprHitBuilder.HasSevereAlertForPromotion(CurrentHit)) {
+                    SetDisplayedHit(hit, hold);
+                }
+                return;
+            }
+
+            SetDisplayedHit(hit, hold);
+        }
+
+        private static void SetDisplayedHit(ALPRHit hit, int holdTotalSeconds) {
             CurrentHit = hit;
-            _currentHitHoldUntilUtc = DateTime.UtcNow.Add(CurrentHitHoldDuration);
+            _displayedHitHoldTotalSeconds = Math.Max(5, holdTotalSeconds);
+            _currentHitHoldUntilUtc = DateTime.UtcNow.AddSeconds(_displayedHitHoldTotalSeconds);
+        }
+
+        internal static int GetDisplayedHitHoldTotalSeconds() {
+            return Math.Max(1, _displayedHitHoldTotalSeconds);
         }
 
         private static void ExpireDisplayedHitIfNeeded() {
@@ -651,7 +363,16 @@ namespace MDTPro.ALPR {
             if (CurrentHit == null) return 0;
             var remaining = _currentHitHoldUntilUtc - DateTime.UtcNow;
             if (remaining.TotalSeconds <= 0) return 0;
-            return (int)Math.Ceiling(remaining.TotalSeconds);
+            return Math.Max(0, (int)Math.Round(remaining.TotalSeconds));
+        }
+
+        /// <summary>0–1 fraction of hold time left (smooth bar; independent of integer seconds label).</summary>
+        internal static float GetDisplayedHitHoldRemainingFraction() {
+            if (CurrentHit == null) return 0f;
+            var rem = _currentHitHoldUntilUtc - DateTime.UtcNow;
+            if (rem.TotalSeconds <= 0) return 0f;
+            int tot = Math.Max(1, _displayedHitHoldTotalSeconds);
+            return (float)Math.Min(1.0, Math.Max(0.0, rem.TotalSeconds / tot));
         }
     }
 }

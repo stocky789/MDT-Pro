@@ -4,6 +4,23 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
+## [0.9.9.1] — 2026-04-15
+
+### Major Features
+
+- **ALPR has been reimplemented** — In-car plate reader with an on-screen terminal. The **browser MDT** and **desktop MDT** use the same reader for popups (toggle ALPR in **F7**).
+- **ALPR** — Hold **Left Alt** to drag the panel or the **SIZE** corner to resize; **F7** still has position options.
+
+### Bug Fixes
+
+- **ALPR** — Owner license warnings now match **Person Search**.
+- **Dashboard** — **Start / End shift** in the browser MDT is more reliable.
+- **Reports** — Status filter buttons behave correctly, with an **All statuses** option.
+- **Reports** — **Create impound report** from **Vehicle Search** opens the right impound draft with your vehicle filled in.
+- **Reports** — Fix **Open / Closed / …** status you pick on a form - previously no highlight was shown on the status.
+
+---
+
 ## [0.9.9.0] — 2026-04-14
 
 ### Major Features

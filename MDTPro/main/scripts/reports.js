@@ -163,22 +163,27 @@ async function onCreateButtonClick() {
   document.querySelector('.createPage .typeSelector').classList.remove('hidden')
 
   let type = document.querySelector('.listPage .typeSelector .selected')?.dataset?.type
+  let prefillReportType = null
   try {
     const prefillRaw = sessionStorage.getItem('mdtproReportPrefill')
     if (prefillRaw) {
       const prefill = JSON.parse(prefillRaw)
       if (prefill.reportType && ['impound', 'injury', 'trafficIncident', 'propertyEvidence'].includes(prefill.reportType)) {
-        type = prefill.reportType
+        prefillReportType = prefill.reportType
       }
     }
   } catch (_) {}
   const draft = getDraft()
-  if (draft) type = draft.type
+  if (prefillReportType) {
+    type = prefillReportType
+  } else if (draft) {
+    type = draft.type
+  }
   if (!type) type = 'incident'
 
   await onCreatePageTypeSelectorButtonClick(type)
 
-  if (draft) {
+  if (draft && draft.type === type) {
     applyDraft(draft)
     topWindow.showNotification(
       language.reports.notifications?.draftRestored ||
@@ -256,39 +261,51 @@ async function onListPageTypeSelectorButtonClick(type) {
   })
 
   const statusButtonWrapper = document.createElement('div')
-  statusButtonWrapper.classList.add('buttonWrapper')
+  statusButtonWrapper.classList.add('buttonWrapper', 'reportsListStatusFilter')
 
   const defaultStatusLabels = ['Closed', 'Open', 'Canceled', 'Pending']
   const statusLabel = (i) => (language.reports?.statusMap?.[i] ?? defaultStatusLabels[i]) || defaultStatusLabels[i]
 
+  const allStatusesButton = document.createElement('button')
+  allStatusesButton.type = 'button'
+  allStatusesButton.innerHTML =
+    language.reports?.list?.filter?.allStatuses || 'All statuses'
+  allStatusesButton.dataset.status = 'all'
+  allStatusesButton.classList.add('selected')
+
   const closedButton = document.createElement('button')
+  closedButton.type = 'button'
   closedButton.innerHTML = statusLabel(0)
   closedButton.dataset.status = 0
-  closedButton.classList.add('selected')
 
   const openButton = document.createElement('button')
+  openButton.type = 'button'
   openButton.innerHTML = statusLabel(1)
   openButton.dataset.status = 1
-  openButton.classList.add('selected')
 
   const canceledButton = document.createElement('button')
+  canceledButton.type = 'button'
   canceledButton.innerHTML = statusLabel(2)
   canceledButton.dataset.status = 2
 
   const pendingButton = document.createElement('button')
+  pendingButton.type = 'button'
   pendingButton.innerHTML = statusLabel(3)
   pendingButton.dataset.status = 3
-  pendingButton.classList.add('selected')
 
+  statusButtonWrapper.appendChild(allStatusesButton)
   statusButtonWrapper.appendChild(closedButton)
   statusButtonWrapper.appendChild(openButton)
   statusButtonWrapper.appendChild(canceledButton)
   statusButtonWrapper.appendChild(pendingButton)
 
-  for (const button of statusButtonWrapper.querySelectorAll('button')) {
-    button.addEventListener('click', async function () {
-      button.blur()
-      button.classList.toggle('selected')
+  for (const statusBtn of statusButtonWrapper.querySelectorAll('button')) {
+    statusBtn.addEventListener('click', async function () {
+      statusBtn.blur()
+      statusButtonWrapper
+        .querySelectorAll('button')
+        .forEach((b) => b.classList.remove('selected'))
+      statusBtn.classList.add('selected')
       await applyFilter()
     })
   }
@@ -448,15 +465,16 @@ async function onListPageTypeSelectorButtonClick(type) {
         }
       }
 
-      for (const statusButton of statusButtonWrapper.querySelectorAll(
-        'button'
-      )) {
-        if (
-          !statusButton.classList.contains('selected') &&
-          report.Status == statusButton.dataset.status
-        ) {
-          removeFromNewReports(report)
-        }
+      const selectedStatusBtn = statusButtonWrapper.querySelector(
+        'button.selected'
+      )
+      const statusFilter = selectedStatusBtn?.dataset?.status
+      if (
+        statusFilter &&
+        statusFilter !== 'all' &&
+        String(report.Status) !== String(statusFilter)
+      ) {
+        removeFromNewReports(report)
       }
     }
 

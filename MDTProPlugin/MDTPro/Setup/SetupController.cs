@@ -187,19 +187,12 @@ namespace MDTPro.Setup {
             return cachedConfig;
         }
 
-        /// <summary>Ensures ALPR config values are sensible. Only enable, popup duration, and HUD position are in config.</summary>
+        /// <summary>Ensures ALPR config values are sensible. User-facing ALPR options are enable, popup duration, and HUD position only.</summary>
         private static void EnsureALPRDefaults(Config cfg, Config def) {
             if (string.IsNullOrEmpty(cfg.alprHudAnchor)) cfg.alprHudAnchor = def.alprHudAnchor ?? "TopRight";
             if (cfg.alprWebToastPlateCooldownSeconds <= 0) cfg.alprWebToastPlateCooldownSeconds = def.alprWebToastPlateCooldownSeconds > 0 ? def.alprWebToastPlateCooldownSeconds : 90;
             if (cfg.alprWebToastPlateCooldownSeconds < 15) cfg.alprWebToastPlateCooldownSeconds = 15;
             if (cfg.alprWebToastPlateCooldownSeconds > 600) cfg.alprWebToastPlateCooldownSeconds = 600;
-            // Older configs omitted web toast source flags; Newtonsoft leaves missing bools false. Apply phase-1 defaults once.
-            const int currentAlprWebToastSourceVersion = 1;
-            if (cfg.alprWebToastSourceVersion < currentAlprWebToastSourceVersion) {
-                cfg.alprWebToastsFromCalloutInterface = def.alprWebToastsFromCalloutInterface;
-                cfg.alprWebToastsFromScanner = def.alprWebToastsFromScanner;
-                cfg.alprWebToastSourceVersion = currentAlprWebToastSourceVersion;
-            }
         }
 
         /// <summary>Clamp log file size limit (0 = unlimited, max 100 MB).</summary>

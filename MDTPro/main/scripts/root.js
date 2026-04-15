@@ -364,8 +364,15 @@ async function openReportWithPrefill(reportType, prefillData) {
     }))
   } catch (_) {}
   const existing = findExistingReportsWindow()
-  if (existing && typeof topWindow.focusWindowByElement === 'function') {
-    topWindow.focusWindowByElement(existing.windowEl)
+  if (existing) {
+    if (typeof topWindow.focusWindowByElement === 'function') {
+      topWindow.focusWindowByElement(existing.windowEl)
+    }
+    const win = existing.iframe.contentWindow
+    if (win && typeof win.onCreateButtonClick === 'function') {
+      await win.onCreateButtonClick()
+    }
+    return
   }
   await topWindow.openWindow('reports')
 }
