@@ -164,7 +164,14 @@
     <Compile Include="Utility\PlayerCoords.cs" />
     <Compile Include="ALPR\ALPRController.cs" />
     <Compile Include="ALPR\ALPRHUD.cs" />
-    <Compile Include="ALPR\CiAlprWebToastBridge.cs" />
+    <Compile Include="ALPR\AlprHitBuilder.cs" />
+    <Compile Include="ALPR\AlprPlateGeometry.cs" />
+    <Compile Include="ALPR\AlprSessionState.cs" />
+    <Compile Include="ALPR\AlprTerminalRow.cs" />
+    <Compile Include="ALPR\AlprDefaults.cs" />
+    <Compile Include="ALPR\Sensors\PlateReadResult.cs" />
+    <Compile Include="ALPR\Sensors\PlateSensorConfig.cs" />
+    <Compile Include="ALPR\Sensors\PlateSensorController.cs" />
     <Compile Include="Utility\PRHelper.cs" />
     <Compile Include="Utility\StpCitationHandoffQueue.cs" />
     <Compile Include="Utility\StpCitationHelper.cs" />

@@ -265,19 +265,43 @@ function applyQuickBackupMenuForProvider(menu, ultimateBackup, lang) {
   }
 })()
 
-const timeWS = new WebSocket(`ws://${location.host}/ws`)
+const _mdtWsScheme = location.protocol === 'https:' ? 'wss' : 'ws'
+const timeWS = new WebSocket(`${_mdtWsScheme}://${location.host}/ws`)
 timeWS.onopen = () => timeWS.send('interval/time')
 
 let currentShift = null
 
+function parseColonTimeToLocalDate(timeStr) {
+  const parts = String(timeStr ?? '').split(':')
+  const d = new Date()
+  d.setHours(parseInt(parts[0], 10) || 0)
+  d.setMinutes(parseInt(parts[1], 10) || 0)
+  d.setSeconds(parseInt(parts[2], 10) || 0, 0)
+  return d
+}
+
+/** Shift JSON may use camelCase or PascalCase depending on serializer settings. */
+function shiftStartValue(shift) {
+  if (!shift) return null
+  const v = shift.startTime ?? shift.StartTime
+  if (v === null || v === undefined || v === '') return null
+  return v
+}
+
+async function buildDisplayDateForShiftUi(config) {
+  if (!config?.useInGameTime) return new Date()
+  try {
+    const text = (await (await fetch('/data/currentTime')).text()).trim()
+    return parseColonTimeToLocalDate(text)
+  } catch (_) {
+    return new Date()
+  }
+}
+
 timeWS.onmessage = async (event) => {
   const config = await getConfig()
   const data = JSON.parse(event.data)
-  const inGameDateArr = data.response.split(':')
-  const inGameDate = new Date()
-  inGameDate.setHours(inGameDateArr[0])
-  inGameDate.setMinutes(inGameDateArr[1])
-  inGameDate.setSeconds(inGameDateArr[2])
+  const inGameDate = parseColonTimeToLocalDate(data.response)
   const realDate = new Date()
   document.querySelector('.taskbar .time').innerHTML = `${
     config.useInGameTime
@@ -301,112 +325,146 @@ timeWS.onmessage = async (event) => {
   )
 }
 
-document
-  .querySelector('.overlay .officerProfile .currentShift .buttonWrapper .startShift')
-  .addEventListener('click', async function () {
+const startShiftBtn = document.querySelector(
+  '.overlay .officerProfile .currentShift .buttonWrapper button.startShift'
+)
+if (startShiftBtn) {
+  startShiftBtn.addEventListener('click', async function () {
     if (this.classList.contains('loading')) return
-    showLoadingOnButton(this)
+    await showLoadingOnButton(this)
+    try {
+      const response = (
+        await (
+          await fetch('/post/modifyCurrentShift', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: 'start',
+          })
+        ).text()
+      ).trim()
 
-    const response = await (
-      await fetch('/post/modifyCurrentShift', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: 'start',
-      })
-    ).text()
-
-    const language = await getLanguage()
-    if (response == 'OK') {
-      currentShift = await (await fetch('/data/currentShift')).json()
-      const officerInformationData = await (
-        await fetch('/data/officerInformationData')
-      ).json()
-      if (officerInformationData.rank && officerInformationData.lastName) {
-        showNotification(
-          `${language.index.notifications.currentShiftStartedOfficerInformationExists} ${officerInformationData.rank} ${officerInformationData.lastName}`
+      const language = await getLanguage()
+      if (response === 'OK') {
+        currentShift = await (await fetch('/data/currentShift')).json()
+        const cfg = await getConfig()
+        await applyCurrentShiftToDOM(
+          currentShift,
+          await buildDisplayDateForShiftUi(cfg)
         )
+        const officerInformationData = await (
+          await fetch('/data/officerInformationData')
+        ).json()
+        if (officerInformationData.rank && officerInformationData.lastName) {
+          showNotification(
+            `${language.index.notifications.currentShiftStartedOfficerInformationExists} ${officerInformationData.rank} ${officerInformationData.lastName}`
+          )
+        } else {
+          showNotification(language.index.notifications.currentShiftStarted)
+        }
       } else {
-        showNotification(language.index.notifications.currentShiftStarted)
+        showNotification(
+          language.index.notifications.currentShiftStartedError,
+          'error'
+        )
       }
-    } else {
+    } catch (_) {
+      const language = await getLanguage()
       showNotification(
-        language.index.notifications.currentShiftStartedError,
+        language.index?.notifications?.currentShiftStartedError ||
+          'Failed to start shift.',
         'error'
       )
+    } finally {
+      hideLoadingOnButton(this)
     }
-
-    hideLoadingOnButton(this)
   })
+}
 
-document
-  .querySelector('.overlay .officerProfile .currentShift .buttonWrapper .endShift')
-  .addEventListener('click', async function () {
+const endShiftBtn = document.querySelector(
+  '.overlay .officerProfile .currentShift .buttonWrapper button.endShift'
+)
+if (endShiftBtn) {
+  endShiftBtn.addEventListener('click', async function () {
     if (this.classList.contains('loading')) return
-    showLoadingOnButton(this)
+    await showLoadingOnButton(this)
+    try {
+      const response = (
+        await (
+          await fetch('/post/modifyCurrentShift', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: 'end',
+          })
+        ).text()
+      ).trim()
 
-    const response = await (
-      await fetch('/post/modifyCurrentShift', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: 'end',
-      })
-    ).text()
-
-    const language = await getLanguage()
-    if (response == 'OK') {
-      currentShift = await (await fetch('/data/currentShift')).json()
-      showNotification(language.index.notifications.currentShiftEnded)
-    } else {
+      const language = await getLanguage()
+      if (response === 'OK') {
+        currentShift = await (await fetch('/data/currentShift')).json()
+        const cfg = await getConfig()
+        await applyCurrentShiftToDOM(
+          currentShift,
+          await buildDisplayDateForShiftUi(cfg)
+        )
+        showNotification(language.index.notifications.currentShiftEnded)
+      } else {
+        showNotification(
+          language.index.notifications.currentShiftEndedError,
+          'error'
+        )
+      }
+    } catch (_) {
+      const language = await getLanguage()
       showNotification(
-        language.index.notifications.currentShiftEndedError,
+        language.index?.notifications?.currentShiftEndedError ||
+          'Failed to end shift.',
         'error'
       )
+    } finally {
+      hideLoadingOnButton(this)
     }
-
-    hideLoadingOnButton(this)
   })
+}
 
 async function applyCurrentShiftToDOM(currentShift, currentDate) {
   const language = await getLanguage()
-  if (currentShift.startTime) {
-    document.querySelector(
-      '.overlay .officerProfile .currentShift .buttonWrapper .startShift'
-    ).disabled = true
-    document.querySelector(
-      '.overlay .officerProfile .currentShift .buttonWrapper .endShift'
-    ).disabled = false
+  const startBtn = document.querySelector(
+    '.overlay .officerProfile .currentShift .buttonWrapper button.startShift'
+  )
+  const endBtn = document.querySelector(
+    '.overlay .officerProfile .currentShift .buttonWrapper button.endShift'
+  )
+  const startTimeEl = document.querySelector(
+    '.overlay .officerProfile .currentShift .startTime'
+  )
+  const durationEl = document.querySelector(
+    '.overlay .officerProfile .currentShift .duration'
+  )
+  if (!startBtn || !endBtn || !startTimeEl || !durationEl) return
 
-    document.querySelector(
-      '.overlay .officerProfile .currentShift .startTime'
-    ).innerHTML = `${
+  const startedAt = shiftStartValue(currentShift)
+  if (startedAt) {
+    startBtn.disabled = true
+    endBtn.disabled = false
+
+    startTimeEl.innerHTML = `${
       language.index.settings.currentShift.startTime
-    }: ${new Date(currentShift.startTime).toLocaleTimeString()}`
+    }: ${new Date(startedAt).toLocaleTimeString()}`
 
     const duration = await convertMsToTimeString(
-      currentDate.getTime() - new Date(currentShift.startTime).getTime()
+      Math.max(0, currentDate.getTime() - new Date(startedAt).getTime())
     )
-    document.querySelector(
-      '.overlay .officerProfile .currentShift .duration'
-    ).innerHTML =
-      `${language.index.settings.currentShift.duration}: ${duration}`
+    durationEl.innerHTML = `${language.index.settings.currentShift.duration}: ${duration}`
   } else {
-    document.querySelector(
-      '.overlay .officerProfile .currentShift .buttonWrapper .startShift'
-    ).disabled = false
-    document.querySelector(
-      '.overlay .officerProfile .currentShift .buttonWrapper .endShift'
-    ).disabled = true
+    startBtn.disabled = false
+    endBtn.disabled = true
 
-    document.querySelector(
-      '.overlay .officerProfile .currentShift .startTime'
-    ).innerHTML = language.index.settings.currentShift.offDuty
-    document.querySelector(
-      '.overlay .officerProfile .currentShift .duration'
-    ).innerHTML = ''
+    startTimeEl.innerHTML = language.index.settings.currentShift.offDuty
+    durationEl.innerHTML = ''
   }
 }
 
@@ -415,7 +473,7 @@ timeWS.onclose = async () => {
   showNotification(language.index.notifications.webSocketOnClose, 'warning', -1)
 }
 
-const locationWS = new WebSocket(`ws://${location.host}/ws`)
+const locationWS = new WebSocket(`${_mdtWsScheme}://${location.host}/ws`)
 locationWS.onopen = () => locationWS.send('interval/playerLocation')
 
 function readApiLocationField(loc, key) {

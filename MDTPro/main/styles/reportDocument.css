@@ -290,15 +290,16 @@
  * On white paper that reads as pale cream + grey label (very low contrast). Match form fields + solid selected state.
  */
 .report-document-body .statusInput button {
-  background-color: var(--mdt-report-field);
-  border: 1px solid #000;
-  color: var(--mdt-report-ink);
+  background-color: #f5ebe0;
+  border: 1px solid #2a2a2a;
+  color: #1a1a1a;
+  font-weight: 600;
 }
 
 .report-document-body .statusInput button:not(:disabled):hover {
-  color: var(--mdt-report-ink);
+  color: #0a0a0a;
   border-color: #000;
-  background-color: #f2dcc8;
+  background-color: #edd9c8;
 }
 
 .report-document-body .statusInput button:focus {
@@ -307,16 +308,31 @@
   box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.45);
 }
 
+/* Strong contrast: selected must stay obvious (theme vars can match paper cream too closely) */
 .report-document-body .statusInput button.selected {
-  background-color: var(--color-accent, #c9a227);
-  color: #0f0f0f;
-  border-color: #000;
-  font-weight: 700;
+  background: linear-gradient(180deg, #f5c842 0%, #e6a812 100%);
+  color: #0a0a0a;
+  border: 2px solid #000;
+  font-weight: 800;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .report-document-body .statusInput button.selected:not(:disabled):hover {
-  background-color: var(--color-accent-dimmed, #b89220);
-  color: #0f0f0f;
+  background: linear-gradient(180deg, #f0c038 0%, #d99d0a 100%);
+  color: #0a0a0a;
+}
+
+.report-document .report-document-body .statusInput button.selected {
+  background: linear-gradient(180deg, #f5c842 0%, #e6a812 100%);
+  color: #0a0a0a;
+  border: 2px solid #000;
+  font-weight: 800;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.report-document .report-document-body .statusInput button.selected:not(:disabled):hover {
+  background: linear-gradient(180deg, #f0c038 0%, #d99d0a 100%);
+  color: #0a0a0a;
 }
 
 /* Section headings: theme borders are faint on white */
@@ -330,8 +346,9 @@
   border-top-color: #000 !important;
 }
 
-/* In-form action buttons (theme chrome is illegible on paper) */
-.report-document .report-document-body button:not(.reportDocToolbarButton):not(.deleteChargeButton),
+/* In-form action buttons (theme chrome is illegible on paper). Exclude .statusInput toggles — that rule
+   matched equal specificity and came later, wiping out the selected status highlight. */
+.report-document .report-document-body button:not(.reportDocToolbarButton):not(.deleteChargeButton):not(.statusInput > button),
 .report-document .propertyEvidenceSection button:not(.reportDocToolbarButton):not(.deleteChargeButton) {
   background-color: var(--mdt-report-field);
   border: 1px solid #000;
@@ -339,20 +356,20 @@
   font-weight: 600;
 }
 
-.report-document .report-document-body button:not(.reportDocToolbarButton):not(.deleteChargeButton):not(:disabled):hover,
+.report-document .report-document-body button:not(.reportDocToolbarButton):not(.deleteChargeButton):not(.statusInput > button):not(:disabled):hover,
 .report-document .propertyEvidenceSection button:not(.reportDocToolbarButton):not(.deleteChargeButton):not(:disabled):hover {
   color: var(--mdt-report-ink);
   border-color: #000;
   background-color: #f2dcc8;
 }
 
-.report-document .report-document-body button:not(.reportDocToolbarButton):not(.deleteChargeButton):focus,
+.report-document .report-document-body button:not(.reportDocToolbarButton):not(.deleteChargeButton):not(.statusInput > button):focus,
 .report-document .propertyEvidenceSection button:not(.reportDocToolbarButton):not(.deleteChargeButton):focus {
   border-color: #000;
   box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.45);
 }
 
-.report-document .report-document-body button:not(.reportDocToolbarButton):not(.deleteChargeButton):disabled,
+.report-document .report-document-body button:not(.reportDocToolbarButton):not(.deleteChargeButton):not(.statusInput > button):disabled,
 .report-document .propertyEvidenceSection button:not(.reportDocToolbarButton):not(.deleteChargeButton):disabled {
   opacity: 0.7;
   cursor: not-allowed;

@@ -95,7 +95,7 @@ namespace MDTPro.UI {
 
             var cfg = GetConfig();
             _alprEnabledItem = new UIMenuCheckboxItem("Enable ALPR (MDT scanner + HUD)", cfg != null && cfg.alprEnabled,
-                "Built-in plate scan and on-screen panel (on duty, police vehicle). Browser ALPR popups can use Callout Interface without turning this on.");
+                "Built-in plate scan, terminal HUD, and browser/native ALPR popups (on duty, police vehicle).");
             _mainMenu.AddItem(_alprEnabledItem);
 
             _alprEnabledItem.CheckboxEvent += (sender, @checked) => {
@@ -145,7 +145,7 @@ namespace MDTPro.UI {
             _alprOffsetXItem.OnListChanged += (sender, newIndex) => ApplyAlprHudOffsetX(OffsetMin + newIndex * OffsetStep);
             _alprOffsetYItem.OnListChanged += (sender, newIndex) => ApplyAlprHudOffsetY(OffsetMin + newIndex * OffsetStep);
 
-            var moveWithArrowsItem = new UIMenuItem("Move panel", "~b~Enter~s~ to drag the panel with the mouse. Enter to save, Backspace to cancel.");
+            var moveWithArrowsItem = new UIMenuItem("Move panel", "~b~Enter~s~ to drag the panel with the mouse. Enter to save, Backspace to cancel. In a police vehicle you can also hold ~b~Left Alt~s~ and drag the live panel (corner = resize).");
             _alprPositionMenu.AddItem(moveWithArrowsItem);
             moveWithArrowsItem.Activated += (menu, item) => StartMoveHudMode();
 
@@ -272,7 +272,7 @@ namespace MDTPro.UI {
             string anchor = cfg.alprHudAnchor ?? "TopRight";
             ALPRHUD.Start(); // ensure HUD is drawing (e.g. if ALPR was disabled)
             ALPRHUD.StartPreviewMode(anchor, x, y);
-            RageNotification.Show("~b~Move ALPR panel:~s~ Click and drag the panel. ~g~Enter~s~ = save. ~r~Backspace~s~ = cancel.", RageNotification.NotificationType.Info);
+            RageNotification.Show("~b~Move ALPR panel:~s~ Click and drag. ~g~Enter~s~ = save. ~r~Backspace~s~ = cancel. Tip: in-game hold ~b~Left Alt~s~ and drag the panel; drag the ~b~SIZE~s~ corner to resize.", RageNotification.NotificationType.Info);
             var prevMove = _moveHudFiber;
             if (prevMove != null) {
                 prevMove.Abort();

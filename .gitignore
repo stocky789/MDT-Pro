@@ -77,7 +77,7 @@ MDTPro/ipAddresses.txt
 # ---- Third-party / local mod copies (not tracked) ----
 STP/
 UltimateBackup/
-CalloutInterfaceAPI/
+# CalloutInterfaceAPI/
 ReportsPlus-main/
 # ---- Secrets / env (never commit) ----
 .env

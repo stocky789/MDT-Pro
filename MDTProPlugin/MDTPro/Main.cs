@@ -28,7 +28,6 @@ namespace MDTPro {
         public override void Finally() {
             try {
                 CalloutEvents.RemoveCalloutEventHandlers();
-                ALPR.CiAlprWebToastBridge.Stop();
                 STPEvents.UnsubscribeAll();
                 PREvents.UnsubscribeAll();
                 CDFEvents.UnsubscribeAll();
@@ -54,7 +53,6 @@ namespace MDTPro {
                 UI.CitationHandoffKeybind.Stop();
                 StpCitationHandoffQueue.Clear();
                 ALPR.ALPRController.Stop();
-                ALPR.CiAlprWebToastBridge.Stop();
                 Server.Stop();
                 GameFiberHttpBridge.Stop();
                 return;
@@ -161,7 +159,6 @@ namespace MDTPro {
                         }
 
                         ALPR.ALPRController.Start();
-                        ALPR.CiAlprWebToastBridge.Start();
                         UI.SettingsMenu.Start();
 
                         var cfg = GetConfig();

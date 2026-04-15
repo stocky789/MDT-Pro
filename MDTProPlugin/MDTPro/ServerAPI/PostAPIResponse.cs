@@ -209,14 +209,44 @@ namespace MDTPro.ServerAPI {
                     return;
                 }
             } else if (path == "modifyCurrentShift") {
-                if (body == "start") {
-                    DataController.StartCurrentShift();
-                } else if (body == "end") {
-                    DataController.EndCurrentShift();
+                string action = Helper.NormalizePlainOrJsonString(body);
+                if (string.IsNullOrEmpty(action)) {
+                    buffer = Encoding.UTF8.GetBytes("Bad Request - Invalid Action");
+                    contentType = "text/plain";
+                    status = 400;
+                    return;
+                }
+                Exception shiftFiberError = null;
+                bool ran;
+                if (action.Equals("start", StringComparison.OrdinalIgnoreCase)) {
+                    ran = GameFiberHttpBridge.TryExecuteBlocking(() => {
+                        try { DataController.StartCurrentShift(); }
+                        catch (Exception ex) { shiftFiberError = ex; }
+                    }, 5000, out var bridgeStartErr);
+                    if (bridgeStartErr != null) shiftFiberError = shiftFiberError ?? bridgeStartErr;
+                } else if (action.Equals("end", StringComparison.OrdinalIgnoreCase)) {
+                    ran = GameFiberHttpBridge.TryExecuteBlocking(() => {
+                        try { DataController.EndCurrentShift(); }
+                        catch (Exception ex) { shiftFiberError = ex; }
+                    }, 5000, out var bridgeEndErr);
+                    if (bridgeEndErr != null) shiftFiberError = shiftFiberError ?? bridgeEndErr;
                 } else {
                     buffer = Encoding.UTF8.GetBytes("Bad Request - Invalid Action");
                     contentType = "text/plain";
                     status = 400;
+                    return;
+                }
+                if (!ran) {
+                    buffer = Encoding.UTF8.GetBytes("Shift control timed out (game busy or paused). Try again.");
+                    contentType = "text/plain";
+                    status = 503;
+                    return;
+                }
+                if (shiftFiberError != null) {
+                    Utility.Helper.Log($"[modifyCurrentShift] {shiftFiberError.Message}", true, Utility.Helper.LogSeverity.Error);
+                    buffer = Encoding.UTF8.GetBytes("Shift control failed.");
+                    contentType = "text/plain";
+                    status = 500;
                     return;
                 }
 

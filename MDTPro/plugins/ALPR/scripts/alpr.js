@@ -1,6 +1,6 @@
 /**
  * ALPR plugin – subscribes to ALPR hits over WebSocket and shows popups.
- * Hits may come from Callout Interface (config.alprWebToastsFromCalloutInterface) and/or the built-in scanner (alprWebToastsFromScanner + alprEnabled).
+ * Hits are pushed by the in-game MDT plate reader when ALPR is enabled (same WebSocket feed the native Windows MDT uses).
  */
 ;(function () {
   function escapeHtml(s) {
@@ -102,9 +102,6 @@
       const res = await fetch('/config')
       const config = await res.json()
       if (!config || config.alprEnabled !== false) return
-      // Browser toasts from the built-in scan loop require in-game ALPR; CI-only mode does not.
-      const webFromScanner = config.alprWebToastsFromScanner === true
-      if (!webFromScanner) return
       const lang = (typeof getLanguage === 'function') ? await getLanguage() : {}
       const msg = (lang && lang.alpr && lang.alpr.inGameNotEnabled) || 'In-game ALPR is not enabled.'
       if (typeof showNotification === 'function') {

@@ -1,8 +1,11 @@
 using MDTPro.Data;
 using MDTPro.Setup;
+using MDTPro.Utility;
 using Rage;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.Windows.Forms;
 using static MDTPro.Setup.SetupController;
 
 namespace MDTPro.ALPR {
@@ -11,6 +14,11 @@ namespace MDTPro.ALPR {
     /// </summary>
     internal static class ALPRHUD {
         private static bool _subscribed;
+        private static GameFiber _layoutFiber;
+        private static volatile bool _runLayoutLoop;
+        /// <summary>Set by the layout fiber when Left Alt is held (in-game move/resize hint).</summary>
+        internal static volatile bool LayoutModifierHeld;
+        private static volatile bool _needsLayoutSave;
         private static bool _previewMode;
         private static string _previewAnchor = "TopRight";
         private static int _previewOffsetX = 20;
@@ -30,7 +38,18 @@ namespace MDTPro.ALPR {
             TimeScanned = System.DateTime.UtcNow
         };
 
-        private const float BasePanelWidth = 280f;
+        private static readonly IReadOnlyList<AlprTerminalRow> PreviewTerminalRows = new List<AlprTerminalRow> {
+            new AlprTerminalRow("8QKZ1234", new ALPRHit {
+                Plate = "8QKZ1234", Owner = "Preview", ModelDisplayName = "Preview Sedan", VehicleColor = "Black",
+                Flags = new List<string> { "Stolen" }, TimeScanned = DateTime.UtcNow
+            }, "FL", "STOLN", DateTime.UtcNow),
+            new AlprTerminalRow("PREVIEW2", new ALPRHit {
+                Plate = "PREVIEW2", Owner = "Row two", ModelDisplayName = "Example", VehicleColor = "White",
+                Flags = new List<string>(), TimeScanned = DateTime.UtcNow
+            }, "RR", "", DateTime.UtcNow),
+        };
+
+        private const float BasePanelWidth = 312f;
         private const float BasePadding = 10f;
         private const float BaseLineHeight = 18f;
         /// <summary>Extra space below content so the hold bar and timer don't get clipped.</summary>
@@ -52,6 +71,8 @@ namespace MDTPro.ALPR {
         private static readonly Color TextMutedColor = Color.FromArgb(255, 170, 182, 202);
         private static readonly Color FlagStolenColor = Color.FromArgb(255, 255, 95, 90);
         private static readonly Color FlagExpiredColor = Color.FromArgb(255, 255, 200, 80);
+        /// <summary>Registration/insurance/DL etc. — visible in READS but not promoted like stolen/BOLO.</summary>
+        private static readonly Color PaperworkRowAccentColor = Color.FromArgb(255, 230, 165, 75);
 
         internal static void Start() {
             if (_subscribed) return;
@@ -59,9 +80,17 @@ namespace MDTPro.ALPR {
             // Do not call natives in OnFrameRender; use ALPRController.IsInPoliceVehicleCached and GetConfig() cache only.
             Game.RawFrameRender += OnFrameRender;
             _subscribed = true;
+            _runLayoutLoop = true;
+            if (_layoutFiber == null || !_layoutFiber.IsAlive)
+                _layoutFiber = GameFiber.StartNew(LayoutInteractionLoop);
         }
 
         internal static void Stop() {
+            _runLayoutLoop = false;
+            FlushLayoutSaveIfNeeded();
+            _layoutFiber?.Abort();
+            _layoutFiber = null;
+            LayoutModifierHeld = false;
             if (!_subscribed) return;
             Game.RawFrameRender -= OnFrameRender;
             _subscribed = false;
@@ -72,13 +101,17 @@ namespace MDTPro.ALPR {
                 var cfg = GetConfig();
                 float scale = GetEffectiveScale(cfg);
                 if (_previewMode) {
-                    DrawPanelAt(e.Graphics, PreviewDummyHit, _previewAnchor, _previewOffsetX, _previewOffsetY, scale);
+                    DrawAdvancedPanelAt(e.Graphics, cfg, _previewAnchor, _previewOffsetX, _previewOffsetY, scale, PreviewTerminalRows, PreviewDummyHit);
                     return;
                 }
                 // Only show ALPR HUD when: enabled in settings, on duty (ALPR only runs then), and in police vehicle.
                 if (cfg == null || !cfg.alprEnabled) return;
                 if (!ALPRController.IsInPoliceVehicleCached) return;
-                DrawPanel(e.Graphics, ALPRController.CurrentHit ?? ScanningDummyHit, cfg);
+                var rows = ALPRController.GetTerminalRowsSnapshot();
+                // Detail follows promoted hits only — never mirror READS row 0 or the panel flickers between plates as the list churns.
+                ALPRHit detail = ALPRController.CurrentHit ?? ScanningDummyHit;
+                DrawAdvancedPanelAt(e.Graphics, cfg, cfg.alprHudAnchor, cfg.alprHudOffsetX, cfg.alprHudOffsetY, scale, rows, detail);
+                DrawLayoutChromeIfApplicable(e.Graphics, cfg);
             } catch (Exception) {
                 // Silently ignore draw errors (e.g. during unload)
             }
@@ -110,9 +143,13 @@ namespace MDTPro.ALPR {
 
         /// <summary>When in preview mode, returns the panel's screen rectangle for hit-testing. Panel top-left follows anchor + offset.</summary>
         internal static bool TryGetPreviewBounds(out float x, out float y, out float w, out float h) {
-            float scale = GetEffectiveScale(GetConfig());
-            w = BasePanelWidth * scale;
-            h = (BasePadding * 2 + BaseLineHeight * 3) * scale;
+            var cfg = GetConfig();
+            float scale = GetEffectiveScale(cfg);
+            w = BasePanelWidth * scale * 1.08f;
+            int rowCap = AlprDefaults.TerminalMaxRows;
+            int listLines = Math.Max(3, Math.Min(rowCap, 8));
+            float extraList = (listLines * BaseLineHeight * 0.92f + 28f) * scale;
+            h = (BasePadding * 2 + BaseLineHeight * 3) * scale + extraList;
             if (!_previewMode) {
                 x = y = 0;
                 return false;
@@ -131,9 +168,13 @@ namespace MDTPro.ALPR {
         internal static void ScreenToOffset(string anchor, float screenX, float screenY, out int offsetX, out int offsetY) {
             int actualW = Game.Resolution.Width;
             int actualH = Game.Resolution.Height;
-            float scale = GetEffectiveScale(GetConfig());
-            float panelW = BasePanelWidth * scale;
-            float panelH = (BasePadding * 2 + BaseLineHeight * 3) * scale;
+            var cfgForH = GetConfig();
+            float scale = GetEffectiveScale(cfgForH);
+            float panelW = BasePanelWidth * scale * 1.08f;
+            int rowCapH = AlprDefaults.TerminalMaxRows;
+            int listLinesH = Math.Max(3, Math.Min(rowCapH, 8));
+            float extraListH = (listLinesH * BaseLineHeight * 0.92f + 28f) * scale;
+            float panelH = (BasePadding * 2 + BaseLineHeight * 3) * scale + extraListH;
             screenX = Math.Max(0, Math.Min(actualW - panelW, screenX));
             screenY = Math.Max(0, Math.Min(actualH - panelH, screenY));
             switch ((anchor ?? "TopRight").ToLowerInvariant()) {
@@ -158,57 +199,224 @@ namespace MDTPro.ALPR {
                     offsetY = (int)screenY;
                     break;
             }
-            offsetX = Math.Max(0, Math.Min(400, offsetX));
-            offsetY = Math.Max(0, Math.Min(400, offsetY));
+            int capX = Math.Max(0, (int)Math.Ceiling(actualW - panelW));
+            int capY = Math.Max(0, (int)Math.Ceiling(actualH - panelH));
+            offsetX = Math.Max(0, Math.Min(capX, offsetX));
+            offsetY = Math.Max(0, Math.Min(capY, offsetY));
         }
 
-        private static void DrawPanel(Rage.Graphics g, ALPRHit hit, Config cfg) {
-            if (hit == null || cfg == null) return;
+        private static void LayoutInteractionLoop() {
+            bool dragging = false;
+            bool resizing = false;
+            float dragGrabDx = 0f;
+            float dragGrabDy = 0f;
+            float resizeStartScale = 1f;
+            float resizeAnchorMy = 0f;
+            const float gripPx = 28f;
+            while (_runLayoutLoop) {
+                try {
+                    GameFiber.Yield();
+                    if (!_runLayoutLoop || !_subscribed) continue;
+                    if (_previewMode) {
+                        dragging = resizing = false;
+                        LayoutModifierHeld = false;
+                        FlushLayoutSaveIfNeeded();
+                        GameFiber.Sleep(40);
+                        continue;
+                    }
+                    var cfg = GetConfig();
+                    if (cfg == null || !cfg.alprEnabled || !ALPRController.IsInPoliceVehicleCached) {
+                        FlushLayoutSaveIfNeeded();
+                        dragging = resizing = false;
+                        LayoutModifierHeld = false;
+                        GameFiber.Sleep(80);
+                        continue;
+                    }
+                    LayoutModifierHeld = Game.IsKeyDownRightNow(Keys.LMenu);
+                    if (!TryGetLivePanelBounds(cfg, out float px, out float py, out float pw, out float ph)) {
+                        GameFiber.Sleep(80);
+                        continue;
+                    }
+                    Rage.MouseState mouse = Game.GetMouseState();
+                    float mx = mouse.X;
+                    float my = mouse.Y;
+                    bool over = mx >= px && mx <= px + pw && my >= py && my <= py + ph;
+                    bool onGrip = over && mx >= px + pw - gripPx && my >= py + ph - gripPx;
+                    if (!LayoutModifierHeld) {
+                        if (dragging || resizing) {
+                            dragging = false;
+                            resizing = false;
+                            FlushLayoutSaveIfNeeded();
+                        }
+                        GameFiber.Sleep(40);
+                        continue;
+                    }
+                    if (mouse.IsLeftButtonDown) {
+                        if (!dragging && !resizing) {
+                            if (onGrip) {
+                                resizing = true;
+                                resizeStartScale = Math.Max(0.75f, Math.Min(2f, cfg.alprHudScale));
+                                resizeAnchorMy = my;
+                            } else if (over) {
+                                dragging = true;
+                                dragGrabDx = mx - px;
+                                dragGrabDy = my - py;
+                            }
+                        }
+                        if (resizing) {
+                            float next = resizeStartScale + (resizeAnchorMy - my) * 0.012f;
+                            next = Math.Max(0.75f, Math.Min(2f, next));
+                            if (Math.Abs(next - cfg.alprHudScale) > 0.0005f) {
+                                cfg.alprHudScale = next;
+                                _needsLayoutSave = true;
+                            }
+                            GameFiber.Sleep(12);
+                            continue;
+                        }
+                        if (dragging) {
+                            string anchor = cfg.alprHudAnchor ?? "TopRight";
+                            ScreenToOffset(anchor, mx - dragGrabDx, my - dragGrabDy, out int ox, out int oy);
+                            cfg.alprHudOffsetX = ox;
+                            cfg.alprHudOffsetY = oy;
+                            _needsLayoutSave = true;
+                            GameFiber.Sleep(12);
+                            continue;
+                        }
+                    } else {
+                        if (dragging || resizing) {
+                            dragging = false;
+                            resizing = false;
+                            FlushLayoutSaveIfNeeded();
+                        }
+                    }
+                } catch {
+                    /* ignore */
+                }
+                GameFiber.Sleep(30);
+            }
+        }
+
+        private static void FlushLayoutSaveIfNeeded() {
+            if (!_needsLayoutSave) return;
+            try {
+                var cfg = GetConfig();
+                if (cfg == null) return;
+                Helper.WriteToJsonFile(ConfigPath, cfg);
+                ResetConfig();
+            } catch {
+                /* ignore */
+            } finally {
+                _needsLayoutSave = false;
+            }
+        }
+
+        /// <summary>Screen rectangle of the live ALPR panel for hit-testing.</summary>
+        internal static bool TryGetLivePanelBounds(Config cfg, out float x, out float y, out float w, out float h) {
+            x = y = w = h = 0f;
+            if (cfg == null || _previewMode) return false;
             float scale = GetEffectiveScale(cfg);
-            DrawPanelAt(g, hit, cfg.alprHudAnchor, cfg.alprHudOffsetX, cfg.alprHudOffsetY, scale);
+            int actualW = Game.Resolution.Width;
+            int actualH = Game.Resolution.Height;
+            int scrW = Math.Max(640, actualW);
+            int scrH = Math.Max(480, actualH);
+            var rows = ALPRController.GetTerminalRowsSnapshot();
+            ALPRHit detail = ALPRController.CurrentHit ?? ScanningDummyHit;
+            ComputeAdvancedPanelSize(rows, detail, scale, out w, out h);
+            ResolvePosition(cfg.alprHudAnchor ?? "TopRight", cfg.alprHudOffsetX, cfg.alprHudOffsetY, scrW, scrH, w, h, out x, out y);
+            x = Math.Max(0, Math.Min(actualW - w, x));
+            y = Math.Max(0, Math.Min(actualH - h, y));
+            return true;
         }
 
-        private static void DrawPanelAt(Rage.Graphics g, ALPRHit hit, string anchor, int offsetX, int offsetY, float scale) {
-            if (hit == null) return;
-            if (scale <= 0) scale = 1f;
-
-            float panelW = BasePanelWidth * scale;
+        private static void ComputeAdvancedPanelSize(IReadOnlyList<AlprTerminalRow> rows, ALPRHit detailHit, float scale, out float panelW, out float panelH) {
+            int maxRows = AlprDefaults.TerminalMaxRows;
+            maxRows = Math.Max(4, Math.Min(12, maxRows));
+            panelW = BasePanelWidth * scale * 1.08f;
             float padding = BasePadding * scale;
             float lineHeight = BaseLineHeight * scale;
+            float rowCompactH = BaseLineHeight * 0.92f * scale;
+            float topBandH = 24f * scale;
+            float holdBarH = 3f * scale;
+            float sensorBarH = 22f * scale;
+            float bottomMargin = BaseBottomMargin * scale;
+            int listCount = rows == null ? 0 : Math.Min(maxRows, rows.Count);
+            bool listEmpty = listCount == 0;
+            int listLineSlots = listEmpty ? 2 : listCount;
+            ALPRHit dh = detailHit ?? ScanningDummyHit;
+            bool detailScanning = IsScanningPlaceholder(dh);
+            bool hasColorLine = !detailScanning && dh != null && !string.IsNullOrWhiteSpace(dh.VehicleColor);
+            int detailFlagLines = (!detailScanning && dh?.Flags != null) ? dh.Flags.Count : 0;
+            int holdDetailLines = (!detailScanning && ALPRController.IsDetailHoldVisible()) ? 1 : 0;
+            int detailBodyLines = detailScanning ? 2 : (3 + (hasColorLine ? 1 : 0) + detailFlagLines + holdDetailLines);
+            float listBlockH = topBandH * 0.85f + padding + listLineSlots * rowCompactH + sensorBarH + padding * 0.5f;
+            float detailBlockH = padding + lineHeight * detailBodyLines + padding * 0.5f;
+            panelH = topBandH + listBlockH + detailBlockH + bottomMargin + holdBarH;
+        }
+
+        private static void DrawLayoutChromeIfApplicable(Rage.Graphics g, Config cfg) {
+            if (!LayoutModifierHeld || cfg == null || _previewMode) return;
+            if (!TryGetLivePanelBounds(cfg, out float px, out float py, out float pw, out float ph)) return;
+            var outline = Color.FromArgb(200, 80, 200, 255);
+            float t = 2f;
+            g.DrawRectangle(new RectangleF(px, py, pw, t), outline);
+            g.DrawRectangle(new RectangleF(px, py + ph - t, pw, t), outline);
+            g.DrawRectangle(new RectangleF(px, py, t, ph), outline);
+            g.DrawRectangle(new RectangleF(px + pw - t, py, t, ph), outline);
+            float gsz = 28f;
+            var grip = new RectangleF(px + pw - gsz, py + ph - gsz, gsz, gsz);
+            g.DrawRectangle(grip, Color.FromArgb(210, 60, 120, 200));
+            g.DrawText("SIZE", FontName, 8f, new PointF(grip.X + 2f, grip.Y + grip.Height * 0.35f), TextMutedColor);
+        }
+
+        private static void DrawAdvancedPanelAt(Rage.Graphics g, Config cfg, string anchor, int offsetX, int offsetY, float scale,
+            IReadOnlyList<AlprTerminalRow> rows, ALPRHit detailHit) {
+            if (cfg == null || scale <= 0) scale = 1f;
+            int maxRows = AlprDefaults.TerminalMaxRows;
+            maxRows = Math.Max(4, Math.Min(12, maxRows));
+
+            float panelW = BasePanelWidth * scale * 1.08f;
+            float padding = BasePadding * scale;
+            float lineHeight = BaseLineHeight * scale;
+            float rowCompactH = BaseLineHeight * 0.92f * scale;
             float fontSizeTitle = (BaseFontSizeTitle + 1f) * scale;
             float fontSizeBody = BaseFontSizeBody * scale;
             float fontSizeSmall = (BaseFontSizeBody - 1f) * scale;
             float borderW = Math.Max(1, (int)(1 * scale));
             float topBandH = 24f * scale;
-            float statusPillH = 16f * scale;
-            float statusPillW = 76f * scale;
             float holdBarH = 3f * scale;
+            float sensorBarH = 22f * scale;
+            float bottomMargin = BaseBottomMargin * scale;
 
-            bool isScanning = IsScanningPlaceholder(hit);
-            bool isAlert = hit.HasFlags;
-            Color accentColor = isAlert ? AlertAccentColor : ScanAccentColor;
+            int listCount = rows == null ? 0 : Math.Min(maxRows, rows.Count);
+            bool listEmpty = listCount == 0;
+            int listLineSlots = listEmpty ? 2 : listCount;
 
-            int extraLines = Math.Max(0, hit.Flags?.Count ?? 0);
-            bool hasColorLine = !isScanning && !string.IsNullOrWhiteSpace(hit.VehicleColor);
-            // plate + owner + vehicle + [color] + flags + hold = 4 + (color?1:0) + extraLines
-            int contentLines = isScanning ? 2 : (4 + (hasColorLine ? 1 : 0) + extraLines);
+            ALPRHit dh = detailHit ?? ScanningDummyHit;
+            bool detailScanning = IsScanningPlaceholder(dh);
+            bool severeAlert = dh != null && AlprHitBuilder.HasSevereAlertForPromotion(dh);
+            bool paperworkAlert = dh != null && AlprHitBuilder.HasPaperworkOrLicenseAlert(dh);
+            bool hotAlert = severeAlert || paperworkAlert;
+            Color accentColor = hotAlert ? AlertAccentColor : ScanAccentColor;
+
+            bool hasColorLine = !detailScanning && dh != null && !string.IsNullOrWhiteSpace(dh.VehicleColor);
+            int detailFlagLines = (!detailScanning && dh?.Flags != null) ? dh.Flags.Count : 0;
+            int holdDetailLines = (!detailScanning && ALPRController.IsDetailHoldVisible()) ? 1 : 0;
+            int detailBodyLines = detailScanning ? 2 : (3 + (hasColorLine ? 1 : 0) + detailFlagLines + holdDetailLines);
+
+            float listBlockH = topBandH * 0.85f + padding + listLineSlots * rowCompactH + sensorBarH + padding * 0.5f;
+            float detailBlockH = padding + lineHeight * detailBodyLines + padding * 0.5f;
+            float panelH = topBandH + listBlockH + detailBlockH + bottomMargin + holdBarH;
 
             int actualW = Game.Resolution.Width;
             int actualH = Game.Resolution.Height;
             int w = Math.Max(640, actualW);
             int h = Math.Max(480, actualH);
-            float bottomMargin = BaseBottomMargin * scale;
-            float panelH = topBandH + padding * 2 + lineHeight * contentLines + bottomMargin + holdBarH;
-
             float x, y;
             ResolvePosition(anchor ?? "TopRight", offsetX, offsetY, w, h, panelW, panelH, out x, out y);
-            // Clamp to actual screen bounds so the panel stays visible on low-resolution displays
             x = Math.Max(0, Math.Min(actualW - panelW, x));
             y = Math.Max(0, Math.Min(actualH - panelH, y));
 
             var rect = new RectangleF(x, y, panelW, panelH);
-
-            // Layered card background and border
             g.DrawRectangle(rect, BgOuterColor);
             g.DrawRectangle(new RectangleF(rect.X + borderW, rect.Y + borderW, rect.Width - borderW * 2, rect.Height - borderW * 2), BgInnerColor);
             g.DrawRectangle(new RectangleF(rect.X, rect.Y, rect.Width, borderW), BorderColor);
@@ -216,70 +424,94 @@ namespace MDTPro.ALPR {
             g.DrawRectangle(new RectangleF(rect.X, rect.Y, borderW, rect.Height), BorderColor);
             g.DrawRectangle(new RectangleF(rect.X + rect.Width - borderW, rect.Y, borderW, rect.Height), BorderColor);
 
-            // Top state band
             g.DrawRectangle(new RectangleF(rect.X + borderW, rect.Y + borderW, rect.Width - borderW * 2, topBandH), Color.FromArgb(120, accentColor));
-
             float contentX = rect.X + padding;
-            float rightX = rect.X + rect.Width - padding;
-            float lineY = rect.Y + topBandH + padding;
+            float lineY = rect.Y + topBandH + padding * 0.35f;
 
-            // Header text
-            string headerTitle = isAlert ? "ALPR ALERT" : "ALPR SCANNER";
-            g.DrawText(headerTitle, FontName, fontSizeSmall, new PointF(contentX, rect.Y + 4f * scale), TextColor);
+            g.DrawText("MDT ALPR", FontName, fontSizeSmall, new PointF(contentX, rect.Y + 4f * scale), TextColor);
+            lineY = rect.Y + topBandH + padding;
 
-            // Status pill (top-right)
-            float pillX = rightX - statusPillW;
-            float pillY = rect.Y + 4f * scale;
-            g.DrawRectangle(new RectangleF(pillX, pillY, statusPillW, statusPillH), PillBgColor);
-            string pillText = isAlert ? "HIT" : "SCAN";
-            g.DrawText(pillText, FontName, fontSizeSmall, new PointF(pillX + 6f * scale, pillY + 1f * scale), accentColor);
+            g.DrawText("READS", FontName, fontSizeSmall * 0.95f, new PointF(contentX, lineY), TextMutedColor);
+            lineY += rowCompactH * 0.85f;
 
-            // Plate/title line
-            string plateText = isScanning ? "Scanning" : SafeTrim(hit.Plate, (int)(22 * scale));
-            Color plateColor = isScanning ? TextMutedColor : TextColor;
-            g.DrawText(string.IsNullOrEmpty(plateText) ? "UNKNOWN" : plateText, FontName, isScanning ? fontSizeBody : fontSizeTitle, new PointF(contentX, lineY), plateColor);
-            lineY += lineHeight;
+            if (listEmpty) {
+                g.DrawText("Awaiting plate reads…", FontName, fontSizeBody, new PointF(contentX, lineY), TextMutedColor);
+                lineY += rowCompactH;
+            } else {
+                float summaryColX = contentX + 118f * scale;
+                float summaryRight = rect.X + rect.Width - borderW - padding - 2f;
+                for (int i = 0; i < listCount; i++) {
+                    AlprTerminalRow row = rows[i];
+                    string plate = SafeTrim(row.Hit?.Plate ?? row.PlateKey, 14);
+                    string sens = SafeTrim(row.SensorId, 3);
+                    string comp = TrimHudLineToWidth(row.CompactSummary, summaryColX, summaryRight, fontSizeSmall);
+                    Color rowAccent = RowAccentForHit(row.Hit);
+                    g.DrawText(sens, FontName, fontSizeSmall, new PointF(contentX, lineY), ALPRController.IsTerminalSensorFlashActive(row.SensorId) ? ScanAccentColor : rowAccent);
+                    g.DrawText(plate, FontName, fontSizeBody, new PointF(contentX + 28f * scale, lineY), TextColor);
+                    if (!string.IsNullOrEmpty(comp))
+                        g.DrawText(comp, FontName, fontSizeSmall, new PointF(summaryColX, lineY), rowAccent);
+                    lineY += rowCompactH;
+                }
+            }
 
-            // Owner + model + color + flags (or just "Scanning" when idle)
-            if (isScanning) {
+            DrawSensorIndicatorRow(g, contentX, lineY, fontSizeSmall, scale);
+            lineY += sensorBarH;
+
+            g.DrawRectangle(new RectangleF(contentX, lineY, panelW - padding * 2, 1f), DividerColor);
+            lineY += padding * 0.6f;
+            g.DrawText("DETAIL", FontName, fontSizeSmall * 0.9f, new PointF(contentX, lineY), TextMutedColor);
+            lineY += lineHeight * 0.9f;
+
+            if (detailScanning) {
+                g.DrawText("Scanning", FontName, fontSizeTitle, new PointF(contentX, lineY), TextMutedColor);
+                lineY += lineHeight;
                 g.DrawText("Monitoring nearby plates", FontName, fontSizeBody, new PointF(contentX, lineY), TextMutedColor);
                 lineY += lineHeight;
-            } else {
-                string owner = SafeTrim(hit.Owner, (int)(28 * scale));
-                string model = SafeTrim(hit.ModelDisplayName, (int)(22 * scale));
+            } else if (dh != null) {
+                g.DrawText(SafeTrim(dh.Plate, 22), FontName, fontSizeTitle, new PointF(contentX, lineY), TextColor);
+                lineY += lineHeight;
+                string owner = SafeTrim(dh.Owner, 28);
                 g.DrawText("Owner: " + (string.IsNullOrEmpty(owner) ? "Unknown" : owner), FontName, fontSizeBody, new PointF(contentX, lineY), TextMutedColor);
                 lineY += lineHeight;
+                string model = SafeTrim(dh.ModelDisplayName, 24);
                 g.DrawText("Vehicle: " + (string.IsNullOrEmpty(model) ? "Unknown" : model), FontName, fontSizeBody, new PointF(contentX, lineY), TextMutedColor);
                 lineY += lineHeight;
                 if (hasColorLine) {
-                    g.DrawText("Color: " + SafeTrim(hit.VehicleColor, (int)(28 * scale)), FontName, fontSizeBody, new PointF(contentX, lineY), TextMutedColor);
+                    g.DrawText("Color: " + SafeTrim(dh.VehicleColor, 28), FontName, fontSizeBody, new PointF(contentX, lineY), TextMutedColor);
                     lineY += lineHeight;
                 }
-
-                if (hit.Flags != null && hit.Flags.Count > 0) {
-                    foreach (string f in hit.Flags) {
+                if (dh.Flags != null) {
+                    float detailTextRight = rect.X + rect.Width - borderW - padding - 2f;
+                    foreach (string f in dh.Flags) {
                         Color c = IsSevereFlag(f) ? FlagStolenColor : FlagExpiredColor;
-                        g.DrawText("• " + SafeTrim(f, (int)(34 * scale)), FontName, fontSizeBody, new PointF(contentX, lineY), c);
+                        string line = TrimHudLineToWidth(AlprHitBuilder.FormatFlagForDetailHud(f), contentX, detailTextRight, fontSizeBody);
+                        g.DrawText(line, FontName, fontSizeBody, new PointF(contentX, lineY), c);
                         lineY += lineHeight;
                     }
                 }
-
-                int remaining = ALPRController.GetDisplayedHitSecondsRemaining();
-                g.DrawText("Hold: " + remaining + "s", FontName, fontSizeBody, new PointF(contentX, lineY), TextMutedColor);
-                lineY += lineHeight;
+                if (ALPRController.IsDetailHoldVisible()) {
+                    int remaining = ALPRController.GetDisplayedHitSecondsRemaining();
+                    g.DrawText("Hold: " + remaining + "s", FontName, fontSizeBody, new PointF(contentX, lineY), TextMutedColor);
+                    lineY += lineHeight;
+                }
             }
-
-            // Divider + hold bar
-            float dividerY = rect.Y + rect.Height - holdBarH - borderW - 1f;
-            g.DrawRectangle(new RectangleF(rect.X + borderW, dividerY - 1f, rect.Width - borderW * 2, 1f), DividerColor);
 
             float fillWidth = rect.Width - borderW * 2;
-            if (isAlert) {
-                int remaining = ALPRController.GetDisplayedHitSecondsRemaining();
-                float ratio = Math.Max(0f, Math.Min(1f, remaining / 30f));
-                fillWidth *= ratio;
+            if (hotAlert && ALPRController.IsDetailHoldVisible()) {
+                fillWidth *= ALPRController.GetDisplayedHitHoldRemainingFraction();
             }
             g.DrawRectangle(new RectangleF(rect.X + borderW, rect.Y + rect.Height - holdBarH - borderW, fillWidth, holdBarH), accentColor);
+        }
+
+        private static void DrawSensorIndicatorRow(Rage.Graphics g, float contentX, float lineY, float fontSizeSmall, float scale) {
+            string[] ids = { "FL", "FR", "RL", "RR" };
+            float step = 52f * scale;
+            for (int i = 0; i < ids.Length; i++) {
+                bool flash = ALPRController.IsTerminalSensorFlashActive(ids[i]);
+                var pill = new RectangleF(contentX + i * step, lineY, 40f * scale, 16f * scale);
+                g.DrawRectangle(pill, flash ? Color.FromArgb(200, ScanAccentColor) : PillBgColor);
+                g.DrawText(ids[i], FontName, fontSizeSmall * 0.9f, new PointF(pill.X + 8f * scale, pill.Y + 1f * scale), flash ? TextColor : TextMutedColor);
+            }
         }
 
         private static bool IsScanningPlaceholder(ALPRHit hit) {
@@ -294,10 +526,32 @@ namespace MDTPro.ALPR {
             return value.Substring(0, maxLen) + "…";
         }
 
+        /// <summary>Shorten text so DrawText at <paramref name="fontSize"/> is unlikely to spill past <paramref name="rightX"/> (Rage has no clip rect).</summary>
+        private static string TrimHudLineToWidth(string value, float leftX, float rightX, float fontSize) {
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+            float avail = rightX - leftX - 2f;
+            if (avail < 24f) avail = 24f;
+            // Average glyph width for mixed Latin text at small HUD sizes (conservative).
+            float approxChar = Math.Max(4.5f, fontSize * 0.52f);
+            int maxLen = (int)Math.Floor(avail / approxChar);
+            if (maxLen < 10) maxLen = 10;
+            if (maxLen > 140) maxLen = 140;
+            return SafeTrim(value, maxLen);
+        }
+
         private static bool IsSevereFlag(string flag) {
-            if (string.IsNullOrEmpty(flag)) return false;
-            string lower = flag.ToLowerInvariant();
-            return lower.Contains("stolen") || lower.Contains("wanted") || lower.Contains("no registration") || lower.Contains("no insurance");
+            if (string.IsNullOrWhiteSpace(flag)) return false;
+            string f = flag.Trim();
+            return string.Equals(f, "Stolen", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(f, "BOLO", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(f, "Owner wanted", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static Color RowAccentForHit(ALPRHit hit) {
+            if (hit == null) return TextMutedColor;
+            if (AlprHitBuilder.HasSevereAlertForPromotion(hit)) return AlertAccentColor;
+            if (AlprHitBuilder.HasInterestingFlagsExcludingNotInDatabase(hit)) return PaperworkRowAccentColor;
+            return TextMutedColor;
         }
 
         private static void ResolvePosition(string anchor, int offsetX, int offsetY, int screenW, int screenH, float panelW, float panelH, out float x, out float y) {

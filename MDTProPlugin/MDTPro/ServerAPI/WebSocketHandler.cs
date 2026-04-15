@@ -124,7 +124,6 @@ namespace MDTPro.ServerAPI {
         private static Task SendUpdatesOnInterval(WebSocket webSocket, string clientMsg, CancellationToken token) {
             return Task.Run(async () => {
                 string lastLocationJson = null;
-                string lastTimeJson = null;
                 string lastCoordsJson = null;
                 try {
                     while (webSocket.State == WebSocketState.Open && Server.RunServer && !token.IsCancellationRequested) {
@@ -140,12 +139,10 @@ namespace MDTPro.ServerAPI {
                                 }
                                 break;
                             case "time":
+                                // Always push on the interval — clients use each tick to refresh wall-clock UI and
+                                // shift duration; deduping on the game-time string stops updates when time is unchanged (e.g. pause).
                                 responseMsg = $"\"{DataController.CurrentTime}\"";
-
-                                if (responseMsg != lastTimeJson) {
-                                    lastTimeJson = responseMsg;
-                                    await SendData(webSocket, responseMsg, clientMsg, token);
-                                }
+                                await SendData(webSocket, responseMsg, clientMsg, token);
                                 break;
                             case "playerCoords":
                                 responseMsg = JsonConvert.SerializeObject(DataController.PlayerCoords);
