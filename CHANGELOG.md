@@ -4,6 +4,18 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
+## [0.9.9.2] — 2026-04-21
+
+### Improvements
+
+- **ALPR** — Flagged plates (including “not in database”) only show on the reader **occasionally**, so traffic-heavy sessions aren’t one long alert list. Stolen / BOLO / wanted alerts are still spaced out so you’re not bombarded with sounds or popups.
+
+- **Reports** — Saved report lists (**native desktop MDT** and **in-game / browser MDT**) show the **newest** report first (by time, then report number), instead of oldest at the top.
+
+### Bug Fixes
+
+- Fixed occasional frame drops and stutter while the MDT is open in your browser or native desktop app.
+
 ## [0.9.9.1] — 2026-04-15
 
 ### Major Features

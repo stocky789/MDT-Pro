@@ -16,12 +16,15 @@ namespace MDTPro.ALPR {
     /// Coordinates ALPR scanning, flag detection, and broadcasting to HUD/WebSocket.
     /// Registration/insurance flags follow live CDF vehicle documents only (same source as Callout Interface), not null/empty string heuristics or SQLite snapshots.
     /// Owner driver-license alerts use CDF on the vehicle owner (same backing as Person Search), not LSPDFR Persona.
-    /// Alert hits (stolen, BOLO, wanted, paperwork, etc.) are randomly throttled with <see cref="AlprDefaults.TerminalAlertFlagRollChanceMin"/>–max per scan; lone NO DATA reads are not rolled.
+    /// Flagged reads (NO DATA, paperwork, stolen, etc.): at most one roll every <see cref="AlprDefaults.MinSecondsBetweenFlaggedPoolRollAttempts"/>s
+    /// while flagged vehicles are in view; each roll is ~5–10% (then at most one car from the pool). Same path for in-game HUD and browser/native.
     /// </summary>
     internal static class ALPRController {
         private static GameFiber _scanFiber;
         private static readonly HashSet<string> AlertedPlates = new HashSet<string>();
         private static readonly Dictionary<string, DateTime> PlateCooldown = new Dictionary<string, DateTime>();
+        /// <summary>Per-plate quiet window so paperwork-only hits do not re-bubble the same plate every tick.</summary>
+        private static readonly Dictionary<string, DateTime> PaperworkPlateQuietUntilUtc = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
         private static readonly object Lock = new object();
         /// <summary>Wall-clock hold for stolen/BOLO/wanted detail promotion.</summary>
         private const int DisplayedHitHoldSecondsSevere = 45;
@@ -35,6 +38,7 @@ namespace MDTPro.ALPR {
         private static DateTime _lastSensorFlashUtc = DateTime.MinValue;
         private static int _scanLoopCount;
         private static DateTime _lastSeverePromotionUtc = DateTime.MinValue;
+        private static DateTime _nextFlaggedPoolRollUtc = DateTime.MinValue;
         private static readonly Random AlertFlagRollRng = new Random();
 
         internal static ALPRHit CurrentHit { get; private set; }
@@ -80,7 +84,9 @@ namespace MDTPro.ALPR {
             lock (Lock) {
                 AlertedPlates.Clear();
                 PlateCooldown.Clear();
+                PaperworkPlateQuietUntilUtc.Clear();
             }
+            _nextFlaggedPoolRollUtc = DateTime.MinValue;
 
             _scanFiber = GameFiber.StartNew(ScanLoop);
             ALPRHUD.Start();
@@ -96,11 +102,13 @@ namespace MDTPro.ALPR {
             CurrentHit = null;
             _currentHitHoldUntilUtc = DateTime.MinValue;
             _lastSeverePromotionUtc = DateTime.MinValue;
+            _nextFlaggedPoolRollUtc = DateTime.MinValue;
             TerminalSession.Clear();
             TryDeleteFlagBlip();
             lock (Lock) {
                 AlertedPlates.Clear();
                 PlateCooldown.Clear();
+                PaperworkPlateQuietUntilUtc.Clear();
             }
             Log("ALPR stopped", false, LogSeverity.Info);
         }
@@ -109,11 +117,13 @@ namespace MDTPro.ALPR {
             CurrentHit = null;
             _currentHitHoldUntilUtc = DateTime.MinValue;
             _lastSeverePromotionUtc = DateTime.MinValue;
+            _nextFlaggedPoolRollUtc = DateTime.MinValue;
             TerminalSession.Clear();
             TryDeleteFlagBlip();
             lock (Lock) {
                 AlertedPlates.Clear();
                 PlateCooldown.Clear();
+                PaperworkPlateQuietUntilUtc.Clear();
             }
         }
 
@@ -179,6 +189,7 @@ namespace MDTPro.ALPR {
             if (reads == null || reads.Count == 0) return;
 
             int cooldownSec = GetConfiguredWebToastPlateCooldownSeconds();
+            var flaggedCandidates = new List<(PlateReadResult read, ALPRHit hit, string plateKey)>();
 
             foreach (PlateReadResult read in reads) {
                 Vehicle v = read.Target;
@@ -189,59 +200,95 @@ namespace MDTPro.ALPR {
                 try {
                     ALPRHit hit = BuildAlprHitForWebFromVehicle(v);
                     if (hit == null) continue;
+                    bool onlyNoData = AlprHitBuilder.HasOnlyNotInDatabaseFlags(hit);
                     bool interesting = AlprHitBuilder.HasInterestingFlagsExcludingNotInDatabase(hit);
-                    if (interesting && !RollAlertFlagReadPasses())
+                    if (!onlyNoData && !interesting) {
+                        CommitAlprReadToTerminalAndAlerts(read, hit, plateKey, cooldownSec);
                         continue;
-                    string compact = AlprHitBuilder.BuildCompactSummary(hit);
-                    bool severe = AlprHitBuilder.HasSevereAlertForPromotion(hit);
-                    bool paperworkHold = AlprHitBuilder.HasPaperworkOrLicenseAlert(hit);
-                    TerminalSession.RecordRead(plateKey, hit, read.Sensor.Id, compact);
-                    _lastSensorFlashId = read.Sensor.Id;
-                    _lastSensorFlashUtc = DateTime.UtcNow;
-
-                    if (severe || paperworkHold) {
-                        int holdSec = severe ? DisplayedHitHoldSecondsSevere : DisplayedHitHoldSecondsPaperwork;
-                        TryPromoteOrRefreshDisplayedHit(hit, holdSec, severe);
                     }
 
-                    if (!severe)
-                        continue;
-
-                    bool plateFresh;
-                    lock (Lock) {
-                        plateFresh = !AlertedPlates.Contains(plateKey);
-                    }
-                    if (!plateFresh)
-                        continue;
-
-                    var nowUtc = DateTime.UtcNow;
-                    if ((nowUtc - _lastSeverePromotionUtc).TotalSeconds < AlprDefaults.MinSecondsBetweenSeverePromotions)
-                        continue;
-
-                    lock (Lock) {
-                        if (AlertedPlates.Contains(plateKey))
-                            continue;
-                        AlertedPlates.Add(plateKey);
-                        PlateCooldown[plateKey] = nowUtc.AddSeconds(cooldownSec);
+                    if (AlprHitBuilder.IsPaperworkOnlyHit(hit)) {
+                        var nowQuiet = DateTime.UtcNow;
+                        lock (Lock) {
+                            if (PaperworkPlateQuietUntilUtc.TryGetValue(plateKey, out DateTime until) && nowQuiet < until)
+                                continue;
+                        }
                     }
 
-                    _lastSeverePromotionUtc = nowUtc;
-
-                    if (AlprDefaults.PlaySoundOnFlaggedHit)
-                        PlayAlprHitSound();
-                    TryEnqueueWebToastFromScanner(hit);
-                    if (AlprDefaults.BlipOnFlaggedHit)
-                        TryAttachFlagBlip(v);
+                    flaggedCandidates.Add((read, hit, plateKey));
                 } catch (Exception ex) {
                     Log($"ALPR advanced skip {plate}: {ex.Message}", false, LogSeverity.Warning);
                 }
             }
+
+            if (flaggedCandidates.Count == 0)
+                return;
+            var rollUtc = DateTime.UtcNow;
+            if (rollUtc < _nextFlaggedPoolRollUtc)
+                return;
+            _nextFlaggedPoolRollUtc = rollUtc.AddSeconds(Math.Max(1, AlprDefaults.MinSecondsBetweenFlaggedPoolRollAttempts));
+            if (!RollBandPasses(AlprDefaults.TerminalFlaggedReadShowChanceMin, AlprDefaults.TerminalFlaggedReadShowChanceMax))
+                return;
+
+            int pick = AlertFlagRollRng.Next(flaggedCandidates.Count);
+            (PlateReadResult read, ALPRHit hit, string plateKey) chosen = flaggedCandidates[pick];
+            if (AlprHitBuilder.IsPaperworkOnlyHit(chosen.hit)) {
+                lock (Lock) {
+                    PaperworkPlateQuietUntilUtc[chosen.plateKey] = DateTime.UtcNow.AddSeconds(AlprDefaults.PaperworkPlateReshowCooldownSeconds);
+                }
+            }
+            CommitAlprReadToTerminalAndAlerts(chosen.read, chosen.hit, chosen.plateKey, cooldownSec);
         }
 
-        /// <summary>Random gate for any flagged read (stolen, BOLO, paperwork, etc.); not used for lone &quot;Not in database&quot; hits.</summary>
-        private static bool RollAlertFlagReadPasses() {
-            double min = AlprDefaults.TerminalAlertFlagRollChanceMin;
-            double max = AlprDefaults.TerminalAlertFlagRollChanceMax;
+        /// <summary>Writes one read to the terminal, detail hold, and severe web/sound path (after any random gate).</summary>
+        private static void CommitAlprReadToTerminalAndAlerts(PlateReadResult read, ALPRHit hit, string plateKey, int cooldownSec) {
+            Vehicle v = read.Target;
+            if (v == null || !v.Exists()) return;
+
+            string compact = AlprHitBuilder.BuildCompactSummary(hit);
+            bool severe = AlprHitBuilder.HasSevereAlertForPromotion(hit);
+            bool paperworkHold = AlprHitBuilder.HasPaperworkOrLicenseAlert(hit);
+            TerminalSession.RecordRead(plateKey, hit, read.Sensor.Id, compact);
+            _lastSensorFlashId = read.Sensor.Id;
+            _lastSensorFlashUtc = DateTime.UtcNow;
+
+            if (severe || paperworkHold) {
+                int holdSec = severe ? DisplayedHitHoldSecondsSevere : DisplayedHitHoldSecondsPaperwork;
+                TryPromoteOrRefreshDisplayedHit(hit, holdSec, severe);
+            }
+
+            if (!severe)
+                return;
+
+            bool plateFresh;
+            lock (Lock) {
+                plateFresh = !AlertedPlates.Contains(plateKey);
+            }
+            if (!plateFresh)
+                return;
+
+            var nowUtc = DateTime.UtcNow;
+            if ((nowUtc - _lastSeverePromotionUtc).TotalSeconds < AlprDefaults.MinSecondsBetweenSeverePromotions)
+                return;
+
+            lock (Lock) {
+                if (AlertedPlates.Contains(plateKey))
+                    return;
+                AlertedPlates.Add(plateKey);
+                PlateCooldown[plateKey] = nowUtc.AddSeconds(cooldownSec);
+            }
+
+            _lastSeverePromotionUtc = nowUtc;
+
+            if (AlprDefaults.PlaySoundOnFlaggedHit)
+                PlayAlprHitSound();
+            TryEnqueueWebToastFromScanner(hit);
+            if (AlprDefaults.BlipOnFlaggedHit)
+                TryAttachFlagBlip(v);
+        }
+
+        /// <summary>Random gate: draw threshold in [min,max], pass if second draw is below it (expected rate ≈ (min+max)/2).</summary>
+        private static bool RollBandPasses(double min, double max) {
             if (max <= min)
                 return AlertFlagRollRng.NextDouble() < min;
             double threshold = min + AlertFlagRollRng.NextDouble() * (max - min);
@@ -300,6 +347,12 @@ namespace MDTPro.ALPR {
                     PlateCooldown.Remove(key);
                     AlertedPlates.Remove(key);
                 }
+                var quietDone = PaperworkPlateQuietUntilUtc
+                    .Where(kv => now >= kv.Value)
+                    .Select(kv => kv.Key)
+                    .ToList();
+                foreach (string key in quietDone)
+                    PaperworkPlateQuietUntilUtc.Remove(key);
             }
         }
 

@@ -64,6 +64,9 @@ namespace MDTPro.Utility {
                         } finally {
                             try { bi.Done.Set(); } catch { /* ignore */ }
                         }
+                        // Never drain an arbitrary backlog in one script tick — yields keep the game
+                        // fiber from hitch-spiking when many HTTP/WebSocket paths enqueue blocking work.
+                        GameFiber.Yield();
                     } else {
                         GameFiber.Yield();
                     }

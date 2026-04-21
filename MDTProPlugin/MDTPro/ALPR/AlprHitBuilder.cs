@@ -155,6 +155,22 @@ namespace MDTPro.ALPR {
             return false;
         }
 
+        /// <summary>Plate returned only &quot;Not in database&quot; (no other flags).</summary>
+        internal static bool HasOnlyNotInDatabaseFlags(ALPRHit hit) {
+            if (hit?.Flags == null || hit.Flags.Count == 0) return false;
+            foreach (string raw in hit.Flags) {
+                if (string.IsNullOrWhiteSpace(raw)) continue;
+                if (!string.Equals(raw.Trim(), "Not in database", StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+            return true;
+        }
+
+        /// <summary>Registration / insurance / DL hits without stolen, BOLO, or owner wanted.</summary>
+        internal static bool IsPaperworkOnlyHit(ALPRHit hit) {
+            return HasPaperworkOrLicenseAlert(hit) && !HasSevereAlertForPromotion(hit);
+        }
+
         internal static List<string> BuildFlagsFromLiveCdfVehicle(MDTProVehicleData vd, MDTProVehicleData dbVehicle) {
             var flags = new List<string>();
             if (vd != null && vd.IsStolen)

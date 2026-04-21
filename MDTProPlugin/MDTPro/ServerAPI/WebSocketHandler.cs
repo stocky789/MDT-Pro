@@ -130,7 +130,12 @@ namespace MDTPro.ServerAPI {
                         string responseMsg;
                         switch (clientMsg) {
                             case "playerLocation":
-                                DataController.RefreshMdtLocationOnGameFiberBlocking(250);
+                                // Location is already refreshed on the game fiber by SetupController's
+                                // "dynamic-data-update-interval" loop at the same webSocketUpdateInterval.
+                                // Do not call RefreshMdtLocationOnGameFiberBlocking here: it duplicated
+                                // expensive address resolution (zone/street/postal) and queued blocking work
+                                // that starved GameFiberHttpBridge and caused stutter when any MDT client
+                                // held a location WebSocket open.
                                 responseMsg = JsonConvert.SerializeObject(DataController.MdtPreferredLocation);
 
                                 if (responseMsg != lastLocationJson) {
