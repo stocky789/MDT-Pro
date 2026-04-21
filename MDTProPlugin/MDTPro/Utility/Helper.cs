@@ -65,6 +65,15 @@ namespace MDTPro.Utility {
             }
         }
 
+        /// <summary>True when <see cref="Setup.Config.performanceDiagnosticLogging"/> is enabled (safe if setup not ready).</summary>
+        internal static bool IsPerformanceDiagnosticLoggingEnabled() {
+            try {
+                return Setup.SetupController.GetConfig().performanceDiagnosticLogging;
+            } catch {
+                return false;
+            }
+        }
+
         /// <summary>Writes to MDTPro.log only when <see cref="Setup.Config.verboseArrestCourtLogging"/> is true.</summary>
         internal static void LogArrestCourtVerbose(string message) {
             try {

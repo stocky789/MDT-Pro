@@ -225,6 +225,8 @@ namespace MDTPro.Setup {
 
         /// <summary>When true, startup writes the full config JSON and MDT folder file list to MDTPro.log. Default off keeps the log short.</summary>
         public bool verboseFileLogging = false;
+        /// <summary>When true, writes <c>[Perf]</c> lines to MDTPro.log (WebSocket/HTTP/bridge as implemented). Periodic location+nearby timing is throttled so the game fiber does not sync-append to disk every second. Turn off after testing.</summary>
+        public bool performanceDiagnosticLogging = false;
         /// <summary>When the log file exceeds this size (KB), it is shortened automatically (newest half kept). 0 = no limit.</summary>
         public int logFileMaxSizeKb = 5120;
     }

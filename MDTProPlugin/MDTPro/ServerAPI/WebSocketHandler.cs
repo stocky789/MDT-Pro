@@ -123,6 +123,16 @@ namespace MDTPro.ServerAPI {
 
         private static Task SendUpdatesOnInterval(WebSocket webSocket, string clientMsg, CancellationToken token) {
             return Task.Run(async () => {
+                if (IsPerformanceDiagnosticLoggingEnabled())
+                    Log($"[Perf] WebSocket interval started: {clientMsg}", false, LogSeverity.Info);
+                int intervalMs = 1000;
+                try {
+                    int iv = SetupController.GetConfig().webSocketUpdateInterval;
+                    if (iv < 50) iv = 50;
+                    intervalMs = iv;
+                } catch {
+                    /* keep default */
+                }
                 string lastLocationJson = null;
                 string lastCoordsJson = null;
                 try {
@@ -162,7 +172,7 @@ namespace MDTPro.ServerAPI {
                                 return;
                         }
 
-                        await Task.Delay(SetupController.GetConfig().webSocketUpdateInterval, token);
+                        await Task.Delay(intervalMs, token);
                     }
                 } catch (OperationCanceledException) {
                 } catch (WebSocketException wse) when (wse.InnerException?.Message.Contains("nonexistent network connection") ?? false) {
