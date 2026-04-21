@@ -366,7 +366,7 @@ public partial class ReportsView : UserControl, IMdtBoundView
                 }
             }
 
-            rows.Sort((a, b) => string.Compare(a.Id, b.Id, StringComparison.OrdinalIgnoreCase));
+            rows.Sort(CompareReportRowsNewestFirst);
 
             await Dispatcher.InvokeAsync(() =>
             {
@@ -695,6 +695,23 @@ public partial class ReportsView : UserControl, IMdtBoundView
     }
 
     sealed record ReportCategory(string Label, string TypeKey);
+
+    static int CompareReportRowsNewestFirst(ReportRow a, ReportRow b)
+    {
+        var ta = ReportRowSortInstant(a.Body);
+        var tb = ReportRowSortInstant(b.Body);
+        var c = tb.CompareTo(ta);
+        if (c != 0) return c;
+        return string.Compare(b.Id, a.Id, StringComparison.OrdinalIgnoreCase);
+    }
+
+    static DateTime ReportRowSortInstant(JObject body)
+    {
+        var t = body["TimeStamp"];
+        if (t == null || t.Type == JTokenType.Null) return DateTime.MinValue;
+        if (t.Type == JTokenType.Date) return t.Value<DateTime>();
+        return NativeMdtFormat.TryParseMdtDateTime(t.ToString(), out var dt) ? dt : DateTime.MinValue;
+    }
 
     sealed class ReportRow
     {

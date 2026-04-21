@@ -243,7 +243,17 @@ async function onListPageTypeSelectorButtonClick(type) {
   } catch (_) {
     reports = []
   }
-  reports = reports.slice().reverse()
+  if (Array.isArray(reports) && reports.length > 1) {
+    reports.sort((a, b) => {
+      const ta = new Date(a.TimeStamp).getTime()
+      const tb = new Date(b.TimeStamp).getTime()
+      if (Number.isFinite(ta) && Number.isFinite(tb) && tb !== ta) return tb - ta
+      return String(b.Id ?? '').localeCompare(String(a.Id ?? ''), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      })
+    })
+  }
 
   const filterElement = document.createElement('div')
   filterElement.classList.add('filter')
