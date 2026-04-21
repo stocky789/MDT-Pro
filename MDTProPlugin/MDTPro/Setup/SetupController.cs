@@ -1,3 +1,4 @@
+using MDTPro;
 using MDTPro.Data;
 using MDTPro.Data.Reports;
 using MDTPro.Utility;
@@ -119,7 +120,12 @@ namespace MDTPro.Setup {
                 Helper.WriteToJsonFile(LanguagePath, new Language());
             }
 
+            // Fibers start during SetupDirectory(), before Main starts Server.Start() on a background thread.
+            // RunServer stays false until the listener is up (~120ms sleep inside Server.Start), so we must
+            // wait first — otherwise while (Server.RunServer) exits immediately and SetDynamicData / DB refresh never run.
             GameFiber.StartNew(() => {
+                GameFiber.WaitUntil(() => Server.RunServer, 60000);
+                if (!Server.RunServer) return;
                 while (Server.RunServer) {
                     DataController.SetDatabases();
                     DataController.CheckAndResolvePendingCases();
@@ -129,6 +135,8 @@ namespace MDTPro.Setup {
             }, "data-update-interval");
 
             GameFiber.StartNew(() => {
+                GameFiber.WaitUntil(() => Server.RunServer, 60000);
+                if (!Server.RunServer) return;
                 while (Server.RunServer) {
                     DataController.TryCapturePickupAndPlayerFirearms();
                     GameFiber.Wait(500);
@@ -136,6 +144,8 @@ namespace MDTPro.Setup {
             }, "firearm-capture-interval");
 
             GameFiber.StartNew(() => {
+                GameFiber.WaitUntil(() => Server.RunServer, 60000);
+                if (!Server.RunServer) return;
                 while (Server.RunServer) {
                     DataController.SetDynamicData();
                     GameFiber.Wait(GetConfig().webSocketUpdateInterval);
@@ -165,26 +175,35 @@ namespace MDTPro.Setup {
             }
             if (config.firearmDebugLogging)
                 Helper.Log("[Firearm] Debug logging ENABLED – firearm capture flow will be logged to this file.", false, Helper.LogSeverity.Info);
+            if (config.performanceDiagnosticLogging)
+                Helper.Log("[Perf] Diagnostic logging is on: quiet location/nearby ticks at most every 20s (spikes log immediately); slow HTTP and game-bridge work log as before.", false, Helper.LogSeverity.Info);
         }
+
+        static readonly object ConfigCacheLock = new object();
 
         internal static void ClearCache() {
-            cachedConfig = null;
-            cachedLanguage = null;
-            cachedCitationOptions = null;
-            cachedArrestOptions = null;
+            lock (ConfigCacheLock) {
+                cachedConfig = null;
+                cachedLanguage = null;
+                cachedCitationOptions = null;
+                cachedArrestOptions = null;
+            }
         }
 
-        private static Config cachedConfig;
+        private static volatile Config cachedConfig;
         internal static Config GetConfig() {
-            if (cachedConfig == null) {
+            var c = cachedConfig;
+            if (c != null) return c;
+            lock (ConfigCacheLock) {
+                if (cachedConfig != null) return cachedConfig;
                 var def = new Config();
                 cachedConfig = Helper.ReadFromJsonFile<Config>(ConfigPath) ?? def;
                 EnsureALPRDefaults(cachedConfig, def);
                 EnsureLogFileDefaults(cachedConfig, def);
                 EnsureCitationArrestOptionsFromDefaults(cachedConfig, def);
                 Helper.WriteToJsonFile(ConfigPath, cachedConfig);
+                return cachedConfig;
             }
-            return cachedConfig;
         }
 
         /// <summary>Ensures ALPR config values are sensible. User-facing ALPR options are enable, popup duration, and HUD position only.</summary>
@@ -277,7 +296,9 @@ namespace MDTPro.Setup {
         }
 
         internal static void ResetConfig() {
-            cachedConfig = null;
+            lock (ConfigCacheLock) {
+                cachedConfig = null;
+            }
         }
 
         private static Language cachedLanguage;

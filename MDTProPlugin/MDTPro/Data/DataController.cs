@@ -15,6 +15,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Diagnostics;
 
 namespace MDTPro.Data {
     public class DataController {
@@ -290,6 +291,7 @@ namespace MDTPro.Data {
         private static DateTime _locationPlayerSkippedLastLogUtc = DateTime.MinValue;
         private static int _emptyLocationTicksWhilePlaced;
         private static bool _warnedEmptyWorldAddressOnce;
+        private static DateTime _lastPerfSetDynamicDataLogUtc = DateTime.MinValue;
         internal static string CurrentTime = World.TimeOfDay.ToString();
         internal static PlayerCoords PlayerCoords = new PlayerCoords();
 
@@ -313,9 +315,29 @@ namespace MDTPro.Data {
         }
 
         internal static void SetDynamicData() {
+            bool perf = Helper.IsPerformanceDiagnosticLoggingEnabled();
+            Stopwatch sw = null;
+            long msLoc = 0, msNear = 0;
+            if (perf) sw = Stopwatch.StartNew();
             UpdatePlayerLocation();
+            if (perf) {
+                msLoc = sw.ElapsedMilliseconds;
+                sw.Restart();
+            }
             CurrentTime = World.TimeOfDay.ToString();
             UpdateCachedNearbyVehicles(fullWorldScan: false);
+            if (perf) {
+                msNear = sw.ElapsedMilliseconds;
+                // Avoid appending to MDTPro.log every second on the game fiber (sync disk I/O can hitch GTA,
+                // especially under Program Files + AV). Log immediately when work is costly; else at most every 20s.
+                DateTime now = DateTime.UtcNow;
+                bool costly = msLoc >= 4 || msNear >= 4;
+                bool heartbeat = (now - _lastPerfSetDynamicDataLogUtc).TotalSeconds >= 20d;
+                if (costly || heartbeat) {
+                    _lastPerfSetDynamicDataLogUtc = now;
+                    Helper.Log($"[Perf] SetDynamicData: player location {msLoc}ms, nearby vehicles {msNear}ms", false, Helper.LogSeverity.Info);
+                }
+            }
         }
 
         /// <summary>HTTP runs on the pool; refresh nearby-vehicle cache on the game fiber before Vehicle Search reads it (same idea as <see cref="RefreshMdtLocationOnGameFiberBlocking"/>).</summary>

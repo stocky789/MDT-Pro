@@ -17,7 +17,7 @@ namespace MDTPro.ALPR {
     /// Registration/insurance flags follow live CDF vehicle documents only (same source as Callout Interface), not null/empty string heuristics or SQLite snapshots.
     /// Owner driver-license alerts use CDF on the vehicle owner (same backing as Person Search), not LSPDFR Persona.
     /// Flagged reads (NO DATA, paperwork, stolen, etc.): at most one roll every <see cref="AlprDefaults.MinSecondsBetweenFlaggedPoolRollAttempts"/>s
-    /// while flagged vehicles are in view; each roll is ~5–10% (then at most one car from the pool). Same path for in-game HUD and browser/native.
+    /// while flagged vehicles are in view; each roll uses <see cref="AlprDefaults.TerminalFlaggedReadShowChanceMin"/>–max (then at most one car). Same path for HUD and browser/native.
     /// </summary>
     internal static class ALPRController {
         private static GameFiber _scanFiber;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Threading;
 using Rage;
 
@@ -53,16 +54,30 @@ namespace MDTPro.Utility {
             try {
                 while (FiberShouldRun) {
                     if (FireAndForget.TryDequeue(out var quick)) {
+                        bool perf = Helper.IsPerformanceDiagnosticLoggingEnabled();
+                        var sw = perf ? Stopwatch.StartNew() : null;
                         try { quick(); } catch (Exception ex) {
                             Helper.Log($"GameFiberHttpBridge fire-and-forget: {ex.Message}", false, Helper.LogSeverity.Warning);
                         }
+                        if (perf && sw != null) {
+                            long ms = sw.ElapsedMilliseconds;
+                            if (ms >= 3)
+                                Helper.Log($"[Perf] GameFiberHttpBridge fire-and-forget took {ms}ms", false, Helper.LogSeverity.Info);
+                        }
                     } else if (Blocking.TryDequeue(out var bi)) {
+                        bool perf = Helper.IsPerformanceDiagnosticLoggingEnabled();
+                        var sw = perf ? Stopwatch.StartNew() : null;
                         try {
                             bi.Action();
                         } catch (Exception ex) {
                             bi.Caught = ex;
                         } finally {
                             try { bi.Done.Set(); } catch { /* ignore */ }
+                        }
+                        if (perf && sw != null) {
+                            long ms = sw.ElapsedMilliseconds;
+                            if (ms >= 2)
+                                Helper.Log($"[Perf] GameFiberHttpBridge blocking work took {ms}ms", false, Helper.LogSeverity.Info);
                         }
                         // Never drain an arbitrary backlog in one script tick — yields keep the game
                         // fiber from hitch-spiking when many HTTP/WebSocket paths enqueue blocking work.

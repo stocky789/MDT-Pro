@@ -1,6 +1,7 @@
 using MDTPro.ServerAPI;
 using Rage;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Threading;
@@ -81,7 +82,14 @@ namespace MDTPro {
             HttpListenerResponse res = ctx.Response;
 
             try {
+                bool perf = IsPerformanceDiagnosticLoggingEnabled();
+                var sw = perf ? Stopwatch.StartNew() : null;
                 APIResponse apiRes = GetAPIResponse(req);
+                if (perf && sw != null) {
+                    long ms = sw.ElapsedMilliseconds;
+                    if (ms >= 12)
+                        Log($"[Perf] HTTP {req.HttpMethod} {req.Url.AbsolutePath} handled in {ms}ms", false, LogSeverity.Info);
+                }
 
                 byte[] buffer = apiRes.buffer;
 

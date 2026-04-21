@@ -18,16 +18,16 @@ namespace MDTPro.ALPR {
         /// </summary>
         internal const int MinSecondsBetweenSeverePromotions = 420;
         /// <summary>
-        /// Once per ALPR scan tick, if any sensor has a flagged vehicle in view, one roll uses this band; on success at most
-        /// one of those vehicles is shown (expected pass rate per tick ~(min+max)/2, here about 7.5%). Same roll drives in-game HUD and browser/native popups.
+        /// When a flagged pool roll runs: threshold drawn uniformly in [min,max]; pass if a second uniform draw is below it
+        /// (expected success ~(min+max)/2, here about 14%). Same roll drives in-game HUD and browser/native popups.
         /// </summary>
-        internal const float TerminalFlaggedReadShowChanceMin = 0.05f;
-        internal const float TerminalFlaggedReadShowChanceMax = 0.10f;
+        internal const float TerminalFlaggedReadShowChanceMin = 0.10f;
+        internal const float TerminalFlaggedReadShowChanceMax = 0.18f;
         /// <summary>
-        /// Minimum seconds between attempts to surface any flagged hit (pool may have many cars; without this, each scan tick
-        /// would get its own 5–10% roll). Keeps driving past dense flagged traffic closer to one roll every few seconds.
+        /// Minimum seconds between flagged-pool roll attempts (many flagged cars in view still share one roll; spacing avoids
+        /// stacking many independent chances per second). Lower = more frequent attempts while still not per-tick.
         /// </summary>
-        internal const int MinSecondsBetweenFlaggedPoolRollAttempts = 6;
+        internal const int MinSecondsBetweenFlaggedPoolRollAttempts = 4;
         /// <summary>After a paperwork-only row shows for a plate, suppress re-surfacing that plate in the terminal for this many seconds (same hit echo).</summary>
         internal const int PaperworkPlateReshowCooldownSeconds = 90;
         internal const bool PlaySoundOnFlaggedHit = true;
