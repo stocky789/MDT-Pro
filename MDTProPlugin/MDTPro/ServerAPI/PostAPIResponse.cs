@@ -46,6 +46,43 @@ namespace MDTPro.ServerAPI {
                 return;
             }
 
+            if (path.Equals("wallpaperUser", StringComparison.OrdinalIgnoreCase)) {
+                string wBody = Helper.GetRequestPostData(req);
+                if (string.IsNullOrEmpty(wBody)) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Empty body" }));
+                    contentType = "application/json";
+                    status = 400;
+                    return;
+                }
+                try {
+                    JObject reqJson = JObject.Parse(wBody);
+                    if (reqJson["reset"]?.ToObject<bool>() == true) {
+                        string err = WallpaperUserStore.TryReset();
+                        buffer = err == null
+                            ? Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = true }))
+                            : Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = err }));
+                        contentType = "application/json";
+                        status = err == null ? 200 : 500;
+                        return;
+                    }
+                    string b64 = reqJson["imageBase64"]?.ToString();
+                    string errSave = WallpaperUserStore.TrySaveFromBase64(b64, out int savedBytes);
+                    if (errSave == null) {
+                        buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = true, bytes = savedBytes }));
+                        status = 200;
+                    } else {
+                        buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = errSave }));
+                        status = 400;
+                    }
+                    contentType = "application/json";
+                } catch (Exception e) {
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = e.Message }));
+                    contentType = "application/json";
+                    status = 400;
+                }
+                return;
+            }
+
             if (path.Equals("calloutAction", StringComparison.OrdinalIgnoreCase)) {
                 string bodyCallout = Helper.GetRequestPostData(req);
                 string action = null;

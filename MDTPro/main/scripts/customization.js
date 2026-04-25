@@ -442,6 +442,11 @@ async function renderConfigPage() {
   })
 
   document.querySelector('.main').appendChild(configWrapper)
+  if (typeof window.__mdtCustomWallpaperAfterConfigRender === 'function') {
+    try {
+      window.__mdtCustomWallpaperAfterConfigRender()
+    } catch (_) {}
+  }
 }
 
 document.querySelector('.sidebar .plugins').click()

@@ -234,13 +234,15 @@ function applyQuickBackupMenuForProvider(menu, ultimateBackup, lang) {
   const pluginInfo = await (await fetch('/pluginInfo')).json()
   let activePlugins = getActivePlugins()
   const isDev = /^localhost$|^127\.0\.0\.1$/i.test(location.hostname)
+  // Opt-out: not enabled in the default "all plugins" set (fresh/cleared storage) or in dev auto-merge
+  const pluginsOffByDefault = new Set(['CustomWallpaper'])
   // When no plugins are enabled (fresh install or cleared storage), default to all bundled plugins so Calendar etc. appear
   if (activePlugins.length === 0 && pluginInfo.length > 0) {
-    activePlugins = pluginInfo.map((p) => p.id)
+    activePlugins = pluginInfo.map((p) => p.id).filter((id) => !pluginsOffByDefault.has(id))
     localStorage.setItem('activePlugins', JSON.stringify(activePlugins))
   } else if (isDev && pluginInfo.length > 0) {
     const serverIds = pluginInfo.map((p) => p.id)
-    const missing = serverIds.filter((id) => !activePlugins.includes(id))
+    const missing = serverIds.filter((id) => !activePlugins.includes(id) && !pluginsOffByDefault.has(id))
     if (missing.length > 0) {
       activePlugins = [...activePlugins, ...missing]
       localStorage.setItem('activePlugins', JSON.stringify(activePlugins))

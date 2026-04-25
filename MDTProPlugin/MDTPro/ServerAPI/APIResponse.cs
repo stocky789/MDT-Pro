@@ -3,6 +3,7 @@ using MDTPro.Plugins;
 using MDTPro.Setup;
 using MDTPro.Utility;
 using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -81,6 +82,11 @@ namespace MDTPro.ServerAPI {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(PluginController.GetPlugins()));
                 status = 200;
                 contentType = "text/json";
+            } else if (path == "/wallpaperSettings") {
+                buffer = Encoding.UTF8.GetBytes(WallpaperUserStore.GetStateJson());
+                status = 200;
+                contentType = "text/json";
+                ExtraResponseHeaders = new List<(string, string)> { ("Cache-Control", "no-store") };
             } else if (path == "/roads.geojson") {
                 buffer = File.ReadAllBytes($"{SetupController.MDTProPath}/roads.geojson");
                 status = 200;

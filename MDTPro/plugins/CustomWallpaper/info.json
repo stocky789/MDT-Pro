@@ -1,0 +1,6 @@
+{
+  "name": "Custom Wallpaper",
+  "description": "Upload a PNG or JPEG in Customization → Config. The image is stored in MDTPro and reapplies on every MDT open (not tied to the plugin being enabled). With Department Styling, your image replaces the animated background (not theme colours or badge).",
+  "author": "MDT Pro",
+  "version": "1.0.0"
+}

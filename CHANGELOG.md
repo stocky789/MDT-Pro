@@ -4,6 +4,18 @@ All notable changes to MDT Pro are documented here.
 
 ---
 
+## [0.9.9.3] — 2026-04-25
+
+### Minor Features
+
+- **Custom Wallpaper** — New optional plugin. Enable in **Config and Plugins**, upload your image in Config, then click **Save** to apply it as the background. To reset, use **Use default** in the wallpaper block.
+
+### Bug Fixes
+
+- **Person Search / ID photos** — Further adjustments to PED image loading and disambiguation.
+
+---
+
 ## [0.9.9.2] — 2026-04-21
 
 ### Minor Changes

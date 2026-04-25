@@ -77,6 +77,7 @@ namespace MDTPro.Data {
                     version INTEGER NOT NULL
                 );
 
+                -- One row per display name: two truly different people cannot both have full records if CDF reuses the same name; a future surrogate PedId PK would be required for that edge case.
                 CREATE TABLE IF NOT EXISTS peds (
                     Name                    TEXT PRIMARY KEY,
                     FirstName               TEXT,
