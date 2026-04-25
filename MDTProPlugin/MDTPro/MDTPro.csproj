@@ -39,7 +39,11 @@
     <LangVersion>8.0</LangVersion>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\CalloutInterfaceAPI\CalloutInterfaceAPI.csproj" />
+    <Reference Include="CalloutInterfaceAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null, processorArchitecture=MSIL">
+      <HintPath>..\lib\CalloutInterfaceAPI\CalloutInterfaceAPI.dll</HintPath>
+      <Private>False</Private>
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
     <Reference Include="CommonDataFramework, Version=1.0.0.8, Culture=neutral, processorArchitecture=AMD64">
       <HintPath>..\packages\CommonDataFramework.1.0.0.8\lib\net48\CommonDataFramework.dll</HintPath>
       <Private>False</Private>
@@ -138,6 +142,7 @@
     <Compile Include="ServerAPI\StyleAPIResponse.cs" />
     <Compile Include="ServerAPI\WebSocketHandler.cs" />
     <Compile Include="Utility\Helper.cs" />
+    <Compile Include="Utility\WallpaperUserStore.cs" />
     <Compile Include="Utility\ReportBrandingResolver.cs" />
     <Compile Include="Utility\RageNotification.cs" />
     <Compile Include="Utility\UpdateChecker.cs" />

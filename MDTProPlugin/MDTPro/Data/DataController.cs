@@ -125,9 +125,12 @@ namespace MDTPro.Data {
         private static DateTime _lastContextVehicleSetAt = DateTime.MinValue;
         private static readonly TimeSpan ContextVehicleTtl = TimeSpan.FromSeconds(60);
 
-        /// <summary>Maps recent-ID lookup key -> (handle, timestamp). Keys are full name, or <c>fullName + '\u001f' + yyyy-MM-dd</c> when CDF DOB was known at ID time (avoids wrong portrait when multiple peds share a generated name).</summary>
+        /// <summary>Maps recent-ID lookup key -> (handle, timestamp). Keys: <c>fullName</c> (weak, last ID wins); <c>fullName + '\u001f' + yyyy-MM-dd</c> when CDF DOB was known; <c>fullName + '\u001f' + m + 8-hex</c> from live <see cref="Rage.Ped"/>.<c>Model.Hash</c>. Lookup in <see cref="GetRecentlyIdentifiedPedHandle"/> tries DOB, then model, then name. CDF 1.0.0.8 <c>PedData</c> (NuGet) has no cross-session person id; true duplicate legal names in one DB would need a future surrogate key (<c>peds</c> is <c>Name</c> PK).
+        /// </summary>
         private static readonly Dictionary<string, (Rage.PoolHandle Handle, DateTime At)> recentlyIdentifiedPedHandles = new Dictionary<string, (Rage.PoolHandle, DateTime)>(StringComparer.OrdinalIgnoreCase);
         private const char PedRecentIdentifiedKeySeparator = '\u001f';
+        /// <summary>Prefix for <c>Name + '\u001f' + mXXXXXXXX</c> keys (distinguishes from <c>yyyy-MM-dd</c> DOB keys).</summary>
+        private const string PedRecentIdentifiedModelKeyPrefix = "m";
         private static readonly object _recentlyIdentifiedLock = new object();
         private static readonly TimeSpan RecentlyIdentifiedTtl = TimeSpan.FromMinutes(5);
 
@@ -1386,6 +1389,8 @@ namespace MDTPro.Data {
             lock (_pedDbLock) {
                 // Prefer exact ped match (Holder) first — we're identifying THIS person, so use their record
                 pedData = pedDatabase.FirstOrDefault(x => x.Holder != null && x.Holder.IsValid() && x.Holder.Handle == ped.Handle)
+                    ?? pedDatabase.FirstOrDefault(x => x.Name?.Equals(pedName, StringComparison.OrdinalIgnoreCase) == true && IdentificationEventRowBindingAllowed(ped, x))
+                    ?? keepInPedDatabase.FirstOrDefault(x => x.Name?.Equals(pedName, StringComparison.OrdinalIgnoreCase) == true && IdentificationEventRowBindingAllowed(ped, x))
                     ?? pedDatabase.FirstOrDefault(x => x.Name?.Equals(pedName, StringComparison.OrdinalIgnoreCase) == true)
                     ?? keepInPedDatabase.FirstOrDefault(x => x.Name?.Equals(pedName, StringComparison.OrdinalIgnoreCase) == true);
                 if (pedData == null) {
@@ -2394,18 +2399,27 @@ namespace MDTPro.Data {
             return ok;
         }
 
-        /// <summary>Store ped handle when we identify someone. Citation handout uses this when Holder is null. When CDF exposes DOB, stores under a composite key only (does not overwrite name-only slot for other minimal-identity peds).</summary>
+        static string BuildRecentIdentifiedModelCompositeKey(string trimName, uint modelHash) =>
+            trimName + PedRecentIdentifiedKeySeparator + PedRecentIdentifiedModelKeyPrefix + modelHash.ToString("X8", CultureInfo.InvariantCulture);
+
+        /// <summary>Store ped handle when we identify someone. Citation handout uses this when Holder is null. Writes <c>name+DOB</c> and/or <c>name+modelHash</c> when available. Always also updates the weak <c>name</c>-only entry (lookup tries composites first) so rows without a stored model hash or parseable DOB still resolve for ~5 min.</summary>
         internal static void StoreIdentifiedPedHandle(string pedName, Rage.PoolHandle handle, Ped pedForIdentityKey = null) {
             if (string.IsNullOrWhiteSpace(pedName)) return;
             string trimName = pedName.Trim();
             string dobNorm = null;
+            uint modelHash = 0;
             if (pedForIdentityKey != null && pedForIdentityKey.IsValid()) {
                 if (TryGetLivePedBirthdayForIdentity(pedForIdentityKey, out DateTime liveDob))
                     dobNorm = NormalizeBirthdayForPedIdentityKey(liveDob);
+                try { modelHash = (uint)pedForIdentityKey.Model.Hash; } catch { modelHash = 0; }
             }
             lock (_recentlyIdentifiedLock) {
                 if (!string.IsNullOrEmpty(dobNorm))
                     recentlyIdentifiedPedHandles[trimName + PedRecentIdentifiedKeySeparator + dobNorm] = (handle, DateTime.UtcNow);
+                if (modelHash != 0)
+                    recentlyIdentifiedPedHandles[BuildRecentIdentifiedModelCompositeKey(trimName, modelHash)] = (handle, DateTime.UtcNow);
+                if (string.IsNullOrEmpty(dobNorm) && modelHash == 0)
+                    recentlyIdentifiedPedHandles[trimName] = (handle, DateTime.UtcNow);
                 else
                     recentlyIdentifiedPedHandles[trimName] = (handle, DateTime.UtcNow);
                 PruneRecentlyIdentifiedHandles();
@@ -2425,14 +2439,19 @@ namespace MDTPro.Data {
             return true;
         }
 
-        /// <summary>Get a recently identified ped's handle for citation handout when Holder is null. Prefer <paramref name="persistedBirthdayOptional"/> when the MDT row has DOB (matches composite store key).</summary>
-        internal static Rage.PoolHandle? GetRecentlyIdentifiedPedHandle(string pedName, string persistedBirthdayOptional = null) {
+        /// <summary>Get a recently identified ped's handle for citation handout when Holder is null. Lookup order: <c>name+DOB</c>, <c>name+modelHash</c> (when <paramref name="persistedModelHashOptional"/> is non-zero), <c>name</c> only.</summary>
+        internal static Rage.PoolHandle? GetRecentlyIdentifiedPedHandle(string pedName, string persistedBirthdayOptional = null, uint? persistedModelHashOptional = null) {
             if (string.IsNullOrWhiteSpace(pedName)) return null;
             string trim = pedName.Trim();
             string pNorm = NormalizeBirthdayStringForPedIdentityKey(persistedBirthdayOptional);
             lock (_recentlyIdentifiedLock) {
-                if (!string.IsNullOrEmpty(pNorm) && TryGetRecentlyIdentifiedPedHandleUnlocked(trim + PedRecentIdentifiedKeySeparator + pNorm, out Rage.PoolHandle hComposite))
-                    return hComposite;
+                if (!string.IsNullOrEmpty(pNorm) && TryGetRecentlyIdentifiedPedHandleUnlocked(trim + PedRecentIdentifiedKeySeparator + pNorm, out Rage.PoolHandle hDob))
+                    return hDob;
+                if (persistedModelHashOptional.HasValue && persistedModelHashOptional.Value != 0) {
+                    string mk = BuildRecentIdentifiedModelCompositeKey(trim, persistedModelHashOptional.Value);
+                    if (TryGetRecentlyIdentifiedPedHandleUnlocked(mk, out Rage.PoolHandle hModel))
+                        return hModel;
+                }
                 if (TryGetRecentlyIdentifiedPedHandleUnlocked(trim, out Rage.PoolHandle hName))
                     return hName;
                 return null;
@@ -2446,6 +2465,16 @@ namespace MDTPro.Data {
             if (recentlyIdentifiedPedHandles.Count < 200) return;
             foreach (var k in recentlyIdentifiedPedHandles.OrderBy(x => x.Value.At).Take(recentlyIdentifiedPedHandles.Count - 180).Select(x => x.Key).ToList())
                 recentlyIdentifiedPedHandles.Remove(k);
+        }
+
+        /// <summary>Whether an STP/PR identification event for <paramref name="ped"/> may bind to <paramref name="row"/> when resolving by name (refuses when SQLite and CDF both have a DOB and they disagree).</summary>
+        private static bool IdentificationEventRowBindingAllowed(Ped ped, MDTProPedData row) {
+            if (ped == null || row == null) return false;
+            if (LivePedIdentityMatchesRecord(ped, row)) return true;
+            string pNorm = NormalizeBirthdayStringForPedIdentityKey(row.Birthday);
+            if (string.IsNullOrEmpty(pNorm)) return true;
+            if (!TryGetLivePedBirthdayForIdentity(ped, out _)) return true;
+            return false;
         }
 
         /// <summary>True if the world ped's identity (CDF or LSPDFR persona) matches the MDT record name and DOB rules.</summary>
@@ -2519,7 +2548,7 @@ namespace MDTPro.Data {
                 // 1) Just-identified handle map — strongest signal for "the ped in front of you"
                 foreach (string key in new[] { searchName, reversedSearchName, pedData.Name }) {
                     if (string.IsNullOrWhiteSpace(key)) continue;
-                    var handleOpt = GetRecentlyIdentifiedPedHandle(key.Trim(), dob);
+                    var handleOpt = GetRecentlyIdentifiedPedHandle(key.Trim(), dob, pedData.ModelHash != 0 ? (uint?)pedData.ModelHash : null);
                     if (!handleOpt.HasValue) continue;
                     try {
                         Ped live = World.GetEntityByHandle<Ped>(handleOpt.Value);
@@ -2597,6 +2626,45 @@ namespace MDTPro.Data {
                     if (!NameMatchesSearchKeys(liveName.Trim())) continue;
                     nearbyMatches.Add((q, dist));
                 }
+                if (nearbyMatches.Count > 1) {
+                    var byIdentity = new List<(Ped ped, float dist)>();
+                    foreach (var t in nearbyMatches) {
+                        if (LivePedIdentityMatchesRecord(t.ped, pedData))
+                            byIdentity.Add(t);
+                    }
+                    List<(Ped ped, float dist)> disambiguated = null;
+                    if (byIdentity.Count == 1) {
+                        disambiguated = byIdentity;
+                        if (SetupController.GetConfig().pedPortraitDebugLogging)
+                            LogPedPortraitDebug($"nearbyScan: {nearbyMatches.Count} same-name peds, disambiguated by DOB/identity to 1 for '{nameTarget}'.");
+                    } else if (byIdentity.Count == 0 && pedData.ModelHash != 0) {
+                        var byModel = new List<(Ped ped, float dist)>();
+                        foreach (var t in nearbyMatches) {
+                            try {
+                                if (t.ped != null && t.ped.IsValid() && (uint)t.ped.Model.Hash == pedData.ModelHash)
+                                    byModel.Add(t);
+                            } catch { /* ignore */ }
+                        }
+                        if (byModel.Count == 1) {
+                            disambiguated = byModel;
+                            if (SetupController.GetConfig().pedPortraitDebugLogging)
+                                LogPedPortraitDebug($"nearbyScan: {nearbyMatches.Count} same-name peds, disambiguated by model hash to 1 for '{nameTarget}'.");
+                        }
+                    }
+                    if (disambiguated != null)
+                        nearbyMatches = disambiguated;
+                    else if (SetupController.GetConfig().pedPortraitDisallowNearbyWhenDuplicateNameInRadius) {
+                        if (SetupController.GetConfig().pedPortraitDebugLogging) {
+                            if (byIdentity.Count > 1)
+                                LogPedPortraitDebug($"nearbyScan skipped: {byIdentity.Count} peds match name+DOB for '{nameTarget}' in radius (ambiguous).");
+                            else if (byIdentity.Count == 0 && pedData.ModelHash == 0)
+                                LogPedPortraitDebug($"nearbyScan skipped: {nearbyMatches.Count} peds share name '{nameTarget}' in radius, row has no model hash to disambiguate.");
+                            else
+                                LogPedPortraitDebug($"nearbyScan skipped: {nearbyMatches.Count} peds share name '{nameTarget}' in radius (ambiguous after DOB/model checks).");
+                        }
+                        return false;
+                    }
+                }
                 nearbyMatches.Sort((a, b) => a.dist.CompareTo(b.dist));
                 foreach (var (q, _) in nearbyMatches) {
                     if (TryApplyPortraitFromPed(pedData, q, "nearbyScan"))
@@ -2647,7 +2715,7 @@ namespace MDTPro.Data {
                 if (live == null) {
                     foreach (string key in new[] { searchName, reversedSearchName, pedData.Name }) {
                         if (string.IsNullOrWhiteSpace(key)) continue;
-                        var handleOpt = GetRecentlyIdentifiedPedHandle(key.Trim(), pedData.Birthday);
+                        var handleOpt = GetRecentlyIdentifiedPedHandle(key.Trim(), pedData.Birthday, pedData.ModelHash != 0 ? (uint?)pedData.ModelHash : null);
                         if (!handleOpt.HasValue) continue;
                         try {
                             Ped p = World.GetEntityByHandle<Ped>(handleOpt.Value);

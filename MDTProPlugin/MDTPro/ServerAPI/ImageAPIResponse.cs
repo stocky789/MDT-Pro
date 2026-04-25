@@ -1,4 +1,5 @@
 using MDTPro.Setup;
+using MDTPro.Utility;
 using System;
 using System.IO;
 using System.Net;
@@ -33,11 +34,10 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "image/png";
             } else if (path == "desktop") {
-                string desktopPath = $"{SetupController.ImgDirPath}/desktop.png";
-                if (File.Exists(desktopPath)) {
-                    buffer = File.ReadAllBytes(desktopPath);
+                if (WallpaperUserStore.TryGetCustomFile(out byte[] customDesktop, out string customContentType)) {
+                    buffer = customDesktop;
                     status = 200;
-                    contentType = "image/png";
+                    contentType = customContentType;
                 }
             } else if (path == "badge") {
                 string badgeSvg = $"{SetupController.ImgDirPath}/badge.svg";

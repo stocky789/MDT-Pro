@@ -8,8 +8,9 @@ A Police Computer Plugin for LSPDFR. MDT Pro runs a local web server when you go
 
 - **LSPDFR**
 - **CommonDataFramework (CDF)** — **always required.** The plugin will not load without it. This applies to every setup, including if you use StopThePed and Ultimate Backup instead of Policing Redefined.
-- **CalloutInterfaceAPI** — required (DLL in game root or `plugins/LSPDFR/`).
-- **CalloutInterface** — required; the *Active Call* page uses it for live callout details (location, priority, messages). Integration is shallow but required.
+- **CalloutInterfaceAPI.dll** — **required** for the plugin to start. It must be in the GTA V **root** (next to `GTA5.exe`) or in `plugins/LSPDFR/` (same rule as other LSPDFR dependencies).
+- **Newtonsoft.Json.dll** — **required** for the plugin to start. Same search locations as above (release builds place it beside `MDTPro.dll` under `plugins/LSPDFR/`).
+- **Callout Interface** (the plugin) — **optional** for loading MDT Pro. If it is not installed, MDT Pro still runs; the **Active Call** page has no live callout feed (location, priority, messages, etc.) from Callout Interface.
 
 ### Stops, backup, and citations — choose **one** integration path
 
@@ -18,9 +19,9 @@ MDT Pro is built to work with **either** Policing Redefined **or** the StopThePe
 | Path | What to install | Notes |
 |------|-----------------|--------|
 | **Policing Redefined** | **Policing Redefined** | Stops, arrests, citations, and backup (when you choose PR in MDT Pro) use PR’s APIs. |
-| **StopThePed + Ultimate Backup** | **StopThePed**, **Ultimate Backup** | Stops and citation handoff use StopThePed; backup requests use Ultimate Backup when selected in MDT Pro **Customization → Config → Mod integration**. **CDF is still required.** **Do not install Policing Redefined** on this profile. |
+| **StopThePed + Ultimate Backup** | **StopThePed**, **Ultimate Backup** | Stops and citation handoff use StopThePed; **Quick Actions → Backup** uses **Ultimate Backup** when that integration is selected (or **Auto** when Policing Redefined is not present). Configure under **Settings (gear) → Config and Plugins** (or `/page/customization`). **CDF is still required.** **Do not install Policing Redefined** on this profile. |
 
-Use **Customization → Config** in the MDT to select the stop/traffic integration and backup provider (**Auto**, **Policing Redefined**, **StopThePed**, **Ultimate Backup**, etc.) so it matches what you actually run.
+On **Config and Plugins**, set **Traffic stops & events** to match your stop/traffic mod (**Auto**, **Policing Redefined**, or **StopThePed**) and **Backup (Quick Actions)** to match your backup mod (**Auto**, **Policing Redefined**, or **Ultimate Backup**). StopThePed is not a backup provider—only the two rows above apply.
 
 ## Building (for developers)
 
@@ -32,16 +33,16 @@ To build the plugin from source:
    (Or open the solution in Visual Studio; it restores automatically.)
 
 2. **Reference DLLs from game**  
-   Create a `References` folder in the repo root and copy these from your GTA V install:
-   - `plugins/LSPDFR/CalloutInterface.dll`
-   - `plugins/LSPDFR/CalloutInterfaceAPI.dll` (or from game root)
-   - `plugins/LSPDFR/PolicingRedefined.dll` (needed to **compile** the plugin; your **runtime** install can still use only StopThePed + Ultimate Backup if you prefer)
-   - `plugins/LSPDFR/LSPD First Response.dll` (from `plugins/`)
-   - `IPT.Common.dll` (game root)
+   Create a `References` folder in the **repo root** and copy these into it (names must match; compile-time only; not committed). Typical sources are your GTA V directory:
+   - `PolicingRedefined.dll` (e.g. from `plugins\LSPDFR\` — needed to **compile** the plugin; your **runtime** install can still use only StopThePed + Ultimate Backup if you prefer)
+   - `LSPD First Response.dll` (e.g. from `plugins\`)
+   - `IPT.Common.dll` (from the game root, same folder as `GTA5.exe`)
+
+   **CalloutInterfaceAPI:** the project references `MDTProPlugin\lib\CalloutInterfaceAPI\CalloutInterfaceAPI.dll` (see `MDTPro.csproj`). That folder is **not** in the repository — add `CalloutInterfaceAPI.dll` there yourself (e.g. extract it from the [CalloutInterfaceAPI](https://www.nuget.org/packages/CalloutInterfaceAPI) package). You do not need a copy in `References`. At **runtime** you must deploy `CalloutInterfaceAPI.dll` to the game (see **Installation**). The **Callout Interface** plugin (separate download) is optional and only needed for a full **Active Call** experience.
 
    Other dependencies (CommonDataFramework, Newtonsoft.Json, System.Data.SQLite, etc.) come from NuGet. `References` is in `.gitignore` (each dev uses their own game copy).
 
-   **StopThePed API check (optional):** The repo can include `STP/StopThePed.dll` (same file the mod ships). After you upgrade StopThePed, run `powershell -NoProfile -File scripts/verify-stp-api.ps1` to confirm `STPEvents` still matches `StopThePed.API.Events`, and `powershell -NoProfile -File scripts/dump-stp-api.ps1` to refresh the human-readable snapshot in `STP/StopThePed.API.cs`.
+   **StopThePed API check (optional):** The repo can include `STP/StopThePed.dll` (gitignored; same file the mod ships). After you upgrade StopThePed, run `powershell -NoProfile -File scripts/verify-stp-api.ps1` to confirm `STPEvents.cs` still matches the event names on `StopThePed.API.Events` in the DLL. Run `powershell -NoProfile -File scripts/dump-stp-api.ps1` and **redirect output** if you want a text snapshot of `StopThePed.API` types, methods, and events (the script prints to the console; it does not write a file in the repo).
 
 3. **Build**  
    From repo root:  
@@ -49,15 +50,17 @@ To build the plugin from source:
    Or open `MDTProPlugin\MDTPro.sln` in Visual Studio and build **Release**.  
    Output is in `Release\plugins\lspdfr\MDTPro.dll` and `Release\MDTPro\` (web UI is copied automatically).
 
-   Optional: run `.\build.ps1` for a clean build; use `.\build.ps1 -Deploy` to build and copy into your GTA V folder (pass `-GamePath "D:\Games\GTA V"` if your install is elsewhere).
+   Optional: run `.\build.ps1` for a clean full build (includes the **native Windows MDT** under `Release\MDTProNative\`). Use `.\build.ps1 -Deploy` to build and copy into your GTA V folder (pass `-GamePath "D:\Games\GTA V"` if your install is elsewhere). Only use `.\build.ps1 -SkipWindowsApp` if you intentionally want to omit the native desktop app from the output.
 
 ## Installation
 
-- **OpenIV:** Install or uninstall with the `.oiv` package. For full removal, delete the `MDTPro` folder after uninstalling.
+- **OpenIV:** Install or uninstall with the `MDTPro-*.oiv` / `MDTPro-*-Uninstall.oiv` packages from a release build. For full removal, delete the `MDTPro` folder after uninstalling if anything remains.
 - **Manual:** Extract all files and folders from the ZIP into the GTA V main directory (the folder containing `GTA5.exe`).
 
 Your GTA V folder should have:
 - `plugins/LSPDFR/MDTPro.dll`
+- `plugins/LSPDFR/Newtonsoft.Json.dll` (or a copy in the game root; the loader checks both)
+- `CalloutInterfaceAPI.dll` (in the game root or `plugins/LSPDFR/`)
 - `System.Data.SQLite.dll` (in the GTA V root, same folder as `GTA5.exe`)
 - `x64/SQLite.Interop.dll` (in the `x64` folder inside the GTA V root)
 - `MDTPro/` folder (web UI)
@@ -68,9 +71,13 @@ Your GTA V folder should have:
 
 - Overwrite the plugin files with the new version (replace the contents of `plugins/LSPDFR/` and the `MDTPro` folder with the updated files, or merge so that new files are added and existing ones updated). Your existing `MDTPro/data/` and `MDTPro/config.json` are preserved if you don’t delete them.
 - **Config:** Existing installs keep the values already in `MDTPro/config.json`. To use a **new default** (e.g. a lower-CPU WebSocket update rate), either:
-  - Open the MDT in your browser → **Settings** (gear) → **Customization** → **Config** tab, change the setting (e.g. `webSocketUpdateInterval` to `1000`), then **Save**, or
+  - Open the MDT in your browser → **Settings** (gear) → **Config and Plugins** → **Config** tab, change the setting (e.g. `webSocketUpdateInterval` to `1000`), then **Save**, or
   - Edit `MDTPro/config.json` in a text editor and set the value (e.g. `"webSocketUpdateInterval": 1000`), then save the file.
 - No need to wipe data or config unless you want a full reset (see [Resetting data](#resetting-data-optional)).
+
+### Resetting data (optional)
+
+- To clear saved MDT data (SQLite DB, shifts, etc.), delete or empty files under `MDTPro/data/` while the game is closed, or use the `ClearMDTProData` utility in the `ClearMDTProData/` folder (run it from your GTA V directory so paths resolve). Deleting `MDTPro/config.json` resets config to defaults on next load.
 
 ### Logs and troubleshooting
 
@@ -82,11 +89,11 @@ Your GTA V folder should have:
 - Go on duty with LSPDFR. MDT Pro will start its web server and show in-game notifications with the addresses to open the MDT.
 - If you miss the notifications, addresses are also written to `MDTPro/ipAddresses.txt`.
 - Open the MDT in any browser. Chromium-based browsers (e.g. Chrome, Brave) work best. Use one of the shown addresses—if one fails (e.g. firewall), try another.
-- The default port is **9000**. You can change it (and other options) on the **Customization** page (see [Customization](#customization)).
+- The default port is **9000**. You can change it (and other options) on **Config and Plugins** (see [Customization](#customization)).
 
 ### Connecting from another device
 
-If you can't reach the MDT from another device (phone, tablet, another PC on your network), it may be a **Windows Firewall** issue—this is the firewall on your game PC, not your router. Add an inbound rule in Windows Firewall to allow the port MDT Pro uses (9000 by default, or whatever you set in Customization). Without this rule, Windows may block incoming connections from other devices on your network.
+If you can't reach the MDT from another device (phone, tablet, another PC on your network), it may be a **Windows Firewall** issue—this is the firewall on your game PC, not your router. Add an inbound rule in Windows Firewall to allow the port MDT Pro uses (9000 by default, or whatever you set in **Config and Plugins**). Without this rule, Windows may block incoming connections from other devices on your network.
 
 ### Setup using Steam overlay
 
@@ -99,12 +106,12 @@ If you can't reach the MDT from another device (phone, tablet, another PC on you
 
 ### Desktop and Control Panel
 
-- The **taskbar** shows the badge, current location, a **Settings** (gear) button, and the clock. Click **Settings** to open the **Control Panel**.
+- The **taskbar** shows the badge, current location, a **Control Panel** entry (gear icon; default label is “Control Panel” in `language.json`), and the clock. Click it to open the **Control Panel** overlay.
 - In the Control Panel you can:
   - Enter and save **Officer Information** (name, badge number, rank, call sign, department). Use *Fill from Game* to pull your character details from the game when supported.
   - **Start** or **End** your current shift.
   - View **Career Statistics** (totals from completed shifts and reports).
-- The **Customization** link in the Control Panel opens the config and plugins page in a new tab.
+- The **Config and Plugins** link in the Control Panel opens the customization page in a new tab (same as `/page/customization`).
 
 ### Reports
 
@@ -121,13 +128,14 @@ If you can't reach the MDT from another device (phone, tablet, another PC on you
 - **Injury** — Injured party, severity, treatment. Create from Reports or Person Search (name prefilled).
 - **Traffic Incident** — Collisions and multi-vehicle incidents. Available under Reports.
 - **Impound** — Plate, owner, reason, tow company. Create from Reports or Vehicle Search (vehicle prefilled).
+- **Property & evidence** — Subjects and seized items (e.g. drugs, firearms). Create from **Reports** like the other main types.
 
 #### Citation and arrest reports
 
 - The **charges** you add are stored with the report and, if an offender is set, are added to that person’s record for future lookups.
 - **Issuing citations in-game:** With **Policing Redefined**, citations can be delivered from the PR ped menu when you close the citation in the MDT. With **StopThePed** (and **without** Policing Redefined), use the MDT citation handoff flow (e.g. in-game key set in `MDTPro.ini`) so StopThePed receives the ticket. Do not run PR and StopThePed together for this—pick one path (see [Requirements](#requirements)).
 
-### Person Lookup (Ped Search)
+### Person Lookup (Person Search on the desktop)
 
 - Search by name to see information about that person (from MDT Pro and, when available, CDF). Create an Injury Report with name prefilled via "New Injury Report".
 - The **history** section lists citations and arrests. Click a citation or arrest entry to **create a new report** for that ped (pre-filled where applicable).
@@ -138,10 +146,14 @@ If you can't reach the MDT from another device (phone, tablet, another PC on you
 - Search by **license plate** or **VIN** to see vehicle and related information. Create an Impound Report with vehicle prefilled via "Create Impound Report".
 - Click the **owner** in the basic information area to open Person Lookup for the vehicle’s registered owner.
 
+### Firearms Check
+
+- Lookup by serial or other fields where supported. Listed on the desktop alongside Person Search and Vehicle Search.
+
 ### BOLO & Backup
 
-- **BOLO Noticeboard** — Add or remove BOLOs (plate, reason, duration) without the vehicle in front of you. BOLOs sync to CDF and ALPR.
-- **Quick Actions** — Panic, Backup (patrol, traffic stop, transport, tow, etc.), and Clear ALPR from the bottom-right bar. Backup is sent through **Policing Redefined** or **Ultimate Backup** depending on your **Mod integration** settings (and **Auto** picks PR when present, otherwise Ultimate Backup when available).
+- **BOLO Noticeboard** — Add or remove BOLOs (plate, reason, duration) without the vehicle in front of you. BOLOs are stored on vehicles in **CDF / MDT**; the in-game **ALPR** scanner can flag the same plate as a BOLO when you read it.
+- **Quick Actions** — Panic, Backup (patrol, traffic stop, transport, tow, etc.), and Clear ALPR from a **bottom-center** floating bar (fixed position; the whole bar can be turned off in **Config and Plugins**). Backup is sent through **Policing Redefined** or **Ultimate Backup** via **Backup (Quick Actions)** in config (**Auto** uses PR when that mod is available, otherwise Ultimate Backup when available).
 
 ### Shift History
 
@@ -149,7 +161,7 @@ If you can't reach the MDT from another device (phone, tablet, another PC on you
 
 ### Court
 
-- View and manage **court cases** derived from arrest reports. Arrests start as Pending; attach reports (Incident, Injury, Citation, Traffic Incident, Impound) as evidence, then Close arrest to create the case.
+- View and manage **court cases** derived from arrest reports. Arrests start as Pending; attach reports (Incident, Injury, Citation, Traffic Incident, Impound, Property & evidence) as evidence, then close the arrest to create the case.
 - Filter and sort by status, case number, ped name, or report ID.
 - Cases can be updated (e.g. status, resolution); the system supports docket management, sentencing, and related options configurable in `config.json`.
 
@@ -166,17 +178,17 @@ If you can't reach the MDT from another device (phone, tablet, another PC on you
 
 ## Customization
 
-The **Customization** page (linked from the Control Panel, or open `/page/customization` in a new tab) lets you:
+The **Config and Plugins** page (linked from the Control Panel, or open `/page/customization` in a new tab) lets you:
 
 - **Change configuration** — e.g. HTTP port, in-game time vs real time, taskbar clock, window size, map options, court and evidence weights, and more. Settings are stored in `MDTPro/config.json`.
 - **Manage plugins** — enable or disable MDT Pro plugins (see [Plugins](#plugins)).
 
 ### ALPR (Automatic License Plate Recognition)
 
-- ALPR is an **optional** in-game feature. Enable it in **Customization** (config) or via the **in-game Settings menu** (default key **F7**; set in `MDTPro/MDTPro.ini`).
+- ALPR is an **optional** in-game feature. Enable it in **Config and Plugins** (browser) or via the **in-game Settings menu** (default key **F7**; set in `MDTPro/MDTPro.ini`).
 - When enabled and you are **on duty** and in a **police vehicle**, the game scans nearby vehicles and flags plates (e.g. stolen, expired registration/insurance, owner wanted). Flagged hits can show an in-game HUD panel and optional sound or notification.
-- **Where flags come from:** Stolen/expired/wanted are read only from **CDF** and the **MDT database** (vehicles you’ve run or marked in the MDT). If you rarely see any hits, vehicles may be outside the read range—increase `alprReadRangeMeters` in `config.json` (e.g. 18–22).
-- The **ALPR plugin** (in `MDTPro/plugins/ALPR/`) adds **popups in the MDT** when the in-game scanner gets a hit, so you can see details in the browser. Enable the plugin on the Customization page.
+- **Where flags come from:** Stolen/expired/wanted are read only from **CDF** and the **MDT database** (vehicles you’ve run or marked in the MDT). Scan distance and angle are tuned in the plugin code (`AlprDefaults`; not a `config.json` setting). If you rarely see hits, vehicles may be outside range or not facing the sensors; building from source is the way to change those limits.
+- The **ALPR plugin** (in `MDTPro/plugins/ALPR/`) adds **popups in the MDT** when the in-game scanner gets a hit, so you can see details in the browser. Enable the plugin on **Config and Plugins**.
 
 ## Plugins
 
@@ -185,9 +197,11 @@ Plugins extend MDT Pro by injecting JavaScript and CSS and optionally adding new
 ### Using a plugin
 
 - Place the plugin folder inside `MDTPro/plugins`.
-- Enable the plugin on the **Customization** page.
+- Enable the plugin on **Config and Plugins**.
 
 ### Creating a plugin
+
+The plugin’s URL id is the **folder name** under `MDTPro/plugins` (e.g. `ALPR` → `/plugin/ALPR/...`); the server sets `id` from the directory even if you add an `id` field in `info.json`.
 
 #### Plugin folder structure
 
@@ -217,7 +231,7 @@ Multiple pages, scripts, and styles are supported per plugin.
 - CSS in `styles` is served at `/plugin/<pluginId>/style/<fileName>`
 - Images in `images` (optional) at `/plugin/<pluginId>/image/<fileName>` (png, jpg, svg)
 - In JavaScript, get the plugin ID with: `const pluginId = document.currentScript.dataset.pluginId`
-- Scripts and styles are loaded on the main index page when the plugin is enabled on the Customization page.
+- Scripts and styles are loaded on the main index page when the plugin is enabled on **Config and Plugins**.
 
 #### info.json example
 

@@ -303,7 +303,11 @@
   bottom: 0;
   z-index: 0;
   background-color: var(--color-background);
-  background-image: url('/image/desktop');
+  background-image: none;
+}
+
+/* Server-stored custom wallpaper (MDTPro/data + img); not tied to CustomWallpaper plugin load order */
+html[data-mdt-custom-wallpaper="1"] .desktopWallpaper {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

@@ -214,6 +214,9 @@ namespace MDTPro.Setup {
         /// <summary>Max distance (meters) from the player when scanning nearby peds to refresh catalogue portrait for Person Search.</summary>
         public float pedPortraitNearbyScanRadiusMeters = 40f;
 
+        /// <summary>When true, skip Person Search <c>nearbyScan</c> portrait refresh if more than one live ped in range shares the CDF name (avoids wrong face). Set false only for narrow debugging.</summary>
+        public bool pedPortraitDisallowNearbyWhenDuplicateNameInRadius = true;
+
         /// <summary>Backup Quick Actions: Auto (Policing Redefined BackupAPI if present, else Ultimate Backup), PolicingRedefined, or UltimateBackup.</summary>
         public string integrationBackupProvider = "Auto";
 

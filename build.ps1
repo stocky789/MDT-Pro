@@ -1,12 +1,12 @@
-# MDT Pro — builds the full mod into Release\ (plugin DLL + MDTPro web + native desktop + dependencies),
-# publishes the Windows MDC app into Release\MDTProNative (so OpenIV installs it to the GTA V root),
-# then mirrors Release\ into Native Release\.
+# MDT Pro — by DEFAULT builds the full distribution: plugin DLL + MDTPro web + Windows native desktop (MDTProNative)
+# + dependencies, OpenIV .oiv, then mirrors Release\ into Native Release\.
 # Run from repo root: .\build.ps1
 #
 # Options:
-#   .\build.ps1                    Clean rebuild (wipes Release, full build; Native Release\ rebuilt at end)
-#   .\build.ps1 -Incremental       Faster build (no wipe, incremental)
-#   .\build.ps1 -SkipWindowsApp    Build mod only; no MDTProNative\ in Release/OIV (still mirrors Release → Native Release)
+#   .\build.ps1                    Clean rebuild (wipes Release\ first). Includes **MDTProNative** (self-contained WPF app).
+#   .\build.ps1 -Incremental       Faster: no Release\ wipe, incremental. Still includes MDTProNative.
+#   .\build.ps1 -SkipWindowsApp    **Mod + web + OIV only** — does NOT run `dotnet publish` for the native Windows app
+#                                  (Release\MDTProNative is removed/omitted; use this only when you intentionally skip the desktop shell).
 #   .\build.ps1 -Deploy            Build then copy to GTA V (use -GamePath if not default)
 #   .\build.ps1 -Deploy -GamePath "D:\Games\GTA V"
 #   GamePath is also used to copy DamageTrackingFramework.dll into Release (required for injury reports; or use References\DamageTrackingFramework.dll).
@@ -93,7 +93,8 @@ if (-not $Incremental) {
 
 # 2) Build the plugin
 Write-Host "Building MDTPro.dll..."
-$buildArgs = @( (Join-Path $root 'MDTProPlugin\MDTPro.sln'), '-c', 'Release', '-v', 'minimal' )
+$sln = Join-Path $root 'MDTProPlugin\MDTPro.sln'
+$buildArgs = @( $sln, '-c', 'Release', '-v', 'minimal' )
 if (-not $Incremental) { $buildArgs += '--no-incremental' }
 dotnet build @buildArgs
 if ($LASTEXITCODE -ne 0) { Write-Error "Build failed."; exit $LASTEXITCODE }
@@ -656,6 +657,8 @@ Write-Host "  Release\x64\SQLite.Interop.dll (GTA V root\x64)"
 Write-Host "  Release\MDTPro\"
 if (-not $SkipWindowsApp -and $nativeAppExeName) {
     Write-Host "  Release\MDTProNative\$nativeAppExeName"
+} elseif ($SkipWindowsApp) {
+    Write-Host '  (Native Windows app was skipped. Run .\build.ps1 without -SkipWindowsApp to include MDTProNative.)'
 }
 Write-Host "Distribution copy (mod + desktop): $nativeReleaseDir"
 if (-not $SkipWindowsApp -and $nativeAppExeName) {
