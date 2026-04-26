@@ -103,11 +103,18 @@
     if (canvas) canvas.remove()
   }
 
+  function useCustomWallpaper() {
+    return document.documentElement.getAttribute('data-mdt-custom-wallpaper') === '1'
+  }
+
   function run() {
     const root = document.documentElement
-    const theme = root.getAttribute('data-mdt-theme')
     const container = document.querySelector('.desktopWallpaper')
-
+    if (useCustomWallpaper()) {
+      stopAnimation()
+      return
+    }
+    const theme = root.getAttribute('data-mdt-theme')
     if (theme && container) {
       stopAnimation()
       startAnimation(container)
@@ -120,13 +127,13 @@
     run()
     const observer = new MutationObserver((mutations) => {
       for (const m of mutations) {
-        if (m.attributeName === 'data-mdt-theme') {
+        if (m.attributeName === 'data-mdt-theme' || m.attributeName === 'data-mdt-custom-wallpaper') {
           run()
           return
         }
       }
     })
-    observer.observe(document.documentElement, { attributes: true })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-mdt-theme', 'data-mdt-custom-wallpaper'] })
   }
 
   if (document.readyState === 'loading') {

@@ -1,7 +1,7 @@
 /* Department Styling plugin – theme switcher + backgrounds */
 
-/* Replace default wallpaper when themed – solid color, no effects */
-[data-mdt-theme] .desktopWallpaper {
+/* Replace default wallpaper when themed – solid color + particles (unless CustomWallpaper plugin overrides) */
+html:not([data-mdt-custom-wallpaper="1"]) [data-mdt-theme] .desktopWallpaper {
   background-image: none;
 }
 

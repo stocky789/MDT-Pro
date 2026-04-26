@@ -417,8 +417,8 @@ const server = http.createServer((req, res) => {
     serveFile(res, filePath, contentType, true);
     return;
   } else if (url === '/image/desktop' || url === '/image/desktop.png') {
-    filePath = path.join(ROOT, 'img', 'desktop.png');
-    contentType = 'image/png';
+    send(res, 404, 'Not found');
+    return;
   } else if (url === '/image/firearms' || url === '/image/firearms.svg') {
     filePath = path.join(ROOT, 'img', 'firearms.svg');
     contentType = 'image/svg+xml';

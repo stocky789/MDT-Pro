@@ -68,6 +68,8 @@ agent-tools/
 # ---- Runtime / local data (do not commit) ----
 MDTPro/MDTPro.log
 MDTPro/data/
+MDTPro/img/wallpaperUser.png
+MDTPro/img/wallpaperUser.jpg
 MDTPro/config.json
 MDTPro/language.json
 MDTPro/citationOptions.json
@@ -77,6 +79,7 @@ MDTPro/ipAddresses.txt
 # ---- Third-party / local mod copies (not tracked) ----
 STP/
 UltimateBackup/
+# Optional local clone (build no longer requires it — use MDTProPlugin\lib\CalloutInterfaceAPI)
 CalloutInterfaceAPI/
 ReportsPlus-main/
 # ---- Secrets / env (never commit) ----
