@@ -611,15 +611,14 @@ namespace MDTPro.Data
                 sw.Restart();
             }
             CurrentTime = World.TimeOfDay.ToString();
-            bool nearbyDemand = HasRecentNearbyVehicleDemand();
             switch (workMode)
             {
                 case GameWorkModeKind.Live:
                     RefreshCachedNearbyVehiclesPassive();
                     break;
                 case GameWorkModeKind.Balanced:
-                    if (nearbyDemand && _balancedDynamicPass % 3 == 0)
-                        RefreshCachedNearbyVehiclesPassive();
+                    // Keep the lightweight nearby snapshot warm so overlay-paused lookups can fall back to cached plates.
+                    RefreshCachedNearbyVehiclesPassive();
                     break;
                 default:
                     // Performance skips passive ped/vehicle DB hydration, but nearby cache must still advance:
@@ -1201,6 +1200,56 @@ namespace MDTPro.Data
             {
                 return (CachedNearbyVehicles ?? new List<CachedNearbyVehicleEntry>()).Take(limit).ToList();
             }
+        }
+
+        /// <summary>Lookup against the last game-thread nearby snapshot. Useful when Steam overlay / alt-tab has frozen the game fiber and a live scan cannot run.</summary>
+        internal static MDTProVehicleData GetCachedNearbyVehicleByPlateOrVin(string plateOrVin)
+        {
+            if (string.IsNullOrWhiteSpace(plateOrVin)) return null;
+            string key = plateOrVin.Trim();
+            string plateKey = NormalizeVehiclePlateKey(key);
+            string vinKey = NormalizeVehicleVinKey(key);
+            CachedNearbyVehicleEntry? match = null;
+            lock (_cachedNearbyLock)
+            {
+                foreach (var row in CachedNearbyVehicles ?? new List<CachedNearbyVehicleEntry>())
+                {
+                    if ((!string.IsNullOrEmpty(plateKey) && !string.IsNullOrEmpty(row.LicensePlate) && NormalizeVehiclePlateKey(row.LicensePlate) == plateKey)
+                        || string.Equals(row.VehicleIdentificationNumber, key, StringComparison.OrdinalIgnoreCase)
+                        || (!string.IsNullOrEmpty(vinKey) && !string.IsNullOrEmpty(row.VehicleIdentificationNumber) && NormalizeVehicleVinKey(row.VehicleIdentificationNumber) == vinKey))
+                    {
+                        match = row;
+                        break;
+                    }
+                }
+            }
+            if (!match.HasValue) return null;
+            var v = match.Value;
+            var data = new MDTProVehicleData
+            {
+                LicensePlate = v.LicensePlate,
+                VehicleIdentificationNumber = v.VehicleIdentificationNumber,
+                ModelName = v.ModelName,
+                ModelDisplayName = v.ModelDisplayName,
+                Owner = v.Owner,
+                Color = v.Color,
+                VinStatus = v.VinStatus,
+                Make = v.Make,
+                Model = v.Model,
+                PrimaryColor = v.PrimaryColor,
+                SecondaryColor = v.SecondaryColor,
+                PrimaryColorSpecific = v.PrimaryColorSpecific,
+                SecondaryColorSpecific = v.SecondaryColorSpecific,
+                RegistrationStatus = v.RegistrationStatus,
+                RegistrationExpiration = v.RegistrationExpiration,
+                RegistrationExpirationVerifiedFromLiveDocument = v.RegistrationExpirationVerifiedFromLiveDocument,
+                InsuranceStatus = v.InsuranceStatus,
+                InsuranceExpiration = v.InsuranceExpiration,
+                InsuranceExpirationVerifiedFromLiveDocument = v.InsuranceExpirationVerifiedFromLiveDocument,
+                IsStolen = v.IsStolen
+            };
+            MergeBOLOsFromStubByPlate(data);
+            return data;
         }
 
         private static void PopulatePedDatabase()
@@ -4010,6 +4059,7 @@ namespace MDTPro.Data
             if (string.IsNullOrWhiteSpace(selectedSource)) return false;
             return selectedSource.Equals("context", StringComparison.OrdinalIgnoreCase)
                 || selectedSource.Equals("live-world", StringComparison.OrdinalIgnoreCase)
+                || selectedSource.Equals("nearby-cache", StringComparison.OrdinalIgnoreCase)
                 || selectedSource.StartsWith("pr-", StringComparison.OrdinalIgnoreCase);
         }
 
@@ -5052,6 +5102,70 @@ namespace MDTPro.Data
             }
         }
 
+        internal static void NormalizeCourtCaseOutcomes()
+        {
+            lock (_courtDatabaseLock)
+            {
+                foreach (CourtData courtCase in courtDatabase)
+                    NormalizeCourtCaseOutcomeConsistency(courtCase);
+            }
+        }
+
+        internal static void NormalizeCourtCaseOutcome(CourtData courtCase)
+        {
+            NormalizeCourtCaseOutcomeConsistency(courtCase);
+        }
+
+        private static bool NormalizeCourtCaseOutcomeConsistency(CourtData courtCase)
+        {
+            if (courtCase == null || courtCase.Status == 0 || courtCase.Charges == null || courtCase.Charges.Count == 0) return false;
+
+            bool changed = false;
+            foreach (CourtData.Charge charge in courtCase.Charges)
+            {
+                if (charge == null) continue;
+                if (charge.Outcome < 1 || charge.Outcome > 3)
+                {
+                    charge.Outcome = courtCase.Status;
+                    changed = true;
+                }
+                if (charge.Outcome != 1 && charge.SentenceDaysServed.HasValue)
+                {
+                    charge.SentenceDaysServed = null;
+                    changed = true;
+                }
+            }
+
+            bool anyConvicted = courtCase.Charges.Any(c => c != null && c.Outcome == 1);
+            if (anyConvicted && courtCase.Status != 1)
+            {
+                courtCase.Status = 1;
+                changed = true;
+            }
+            else if (!anyConvicted && courtCase.Status == 1)
+            {
+                bool allDismissed = courtCase.Charges.Where(c => c != null).All(c => c.Outcome == 3);
+                courtCase.Status = allDismissed ? 3 : 2;
+                changed = true;
+            }
+
+            if (courtCase.Status != 1)
+            {
+                if (!string.IsNullOrWhiteSpace(courtCase.SentenceReasoning))
+                {
+                    courtCase.SentenceReasoning = null;
+                    changed = true;
+                }
+                if (courtCase.LicenseRevocations != null && courtCase.LicenseRevocations.Count > 0)
+                {
+                    courtCase.LicenseRevocations = new List<string>();
+                    changed = true;
+                }
+            }
+
+            return changed;
+        }
+
         /// <summary>Court cases for a defendant, newest hearing/resolution first (Person Search API).</summary>
         internal static List<CourtData> GetCourtCasesForPedName(string pedName)
         {
@@ -5059,6 +5173,9 @@ namespace MDTPro.Data
             string n = pedName.Trim();
             lock (_courtDatabaseLock)
             {
+                foreach (CourtData courtCase in courtDatabase)
+                    NormalizeCourtCaseOutcomeConsistency(courtCase);
+
                 return courtDatabase
                     .Where(c => c != null && string.Equals(c.PedName, n, StringComparison.OrdinalIgnoreCase))
                     .OrderByDescending(ParseCourtSortDateForPedCases)
@@ -5771,18 +5888,33 @@ namespace MDTPro.Data
             if (hasPublicDefender.HasValue) courtCase.HasPublicDefender = hasPublicDefender.Value;
             if (outcomeNotes != null) courtCase.OutcomeNotes = outcomeNotes;
             if (outcomeReasoning != null) courtCase.OutcomeReasoning = outcomeReasoning;
-            if (status == 3)
+
+            if (status != 0 && courtCase.Charges != null)
             {
-                if (string.IsNullOrWhiteSpace(courtCase.OutcomeReasoning))
+                foreach (CourtData.Charge charge in courtCase.Charges)
                 {
-                    // Same charge-aware dismissal wording as auto-resolution would use (evidence band, burden of proof, charge-specific lines).
-                    courtCase.OutcomeReasoning = BuildOutcomeReasoning(courtCase, courtCase.ConvictionChance, 3);
+                    if (charge == null) continue;
+                    if (status == 2 || status == 3 || charge.Outcome < 1 || charge.Outcome > 3) charge.Outcome = status;
+                    if (charge.Outcome != 1) charge.SentenceDaysServed = null;
                 }
-                courtCase.SentenceReasoning = null;
             }
-            else if (status == 2)
+            NormalizeCourtCaseOutcomeConsistency(courtCase);
+            status = courtCase.Status;
+
+            if (status >= 1 && status <= 3 && string.IsNullOrWhiteSpace(courtCase.OutcomeReasoning))
+            {
+                courtCase.OutcomeReasoning = BuildOutcomeReasoning(courtCase, courtCase.ConvictionChance, status);
+            }
+
+            if (status == 1)
+            {
+                if (string.IsNullOrWhiteSpace(courtCase.SentenceReasoning))
+                    courtCase.SentenceReasoning = BuildSentenceReasoning(courtCase);
+            }
+            else if (status == 2 || status == 3)
             {
                 courtCase.SentenceReasoning = null;
+                courtCase.LicenseRevocations = new List<string>();
             }
             courtCase.LastUpdatedUtc = DateTime.UtcNow.ToString("o");
 
@@ -8180,6 +8312,243 @@ namespace MDTPro.Data
             return eligible[eligible.Count - 1].text;
         }
 
+        private static int ClampConvictionChance(int chance)
+        {
+            return Math.Max(10, Math.Min(90, chance));
+        }
+
+        private static int GetJuryLeanConvictionModifier(CourtData courtCase)
+        {
+            if (courtCase == null || !courtCase.IsJuryTrial || courtCase.JurySize <= 0) return 0;
+            int margin = courtCase.JuryVotesForConviction - courtCase.JuryVotesForAcquittal;
+            float marginRatio = margin / (float)Math.Max(1, courtCase.JurySize);
+            return (int)Math.Round(marginRatio * 18f);
+        }
+
+        private static CourtData CreateChargeScope(CourtData source, IEnumerable<CourtData.Charge> charges)
+        {
+            if (source == null) return null;
+            return new CourtData
+            {
+                PedName = source.PedName,
+                Number = source.Number,
+                ReportId = source.ReportId,
+                ShortYear = source.ShortYear,
+                Status = source.Status,
+                IsJuryTrial = source.IsJuryTrial,
+                JurySize = source.JurySize,
+                JuryVotesForConviction = source.JuryVotesForConviction,
+                JuryVotesForAcquittal = source.JuryVotesForAcquittal,
+                PriorCitationCount = source.PriorCitationCount,
+                PriorArrestCount = source.PriorArrestCount,
+                PriorConvictionCount = source.PriorConvictionCount,
+                SeverityScore = source.SeverityScore,
+                EvidenceScore = source.EvidenceScore,
+                EvidenceBand = source.EvidenceBand,
+                EvidenceHadWeapon = source.EvidenceHadWeapon,
+                EvidenceWasWanted = source.EvidenceWasWanted,
+                EvidenceWasPatDown = source.EvidenceWasPatDown,
+                EvidenceWasDrunk = source.EvidenceWasDrunk,
+                EvidenceWasFleeing = source.EvidenceWasFleeing,
+                EvidenceAssaultedPed = source.EvidenceAssaultedPed,
+                EvidenceDamagedVehicle = source.EvidenceDamagedVehicle,
+                EvidenceIllegalWeapon = source.EvidenceIllegalWeapon,
+                EvidenceViolatedSupervision = source.EvidenceViolatedSupervision,
+                EvidenceResisted = source.EvidenceResisted,
+                EvidenceHadDrugs = source.EvidenceHadDrugs,
+                EvidenceUseOfForce = source.EvidenceUseOfForce,
+                EvidenceDrugTypesBreakdown = source.EvidenceDrugTypesBreakdown,
+                EvidenceFirearmTypesBreakdown = source.EvidenceFirearmTypesBreakdown,
+                RepeatOffenderScore = source.RepeatOffenderScore,
+                ConvictionChance = source.ConvictionChance,
+                ResolveAtUtc = source.ResolveAtUtc,
+                SentenceMultiplier = source.SentenceMultiplier,
+                ProsecutionStrength = source.ProsecutionStrength,
+                DefenseStrength = source.DefenseStrength,
+                DocketPressure = source.DocketPressure,
+                PolicyAdjustment = source.PolicyAdjustment,
+                CourtDistrict = source.CourtDistrict,
+                CourtName = source.CourtName,
+                CourtType = source.CourtType,
+                HasPublicDefender = source.HasPublicDefender,
+                Plea = source.Plea,
+                JudgeName = source.JudgeName,
+                ProsecutorName = source.ProsecutorName,
+                DefenseAttorneyName = source.DefenseAttorneyName,
+                HearingDateUtc = source.HearingDateUtc,
+                CreatedAtUtc = source.CreatedAtUtc,
+                LastUpdatedUtc = source.LastUpdatedUtc,
+                OutcomeNotes = source.OutcomeNotes,
+                OutcomeReasoning = source.OutcomeReasoning,
+                SentenceReasoning = source.SentenceReasoning,
+                LicenseRevocations = source.LicenseRevocations,
+                AttachedReportIds = source.AttachedReportIds,
+                OfficerTestimonySummary = source.OfficerTestimonySummary,
+                Charges = charges?.Where(c => c != null).ToList() ?? new List<CourtData.Charge>()
+            };
+        }
+
+        private static CourtData CreateChargeOutcomeScope(CourtData source, int outcome)
+        {
+            return CreateChargeScope(source, source?.Charges?.Where(c => c != null && c.Outcome == outcome));
+        }
+
+        private static string FormatChargeOutcomeList(IEnumerable<CourtData.Charge> charges)
+        {
+            var names = charges?
+                .Where(c => c != null && !string.IsNullOrWhiteSpace(c.Name))
+                .GroupBy(c => c.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(g =>
+                {
+                    string name = g.First().Name.Trim();
+                    int count = g.Count();
+                    return count == 1 ? name : $"{count} counts of {name}";
+                })
+                .ToList() ?? new List<string>();
+            if (names.Count == 0) return "the filed count";
+
+            const int maxNames = 5;
+            var shown = names.Take(maxNames).ToList();
+            string joined;
+            if (shown.Count == 1) joined = shown[0];
+            else if (shown.Count == 2) joined = shown[0] + " and " + shown[1];
+            else joined = string.Join(", ", shown.Take(shown.Count - 1)) + ", and " + shown.Last();
+
+            int remaining = names.Count - shown.Count;
+            if (remaining > 0)
+                joined += $" and {remaining} other {(remaining == 1 ? "count" : "counts")}";
+            return joined;
+        }
+
+        private static string BuildChargeOutcomeSummary(CourtData courtData)
+        {
+            var charges = courtData?.Charges?.Where(c => c != null).ToList() ?? new List<CourtData.Charge>();
+            if (charges.Count <= 1) return "";
+
+            var convicted = charges.Where(c => c.Outcome == 1).ToList();
+            var acquitted = charges.Where(c => c.Outcome == 2).ToList();
+            var dismissed = charges.Where(c => c.Outcome == 3).ToList();
+            int resolvedCount = convicted.Count + acquitted.Count + dismissed.Count;
+            if (resolvedCount == 0) return "";
+
+            if (convicted.Count == charges.Count)
+                return "All counts resulted in conviction: " + FormatChargeOutcomeList(convicted) + ".";
+            if (acquitted.Count == charges.Count)
+                return "All counts resulted in acquittal: " + FormatChargeOutcomeList(acquitted) + ".";
+            if (dismissed.Count == charges.Count)
+                return "All counts were dismissed: " + FormatChargeOutcomeList(dismissed) + ".";
+
+            var parts = new List<string>();
+            if (convicted.Count > 0) parts.Add("convicted on " + FormatChargeOutcomeList(convicted));
+            if (acquitted.Count > 0) parts.Add("acquitted on " + FormatChargeOutcomeList(acquitted));
+            if (dismissed.Count > 0) parts.Add("dismissed " + FormatChargeOutcomeList(dismissed));
+            return parts.Count > 0 ? "Verdict by count: " + string.Join("; ", parts) + "." : "";
+        }
+
+        private static void AppendChargeOutcomeSummary(StringBuilder b, CourtData courtData)
+        {
+            string summary = BuildChargeOutcomeSummary(courtData);
+            if (string.IsNullOrWhiteSpace(summary)) return;
+            if (b.Length > 0) b.Append(" ");
+            b.Append(summary);
+        }
+
+        private static void AppendJuryOutcomePhrase(StringBuilder b, CourtData courtData, int resolvedStatus, bool hasMixedChargeOutcomes)
+        {
+            if (b == null || courtData == null || !courtData.IsJuryTrial || courtData.JurySize <= 0) return;
+            int votesForConviction = courtData.JuryVotesForConviction;
+            int votesForAcquittal = courtData.JuryVotesForAcquittal;
+            string phrase;
+
+            if (hasMixedChargeOutcomes)
+            {
+                string[] mixed = new[] {
+                    $"The jury's overall split was {votesForConviction}-{votesForAcquittal}, but deliberations were entered count by count.",
+                    $"Jurors recorded an overall {votesForConviction}-{votesForAcquittal} split while separating the stronger counts from the weaker ones.",
+                    $"The jury did not treat the case as all-or-nothing; the recorded split was {votesForConviction}-{votesForAcquittal} overall.",
+                    $"A count-specific verdict was returned after an overall {votesForConviction}-{votesForAcquittal} jury split.",
+                };
+                phrase = mixed[Helper.GetRandomInt(0, mixed.Length - 1)];
+            }
+            else if (resolvedStatus == 1)
+            {
+                if (votesForConviction > votesForAcquittal)
+                {
+                    string[] juryConviction = new[] {
+                        $"The jury voted {votesForConviction}-{votesForAcquittal} in favour of conviction.",
+                        $"The jury reached a {votesForConviction}-{votesForAcquittal} verdict.",
+                        $"The jury split {votesForConviction}-{votesForAcquittal} in favour of guilt.",
+                        $"The vote was {votesForConviction} to {votesForAcquittal}.",
+                        $"The jury voted {votesForConviction} to {votesForAcquittal} for conviction.",
+                        $"A {votesForConviction}-{votesForAcquittal} jury verdict found the defendant guilty.",
+                        $"The jury returned a guilty verdict by a margin of {votesForConviction} to {votesForAcquittal}.",
+                        $"Jurors voted {votesForConviction}-{votesForAcquittal} to convict.",
+                    };
+                    phrase = juryConviction[Helper.GetRandomInt(0, juryConviction.Length - 1)];
+                }
+                else if (votesForConviction == votesForAcquittal)
+                {
+                    string[] tiedConviction = new[] {
+                        $"The recorded jury split was {votesForConviction}-{votesForAcquittal}; the proven counts turned on the strongest admissible evidence.",
+                        $"With jurors split {votesForConviction}-{votesForAcquittal} overall, the verdict rested on count-specific proof.",
+                        $"The jury was evenly divided overall, but the sustained counts survived deliberation on their own evidence.",
+                    };
+                    phrase = tiedConviction[Helper.GetRandomInt(0, tiedConviction.Length - 1)];
+                }
+                else
+                {
+                    string[] narrowConviction = new[] {
+                        $"Although the overall jury split leaned {votesForAcquittal}-{votesForConviction} against conviction, the sustained counts were proven separately.",
+                        $"The jury's overall split was skeptical, but the surviving counts carried enough proof for conviction.",
+                        $"Jurors rejected part of the prosecution theory, yet the proven counts survived count-specific deliberation.",
+                    };
+                    phrase = narrowConviction[Helper.GetRandomInt(0, narrowConviction.Length - 1)];
+                }
+            }
+            else if (resolvedStatus == 2)
+            {
+                if (votesForAcquittal > votesForConviction)
+                {
+                    string[] juryAcquittal = new[] {
+                        $"The jury voted {votesForAcquittal}-{votesForConviction} in favour of acquittal.",
+                        $"The jury reached a {votesForAcquittal}-{votesForConviction} verdict for acquittal.",
+                        $"The jury split {votesForAcquittal}-{votesForConviction} in favour of not guilty.",
+                        $"A {votesForAcquittal}-{votesForConviction} jury vote returned a not guilty verdict.",
+                        $"The jury voted {votesForAcquittal} to {votesForConviction} for acquittal.",
+                        $"The jury returned a not guilty verdict by a margin of {votesForAcquittal} to {votesForConviction}.",
+                        $"A {votesForAcquittal}-{votesForConviction} vote in favour of acquittal was recorded.",
+                        $"Jurors voted {votesForAcquittal}-{votesForConviction} for acquittal.",
+                    };
+                    phrase = juryAcquittal[Helper.GetRandomInt(0, juryAcquittal.Length - 1)];
+                }
+                else if (votesForAcquittal == votesForConviction)
+                {
+                    string[] tiedAcquittal = new[] {
+                        $"The jury split {votesForConviction}-{votesForAcquittal}, leaving reasonable doubt on the counts before it.",
+                        $"An even {votesForConviction}-{votesForAcquittal} jury split left the prosecution short of a guilty verdict.",
+                        $"With jurors divided {votesForConviction}-{votesForAcquittal}, reasonable doubt controlled the verdict.",
+                    };
+                    phrase = tiedAcquittal[Helper.GetRandomInt(0, tiedAcquittal.Length - 1)];
+                }
+                else
+                {
+                    string[] surpriseAcquittal = new[] {
+                        $"Although the initial jury split leaned {votesForConviction}-{votesForAcquittal} toward conviction, count-specific deliberation ended in acquittal.",
+                        $"Jurors leaned toward conviction overall, but reasonable doubt remained on every count.",
+                        $"The prosecution could not carry any individual count despite an overall jury lean toward guilt.",
+                    };
+                    phrase = surpriseAcquittal[Helper.GetRandomInt(0, surpriseAcquittal.Length - 1)];
+                }
+            }
+            else
+            {
+                phrase = $"The recorded jury split was {votesForConviction}-{votesForAcquittal}.";
+            }
+
+            if (b.Length > 0) b.Append(" ");
+            b.Append(phrase);
+        }
+
         private static string BuildOutcomeReasoning(CourtData courtData, int convictionChance, int resolvedStatus)
         {
             if (courtData == null) return "";
@@ -8192,6 +8561,15 @@ namespace MDTPro.Data
                 && !string.Equals(pleaNorm, "Guilty", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(pleaNorm, "No Contest", StringComparison.OrdinalIgnoreCase)
                 && convictionChance <= 45 && evidenceBand == 0;
+            CourtData convictedChargeScope = CreateChargeOutcomeScope(courtData, 1);
+            CourtData acquittedChargeScope = CreateChargeOutcomeScope(courtData, 2);
+            CourtData dismissedChargeScope = CreateChargeOutcomeScope(courtData, 3);
+            CourtData reasoningChargeScope = courtData;
+            if (resolvedStatus == 1 && convictedChargeScope?.Charges?.Count > 0) reasoningChargeScope = convictedChargeScope;
+            else if (resolvedStatus == 2 && acquittedChargeScope?.Charges?.Count > 0) reasoningChargeScope = acquittedChargeScope;
+            else if (resolvedStatus == 3 && dismissedChargeScope?.Charges?.Count > 0) reasoningChargeScope = dismissedChargeScope;
+            bool hasMixedChargeOutcomes = courtData.Charges != null
+                && courtData.Charges.Where(c => c != null).Select(c => c.Outcome).Distinct().Count() > 1;
 
             if (resolvedStatus == 1)
             {
@@ -8312,7 +8690,7 @@ namespace MDTPro.Data
                         ("The {0} returned a guilty verdict on traffic charges. Limited speed measurement evidence was supplemented by officer observations.", new[] { "__traffic_no_arson__" }),
                         ("Despite limited resisting evidence, the {0} found the defendant guilty. Officer testimony established the lawfulness of the arrest.", new[] { "resisting", "obstruction" }),
                     };
-                    var chosen = SelectChargeAwarePhrase(courtData, lowEvidenceGuilty);
+                    var chosen = SelectChargeAwarePhrase(reasoningChargeScope, lowEvidenceGuilty);
                     b.AppendFormat(string.IsNullOrEmpty(chosen) ? "Despite limited physical evidence, the {0} found the defendant guilty based on witness testimony and circumstantial evidence." : chosen, tribunal);
                 }
                 else
@@ -8497,33 +8875,48 @@ namespace MDTPro.Data
                         ("The {0} found the defendant guilty. The arson charges were a defining element of the case.", new[] { "Arson" }),
                         ("The {0} returned a guilty verdict. Fire-related offences and property destruction were central to the verdict.", new[] { "Arson" }),
                     };
-                    string chosen = SelectWeightedOutcome(courtData, guiltyTrialPool);
+                    string chosen = SelectWeightedOutcome(reasoningChargeScope, guiltyTrialPool);
+                    if (hasMixedChargeOutcomes
+                        && (chosen.IndexOf("all counts", StringComparison.OrdinalIgnoreCase) >= 0
+                            || chosen.IndexOf("each charge", StringComparison.OrdinalIgnoreCase) >= 0))
+                    {
+                        chosen = "The {0} returned a guilty verdict on the counts the prosecution proved beyond a reasonable doubt.";
+                    }
                     b.AppendFormat(chosen, tribunal);
                 }
+                if (hasMixedChargeOutcomes)
+                {
+                    string[] mixedVerdict = new[] {
+                        $"The {tribunal} returned a mixed verdict and did not treat every count the same.",
+                        $"The {tribunal} separated the counts instead of resolving the arrest as all-or-nothing.",
+                        $"Some counts survived deliberation while others failed under the reasonable-doubt standard.",
+                    };
+                    b.Append(" " + mixedVerdict[Helper.GetRandomInt(0, mixedVerdict.Length - 1)]);
+                }
                 var factors = new List<string>();
-                if (HasChargeKeyword(courtData, "murder") || HasChargeKeyword(courtData, "manslaughter"))
+                if (HasChargeKeyword(reasoningChargeScope, "murder") || HasChargeKeyword(reasoningChargeScope, "manslaughter"))
                     factors.Add("the defendant was convicted of murder or manslaughter");
-                if (HasSexOffenseCharge(courtData))
+                if (HasSexOffenseCharge(reasoningChargeScope))
                     factors.Add("the defendant was convicted of sexual or related offences");
-                if (HasKidnappingCharge(courtData))
+                if (HasKidnappingCharge(reasoningChargeScope))
                     factors.Add("the defendant was convicted of kidnapping");
-                if (HasArsonCharge(courtData))
+                if (HasArsonCharge(reasoningChargeScope))
                     factors.Add("the defendant was convicted of arson or unlawful burning");
-                if (HasChargeKeyword(courtData, "robbery") || HasChargeKeyword(courtData, "burglary") || HasChargeKeyword(courtData, "carjacking") || HasChargeKeyword(courtData, "home invasion"))
+                if (HasChargeKeyword(reasoningChargeScope, "robbery") || HasChargeKeyword(reasoningChargeScope, "burglary") || HasChargeKeyword(reasoningChargeScope, "carjacking") || HasChargeKeyword(reasoningChargeScope, "home invasion"))
                     factors.Add("serious property and robbery charges were proven");
-                if (HasDrugCrimeCharge(courtData))
+                if (HasDrugCrimeCharge(reasoningChargeScope))
                     factors.Add("drug-related charges formed part of the case");
-                if (HasChargeKeyword(courtData, "escape") && !HasChargeKeyword(courtData, "evad"))
+                if (HasChargeKeyword(reasoningChargeScope, "escape") && !HasChargeKeyword(reasoningChargeScope, "evad"))
                     factors.Add("escape or attempted escape from custody was established");
-                if (HasChargeKeyword(courtData, "violation of probation") || HasChargeKeyword(courtData, "violation of parole") || HasChargeKeyword(courtData, "protective order"))
+                if (HasChargeKeyword(reasoningChargeScope, "violation of probation") || HasChargeKeyword(reasoningChargeScope, "violation of parole") || HasChargeKeyword(reasoningChargeScope, "protective order"))
                     factors.Add("breach of court orders or supervision was established");
-                if (HasGangCharge(courtData)) factors.Add("gang-related charges formed part of the case");
-                if (HasFederalCharge(courtData)) factors.Add("federal charges were proven");
-                if (HasICECharge(courtData)) factors.Add("immigration-related charges were established");
-                if (HasRICOCharge(courtData)) factors.Add("RICO or racketeering charges were proven");
-                if (HasFraudCharge(courtData)) factors.Add("fraud or financial crime charges were established");
-                if (HasWildlifeCharge(courtData)) factors.Add("wildlife or animal cruelty charges were proven");
-                if (HasUnlicensedCharge(courtData)) factors.Add("unlicensed or unauthorised practice was established");
+                if (HasGangCharge(reasoningChargeScope)) factors.Add("gang-related charges formed part of the case");
+                if (HasFederalCharge(reasoningChargeScope)) factors.Add("federal charges were proven");
+                if (HasICECharge(reasoningChargeScope)) factors.Add("immigration-related charges were established");
+                if (HasRICOCharge(reasoningChargeScope)) factors.Add("RICO or racketeering charges were proven");
+                if (HasFraudCharge(reasoningChargeScope)) factors.Add("fraud or financial crime charges were established");
+                if (HasWildlifeCharge(reasoningChargeScope)) factors.Add("wildlife or animal cruelty charges were proven");
+                if (HasUnlicensedCharge(reasoningChargeScope)) factors.Add("unlicensed or unauthorised practice was established");
                 if (courtData.EvidenceHadWeapon) factors.Add("the defendant was armed at the time of arrest");
                 if (courtData.EvidenceWasWanted) factors.Add("an active warrant was outstanding");
                 if (courtData.EvidenceViolatedSupervision) factors.Add("the defendant was on probation or parole");
@@ -8574,20 +8967,7 @@ namespace MDTPro.Data
                     };
                     b.Append(" " + repeatOffender[Helper.GetRandomInt(0, repeatOffender.Length - 1)]);
                 }
-                if (courtData.IsJuryTrial)
-                {
-                    string[] juryConviction = new[] {
-                        $"The jury voted {courtData.JuryVotesForConviction}-{courtData.JuryVotesForAcquittal} in favour of conviction.",
-                        $"The jury reached a {courtData.JuryVotesForConviction}-{courtData.JuryVotesForAcquittal} verdict.",
-                        $"The jury split {courtData.JuryVotesForConviction}-{courtData.JuryVotesForAcquittal} in favour of guilt.",
-                        $"The vote was {courtData.JuryVotesForConviction} to {courtData.JuryVotesForAcquittal}.",
-                        $"The jury voted {courtData.JuryVotesForConviction} to {courtData.JuryVotesForAcquittal} for conviction.",
-                        $"A {courtData.JuryVotesForConviction}-{courtData.JuryVotesForAcquittal} jury verdict found the defendant guilty.",
-                        $"The jury returned a guilty verdict by a margin of {courtData.JuryVotesForConviction} to {courtData.JuryVotesForAcquittal}.",
-                        $"Jurors voted {courtData.JuryVotesForConviction}-{courtData.JuryVotesForAcquittal} to convict.",
-                    };
-                    b.Append(" " + juryConviction[Helper.GetRandomInt(0, juryConviction.Length - 1)]);
-                }
+                AppendJuryOutcomePhrase(b, courtData, resolvedStatus, hasMixedChargeOutcomes);
                 if (courtData.DocketPressure > 0.6f)
                 {
                     string[] docketConviction = new[] {
@@ -8601,7 +8981,7 @@ namespace MDTPro.Data
                     };
                     b.Append(" " + docketConviction[Helper.GetRandomInt(0, docketConviction.Length - 1)]);
                 }
-                AppendChargeDomainPhrase(b, courtData, resolvedStatus);
+                AppendChargeDomainPhrase(b, reasoningChargeScope, resolvedStatus);
             }
             else if (resolvedStatus == 2)
             {
@@ -8655,7 +9035,7 @@ namespace MDTPro.Data
                         ("The {0} acquitted while the paper record still looked damning. The jury trusted the witnesses less than the file.", null),
                         ("The {0} acquitted the defendant. The defence successfully argued that the prosecution's theory did not fit the evidence.", null),
                     };
-                    var chosen = SelectChargeAwarePhrase(courtData, highEvidenceAcquittal);
+                    var chosen = SelectChargeAwarePhrase(reasoningChargeScope, highEvidenceAcquittal);
                     b.AppendFormat(string.IsNullOrEmpty(chosen) ? "The {0} acquitted. The defence opened enough gaps that reasonable doubt held." : chosen, tribunal);
                 }
                 else
@@ -8826,7 +9206,7 @@ namespace MDTPro.Data
                     ("The {0} returned a not guilty verdict. The prosecution failed to prove guilt beyond a reasonable doubt on any charge.", null),
                     ("The {0} found the defendant not guilty. The prosecution's evidence was insufficient to support a conviction.", null),
                 };
-                    string chosen = SelectWeightedOutcome(courtData, acquittalPool);
+                    string chosen = SelectWeightedOutcome(reasoningChargeScope, acquittalPool);
                     b.AppendFormat(chosen, tribunal);
                 }
                 if (!courtData.HasPublicDefender)
@@ -8843,20 +9223,7 @@ namespace MDTPro.Data
                     };
                     b.Append(" " + privateCounsel[Helper.GetRandomInt(0, privateCounsel.Length - 1)]);
                 }
-                if (courtData.IsJuryTrial)
-                {
-                    string[] juryAcquittal = new[] {
-                        $"The jury voted {courtData.JuryVotesForAcquittal}-{courtData.JuryVotesForConviction} in favour of acquittal.",
-                        $"The jury reached a {courtData.JuryVotesForAcquittal}-{courtData.JuryVotesForConviction} verdict for acquittal.",
-                        $"The jury split {courtData.JuryVotesForAcquittal}-{courtData.JuryVotesForConviction} in favour of not guilty.",
-                        $"A {courtData.JuryVotesForAcquittal}-{courtData.JuryVotesForConviction} jury vote returned a not guilty verdict.",
-                        $"The jury voted {courtData.JuryVotesForAcquittal} to {courtData.JuryVotesForConviction} for acquittal.",
-                        $"The jury returned a not guilty verdict by a margin of {courtData.JuryVotesForAcquittal} to {courtData.JuryVotesForConviction}.",
-                        $"A {courtData.JuryVotesForAcquittal}-{courtData.JuryVotesForConviction} vote in favour of acquittal was recorded.",
-                        $"Jurors voted {courtData.JuryVotesForAcquittal}-{courtData.JuryVotesForConviction} for acquittal.",
-                    };
-                    b.Append(" " + juryAcquittal[Helper.GetRandomInt(0, juryAcquittal.Length - 1)]);
-                }
+                AppendJuryOutcomePhrase(b, courtData, resolvedStatus, hasMixedChargeOutcomes);
                 if (courtData.DocketPressure > 0.6f)
                 {
                     string[] docketAcquittal = new[] {
@@ -8870,7 +9237,7 @@ namespace MDTPro.Data
                     };
                     b.Append(" " + docketAcquittal[Helper.GetRandomInt(0, docketAcquittal.Length - 1)]);
                 }
-                AppendChargeDomainPhrase(b, courtData, resolvedStatus);
+                AppendChargeDomainPhrase(b, reasoningChargeScope, resolvedStatus);
             }
             else if (resolvedStatus == 3)
             {
@@ -8995,16 +9362,17 @@ namespace MDTPro.Data
                 };
                 if (evidenceBand == 0 && Helper.GetRandomInt(0, 99) < 65)
                 {
-                    var lowResult = SelectChargeAwarePhrase(courtData, lowEvidenceDismissals);
+                    var lowResult = SelectChargeAwarePhrase(reasoningChargeScope, lowEvidenceDismissals);
                     b.Append(string.IsNullOrEmpty(lowResult) ? "The case was dismissed. Insufficient evidence to proceed to trial." : lowResult);
                 }
                 else
                 {
-                    var dismResult = SelectChargeAwarePhrase(courtData, dismissedPool);
+                    var dismResult = SelectChargeAwarePhrase(reasoningChargeScope, dismissedPool);
                     b.Append(string.IsNullOrEmpty(dismResult) ? "Charges were dismissed. The case did not proceed to trial." : dismResult);
                 }
             }
 
+            AppendChargeOutcomeSummary(b, courtData);
             return b.ToString().Trim();
         }
 
@@ -9274,6 +9642,8 @@ namespace MDTPro.Data
         private static string BuildSentenceReasoning(CourtData courtData)
         {
             if (courtData == null) return "";
+            CourtData convictedScope = CreateChargeOutcomeScope(courtData, 1);
+            if (convictedScope?.Charges?.Count > 0) courtData = convictedScope;
             var b = new StringBuilder();
             string judge = courtData.JudgeName ?? "the court";
             bool hasLife = courtData.Charges?.Any(c => c.Time == null) == true;
@@ -9770,28 +10140,23 @@ namespace MDTPro.Data
 
                 if (courtCase.Charges != null)
                 {
-                    bool juryConvicted = false;
-                    if (courtCase.IsJuryTrial && courtCase.JurySize > 0)
-                    {
-                        juryConvicted = courtCase.JuryVotesForConviction > (courtCase.JurySize / 2);
-                    }
+                    int juryLeanModifier = GetJuryLeanConvictionModifier(courtCase);
 
                     foreach (CourtData.Charge charge in courtCase.Charges)
                     {
                         if (charge == null) continue;
+                        charge.SentenceDaysServed = null;
+
                         if (pleaGuiltyOrNoContest)
                         {
                             charge.Outcome = 1; // Convicted
                             charge.ConvictionChance = null;
                         }
-                        else if (courtCase.IsJuryTrial && courtCase.JurySize > 0)
-                        {
-                            charge.Outcome = juryConvicted ? 1 : 2;
-                            charge.ConvictionChance = null;
-                        }
                         else
                         {
                             int chance = GetPerChargeConvictionChance(courtCase, charge);
+                            if (courtCase.IsJuryTrial && courtCase.JurySize > 0)
+                                chance = ClampConvictionChance(chance + juryLeanModifier);
                             charge.ConvictionChance = chance;
                             int roll = Helper.GetRandomInt(1, 100);
                             charge.Outcome = roll <= chance ? 1 : 2; // 1 Convicted, 2 Acquitted

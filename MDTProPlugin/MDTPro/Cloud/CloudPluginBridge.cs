@@ -249,7 +249,8 @@ namespace MDTPro.Cloud {
                     resultSource = "live-bridge";
                     bool frozen = IsGameThreadFrozenForLookup();
                     if (frozen) {
-                        vehicle = DataController.GetVehicleByPlateOrVin(query);
+                        vehicle = DataController.GetCachedNearbyVehicleByPlateOrVin(query) ?? DataController.GetVehicleByPlateOrVin(query);
+                        if (vehicle != null) resultSource = "nearby-cache";
                     } else {
                         bool completed = DataController.TryResolveVehicleFromLiveWorldByPlateOrVinBlocking(
                             query,
@@ -259,7 +260,8 @@ namespace MDTPro.Cloud {
                             GameWorkJobTrigger.CloudCommand,
                             "cloud-vehicle-lookup");
                         if (!completed) {
-                            vehicle = DataController.GetVehicleByPlateOrVin(query);
+                            vehicle = DataController.GetCachedNearbyVehicleByPlateOrVin(query) ?? DataController.GetVehicleByPlateOrVin(query);
+                            if (vehicle != null) resultSource = "nearby-cache";
                             if (vehicle == null) {
                                 result["found"] = false;
                                 result["error"] = string.IsNullOrWhiteSpace(failureReason) ? "game_busy" : failureReason;
@@ -267,7 +269,8 @@ namespace MDTPro.Cloud {
                             }
                         }
                         if (vehicle == null) {
-                            vehicle = DataController.GetVehicleByPlateOrVin(query);
+                            vehicle = DataController.GetCachedNearbyVehicleByPlateOrVin(query) ?? DataController.GetVehicleByPlateOrVin(query);
+                            if (vehicle != null) resultSource = "nearby-cache";
                         }
                     }
                 }

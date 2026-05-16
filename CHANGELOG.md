@@ -24,6 +24,7 @@ No general release notes yet.
 
 ### Bug Fixes
 
+- **Court** - Jury trials now resolve each charge separately, summarize count-by-count verdicts, and hide empty outcome notes.
 - **Vehicle Search** - BOLO removal now targets the selected BOLO when duplicate reasons exist.
 - **Game work** - In-game tasks are now better managed, so things like cloud sync and database updates run smoothly without slowing down your game.
 - **In-game settings** - The "world-load list" is now called **Game work mode**, with clearer descriptions for Performance, Balanced, and Live options.

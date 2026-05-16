@@ -210,6 +210,11 @@ namespace MDTPro.Data
             }
             if (vehicleData == null && !string.IsNullOrEmpty(query) && !wantsContext)
             {
+                vehicleData = DataController.GetCachedNearbyVehicleByPlateOrVin(query);
+                if (vehicleData != null) selectedSource = "nearby-cache";
+            }
+            if (vehicleData == null && !string.IsNullOrEmpty(query) && !wantsContext)
+            {
                 vehicleData = DataController.GetVehicleByPlateOrVin(query);
                 if (vehicleData != null)
                     selectedSource = SetupController.GetConfig()?.localVehicleLookupDebugLogging == true
@@ -220,6 +225,11 @@ namespace MDTPro.Data
             {
                 vehicleData = DataController.TryResolveVehicleFromLiveWorldByPlateOrVinBlocking(query, 500);
                 if (vehicleData != null) selectedSource = "live-world";
+            }
+            if (vehicleData == null && !string.IsNullOrEmpty(query) && !wantsContext)
+            {
+                vehicleData = DataController.GetCachedNearbyVehicleByPlateOrVin(query);
+                if (vehicleData != null) selectedSource = "nearby-cache";
             }
 
             vehicleData = HydrateVehicleForDisplay(vehicleData, query, selectedSource);
@@ -700,6 +710,7 @@ namespace MDTPro.Data
             var cases = jo["CourtCases"] == null || jo["CourtCases"].Type == JTokenType.Null
                 ? new List<CourtData>()
                 : jo["CourtCases"].ToObject<List<CourtData>>() ?? new List<CourtData>();
+            foreach (CourtData courtCase in cases) DataController.NormalizeCourtCaseOutcome(courtCase);
             jo["CourtCases"] = JArray.FromObject(cases);
             return new PedLookupResult
             {

@@ -497,7 +497,8 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   }
 
   const isCaseConcluded = courtCase.Status === 1 || courtCase.Status === 2
-  if (isCaseConcluded) {
+  const hasConvictedDisposition = courtCase.Status === 1
+  if (hasConvictedDisposition) {
     const totalFineWrapper = document.createElement('div')
     totalFineWrapper.appendChild(createLabel(language.court.totalFine))
     totalFineWrapper.appendChild(createReadOnlyInput(await getCurrencyString(totalFine)))
@@ -762,22 +763,29 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   pleaWrapper.appendChild(pleaSelect)
   inputWrapper.appendChild(pleaWrapper)
 
-  const notesWrapper = document.createElement('div')
   inputWrapper.appendChild(
     createSectionHeader(language.court.sectionDisposition || 'Disposition')
   )
-  notesWrapper.classList.add('courtNotes')
-  notesWrapper.appendChild(createLabel(language.court.outcomeNotes || 'Outcome Notes'))
-  const notesInput = document.createElement('textarea')
-  notesInput.value = courtCase.OutcomeNotes || ''
-  if (isSyntheticPriorCase) {
-    notesInput.readOnly = true
-    notesInput.title =
-      language.court.syntheticNotesReadOnly ||
-      'Reconstructed disposition — edit via game data reset only.'
+  const outcomeNotesText = typeof courtCase.OutcomeNotes === 'string' ? courtCase.OutcomeNotes : ''
+  const shouldShowOutcomeNotes = courtCase.Status === 0 || outcomeNotesText.trim().length > 0
+  let notesInput = null
+  if (shouldShowOutcomeNotes) {
+    const notesWrapper = document.createElement('div')
+    notesWrapper.classList.add('courtNotes')
+    notesWrapper.appendChild(createLabel(language.court.outcomeNotes || 'Outcome Notes'))
+    notesInput = document.createElement('textarea')
+    notesInput.value = outcomeNotesText
+    if (courtCase.Status !== 0 || isSyntheticPriorCase) {
+      notesInput.readOnly = true
+      if (isSyntheticPriorCase) {
+        notesInput.title =
+          language.court.syntheticNotesReadOnly ||
+          'Reconstructed disposition - edit via game data reset only.'
+      }
+    }
+    notesWrapper.appendChild(notesInput)
+    inputWrapper.appendChild(notesWrapper)
   }
-  notesWrapper.appendChild(notesInput)
-  inputWrapper.appendChild(notesWrapper)
 
   if (courtCase.Status !== 0) {
     const dispositionSection = document.createElement('div')

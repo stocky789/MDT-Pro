@@ -90,6 +90,7 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/json";
             } else if (path == "court") {
+                DataController.NormalizeCourtCaseOutcomes();
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(DataController.courtDatabase));
                 status = 200;
                 contentType = "text/json";

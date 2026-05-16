@@ -108,6 +108,7 @@ namespace MDTPro.Setup {
 
             DataController.OfficerInformationData = Database.LoadOfficerInformation() ?? new OfficerInformationData();
             DataController.courtDatabase = Database.LoadCourtCases() ?? new List<CourtData>();
+            DataController.NormalizeCourtCaseOutcomes();
             DataController.shiftHistoryData = Database.LoadShifts() ?? new List<ShiftData>();
             DataController.incidentReports = Database.LoadIncidentReports() ?? new List<IncidentReport>();
             DataController.citationReports = Database.LoadCitationReports() ?? new List<CitationReport>();

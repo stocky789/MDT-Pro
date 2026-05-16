@@ -267,7 +267,7 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
         }
 
         var concluded = status == 1 || status == 2;
-        if (concluded)
+        if (status == 1)
         {
             var totalFine = 0;
             var totalTime = 0;
@@ -584,14 +584,15 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
     StackPanel BuildDispositionPanel(JObject c, bool synth, int status)
     {
         var sp = new StackPanel();
+        var outcomeNotes = c["OutcomeNotes"]?.ToString() ?? "";
         if (status == 0 && !synth)
         {
             sp.Children.Add(Muted("Outcome notes and plea are edited in Case actions at the bottom of this case."));
         }
-        else
+        else if (!string.IsNullOrWhiteSpace(outcomeNotes))
         {
             sp.Children.Add(FieldLabelRow("Outcome notes"));
-            sp.Children.Add(ReadOnlyMultiline(c["OutcomeNotes"]?.ToString() ?? ""));
+            sp.Children.Add(ReadOnlyMultiline(outcomeNotes));
         }
 
         if (status != 0)
