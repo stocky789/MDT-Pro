@@ -1100,6 +1100,14 @@ async function getArrestAttachedReportsSection(report) {
   }
 
   const isArrestNotFound = (err) => (err && (String(err.error || '').toLowerCase().includes('not found') || String(err.error || '').toLowerCase().includes('already closed')))
+  const getPersistedArrest = async () => {
+    try {
+      const list = await (await fetch('/data/arrestReports')).json()
+      return Array.isArray(list) ? list.find((r) => r && r.Id === report.Id) || null : null
+    } catch (_) {
+      return null
+    }
+  }
 
   attachedIds.forEach((reportId) => {
     const sum = summaries.find((s) => s.id === reportId)
@@ -1197,6 +1205,20 @@ async function getArrestAttachedReportsSection(report) {
         importRecentBtn.classList.remove('loading')
         return
       }
+      const recentTypeLabels = {}
+      ;(Array.isArray(recent) ? recent : []).forEach((r) => { if (r && r.id && r.type) recentTypeLabels[r.id] = (r.type === 'propertyEvidence' ? 'Property & Evidence' : r.type === 'injury' ? 'Injury' : (r.type || '').charAt(0).toUpperCase() + (r.type || '').slice(1)) })
+      const persistedArrest = await getPersistedArrest()
+      if (!persistedArrest && reportInfoEl) {
+        const added = await localAttachReports(reportInfoEl, listWrap, report, reportIds, language, recentTypeLabels)
+        topWindow.showNotification(
+          added > 0
+            ? (language.reports?.sections?.arrest?.attachReportDraftHint ?? 'Reports will be attached when you save the arrest.') + ' (' + added + ')'
+            : (language.reports?.sections?.arrest?.importRecentReportsNone ?? 'No new recent reports to import.'),
+          added > 0 ? 'success' : 'info'
+        )
+        importRecentBtn.classList.remove('loading')
+        return
+      }
       const attachRes = await fetch('/post/attachReportsToArrest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1256,6 +1278,21 @@ async function getArrestAttachedReportsSection(report) {
     if (!reportId) return
     if (attachBtn.classList.contains('loading')) return
     attachBtn.classList.add('loading')
+    const persistedArrest = await getPersistedArrest()
+    if (!persistedArrest && reportInfoEl) {
+      const added = await localAttachReports(reportInfoEl, listWrap, report, [reportId], language, null)
+      attachBtn.classList.remove('loading')
+      if (added > 0) {
+        attachInput.value = ''
+        topWindow.showNotification(
+          language.reports?.sections?.arrest?.attachReportDraftHint ?? 'Report will be attached when you save the arrest.',
+          'success'
+        )
+      } else {
+        topWindow.showNotification(language.reports?.notifications?.saveError ?? 'Error', 'error')
+      }
+      return
+    }
     const res = await (
       await fetch('/post/attachReportToArrest', {
         method: 'POST',

@@ -1,9 +1,12 @@
 // Ignore Spelling: Taskbar
 
-namespace MDTPro.Setup {
-    internal class Config {
+namespace MDTPro.Setup
+{
+    internal class Config
+    {
         /// <summary>Production scheduler defaults. Decoder: Ws=dynamic/WebSocket tick, Db=data pass, Ploc=passive street resolve, Pnv=passive nearby-vehicle cache, FHeld=firearm held pass, FPkup=PR pickup scan, Cloud=cloud flush, ExVehCd=manual nearby-veh scan cooldown, LiveLocAge=blocking location max age.</summary>
-        internal static class PerfCaptureIntervalMs {
+        internal static class PerfCaptureIntervalMs
+        {
             internal const int WebSocket = 2000;
             internal const int Database = 8000;
             internal const int PassiveLocation = 10000;
@@ -52,6 +55,8 @@ namespace MDTPro.Setup {
         public int stpCitationHandoffPendingExpireMinutes = 45;
         /// <summary>When true, StopThePed-path citation notifications include a line with your MDT browser link. When false, only the short in-game message is shown.</summary>
         public bool citationStpAppendMdtBrowserLink = true;
+        /// <summary>When true, writes concise local Vehicle Search hydration diagnostics to the MDT Pro log.</summary>
+        public bool localVehicleLookupDebugLogging = false;
         /// <summary>After handing a citation, show a random suspect line (subtitle) matched to charge keywords.</summary>
         public bool citationPedReactionEnabled = true;
         /// <summary>How long the suspect subtitle stays on screen (ms).</summary>
@@ -135,7 +140,7 @@ namespace MDTPro.Setup {
 
         // available: type (reportId only), year, shortYear, month, day, index
         // reportIds/courtCaseNumbers must be unique, to achieve this year/shortYear and index must be included
-        public string reportIdFormat = "{type}-{shortYear}-{index}"; 
+        public string reportIdFormat = "{type}-{shortYear}-{index}";
         public int reportIdIndexPad = 6;
         public string courtCaseNumberFormat = "{shortYear}-{index}";
         public int courtCaseNumberIndexPad = 6;

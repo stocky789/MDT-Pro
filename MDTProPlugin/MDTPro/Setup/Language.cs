@@ -1,7 +1,9 @@
 // Ignore Spelling: Taskbar Newtonsoft Ffl Ccw Yankton Cayo Perico Ip
 
-namespace MDTPro.Setup {
-    internal class Language {
+namespace MDTPro.Setup
+{
+    internal class Language
+    {
         public InGame inGame = new InGame();
         public Index index = new Index();
         public PedSearch pedSearch = new PedSearch();
@@ -19,7 +21,8 @@ namespace MDTPro.Setup {
         public Alpr alpr = new Alpr();
         public QuickActions quickActions = new QuickActions();
 
-        public class QuickActions {
+        public class QuickActions
+        {
             public string panicSuccess = "Panic backup requested.";
             public string backupSuccess = "Backup requested.";
             public string gpsSuccess = "GPS set to callout.";
@@ -35,7 +38,8 @@ namespace MDTPro.Setup {
             public string backupResponseCodeLabelUb = "Patrol code";
         }
 
-        public class Alpr {
+        public class Alpr
+        {
             public string alertTitle = "ALPR Alert";
             public string owner = "Owner";
             public string model = "Model";
@@ -44,7 +48,8 @@ namespace MDTPro.Setup {
             public string inGameNotEnabled = "In-game ALPR is off; enable it in the MDT Pro in-game menu (see MDTPro.ini SettingsMenuKey) for browser hits from the built-in scanner.";
         }
 
-        public class InGame {
+        public class InGame
+        {
             public string loaded = "MDT Pro is ready.";
             public string unloaded = "MDT Pro has been shut down.";
             public string listeningOnIpAddress = "MDT Pro is available at: ";
@@ -97,18 +102,21 @@ namespace MDTPro.Setup {
             public string citationPostHandoffViolenceNotify = "~r~Hostile:~s~ The suspect is attacking!";
         }
 
-        public class Index {
+        public class Index
+        {
             public Static @static = new Static();
             public Settings settings = new Settings();
             public Notifications notifications = new Notifications();
 
-            public class Static {
+            public class Static
+            {
                 public string title = "MDT Pro";
                 public Desktop desktop = new Desktop();
                 public Taskbar taskbar = new Taskbar();
                 public Settings settings = new Settings();
 
-                public class Desktop {
+                public class Desktop
+                {
                     public string pedSearch = "Person Search";
                     public string vehicleSearch = "Vehicle Search";
                     public string boloNoticeboard = "BOLOs";
@@ -120,18 +128,21 @@ namespace MDTPro.Setup {
                     public string callout = "Active Call";
                 }
 
-                public class Taskbar {
+                public class Taskbar
+                {
                     public string settings = "Control Panel";
                 }
 
-                public class Settings {
+                public class Settings
+                {
                     public string customization = "Config and Plugins";
                     public string customizationInfo = "Change config and manage installed plugins. Opens in a new tab.";
                     public OfficerInformation officerInformation = new OfficerInformation();
                     public CurrentShift currentShift = new CurrentShift();
                     public OfficerMetrics officerMetrics = new OfficerMetrics();
 
-                    public class OfficerInformation {
+                    public class OfficerInformation
+                    {
                         public string title = "Officer Information";
                         public string firstName = "First Name";
                         public string lastName = "Last Name";
@@ -142,7 +153,8 @@ namespace MDTPro.Setup {
                         public string autoFill = "Fill from Game";
                         public string save = "Save";
                         public Info info = new Info();
-                        public class Info {
+                        public class Info
+                        {
                             public string title = "Your character details. Used to pre-fill reports and show who is on duty.";
                             public string firstName = "Your character's first name.";
                             public string lastName = "Your character's last name.";
@@ -155,40 +167,47 @@ namespace MDTPro.Setup {
                         }
                     }
 
-                    public class CurrentShift {
+                    public class CurrentShift
+                    {
                         public string title = "Current Shift";
                         public string startShift = "Start Shift";
                         public string endShift = "End Shift";
                         public Info info = new Info();
-                        public class Info {
+                        public class Info
+                        {
                             public string title = "Track your on-duty time. Start when you go on patrol, end when you finish.";
                             public string startShift = "Mark the start of your shift. Your info above is shown in notifications.";
                             public string endShift = "End your current shift. Duration is saved to your statistics.";
                         }
                     }
 
-                    public class OfficerMetrics {
+                    public class OfficerMetrics
+                    {
                         public string title = "Career Statistics";
                         public Info info = new Info();
-                        public class Info {
+                        public class Info
+                        {
                             public string title = "Totals from your completed shifts and reports. Read-only.";
                         }
                     }
                 }
             }
 
-            public class Settings {
+            public class Settings
+            {
                 public string version = "Version";
                 public CurrentShift currentShift = new CurrentShift();
                 public OfficerMetrics officerMetrics = new OfficerMetrics();
 
-                public class CurrentShift {
+                public class CurrentShift
+                {
                     public string startTime = "Start";
                     public string duration = "Duration";
                     public string offDuty = "Off duty";
                 }
 
-                public class OfficerMetrics {
+                public class OfficerMetrics
+                {
                     public string totalShifts = "Total Shifts";
                     public string avgDuration = "Avg. Shift Duration";
                     public string incidents = "Incidents";
@@ -199,7 +218,8 @@ namespace MDTPro.Setup {
                 }
             }
 
-            public class Notifications {
+            public class Notifications
+            {
                 public string webSocketOnClose = "Connection lost. Reload the page to reconnect.";
                 public string officerInformationSaved = "Officer information saved.";
                 public string officerInformationError = "Failed to save officer information.";
@@ -211,12 +231,14 @@ namespace MDTPro.Setup {
             }
         }
 
-        public class PedSearch {
+        public class PedSearch
+        {
             public Static @static = new Static();
             public Notifications notifications = new Notifications();
             public string createInjuryReport = "New Injury Report";
 
-            public class Static {
+            public class Static
+            {
                 public string title = "Person Search";
                 public string search = "Search";
                 public string searchInput = "Enter name to search";
@@ -230,7 +252,8 @@ namespace MDTPro.Setup {
                 public string reportsTitle = "Associated Reports";
                 public Labels labels = new Labels();
 
-                public class Labels {
+                public class Labels
+                {
                     public string idPhoto = "Photo";
                     public string firstName = "First Name";
                     public string lastName = "Last Name";
@@ -257,17 +280,20 @@ namespace MDTPro.Setup {
                 }
             }
 
-            public class Notifications {
+            public class Notifications
+            {
                 public string emptySearchInput = "Enter a name to search.";
                 public string pedNotFound = "No person found with that name.";
             }
         }
 
-        public class FirearmsSearch {
+        public class FirearmsSearch
+        {
             public Static @static = new Static();
             public Notifications notifications = new Notifications();
 
-            public class Static {
+            public class Static
+            {
                 public string title = "Firearms Check";
                 public string search = "Search";
                 public string searchInput = "Serial number or owner name";
@@ -275,18 +301,21 @@ namespace MDTPro.Setup {
                 public string recentIdsTitle = "Recent IDs";
             }
 
-            public class Notifications {
+            public class Notifications
+            {
                 public string emptySearchInput = "Enter serial number or owner name.";
                 public string notFound = "No firearm or owner found.";
                 public string searchError = "Search failed. Please try again.";
             }
         }
 
-        public class VehicleSearch {
+        public class VehicleSearch
+        {
             public Static @static = new Static();
             public Notifications notifications = new Notifications();
 
-            public class Static {
+            public class Static
+            {
                 public string title = "Vehicle Search";
                 public string search = "Search";
                 public string searchInput = "Enter plate or VIN";
@@ -296,7 +325,14 @@ namespace MDTPro.Setup {
                 public string documentsTitle = "Documents";
                 public string bolosTitle = "BOLOs (Be On the Look-Out)";
                 public string boloVehicleRequired = "Vehicle must be nearby to add or remove BOLOs.";
+                public string boloRemoveVehicleRequired = "Vehicle must be nearby to remove BOLOs.";
                 public string addBOLO = "Add BOLO";
+                public string addBOLOTitle = "Add BOLO";
+                public string addBOLOSubtitle = "Enter BOLO details for this vehicle.";
+                public string boloReason = "Reason *";
+                public string boloExpires = "Expires in (days)";
+                public string addBOLOSubmit = "Add BOLO";
+                public string cancel = "Cancel";
                 public string removeBOLO = "Remove";
                 public string boloReasonPrompt = "Enter BOLO reason:";
                 public string boloExpiresPrompt = "Expires in how many days? (default 7):";
@@ -305,7 +341,8 @@ namespace MDTPro.Setup {
                 public string createImpoundReport = "Create Impound Report";
                 public Labels labels = new Labels();
 
-                public class Labels {
+                public class Labels
+                {
                     public string licensePlate = "License Plate";
                     public string modelDisplayName = "Display name";
                     public string model = "Model";
@@ -317,6 +354,7 @@ namespace MDTPro.Setup {
                     public string secondaryColor = "Secondary color";
                     public string primaryColorGta = "Primary (GTA)";
                     public string secondaryColorGta = "Secondary (GTA)";
+                    public string vinNumber = "VIN";
                     public string vinStatus = "VIN status";
                     public string vehicleModel = "Vehicle Model";
                     public string registrationStatus = "Registration Status";
@@ -326,7 +364,8 @@ namespace MDTPro.Setup {
                 }
             }
 
-            public class Notifications {
+            public class Notifications
+            {
                 public string emptySearchInput = "Enter a license plate or VIN.";
                 public string vehicleNotFound = "No vehicle found.";
                 public string noNearbyVehicles = "No vehicles detected nearby.";
@@ -338,13 +377,15 @@ namespace MDTPro.Setup {
             }
         }
 
-        public class BoloNoticeboard {
+        public class BoloNoticeboard
+        {
             public Static @static = new Static();
             public string stolenBadge = "STOLEN";
             public string viewInVehicleSearch = "View in Vehicle Search";
             public string expires = "Expires";
             public string boloCreated = "BOLO created.";
-            public class Static {
+            public class Static
+            {
                 public string title = "BOLO Noticeboard";
                 public string subtitle = "Be On the Look-Out — vehicles to watch for";
                 public string refresh = "Refresh";
@@ -361,7 +402,8 @@ namespace MDTPro.Setup {
             }
         }
 
-        public class Values {
+        public class Values
+        {
             public string wanted = "Wanted";
             public string notWanted = "Clear";
             public string @true = "Yes";
@@ -385,7 +427,8 @@ namespace MDTPro.Setup {
             public string CayoPerico = "Cayo Perico";
         }
 
-        public class Reports {
+        public class Reports
+        {
             public string newReportTitle = "New Report";
             public string editReportTitle = "Edit Report";
             public string[] statusMap = {
@@ -400,16 +443,19 @@ namespace MDTPro.Setup {
             public IdTypeMap idTypeMap = new IdTypeMap();
             public List list = new List();
 
-            public class Static {
+            public class Static
+            {
                 public string title = "Reports";
                 public ListPage listPage = new ListPage();
                 public CreatePage createPage = new CreatePage();
 
-                public class ListPage {
+                public class ListPage
+                {
                     public string createButton = "New Report";
                     public ReportType reportType = new ReportType();
 
-                    public class ReportType {
+                    public class ReportType
+                    {
                         public string incident = "Incident Reports";
                         public string citation = "Citation Reports";
                         public string arrest = "Arrest Reports";
@@ -420,12 +466,14 @@ namespace MDTPro.Setup {
                     }
                 }
 
-                public class CreatePage {
+                public class CreatePage
+                {
                     public string saveButton = "Save";
                     public string cancelButton = "Cancel";
                     public ReportType reportType = new ReportType();
 
-                    public class ReportType {
+                    public class ReportType
+                    {
                         public string select = "Select Report Type";
                         public string incident = "Incident Report";
                         public string citation = "Citation Report";
@@ -438,7 +486,8 @@ namespace MDTPro.Setup {
                 }
             }
 
-            public class Notifications {
+            public class Notifications
+            {
                 public string createPageAlreadyOpen = "Finish or cancel the current report first.";
                 public string invalidPedName = "No person found with this name.";
                 public string invalidVehicleLicensePlate = "No vehicle found with this plate.";
@@ -461,7 +510,8 @@ namespace MDTPro.Setup {
                 public string closeArrestError = "Failed to close arrest.";
             }
 
-            public class Sections {
+            public class Sections
+            {
                 public string notes = "Notes";
                 public string fine = "Fine";
                 public string incarceration = "Incarceration";
@@ -473,7 +523,8 @@ namespace MDTPro.Setup {
                 public Citation citation = new Citation();
                 public Arrest arrest = new Arrest();
 
-                public class GeneralInformation {
+                public class GeneralInformation
+                {
                     public string title = "General Information";
                     public string date = "Date";
                     public string time = "Time";
@@ -484,7 +535,8 @@ namespace MDTPro.Setup {
                     public string copyFailed = "Could not copy.";
                 }
 
-                public class Location {
+                public class Location
+                {
                     public string title = "Location";
                     public string area = "Area";
                     public string street = "Street";
@@ -492,7 +544,8 @@ namespace MDTPro.Setup {
                     public string postal = "Postal Code";
                 }
 
-                public class OfficerInformation {
+                public class OfficerInformation
+                {
                     public string title = "Officer Information";
                     public string firstName = "First Name";
                     public string lastName = "Last Name";
@@ -502,7 +555,8 @@ namespace MDTPro.Setup {
                     public string badgeNumber = "Badge Number";
                 }
 
-                public class Incident {
+                public class Incident
+                {
                     public string titleOffenders = "Offenders";
                     public string titleWitnesses = "Witnesses & Victims";
                     public string labelOffenders = "Offender Name";
@@ -513,18 +567,21 @@ namespace MDTPro.Setup {
                     public string removeWitness = "Remove";
                 }
 
-                public class Offender {
+                public class Offender
+                {
                     public string title = "Offender";
                     public string pedName = "Name";
                     public string vehicleLicensePlate = "Vehicle Plate";
                 }
 
-                public class Citation {
+                public class Citation
+                {
                     public string title = "Citation Charges";
                     public string searchChargesPlaceholder = "Search charges";
                 }
 
-                public class Arrest {
+                public class Arrest
+                {
                     public string title = "Arrest Charges";
                     public string searchChargesPlaceholder = "Search charges";
                     public string evidenceSeized = "Evidence seized";
@@ -551,7 +608,8 @@ namespace MDTPro.Setup {
                 public Injury injury = new Injury();
                 public PropertyEvidence propertyEvidence = new PropertyEvidence();
 
-                public class Impound {
+                public class Impound
+                {
                     public string title = "Vehicle & Impound Details";
                     public string personAtFault = "Person at fault";
                     public string selectFromRecentIds = "Select person at fault (Recent IDs)";
@@ -570,7 +628,8 @@ namespace MDTPro.Setup {
                     public string impoundLot = "Impound Lot";
                 }
 
-                public class TrafficIncident {
+                public class TrafficIncident
+                {
                     public string title = "Traffic Incident Details";
                     public string drivers = "Drivers";
                     public string driver = "Driver";
@@ -597,7 +656,8 @@ namespace MDTPro.Setup {
                     public string collisionType = "Collision type";
                 }
 
-                public class Injury {
+                public class Injury
+                {
                     public string title = "Injury Details";
                     public string injuredParty = "Injured party";
                     public string injuryType = "Injury type";
@@ -610,7 +670,8 @@ namespace MDTPro.Setup {
                     public string recentIdsError = "Could not load Recent IDs.";
                 }
 
-                public class PropertyEvidence {
+                public class PropertyEvidence
+                {
                     public string title = "Property and Evidence Details";
                     public string subjectsTitle = "Subjects (persons from whom seized)";
                     public string subjectPedName = "Subject (person from whom seized)";
@@ -631,7 +692,8 @@ namespace MDTPro.Setup {
                     public string attachPropertyReceiptHint = "Attach a Property and Evidence Receipt to document seized contraband.";
                 }
 
-                public class UseOfForce {
+                public class UseOfForce
+                {
                     public string title = "Use of Force";
                     public string type = "Type";
                     public string typeOther = "Type (if Other)";
@@ -643,7 +705,8 @@ namespace MDTPro.Setup {
                 }
             }
 
-            public class IdTypeMap {
+            public class IdTypeMap
+            {
                 public string incident = "I";
                 public string citation = "C";
                 public string arrest = "A";
@@ -653,7 +716,8 @@ namespace MDTPro.Setup {
                 public string propertyEvidence = "PER";
             }
 
-            public class List {
+            public class List
+            {
                 public string viewButton = "View";
                 public string editButton = "Edit";
                 public string empty = "No reports yet.";
@@ -666,14 +730,16 @@ namespace MDTPro.Setup {
                 public string finalAmount = "Final Amount";
                 public Filter filter = new Filter();
 
-                public class Filter {
+                public class Filter
+                {
                     public string title = "Filter";
                     public string searchPlaceholder = "Search";
                 }
             }
         }
 
-        public class Units {
+        public class Units
+        {
             public string year = "y";
             public string month = "mo";
             public string day = "d";
@@ -688,17 +754,20 @@ namespace MDTPro.Setup {
             public string miles = "mi";
         }
 
-        public class ShiftHistory {
+        public class ShiftHistory
+        {
             public string empty = "No shift history.";
             public string reports = "Reports";
             public Static @static = new Static();
 
-            public class Static {
+            public class Static
+            {
                 public string title = "Shift History";
             }
         }
 
-        public class Court {
+        public class Court
+        {
             /// <summary>Shown as in-game notification when a trial is auto-resolved. {0} = case number, {1} = defendant name.</summary>
             public string trialHeardNotification = "Trial {0} for {1} has been heard - to see the outcome check the MDT.";
             public string empty = "No court cases.";
@@ -834,45 +903,53 @@ namespace MDTPro.Setup {
             public string reportTypePropertyEvidence = "Property & Evidence";
             public Static @static = new Static();
 
-            public class Static {
+            public class Static
+            {
                 public string title = "Court";
             }
         }
 
-        public class Customization {
+        public class Customization
+        {
             public string save = "Save";
             public string reset = "Reset";
             public Static @static = new Static();
             public Plugins plugins = new Plugins();
 
-            public class Static {
+            public class Static
+            {
                 public string title = "Customization";
                 public Sidebar sidebar = new Sidebar();
 
-                public class Sidebar {
+                public class Sidebar
+                {
                     public string plugins = "Plugins";
                     public string config = "Config";
                 }
             }
 
-            public class Plugins {
+            public class Plugins
+            {
                 public string version = "Version";
                 public string author = "Author";
                 public string noPlugins = "No plugins installed.";
             }
         }
 
-        public class Map {
+        public class Map
+        {
             public string zoomIn = "Zoom In";
             public string zoomOut = "Zoom Out";
             public Static @static = new Static();
             public RouteInstructions routeInstructions = new RouteInstructions();
 
-            public class Static {
+            public class Static
+            {
                 public string title = "GPS";
             }
 
-            public class RouteInstructions {
+            public class RouteInstructions
+            {
                 public string turnLeft = "In {distance}, turn left onto {street}";
                 public string turnRight = "In {distance}, turn right onto {street}";
                 public string streetChange = "In {distance}, continue on {street}";
@@ -881,14 +958,16 @@ namespace MDTPro.Setup {
             }
         }
 
-        public class Callout {
+        public class Callout
+        {
             public string defaultPriority = "Code 2";
             public Static @static = new Static();
             public CalloutInfo calloutInfo = new CalloutInfo();
             public Actions actions = new Actions();
             public Status status = new Status();
 
-            public class Actions {
+            public class Actions
+            {
                 public string setGps = "Set GPS";
                 public string gpsSuccess = "GPS set to callout.";
                 public string accept = "Accept";
@@ -896,7 +975,8 @@ namespace MDTPro.Setup {
                 public string error = "Action failed.";
             }
 
-            public class Status {
+            public class Status
+            {
                 public string pending = "Open";
                 public string responded = "Responded";
                 public string enRoute = "En Route";
@@ -905,7 +985,8 @@ namespace MDTPro.Setup {
                 public string displayed = "Displayed";
             }
 
-            public class Static {
+            public class Static
+            {
                 public string title = "Callout";
                 public string noActiveCall = "No active callout";
                 public string address = "Address";
@@ -914,7 +995,8 @@ namespace MDTPro.Setup {
                 public string priority = "Priority";
                 public Cad cad = new Cad();
 
-                public class Cad {
+                public class Cad
+                {
                     public string unitStatusTitle = "Unit / CAD status";
                     public string unitStatusHint =
                         "Broadcast to this MDT channel (browser + native). Does not change LSPDFR on-duty state.";
@@ -925,7 +1007,8 @@ namespace MDTPro.Setup {
                 }
             }
 
-            public class CalloutInfo {
+            public class CalloutInfo
+            {
                 public string displayedTime = "Dispatched ";
                 public string unit = "Unit ";
                 public string acceptedTime = " — Assigned ";

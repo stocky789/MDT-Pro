@@ -24,9 +24,11 @@ No general release notes yet.
 
 ### Bug Fixes
 
+- **Vehicle Search** - BOLO removal now targets the selected BOLO when duplicate reasons exist.
 - **Game work** - In-game tasks are now better managed, so things like cloud sync and database updates run smoothly without slowing down your game.
 - **In-game settings** - The "world-load list" is now called **Game work mode**, with clearer descriptions for Performance, Balanced, and Live options.
 - **Citation paperwork** - The success message and suspect subtitle after a StopThePed handoff waited on the wrong signal, so they could appear while the clipboard idle was still playing. They now wait until that clip stops (including when you break out early).
+- **Vehicle Search** - Fixed missing local vehicle details showing as `N/A` when PolicingRedefined/CDF data was available.
 
 ## [0.9.9.3] - 2026-04-25
 

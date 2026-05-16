@@ -16,6 +16,7 @@ namespace MDTPro.ServerAPI {
         internal static bool IsProtectedHttpPath(string path) {
             if (string.IsNullOrWhiteSpace(path)) return false;
             return path.Equals("/config", StringComparison.OrdinalIgnoreCase)
+                || path.Equals("/cloudStatus", StringComparison.OrdinalIgnoreCase)
                 || path.Equals("/integration", StringComparison.OrdinalIgnoreCase)
                 || path.StartsWith("/data/", StringComparison.OrdinalIgnoreCase)
                 || path.StartsWith("/post/", StringComparison.OrdinalIgnoreCase);

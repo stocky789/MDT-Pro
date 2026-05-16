@@ -1,4 +1,5 @@
 using MDTPro;
+using MDTPro.Cloud;
 using MDTPro.Plugins;
 using MDTPro.Setup;
 using MDTPro.Utility;
@@ -49,6 +50,17 @@ namespace MDTPro.ServerAPI {
                 buffer = Encoding.UTF8.GetBytes(BridgeSecurity.SafeConfigJson());
                 status = 200;
                 contentType = "text/json";
+            } else if (path == "/cloudStatus") {
+                bool connected = CloudPluginBridge.ConnectionState == CloudConnectionState.Connected;
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new {
+                    connected,
+                    status = CloudPluginBridge.ConnectionStatusText,
+                    detail = CloudPluginBridge.ConnectionDetail,
+                    hasSavedLogin = CloudPluginBridge.HasSavedLogin()
+                }));
+                status = 200;
+                contentType = "text/json";
+                ExtraResponseHeaders = new List<(string, string)> { ("Cache-Control", "no-store") };
             } else if (path == "/integration") {
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new {
                     version = Main.Version,

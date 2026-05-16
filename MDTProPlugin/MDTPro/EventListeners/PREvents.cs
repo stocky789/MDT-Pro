@@ -8,8 +8,10 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 
-namespace MDTPro.EventListeners {
-    internal static class PREvents {
+namespace MDTPro.EventListeners
+{
+    internal static class PREvents
+    {
         private static bool subscribed;
         private static readonly string[] eventNames = {
             "OnPedStopped",
@@ -54,24 +56,31 @@ namespace MDTPro.EventListeners {
         private static readonly List<(EventInfo Event, Delegate Handler)> _prHandlerRegistrations = new List<(EventInfo, Delegate)>();
 
         /// <summary><see cref="Type.GetType(string)"/> often fails for plugin assemblies; prefer scanning loaded assemblies first.</summary>
-        static Type ResolvePolicingRedefinedType(string fullName, string assemblyQualifiedName) {
+        static Type ResolvePolicingRedefinedType(string fullName, string assemblyQualifiedName)
+        {
             Type t = ModIntegration.FindTypeInLoadedAssemblies(fullName);
             if (t != null) return t;
             return Type.GetType(assemblyQualifiedName, throwOnError: false, ignoreCase: false);
         }
 
-        private static void RegisterPrHandler(EventInfo eventInfo, Delegate handler) {
+        private static void RegisterPrHandler(EventInfo eventInfo, Delegate handler)
+        {
             eventInfo.AddEventHandler(null, handler);
             _prHandlerRegistrations.Add((eventInfo, handler));
         }
 
         /// <summary>Unregister PR static handlers so RPH plugin reload does not leave stale delegates into this assembly.</summary>
-        internal static void UnsubscribeAll() {
-            for (int i = _prHandlerRegistrations.Count - 1; i >= 0; i--) {
+        internal static void UnsubscribeAll()
+        {
+            for (int i = _prHandlerRegistrations.Count - 1; i >= 0; i--)
+            {
                 var (evt, handler) = _prHandlerRegistrations[i];
-                try {
+                try
+                {
                     evt?.RemoveEventHandler(null, handler);
-                } catch {
+                }
+                catch
+                {
                     /* ignore */
                 }
             }
@@ -79,14 +88,17 @@ namespace MDTPro.EventListeners {
             subscribed = false;
         }
 
-        internal static void SubscribeToPREvents() {
+        internal static void SubscribeToPREvents()
+        {
             if (subscribed) return;
 
-            try {
+            try
+            {
                 Type eventsApiType = ResolvePolicingRedefinedType("PolicingRedefined.API.EventsAPI", "PolicingRedefined.API.EventsAPI, PolicingRedefined");
                 if (eventsApiType == null) return;
 
-                foreach (string eventName in eventNames) {
+                foreach (string eventName in eventNames)
+                {
                     EventInfo eventInfo = eventsApiType.GetEvent(eventName, BindingFlags.Public | BindingFlags.Static);
                     if (eventInfo == null) continue;
 
@@ -99,13 +111,17 @@ namespace MDTPro.EventListeners {
                 SubscribeToOptionalWeaponFirearmEvents(eventsApiType);
                 SubscribeToOptionalVehicleSearchEvents(eventsApiType);
                 subscribed = true;
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 Game.LogTrivial($"MDT Pro: [Warning] Failed to subscribe to PR events: {e.Message}");
             }
         }
 
-        private static void SubscribeToOnFootTrafficStopStarted() {
-            try {
+        private static void SubscribeToOnFootTrafficStopStarted()
+        {
+            try
+            {
                 Type apiType = ResolvePolicingRedefinedType("PolicingRedefined.API.OnFootTrafficStopAPI", "PolicingRedefined.API.OnFootTrafficStopAPI, PolicingRedefined");
                 if (apiType == null) return;
                 EventInfo eventInfo = apiType.GetEvent("OnFootTrafficStopStarted", BindingFlags.Public | BindingFlags.Static);
@@ -113,55 +129,75 @@ namespace MDTPro.EventListeners {
 
                 Delegate handler = CreateForwardingDelegate(eventInfo.EventHandlerType, "OnFootTrafficStopStarted");
                 RegisterPrHandler(eventInfo, handler);
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 Game.LogTrivial($"MDT Pro: [Warning] Failed to subscribe to PR OnFootTrafficStopStarted: {e.Message}");
             }
         }
 
         /// <summary>Tries to subscribe to PR vehicle search events if they exist. Capture runs when vehicle is actually searched, not just when plate is run.</summary>
-        private static void SubscribeToOptionalVehicleSearchEvents(Type eventsApiType) {
+        private static void SubscribeToOptionalVehicleSearchEvents(Type eventsApiType)
+        {
             if (eventsApiType == null) return;
-            try {
-                foreach (string name in vehicleSearchEventNames) {
+            try
+            {
+                foreach (string name in vehicleSearchEventNames)
+                {
                     EventInfo evt = eventsApiType.GetEvent(name, BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase);
                     if (evt == null) continue;
-                    try {
+                    try
+                    {
                         Delegate handler = CreateForwardingDelegate(evt.EventHandlerType, name);
                         RegisterPrHandler(evt, handler);
                         Game.LogTrivial($"[MDTPro] Subscribed to PR event: {name} (vehicle search contraband)");
                         return; // One handler is enough
-                    } catch (Exception ex) {
+                    }
+                    catch (Exception ex)
+                    {
                         Game.LogTrivial($"[MDTPro] Could not subscribe to {name}: {ex.Message}");
                     }
                 }
-            } catch (Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 Game.LogTrivial($"[MDTPro] Optional vehicle search event subscription failed: {ex.Message}");
             }
         }
 
         /// <summary>Tries to subscribe to PR weapon/firearm check events if they exist (e.g. OnRequestWeaponCheck, OnWeaponRanThroughDispatch).</summary>
-        private static void SubscribeToOptionalWeaponFirearmEvents(Type eventsApiType) {
+        private static void SubscribeToOptionalWeaponFirearmEvents(Type eventsApiType)
+        {
             if (eventsApiType == null) return;
-            try {
+            try
+            {
                 string[] candidates = { "OnRequestWeaponCheck", "OnWeaponRanThroughDispatch", "OnFirearmCheckComplete", "OnWeaponCheckComplete", "OnRequestFirearmCheck", "OnFirearmRanThroughDispatch" };
-                foreach (string name in candidates) {
+                foreach (string name in candidates)
+                {
                     EventInfo evt = eventsApiType.GetEvent(name, BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase);
                     if (evt == null) continue;
-                    try {
+                    try
+                    {
                         Delegate handler = CreateForwardingDelegate(evt.EventHandlerType, name);
                         RegisterPrHandler(evt, handler);
                         Game.LogTrivial($"[MDTPro] Subscribed to PR event: {name}");
-                    } catch (Exception ex) {
+                    }
+                    catch (Exception ex)
+                    {
                         Game.LogTrivial($"[MDTPro] Could not subscribe to {name}: {ex.Message}");
                     }
                 }
-            } catch (Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 Game.LogTrivial($"[MDTPro] Optional weapon event subscription failed: {ex.Message}");
             }
         }
 
-        private static void SubscribeToOnFootTrafficStopEnded() {
-            try {
+        private static void SubscribeToOnFootTrafficStopEnded()
+        {
+            try
+            {
                 Type apiType = ResolvePolicingRedefinedType("PolicingRedefined.API.OnFootTrafficStopAPI", "PolicingRedefined.API.OnFootTrafficStopAPI, PolicingRedefined");
                 if (apiType == null) return;
                 EventInfo eventInfo = apiType.GetEvent("OnFootTrafficStopEnded", BindingFlags.Public | BindingFlags.Static);
@@ -169,12 +205,15 @@ namespace MDTPro.EventListeners {
 
                 Delegate handler = CreateForwardingDelegate(eventInfo.EventHandlerType, "OnFootTrafficStopEnded");
                 RegisterPrHandler(eventInfo, handler);
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 Game.LogTrivial($"MDT Pro: [Warning] Failed to subscribe to PR OnFootTrafficStopEnded: {e.Message}");
             }
         }
 
-        private static Delegate CreateForwardingDelegate(Type delegateType, string eventName) {
+        private static Delegate CreateForwardingDelegate(Type delegateType, string eventName)
+        {
             MethodInfo invokeMethod = delegateType.GetMethod("Invoke");
             ParameterInfo[] parameters = invokeMethod.GetParameters();
             ParameterExpression[] parameterExpressions = parameters
@@ -193,49 +232,68 @@ namespace MDTPro.EventListeners {
             return Expression.Lambda(delegateType, body, parameterExpressions).Compile();
         }
 
-        private static void HandlePREvent(string eventName, object[] args) {
+        private static void HandlePREvent(string eventName, object[] args)
+        {
             if (args == null || args.Length == 0) return;
 
-            if (eventName == "OnVehicleStopped" && args[0] is Vehicle vehicle) {
+            if (eventName == "OnVehicleStopped" && args[0] is Vehicle vehicle)
+            {
                 DataController.ResolveVehicleAndDriverForStop(vehicle);
+                DataController.ScheduleDelayedPrVehicleHydration(vehicle, eventName);
                 return;
             }
 
-            if (vehicleDispatchEventNames.Contains(eventName) && args[0] is Vehicle dispatchVehicle) {
+            if (vehicleDispatchEventNames.Contains(eventName) && args[0] is Vehicle dispatchVehicle)
+            {
                 if (SetupController.GetConfig().firearmDebugLogging)
                     Helper.Log($"[Firearm] PR event fired: {eventName}, plate={dispatchVehicle?.LicensePlate ?? "—"}", false, Helper.LogSeverity.Info);
                 DataController.ResolveVehicleAndDriverForStop(dispatchVehicle);
-                try {
-                    if (dispatchVehicle != null && dispatchVehicle.Exists()) {
+                DataController.ScheduleDelayedPrVehicleHydration(dispatchVehicle, eventName);
+                try
+                {
+                    if (dispatchVehicle != null && dispatchVehicle.Exists())
+                    {
                         DataController.CaptureVehicleSearchItems(dispatchVehicle);
                         if (eventName == "OnRequestVehicleCheck") DataController.TryCapturePickupAndPlayerFirearms();
                         // Delayed retry: player typically searches after running plate. Capture again in 8s.
-                        GameFiber.StartNew(() => {
+                        GameFiber.StartNew(() =>
+                        {
                             GameFiber.Wait(8000);
-                            try {
+                            try
+                            {
                                 if (dispatchVehicle != null && dispatchVehicle.Exists())
                                     DataController.CaptureVehicleSearchItems(dispatchVehicle);
-                            } catch (Exception ex) {
+                            }
+                            catch (Exception ex)
+                            {
                                 Game.LogTrivial($"MDT Pro: [Warning] Delayed vehicle search capture: {ex.Message}");
                             }
                         }, "MDTPro-vehicle-search-delayed");
                     }
-                } catch (Exception ex) {
+                }
+                catch (Exception ex)
+                {
                     Game.LogTrivial($"MDT Pro: [Warning] OnVehicleRanThroughDispatch capture: {ex.Message}");
                 }
                 return;
             }
 
             // Vehicle search events (if PR exposes OnVehicleSearched etc.)
-            if (vehicleSearchEventNames.Contains(eventName) && args != null && args.Length >= 1) {
+            if (vehicleSearchEventNames.Contains(eventName) && args != null && args.Length >= 1)
+            {
                 Vehicle searchVehicle = null;
-                foreach (object arg in args) {
+                foreach (object arg in args)
+                {
                     if (arg is Vehicle v && v.Exists()) { searchVehicle = v; break; }
                 }
-                if (searchVehicle != null) {
-                    try {
+                if (searchVehicle != null)
+                {
+                    try
+                    {
                         DataController.CaptureVehicleSearchItems(searchVehicle);
-                    } catch (Exception ex) {
+                    }
+                    catch (Exception ex)
+                    {
                         Game.LogTrivial($"MDT Pro: [Warning] {eventName} capture: {ex.Message}");
                     }
                 }
@@ -243,46 +301,61 @@ namespace MDTPro.EventListeners {
             }
 
             // OnRequestPedCheck: player just requested dispatch to run this ped. Capture immediately (PR may have search items from prior pat-down). Also capture player-held weapon in case they're checking that.
-            if (eventName == "OnRequestPedCheck" && args.Length >= 1 && args[0] is Ped requestPed) {
+            if (eventName == "OnRequestPedCheck" && args.Length >= 1 && args[0] is Ped requestPed)
+            {
                 if (SetupController.GetConfig().firearmDebugLogging)
                     Helper.Log($"[Firearm] PR event fired: OnRequestPedCheck, pedHandle={requestPed?.Handle ?? 0}", false, Helper.LogSeverity.Info);
-                try {
+                try
+                {
                     if (requestPed != null && requestPed.IsValid())
                         DataController.CaptureFirearmsFromPed(requestPed, "Firearm check (request)");
                     DataController.TryCapturePickupAndPlayerFirearms();
-                } catch (Exception ex) {
+                }
+                catch (Exception ex)
+                {
                     Game.LogTrivial($"MDT Pro: [Warning] OnRequestPedCheck capture: {ex.Message}");
                 }
             }
 
             // OnPedRanThroughDispatch: when dispatch returns ped info (may include warrant/firearm results). Refresh wanted status from CDF so MDT Person Search shows warrants; capture firearms for Firearms Check.
-            if (eventName == "OnPedRanThroughDispatch" && args.Length >= 1 && args[0] is Ped dispatchPed) {
+            if (eventName == "OnPedRanThroughDispatch" && args.Length >= 1 && args[0] is Ped dispatchPed)
+            {
                 if (SetupController.GetConfig().firearmDebugLogging)
                     Helper.Log($"[Firearm] PR event fired: OnPedRanThroughDispatch, pedHandle={dispatchPed?.Handle ?? 0}", false, Helper.LogSeverity.Info);
-                try {
-                    if (dispatchPed != null && dispatchPed.IsValid()) {
+                try
+                {
+                    if (dispatchPed != null && dispatchPed.IsValid())
+                    {
                         DataController.RefreshPedWantedStatusFromCDF(dispatchPed);
                         DataController.CaptureFirearmsFromPed(dispatchPed, "Firearm check (dispatch)");
                         DataController.ScheduleDelayedPedDocumentRefresh(dispatchPed, "Dispatch (PR)");
                     }
-                } catch (Exception ex) {
+                }
+                catch (Exception ex)
+                {
                     Game.LogTrivial($"MDT Pro: [Warning] OnPedRanThroughDispatch capture: {ex.Message}");
                 }
             }
 
             // Optional weapon/firearm check events: if PR fires these, capture so firearm shows in MDT.
             // PR may pass (Ped) when checking someone else's weapon, or no Ped when checking player's held weapon.
-            if ((eventName.Contains("Weapon") || eventName.Contains("Firearm")) && args != null) {
+            if ((eventName.Contains("Weapon") || eventName.Contains("Firearm")) && args != null)
+            {
                 if (SetupController.GetConfig().firearmDebugLogging)
                     Helper.Log($"[Firearm] PR event fired: {eventName}", false, Helper.LogSeverity.Info);
                 bool captured = false;
-                foreach (object arg in args) {
-                    if (arg is Ped wpnPed && wpnPed.IsValid()) {
-                        try {
+                foreach (object arg in args)
+                {
+                    if (arg is Ped wpnPed && wpnPed.IsValid())
+                    {
+                        try
+                        {
                             DataController.CaptureFirearmsFromPed(wpnPed, "Firearm check");
                             captured = true;
                             break;
-                        } catch (Exception ex) {
+                        }
+                        catch (Exception ex)
+                        {
                             Game.LogTrivial($"MDT Pro: [Warning] {eventName} firearm capture: {ex.Message}");
                         }
                     }
@@ -291,30 +364,41 @@ namespace MDTPro.EventListeners {
                 if (!captured) DataController.TryCapturePickupAndPlayerFirearms();
             }
 
-            if (eventName == "OnFootTrafficStopStarted" && args.Length > 0) {
+            if (eventName == "OnFootTrafficStopStarted" && args.Length > 0)
+            {
                 HandleOnFootTrafficStopStarted(args[0]);
                 return;
             }
 
-            if (eventName == "OnFootTrafficStopEnded") {
+            if (eventName == "OnFootTrafficStopEnded")
+            {
                 return;
             }
 
-            if (trafficStopEventNames.Contains(eventName) && args.Length >= 2 && args[0] is Ped tsPed && args[1] is Vehicle tsVehicle) {
-                try {
-                    if (tsPed != null && tsPed.IsValid()) {
+            if (trafficStopEventNames.Contains(eventName) && args.Length >= 2 && args[0] is Ped tsPed && args[1] is Vehicle tsVehicle)
+            {
+                try
+                {
+                    if (tsPed != null && tsPed.IsValid())
+                    {
                         DataController.ResolvePedForReEncounter(tsPed);
                         DataController.AddIdentificationEvent(tsPed, eventName == "OnPedAskedToExitVehicle" ? "Procedural: Asked to exit vehicle" : "Procedural: Asked to turn off engine");
                     }
                     if (tsVehicle != null && tsVehicle.Exists())
+                    {
                         DataController.ResolveVehicleAndDriverForStop(tsVehicle);
-                } catch (Exception ex) {
+                        DataController.ScheduleDelayedPrVehicleHydration(tsVehicle, eventName);
+                    }
+                }
+                catch (Exception ex)
+                {
                     Game.LogTrivial($"MDT Pro: [Warning] {eventName} handler: {ex.Message}");
                 }
                 return;
             }
 
-            if (identificationEventTypes.ContainsKey(eventName) && args.Length >= 2 && args[0] is Ped idPed) {
+            if (identificationEventTypes.ContainsKey(eventName) && args.Length >= 2 && args[0] is Ped idPed)
+            {
                 string idType = MapIdentificationEnum(args[1]) ?? "Identification";
                 if (eventName == "OnOccupantIdentificationGiven") idType = idType + " (occupant)";
                 DataController.ResolvePedForReEncounter(idPed);
@@ -323,7 +407,8 @@ namespace MDTPro.EventListeners {
             }
 
             // OnDeadPedSearched (PedDelegate): fires when PR search finds ID on a corpse. Add to ID History and capture firearms/drugs.
-            if (eventName == "OnDeadPedSearched" && args.Length >= 1 && args[0] is Ped deadPed) {
+            if (eventName == "OnDeadPedSearched" && args.Length >= 1 && args[0] is Ped deadPed)
+            {
                 if (SetupController.GetConfig().firearmDebugLogging)
                     Helper.Log($"[Firearm] PR event fired: OnDeadPedSearched, pedHandle={deadPed?.Handle ?? 0}", false, Helper.LogSeverity.Info);
                 DataController.AddIdentificationEvent(deadPed, "Dead body search");
@@ -331,14 +416,17 @@ namespace MDTPro.EventListeners {
                 return;
             }
 
-            foreach (object value in args) {
+            foreach (object value in args)
+            {
                 ResolvePedFromValue(value, eventName);
             }
         }
 
-        private static void HandleOnFootTrafficStopStarted(object handle) {
+        private static void HandleOnFootTrafficStopStarted(object handle)
+        {
             if (handle == null) return;
-            try {
+            try
+            {
                 Type apiType = ResolvePolicingRedefinedType("PolicingRedefined.API.OnFootTrafficStopAPI", "PolicingRedefined.API.OnFootTrafficStopAPI, PolicingRedefined");
                 if (apiType == null) return;
                 MethodInfo getVehicle = apiType.GetMethod("GetOnFootTrafficStopVehicle", BindingFlags.Public | BindingFlags.Static);
@@ -350,14 +438,20 @@ namespace MDTPro.EventListeners {
                 if (suspectObj is Ped suspect && suspect.IsValid())
                     DataController.ResolvePedForReEncounter(suspect);
                 if (vehicleObj is Vehicle vehicle && vehicle.Exists())
+                {
                     DataController.ResolveVehicleAndDriverForStop(vehicle);
-            } catch (Exception ex) {
+                    DataController.ScheduleDelayedPrVehicleHydration(vehicle, "OnFootTrafficStopStarted");
+                }
+            }
+            catch (Exception ex)
+            {
                 Game.LogTrivial($"MDT Pro: [Warning] OnFootTrafficStopStarted handler: {ex.Message}");
             }
         }
 
         /// <summary>Maps PR's EGivenIdentification enum to our ID type strings. PR may have more than ID/DriversLicense (e.g. WeaponPermit); docs only list those two.</summary>
-        private static string MapIdentificationEnum(object enumValue) {
+        private static string MapIdentificationEnum(object enumValue)
+        {
             if (enumValue == null) return null;
             Type t = enumValue.GetType();
             if (!t.IsEnum) return null;
@@ -374,18 +468,24 @@ namespace MDTPro.EventListeners {
             return System.Text.RegularExpressions.Regex.Replace(name, "([a-z])([A-Z])", "$1 $2").Trim();
         }
 
-        private static void ResolvePedFromValue(object value, string eventName) {
+        private static void ResolvePedFromValue(object value, string eventName)
+        {
             if (value == null) return;
 
-            if (value is Ped ped) {
-                if (eventName == "OnPedReleased") {
-                    try {
+            if (value is Ped ped)
+            {
+                if (eventName == "OnPedReleased")
+                {
+                    try
+                    {
                         if (ped == null || !ped.IsValid()) return;
-                    } catch { return; }
+                    }
+                    catch { return; }
                 }
                 DataController.ResolvePedForReEncounter(ped);
                 if (eventName == "OnPedArrested") DataController.CaptureEvidenceForPed(ped);
-                else if (eventName == "OnPedPatDown") {
+                else if (eventName == "OnPedPatDown")
+                {
                     DataController.MarkPedPatDown(ped);
                     DataController.AddIdentificationEvent(ped, "Pat-down");
                 }
@@ -399,20 +499,26 @@ namespace MDTPro.EventListeners {
                 .GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(property => property.CanRead && typeof(Ped).IsAssignableFrom(property.PropertyType));
 
-            foreach (PropertyInfo property in pedProperties) {
-                try {
+            foreach (PropertyInfo property in pedProperties)
+            {
+                try
+                {
                     object pedValue = property.GetValue(value);
-                    if (pedValue is Ped nestedPed) {
+                    if (pedValue is Ped nestedPed)
+                    {
                         DataController.ResolvePedForReEncounter(nestedPed);
                         if (eventName == "OnPedArrested") DataController.CaptureEvidenceForPed(nestedPed);
-                        else if (eventName == "OnPedPatDown") {
+                        else if (eventName == "OnPedPatDown")
+                        {
                             DataController.MarkPedPatDown(nestedPed);
                             DataController.AddIdentificationEvent(nestedPed, "Pat-down");
                         }
                         else if (eventName == "OnPedSurrendered") DataController.MarkPedFleeing(nestedPed);
                         else if (identificationEventTypes.TryGetValue(eventName, out string idType)) DataController.AddIdentificationEvent(nestedPed, idType);
                     }
-                } catch {
+                }
+                catch
+                {
                     // Ignore malformed event payloads and continue.
                 }
             }

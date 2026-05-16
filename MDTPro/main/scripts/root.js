@@ -21,6 +21,7 @@ const mdtBridgeAuth = (() => {
       if (url.origin !== location.origin) return false
       return (
         url.pathname === '/config' ||
+        url.pathname === '/cloudStatus' ||
         url.pathname === '/integration' ||
         url.pathname.startsWith('/data/') ||
         url.pathname.startsWith('/post/')
@@ -72,7 +73,7 @@ const mdtBridgeAuth = (() => {
   return { ready }
 })()
 
-/** True when the parent page is the real MDT shell (notifications + icon strip), not e.g. the cloud portal. */
+/** True when the parent page is the real MDT shell (notifications + icon strip), not an embedded viewer. */
 function parentLooksLikeMdtShell() {
   if (!isInIframe) return false
   try {
@@ -168,7 +169,7 @@ const keepLoadingOnButton = new Object()
 
 async function showLoadingOnButton(button) {
   keepLoadingOnButton[button] = true
-  await sleep(50)
+  await sleep(25)
   if (keepLoadingOnButton[button]) button.classList.add('loading')
 }
 

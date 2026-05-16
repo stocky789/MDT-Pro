@@ -1,201 +1,343 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title data-language="title">Vehicle Search</title>
-    <link rel="stylesheet" href="/style/root.css" />
-    <link rel="stylesheet" href="/style/vehicleSearch.css" />
-  </head>
-  <body>
-    <div class="searchInputWrapper">
-      <input
-        type="text"
-        id="vehicleSearchInput"
-        data-language-placeholder="searchInput"
-        placeholder="Enter plate or VIN"
-        autocomplete="off"
-      />
-      <button data-language="search">Search</button>
-    </div>
-    <div class="nearbyPlatesWrapper hidden">
-      <div class="searchResponseSectionTitle" data-language="nearbyPlatesTitle">
-        Nearby Vehicles
-      </div>
-      <div class="nearbyPlatesHeader">
-        <button class="nearbyPlatesRefresh" data-language="refreshNearby">
-          Refresh
-        </button>
-      </div>
-      <div class="nearbyPlatesList"></div>
-    </div>
-    <div class="searchHistoryWrapper hidden">
-      <div class="searchResponseSectionTitle" data-language="recentSearchesTitle">
-        Recent Searches
-      </div>
-      <div class="searchHistoryList"></div>
-    </div>
-    <div class="searchResponseWrapper hidden">
-      <div class="searchResponseSectionTitle" data-language="basicInfoTitle">
-        Basic Information
-      </div>
-      <div class="inputWrapper grid basicInfo">
-        <div>
-          <label for="licensePlateInput" data-language="labels.licensePlate"
-            >License Plate</label
-          >
-          <input
-            type="text"
-            id="licensePlateInput"
-            disabled
-            data-property="LicensePlate"
-          />
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title data-language="title">Vehicle Search</title>
+        <link rel="stylesheet" href="/style/root.css" />
+        <link rel="stylesheet" href="/style/vehicleSearch.css" />
+    </head>
+    <body>
+        <div class="searchInputWrapper">
+            <input
+                type="text"
+                id="vehicleSearchInput"
+                data-language-placeholder="searchInput"
+                placeholder="Enter plate or VIN"
+                autocomplete="off"
+            />
+            <button data-language="search">Search</button>
         </div>
-        <div>
-          <label
-            for="modelDisplayNameInput"
-            data-language="labels.modelDisplayName"
-            >Display name</label
-          >
-          <input
-            type="text"
-            id="modelDisplayNameInput"
-            disabled
-            data-property="ModelDisplayName"
-          />
+        <div class="nearbyPlatesWrapper hidden">
+            <div
+                class="searchResponseSectionTitle"
+                data-language="nearbyPlatesTitle"
+            >
+                Nearby Vehicles
+            </div>
+            <div class="nearbyPlatesHeader">
+                <button
+                    class="nearbyPlatesRefresh"
+                    data-language="refreshNearby"
+                >
+                    Refresh
+                </button>
+            </div>
+            <div class="nearbyPlatesList"></div>
         </div>
-        <div>
-          <label for="cdfModelInput" data-language="labels.model">Model</label>
-          <input type="text" id="cdfModelInput" disabled data-property="Model" />
+        <div class="searchHistoryWrapper hidden">
+            <div
+                class="searchResponseSectionTitle"
+                data-language="recentSearchesTitle"
+            >
+                Recent Searches
+            </div>
+            <div class="searchHistoryList"></div>
         </div>
-        <div>
-          <label for="ownerInput" data-language="labels.owner">Owner</label>
-          <input type="text" id="ownerInput" disabled data-property="Owner" />
+        <div class="searchResponseWrapper hidden">
+            <div
+                class="searchResponseSectionTitle"
+                data-language="basicInfoTitle"
+            >
+                Basic Information
+            </div>
+            <div class="inputWrapper grid basicInfo">
+                <div>
+                    <label
+                        for="licensePlateInput"
+                        data-language="labels.licensePlate"
+                        >License Plate</label
+                    >
+                    <input
+                        type="text"
+                        id="licensePlateInput"
+                        disabled
+                        data-property="LicensePlate"
+                    />
+                </div>
+                <div>
+                    <label
+                        for="modelDisplayNameInput"
+                        data-language="labels.modelDisplayName"
+                        >Display name</label
+                    >
+                    <input
+                        type="text"
+                        id="modelDisplayNameInput"
+                        disabled
+                        data-property="ModelDisplayName"
+                    />
+                </div>
+                <div>
+                    <label for="cdfModelInput" data-language="labels.model"
+                        >Model</label
+                    >
+                    <input
+                        type="text"
+                        id="cdfModelInput"
+                        disabled
+                        data-property="Model"
+                    />
+                </div>
+                <div>
+                    <label for="ownerInput" data-language="labels.owner"
+                        >Owner</label
+                    >
+                    <input
+                        type="text"
+                        id="ownerInput"
+                        disabled
+                        data-property="Owner"
+                    />
+                </div>
+                <div>
+                    <label for="isStolenInput" data-language="labels.isStolen"
+                        >Stolen</label
+                    >
+                    <input
+                        type="text"
+                        id="isStolenInput"
+                        disabled
+                        data-property="IsStolen"
+                    />
+                </div>
+                <div>
+                    <label for="makeInput" data-language="labels.make"
+                        >Make</label
+                    >
+                    <input
+                        type="text"
+                        id="makeInput"
+                        disabled
+                        data-property="Make"
+                    />
+                </div>
+                <div>
+                    <label
+                        for="primaryColorInput"
+                        data-language="labels.primaryColor"
+                        >Primary color</label
+                    >
+                    <input
+                        type="text"
+                        id="primaryColorInput"
+                        disabled
+                        data-property="PrimaryColor"
+                    />
+                </div>
+                <div>
+                    <label
+                        for="secondaryColorInput"
+                        data-language="labels.secondaryColor"
+                        >Secondary color</label
+                    >
+                    <input
+                        type="text"
+                        id="secondaryColorInput"
+                        disabled
+                        data-property="SecondaryColor"
+                    />
+                </div>
+                <div>
+                    <label
+                        for="primaryColorGtaInput"
+                        data-language="labels.primaryColorGta"
+                        >Primary (GTA)</label
+                    >
+                    <input
+                        type="text"
+                        id="primaryColorGtaInput"
+                        disabled
+                        data-property="PrimaryColorSpecific"
+                    />
+                </div>
+                <div>
+                    <label
+                        for="secondaryColorGtaInput"
+                        data-language="labels.secondaryColorGta"
+                        >Secondary (GTA)</label
+                    >
+                    <input
+                        type="text"
+                        id="secondaryColorGtaInput"
+                        disabled
+                        data-property="SecondaryColorSpecific"
+                    />
+                </div>
+                <div>
+                    <label data-language="labels.color">Color</label>
+                    <div data-property="Color"></div>
+                </div>
+                <div>
+                    <label for="vinNumberInput" data-language="labels.vinNumber"
+                        >VIN</label
+                    >
+                    <input
+                        type="text"
+                        id="vinNumberInput"
+                        disabled
+                        data-property="VehicleIdentificationNumber"
+                    />
+                </div>
+                <div>
+                    <label for="vinStatusInput" data-language="labels.vinStatus"
+                        >VIN Status</label
+                    >
+                    <input
+                        type="text"
+                        id="vinStatusInput"
+                        disabled
+                        data-property="VinStatus"
+                    />
+                </div>
+            </div>
+            <div
+                class="searchResponseSectionTitle"
+                data-language="documentsTitle"
+            >
+                Documents
+            </div>
+            <div class="inputWrapper grid basicInfo">
+                <div>
+                    <label
+                        for="registrationStatusInput"
+                        data-language="labels.registrationStatus"
+                        >Registration Status</label
+                    >
+                    <input
+                        type="text"
+                        id="registrationStatusInput"
+                        disabled
+                        data-property="RegistrationStatus"
+                    />
+                </div>
+                <div>
+                    <label
+                        for="registrationExpirationInput"
+                        data-language="labels.registrationExpiration"
+                        >Registration Expiration</label
+                    >
+                    <input
+                        type="text"
+                        id="registrationExpirationInput"
+                        disabled
+                        data-property="RegistrationExpiration"
+                    />
+                </div>
+                <div>
+                    <label
+                        for="insuranceStatusInput"
+                        data-language="labels.insuranceStatus"
+                        >Insurance Status</label
+                    >
+                    <input
+                        type="text"
+                        id="insuranceStatusInput"
+                        disabled
+                        data-property="InsuranceStatus"
+                    />
+                </div>
+                <div>
+                    <label
+                        for="insuranceExpirationInput"
+                        data-language="labels.insuranceExpiration"
+                        >Insurance Expiration</label
+                    >
+                    <input
+                        type="text"
+                        id="insuranceExpirationInput"
+                        disabled
+                        data-property="InsuranceExpiration"
+                    />
+                </div>
+            </div>
+            <div class="boloSectionPlaceholder"></div>
         </div>
-        <div>
-          <label for="isStolenInput" data-language="labels.isStolen"
-            >Stolen</label
-          >
-          <input
-            type="text"
-            id="isStolenInput"
-            disabled
-            data-property="IsStolen"
-          />
+        <div
+            id="addBoloModal"
+            class="addBoloModal hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="addBoloModalTitle"
+        >
+            <div class="addBoloModalContent">
+                <h2
+                    id="addBoloModalTitle"
+                    class="addBoloModalTitle"
+                    data-language="addBOLOTitle"
+                >
+                    Add BOLO
+                </h2>
+                <p class="addBoloModalSubtitle" data-language="addBOLOSubtitle">
+                    Enter BOLO details for this vehicle.
+                </p>
+                <form id="addBoloForm" class="addBoloModalForm">
+                    <div class="addBoloFormRow">
+                        <label
+                            for="addBoloPlate"
+                            data-language="labels.licensePlate"
+                            >License Plate</label
+                        >
+                        <input
+                            id="addBoloPlate"
+                            type="text"
+                            readonly
+                            disabled
+                        />
+                    </div>
+                    <div class="addBoloFormRow">
+                        <label for="addBoloReason" data-language="boloReason"
+                            >Reason *</label
+                        >
+                        <input
+                            id="addBoloReason"
+                            type="text"
+                            required
+                            placeholder="e.g. Armed robbery suspect"
+                        />
+                    </div>
+                    <div class="addBoloFormRow">
+                        <label for="addBoloExpires" data-language="boloExpires"
+                            >Expires in (days)</label
+                        >
+                        <input
+                            id="addBoloExpires"
+                            type="number"
+                            min="1"
+                            max="365"
+                            value="7"
+                        />
+                    </div>
+                    <div class="addBoloModalActions">
+                        <button
+                            type="button"
+                            class="addBoloModalCancel"
+                            data-language="cancel"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="addBoloModalSubmit"
+                            data-language="addBOLOSubmit"
+                        >
+                            Add BOLO
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
-        <div>
-          <label for="makeInput" data-language="labels.make">Make</label>
-          <input type="text" id="makeInput" disabled data-property="Make" />
-        </div>
-        <div>
-          <label for="primaryColorInput" data-language="labels.primaryColor">Primary color</label>
-          <input type="text" id="primaryColorInput" disabled data-property="PrimaryColor" />
-        </div>
-        <div>
-          <label for="secondaryColorInput" data-language="labels.secondaryColor">Secondary color</label>
-          <input type="text" id="secondaryColorInput" disabled data-property="SecondaryColor" />
-        </div>
-        <div>
-          <label for="primaryColorGtaInput" data-language="labels.primaryColorGta">Primary (GTA)</label>
-          <input type="text" id="primaryColorGtaInput" disabled data-property="PrimaryColorSpecific" />
-        </div>
-        <div>
-          <label for="secondaryColorGtaInput" data-language="labels.secondaryColorGta">Secondary (GTA)</label>
-          <input type="text" id="secondaryColorGtaInput" disabled data-property="SecondaryColorSpecific" />
-        </div>
-        <div>
-          <label data-language="labels.color">Color</label>
-          <div data-property="Color"></div>
-        </div>
-        <div>
-          <label for="vinStatusInput" data-language="labels.vinStatus">VIN Status</label>
-          <input type="text" id="vinStatusInput" disabled data-property="VinStatus" />
-        </div>
-      </div>
-      <div class="searchResponseSectionTitle" data-language="documentsTitle">
-        Documents
-      </div>
-      <div class="inputWrapper grid basicInfo">
-        <div>
-          <label
-            for="registrationStatusInput"
-            data-language="labels.registrationStatus"
-            >Registration Status</label
-          >
-          <input
-            type="text"
-            id="registrationStatusInput"
-            disabled
-            data-property="RegistrationStatus"
-          />
-        </div>
-        <div>
-          <label
-            for="registrationExpirationInput"
-            data-language="labels.registrationExpiration"
-            >Registration Expiration</label
-          >
-          <input
-            type="text"
-            id="registrationExpirationInput"
-            disabled
-            data-property="RegistrationExpiration"
-          />
-        </div>
-        <div>
-          <label
-            for="insuranceStatusInput"
-            data-language="labels.insuranceStatus"
-            >Insurance Status</label
-          >
-          <input
-            type="text"
-            id="insuranceStatusInput"
-            disabled
-            data-property="InsuranceStatus"
-          />
-        </div>
-        <div>
-          <label
-            for="insuranceExpirationInput"
-            data-language="labels.insuranceExpiration"
-            >Insurance Expiration</label
-          >
-          <input
-            type="text"
-            id="insuranceExpirationInput"
-            disabled
-            data-property="InsuranceExpiration"
-          />
-        </div>
-      </div>
-      <div class="boloSectionPlaceholder"></div>
-    </div>
-    <div id="addBoloModal" class="addBoloModal hidden" role="dialog" aria-modal="true" aria-labelledby="addBoloModalTitle">
-      <div class="addBoloModalContent">
-        <h2 id="addBoloModalTitle" class="addBoloModalTitle" data-language="addBOLOTitle">Add BOLO</h2>
-        <p class="addBoloModalSubtitle" data-language="addBOLOSubtitle">Enter BOLO details for this vehicle.</p>
-        <form id="addBoloForm" class="addBoloModalForm">
-          <div class="addBoloFormRow">
-            <label for="addBoloPlate" data-language="labels.licensePlate">License Plate</label>
-            <input id="addBoloPlate" type="text" readonly disabled />
-          </div>
-          <div class="addBoloFormRow">
-            <label for="addBoloReason" data-language="boloReason">Reason *</label>
-            <input id="addBoloReason" type="text" required placeholder="e.g. Armed robbery suspect" />
-          </div>
-          <div class="addBoloFormRow">
-            <label for="addBoloExpires" data-language="boloExpires">Expires in (days)</label>
-            <input id="addBoloExpires" type="number" min="1" max="365" value="7" />
-          </div>
-          <div class="addBoloModalActions">
-            <button type="button" class="addBoloModalCancel" data-language="cancel">Cancel</button>
-            <button type="submit" class="addBoloModalSubmit" data-language="addBOLOSubmit">Add BOLO</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </body>
-  <script src="/script/root.js"></script>
-  <script src="/script/vehicleSearch.js"></script>
+    </body>
+    <script src="/script/root.js"></script>
+    <script src="/script/vehicleSearch.js"></script>
 </html>

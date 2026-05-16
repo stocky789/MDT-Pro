@@ -158,7 +158,9 @@ function applyQuickBackupMenuForProvider(menu, ultimateBackup, lang) {
         narcoticsPopup.classList.remove('open')
         narcoticsPopup.setAttribute('aria-hidden', 'true')
       }
-      narcoticsBtn.addEventListener('click', openNarcoticsCheatsheet)
+      narcoticsBtn.addEventListener('click', function () {
+        openNarcoticsCheatsheet()
+      })
       narcoticsPopup.querySelectorAll('[data-narcotics-cheatsheet-close]').forEach((el) => {
         el.addEventListener('click', closeNarcoticsCheatsheet)
       })
@@ -808,6 +810,8 @@ async function openWindow(name, pluginId = null) {
   requestAnimationFrame(() => {
     taskbarIcon.style.opacity = '1'
   })
+
+  return windowElement
 }
 
 /**

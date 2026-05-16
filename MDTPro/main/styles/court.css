@@ -338,6 +338,15 @@ body {
   min-width: fit-content;
 }
 
+.courtStatusWrapper .forceResolveBtn {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.courtStatusWrapper .forceResolveBtn:hover {
+  background-color: color-mix(in srgb, var(--color-warning) 16%, transparent);
+}
+
 .courtNotes {
   grid-column: 1 / -1;
 }
@@ -584,6 +593,11 @@ body {
 }
 
 /* Force Resolve processing overlay */
+.courtProcessingOverlay--closing {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
 .courtProcessingOverlay {
   position: fixed;
   inset: 0;
@@ -635,7 +649,7 @@ body {
   stroke-linecap: round;
   stroke-dasharray: 226; /* 2 * pi * 36 */
   stroke-dashoffset: 226;
-  transition: stroke-dashoffset 0.15s linear;
+  transition: stroke-dashoffset 0.1s linear;
 }
 
 .courtProcessingStage {

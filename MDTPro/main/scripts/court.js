@@ -831,10 +831,6 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
 
   const statusWrapper = document.createElement('div')
   statusWrapper.classList.add('courtStatusWrapper')
-  const serverResolvedHint = document.createElement('p')
-  serverResolvedHint.className = 'courtServerResolvedHint'
-  serverResolvedHint.textContent = language.court.serverResolvedHint || 'Verdict and sentence are resolved centrally by MDT Cloud.'
-  statusWrapper.appendChild(serverResolvedHint)
   statusWrapper.appendChild(createLabel(language.court.status || 'Status'))
 
   const currentStatusLabel = createReadOnlyInput(statusMap[courtCase.Status] || 'Unknown')
@@ -881,6 +877,43 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
       hideLoadingOnButton(saveCaseBtn)
     })
     statusButtonWrapper.appendChild(saveCaseBtn)
+
+    const forceResolveBtn = document.createElement('button')
+    forceResolveBtn.className = 'forceResolveBtn'
+    forceResolveBtn.innerText = language.court.forceResolve || 'Force Resolve'
+    forceResolveBtn.addEventListener('click', async function () {
+      if (forceResolveBtn.classList.contains('loading')) return
+      await showLoadingOnButton(forceResolveBtn)
+      const processingModal = showCourtProcessingModal(language)
+      try {
+        const responsePromise = fetch('/post/forceResolveCourtCase', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            Number: courtCase.Number,
+            Plea: pleaSelect.value,
+            OutcomeNotes: notesInput.value,
+          }),
+        })
+        const [response] = await Promise.all([responsePromise, sleep(1100)])
+        let payload = {}
+        try {
+          payload = await response.json()
+        } catch (_) {}
+        if (response.ok && payload?.success !== false) {
+          topWindow.showNotification(language.court.forceResolveSuccess || 'Case resolved.', 'checkMark')
+          if (typeof refreshCourtList === 'function') await refreshCourtList()
+        } else {
+          topWindow.showNotification(payload?.error || language.court.forceResolveError || 'Could not resolve case.', 'error')
+        }
+      } catch (_) {
+        topWindow.showNotification(language.court.forceResolveError || 'Could not resolve case.', 'error')
+      } finally {
+        processingModal.close()
+        hideLoadingOnButton(forceResolveBtn)
+      }
+    })
+    statusButtonWrapper.appendChild(forceResolveBtn)
     statusWrapper.appendChild(statusButtonWrapper)
   }
 
@@ -899,6 +932,64 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   }
 
   return listItem
+}
+
+
+function showCourtProcessingModal(language) {
+  const stages = Array.isArray(language.court.forceResolveStages) && language.court.forceResolveStages.length > 0
+    ? language.court.forceResolveStages
+    : [
+        'Submitting case to court...',
+        'Prosecution and defense present...',
+        'Judge deliberating...',
+        'Verdict being entered...',
+        'Finalizing case record...',
+      ]
+  const overlay = document.createElement('div')
+  overlay.className = 'courtProcessingOverlay'
+  overlay.setAttribute('role', 'status')
+  overlay.setAttribute('aria-live', 'polite')
+  overlay.innerHTML = `
+    <div class="courtProcessingModal">
+      <div class="courtProcessingTitle"></div>
+      <svg class="courtProcessingCircle" viewBox="0 0 80 80" aria-hidden="true">
+        <circle class="courtProcessingCircleBg" cx="40" cy="40" r="36"></circle>
+        <circle class="courtProcessingCircleProgress" cx="40" cy="40" r="36"></circle>
+      </svg>
+      <div class="courtProcessingStage"></div>
+    </div>
+  `
+
+  const title = overlay.querySelector('.courtProcessingTitle')
+  const progress = overlay.querySelector('.courtProcessingCircleProgress')
+  const stage = overlay.querySelector('.courtProcessingStage')
+  title.textContent = language.court.forceResolveProcessing || 'Processing case...'
+  stage.textContent = stages[0]
+  document.body.appendChild(overlay)
+
+  const circumference = 226
+  const durationMs = Math.max(1000, stages.length * 220)
+  const started = performance.now()
+  let frameId = null
+
+  const tick = (now) => {
+    const elapsed = now - started
+    const pct = Math.min(elapsed / durationMs, 0.96)
+    const stageIndex = Math.min(stages.length - 1, Math.floor(pct * stages.length))
+    progress.style.strokeDashoffset = String(circumference - circumference * pct)
+    stage.textContent = stages[stageIndex]
+    frameId = requestAnimationFrame(tick)
+  }
+  frameId = requestAnimationFrame(tick)
+
+  return {
+    close() {
+      if (frameId) cancelAnimationFrame(frameId)
+      progress.style.strokeDashoffset = '0'
+      overlay.classList.add('courtProcessingOverlay--closing')
+      setTimeout(() => overlay.remove(), 120)
+    },
+  }
 }
 
 function escapeHtml(s) {

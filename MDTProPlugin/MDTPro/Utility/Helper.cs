@@ -286,9 +286,13 @@ namespace MDTPro.Utility {
         }
 
         public static bool AddUrlAcl(string url) {
+            if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+                return false;
+
+            string userName = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
             Process process = new Process();
             process.StartInfo.FileName = "netsh";
-            process.StartInfo.Arguments = $"http add urlacl url={url} user=\"{System.Security.Principal.WindowsIdentity.GetCurrent().Name}\"";
+            process.StartInfo.Arguments = $"http add urlacl url={url} user=\"{userName}\"";
             process.StartInfo.UseShellExecute = true;
             process.StartInfo.CreateNoWindow = true;
             process.StartInfo.Verb = "runas";

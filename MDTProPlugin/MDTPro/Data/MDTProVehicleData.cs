@@ -4,8 +4,10 @@ using Rage;
 using System;
 using System.Drawing;
 
-namespace MDTPro.Data {
-    public class MDTProVehicleData {
+namespace MDTPro.Data
+{
+    public class MDTProVehicleData
+    {
         internal readonly Vehicle Holder;
         internal readonly VehicleData CDFVehicleData;
 
@@ -36,33 +38,39 @@ namespace MDTPro.Data {
         public string OwnerPersonId;
 
         /// <summary>True when vehicle is in world and BOLOs can be added/removed via CDF.</summary>
-        public bool CanModifyBOLOs {
-            get {
+        public bool CanModifyBOLOs
+        {
+            get
+            {
                 if (Holder == null) return false;
                 try { return Holder.Exists(); } catch { return false; }
             }
         }
 
-        internal MDTProVehicleData(Vehicle vehicle) {
+        internal MDTProVehicleData(Vehicle vehicle)
+        {
             Holder = vehicle;
             CDFVehicleData = vehicle.GetVehicleData();
             PopulateParameters();
         }
-        internal MDTProVehicleData(VehicleData vehicleData) {
+        internal MDTProVehicleData(VehicleData vehicleData)
+        {
             Holder = vehicleData.Holder;
             CDFVehicleData = vehicleData;
             PopulateParameters();
         }
         internal MDTProVehicleData() { }
 
-        private void PopulateParameters() {
+        private void PopulateParameters()
+        {
             if (Holder == null) return;
 
             // Always pull plate/model from the world entity first. StopThePed can fire before CDF links an
             // owner; Policing Redefined's stop tended to run later. Without a plate here, vehicles never enter
             // vehicleDatabase and Vehicle Search "Nearby Vehicles" stays empty (cache is built from that DB).
-            try {
-                LicensePlate = Holder.LicensePlate;
+            try
+            {
+                LicensePlate = DataController.TryResolveLiveVehiclePlate(Holder, out _) ?? Holder.LicensePlate;
                 ModelName = Holder.Model.Name;
                 string unlocalizedModelDisplayName =
                     Rage.Native.NativeFunction.Natives.GET_DISPLAY_NAME_FROM_VEHICLE_MODEL<string>(Holder.Model.Hash);
@@ -70,41 +78,57 @@ namespace MDTPro.Data {
                 Color = Rage.Native.NativeFunction.Natives.GET_VEHICLE_LIVERY<int>(Holder) == -1
                     ? GetColorDisplay(Holder.PrimaryColor, Holder.SecondaryColor)
                     : null;
-            } catch { /* invalid Holder or wrong thread */ }
+                GtaVVehicleMakeModelCatalog.TryEnrichFromSpawnName(ModelName, this);
+            }
+            catch { /* invalid Holder or wrong thread */ }
 
             if (CDFVehicleData == null) return;
 
-            try {
+            try
+            {
                 IsStolen = CDFVehicleData.IsStolen;
-            } catch { }
-            try {
+            }
+            catch { }
+            try
+            {
                 BOLOs = CDFVehicleData.GetAllBOLOs();
-            } catch { BOLOs = null; }
+            }
+            catch { BOLOs = null; }
 
-            if (CDFVehicleData.Registration != null) {
-                try {
+            if (CDFVehicleData.Registration != null)
+            {
+                try
+                {
                     RegistrationStatus = CDFVehicleData.Registration.Status.ToString();
                     RegistrationExpiration = CDFVehicleData.Registration.ExpirationDate?.ToString("s");
                     RegistrationExpirationVerifiedFromLiveDocument = !string.IsNullOrWhiteSpace(RegistrationExpiration);
-                } catch { /* CDF version differences */ }
+                }
+                catch { /* CDF version differences */ }
             }
-            if (CDFVehicleData.Insurance != null) {
-                try {
+            if (CDFVehicleData.Insurance != null)
+            {
+                try
+                {
                     InsuranceStatus = CDFVehicleData.Insurance.Status.ToString();
                     InsuranceExpiration = CDFVehicleData.Insurance.ExpirationDate?.ToString("s");
                     InsuranceExpirationVerifiedFromLiveDocument = !string.IsNullOrWhiteSpace(InsuranceExpiration);
-                } catch { }
+                }
+                catch { }
             }
 
             VehicleIdentificationNumber = CDFVehicleData.Vin?.Number;
-            try {
+            try
+            {
                 var vin = CDFVehicleData.Vin;
-                if (vin != null) {
+                if (vin != null)
+                {
                     var statusProp = vin.GetType().GetProperty("Status");
                     if (statusProp != null) VinStatus = statusProp.GetValue(vin)?.ToString();
                 }
-            } catch { VinStatus = null; }
-            try {
+            }
+            catch { VinStatus = null; }
+            try
+            {
                 var t = CDFVehicleData.GetType();
                 Make = t.GetProperty("Make")?.GetValue(CDFVehicleData) as string ?? Make;
                 Model = t.GetProperty("Model")?.GetValue(CDFVehicleData) as string ?? Model;
@@ -113,19 +137,30 @@ namespace MDTPro.Data {
                 PrimaryColorSpecific = t.GetProperty("PrimaryColorSpecific")?.GetValue(CDFVehicleData) as string;
                 SecondaryColorSpecific = t.GetProperty("SecondaryColorSpecific")?.GetValue(CDFVehicleData) as string;
                 ApplyCombinedColorFromCdfStrings();
-            } catch { }
+            }
+            catch { }
 
-            if (CDFVehicleData.Owner == null) return;
+            if (CDFVehicleData.Owner == null)
+            {
+                ApplyGovernmentOwnerFallback();
+                return;
+            }
 
-            Owner = CDFVehicleData.Owner.FullName?.Trim() ?? string.Empty;
+            string cdfOwnerName = CDFVehicleData.Owner.FullName?.Trim();
+            if (!string.IsNullOrWhiteSpace(cdfOwnerName))
+                Owner = cdfOwnerName;
 
-            if (CDFVehicleData.Owner.FullName?.Trim() != "Government") {
+            if (!string.Equals(cdfOwnerName, "Government", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(cdfOwnerName))
+            {
                 DataController.AddCDFPedDataPedToDatabase(CDFVehicleData.Owner);
             }
+
+            ApplyGovernmentOwnerFallback();
         }
 
         /// <summary>Sets <see cref="Color"/> from CDF primary/secondary (human + GTA-specific) when any CDF color string is present; prefers human-readable pair for the summary.</summary>
-        private void ApplyCombinedColorFromCdfStrings() {
+        private void ApplyCombinedColorFromCdfStrings()
+        {
             string pc = PrimaryColor?.Trim();
             string sc = SecondaryColor?.Trim();
             string pcs = PrimaryColorSpecific?.Trim();
@@ -140,51 +175,81 @@ namespace MDTPro.Data {
                 Color = string.IsNullOrEmpty(a) ? b : a;
         }
 
+        private void ApplyGovernmentOwnerFallback()
+        {
+            if (!string.IsNullOrWhiteSpace(Owner)) return;
+            try
+            {
+                string ownerType = CDFVehicleData?.GetType().GetProperty("OwnerType")?.GetValue(CDFVehicleData)?.ToString();
+                if (string.Equals(ownerType, "Government", StringComparison.OrdinalIgnoreCase))
+                    Owner = "Government";
+            }
+            catch { }
+        }
+
         /// <summary>Converts vehicle primary/secondary colors to a readable display string (e.g. "Black / White") using CalloutInterfaceAPI.</summary>
-        private static string GetColorDisplay(System.Drawing.Color primary, System.Drawing.Color secondary) {
-            try {
+        private static string GetColorDisplay(System.Drawing.Color primary, System.Drawing.Color secondary)
+        {
+            try
+            {
                 string p = CalloutInterfaceAPI.Functions.GetColorName(primary);
                 string s = CalloutInterfaceAPI.Functions.GetColorName(secondary);
                 if (!string.IsNullOrEmpty(p) && !string.IsNullOrEmpty(s) && p != s)
                     return p + " / " + s;
                 if (!string.IsNullOrEmpty(p)) return p;
                 if (!string.IsNullOrEmpty(s)) return s;
-            } catch { }
+            }
+            catch { }
             return $"{primary.R}-{primary.G}-{primary.B}";
         }
 
         /// <summary>Re-reads CDF-backed fields (stolen, BOLOs, reg/ins, VIN, colors, owner) from <see cref="CDFVehicleData"/> after a SQLite merge. Plate/model still come from <see cref="Holder"/> when present.</summary>
-        internal void RefreshCdfBackedVehicleFieldsFromCdf() {
+        internal void RefreshCdfBackedVehicleFieldsFromCdf()
+        {
             if (CDFVehicleData == null) return;
-            try {
+            try
+            {
                 IsStolen = CDFVehicleData.IsStolen;
-            } catch { }
-            try {
+            }
+            catch { }
+            try
+            {
                 BOLOs = CDFVehicleData.GetAllBOLOs();
-            } catch { BOLOs = null; }
-            try {
-                if (CDFVehicleData.Registration != null) {
+            }
+            catch { BOLOs = null; }
+            try
+            {
+                if (CDFVehicleData.Registration != null)
+                {
                     RegistrationStatus = CDFVehicleData.Registration.Status.ToString();
                     RegistrationExpiration = CDFVehicleData.Registration.ExpirationDate?.ToString("s");
                     RegistrationExpirationVerifiedFromLiveDocument = !string.IsNullOrWhiteSpace(RegistrationExpiration);
                 }
-            } catch { }
-            try {
-                if (CDFVehicleData.Insurance != null) {
+            }
+            catch { }
+            try
+            {
+                if (CDFVehicleData.Insurance != null)
+                {
                     InsuranceStatus = CDFVehicleData.Insurance.Status.ToString();
                     InsuranceExpiration = CDFVehicleData.Insurance.ExpirationDate?.ToString("s");
                     InsuranceExpirationVerifiedFromLiveDocument = !string.IsNullOrWhiteSpace(InsuranceExpiration);
                 }
-            } catch { }
+            }
+            catch { }
             VehicleIdentificationNumber = CDFVehicleData.Vin?.Number;
-            try {
+            try
+            {
                 var vin = CDFVehicleData.Vin;
-                if (vin != null) {
+                if (vin != null)
+                {
                     var statusProp = vin.GetType().GetProperty("Status");
                     if (statusProp != null) VinStatus = statusProp.GetValue(vin)?.ToString();
                 }
-            } catch { VinStatus = null; }
-            try {
+            }
+            catch { VinStatus = null; }
+            try
+            {
                 var t = CDFVehicleData.GetType();
                 Make = t.GetProperty("Make")?.GetValue(CDFVehicleData) as string ?? Make;
                 Model = t.GetProperty("Model")?.GetValue(CDFVehicleData) as string ?? Model;
@@ -193,33 +258,48 @@ namespace MDTPro.Data {
                 PrimaryColorSpecific = t.GetProperty("PrimaryColorSpecific")?.GetValue(CDFVehicleData) as string;
                 SecondaryColorSpecific = t.GetProperty("SecondaryColorSpecific")?.GetValue(CDFVehicleData) as string;
                 ApplyCombinedColorFromCdfStrings();
-            } catch { }
+            }
+            catch { }
             if (CDFVehicleData.Owner != null)
-                Owner = CDFVehicleData.Owner.FullName?.Trim() ?? string.Empty;
+            {
+                string cdfOwnerName = CDFVehicleData.Owner.FullName?.Trim();
+                if (!string.IsNullOrWhiteSpace(cdfOwnerName))
+                    Owner = cdfOwnerName;
+            }
+            ApplyGovernmentOwnerFallback();
+            GtaVVehicleMakeModelCatalog.TryEnrichFromSpawnName(ModelName, this);
         }
 
         /// <summary>Updates registration/insurance string fields from CDF (expirations and default statuses). With StopThePed stops, <see cref="DataController.TryOverlayStopThePedVehicleDocStatusFromApi"/> overwrites statuses from STP’s API (<c>getVehicleRegistrationStatus</c> / <c>getVehicleInsuranceStatus</c>). Does not replace Holder/CDFVehicleData.</summary>
-        internal void CopyRegistrationInsuranceFromCdf(VehicleData cdf) {
+        internal void CopyRegistrationInsuranceFromCdf(VehicleData cdf)
+        {
             if (cdf == null) return;
-            try {
-                if (cdf.Registration != null) {
+            try
+            {
+                if (cdf.Registration != null)
+                {
                     RegistrationStatus = cdf.Registration.Status.ToString();
                     RegistrationExpiration = cdf.Registration.ExpirationDate?.ToString("s");
                     RegistrationExpirationVerifiedFromLiveDocument = !string.IsNullOrWhiteSpace(RegistrationExpiration);
                 }
-            } catch { /* CDF version differences */ }
-            try {
-                if (cdf.Insurance != null) {
+            }
+            catch { /* CDF version differences */ }
+            try
+            {
+                if (cdf.Insurance != null)
+                {
                     InsuranceStatus = cdf.Insurance.Status.ToString();
                     InsuranceExpiration = cdf.Insurance.ExpirationDate?.ToString("s");
                     InsuranceExpirationVerifiedFromLiveDocument = !string.IsNullOrWhiteSpace(InsuranceExpiration);
                 }
-            } catch { }
+            }
+            catch { }
         }
 
         /// <summary>Apply persistent vehicle identity from a previously seen vehicle (same owner + model). Keeps current LicensePlate.
         /// Registration and Insurance are NOT copied from source — CDF/PR is authoritative at stop time (revoked/expired can change).</summary>
-        internal void ApplyPersistentVehicleIdentity(MDTProVehicleData source) {
+        internal void ApplyPersistentVehicleIdentity(MDTProVehicleData source)
+        {
             if (source == null) return;
             IsStolen = source.IsStolen;
             Owner = source.Owner;
