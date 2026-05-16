@@ -190,6 +190,7 @@ namespace MDTPro.EventListeners {
                 if (eventName == "pedArrestedEvent") {
                     DataController.ResolvePedForReEncounter(ped, persistToSql: true);
                     DataController.CaptureFirearmsFromPed(ped, "Arrest (STP)");
+                    DataController.ScheduleDelayedPedDocumentRefresh(ped, "Arrest (STP)");
                     return;
                 }
 
@@ -197,26 +198,36 @@ namespace MDTPro.EventListeners {
                     DataController.ResolvePedForReEncounter(ped, persistToSql: false);
                     DataController.MarkPedPatDown(ped);
                     DataController.AddIdentificationEvent(ped, "Pat-down");
+                    DataController.ScheduleDelayedPedDocumentRefresh(ped, "Pat-down (STP)");
                     return;
                 }
 
                 if (eventName == "askDriverLicenseEvent") {
                     DataController.ResolvePedForReEncounter(ped, persistToSql: false);
+                    // STP is still building its licence-card/search-item state while this event fires.
+                    // Record the ID immediately, but let the delayed refresh read STP document fields after STP settles.
                     DataController.AddIdentificationEvent(ped, "Driver's License");
+                    DataController.ScheduleDelayedPedDocumentRefresh(ped, "Driver's License (STP)");
                     TryAssociateVehicleForStoppedPed(ped, persistVehicleToSql: false);
                     return;
                 }
 
                 if (eventName == "askRegistrationEvent" || eventName == "askInsuranceEvent") {
+                    string documentType = eventName == "askRegistrationEvent" ? "Registration" : "Insurance";
                     DataController.ResolvePedForReEncounter(ped, persistToSql: false);
-                    DataController.AddIdentificationEvent(ped, eventName == "askRegistrationEvent" ? "Registration" : "Insurance");
-                    TryAssociateVehicleForStoppedPed(ped, persistVehicleToSql: true);
+                    Vehicle vehicle = TryAssociateVehicleForStoppedPed(ped, persistVehicleToSql: true);
+                    if (!DataController.AddVehicleDocumentIdentificationEventForOwner(vehicle, documentType))
+                        DataController.AddIdentificationEvent(ped, documentType);
+                    DataController.ScheduleDelayedPedDocumentRefresh(ped, documentType + " (STP)");
+                    if (vehicle != null && vehicle.Exists())
+                        DataController.ScheduleDelayedVehicleDocumentRefresh(vehicle, documentType + " (STP)");
                     return;
                 }
 
                 if (eventName == "askIdEvent") {
                     DataController.ResolvePedForReEncounter(ped, persistToSql: false);
                     DataController.AddIdentificationEvent(ped, "State ID");
+                    DataController.ScheduleDelayedPedDocumentRefresh(ped, "State ID (STP)");
                     TryAssociateVehicleForStoppedPed(ped, persistVehicleToSql: false);
                     return;
                 }
@@ -277,15 +288,18 @@ namespace MDTPro.EventListeners {
         }
 
         /// <param name="persistVehicleToSql">True when STP shows vehicle documents (registration/insurance); false for stop/ID/license-only.</param>
-        private static void TryAssociateVehicleForStoppedPed(Ped ped, bool persistVehicleToSql = false) {
+        private static Vehicle TryAssociateVehicleForStoppedPed(Ped ped, bool persistVehicleToSql = false) {
             try {
-                if (ped == null || !ped.IsValid()) return;
+                if (ped == null || !ped.IsValid()) return null;
                 if (ped.IsInAnyVehicle(false)) {
                     var v = ped.CurrentVehicle;
-                    if (v != null && v.Exists())
+                    if (v != null && v.Exists()) {
                         DataController.ResolveVehicleAndDriverForStop(v, persistToSql: persistVehicleToSql);
+                        return v;
+                    }
                 }
             } catch { /* ignore */ }
+            return null;
         }
     }
 }

@@ -1,52 +1,56 @@
-# MDT Pro — Native desktop client (WPF)
+# MDT Pro Native
 
-This folder is a **separate .NET solution** that implements a **native Windows** shell for the same MDT Pro plugin endpoints used by the **browser MDT**. **Reports** are **native WPF** structured forms only (same `/post` save routes as the web UI). **WebView2** is used only where explicitly listed below (e.g. settings customization), not for reports.
+This folder contains the native Windows desktop client for MDT Pro. It talks to the same local MDT Pro
+plugin server as the browser MDT, usually `http://127.0.0.1:9000`.
+
+Use it when you want the MDT on a second monitor, in a normal Windows window, or outside the browser.
 
 ## Requirements
 
-- Windows with .NET **10** SDK and WPF workload.
-- MDT Pro plugin running in-game (default port **9000**).
-- **[WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)** for Settings → embedded customization only (not for reports or core searches).
+- Windows
+- .NET 10 SDK with WPF workload
+- MDT Pro running in-game
+- [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) for the embedded Settings page
 
-## Build
+Reports, lookups, court, dashboard, quick actions, and most day-to-day views are native WPF. WebView2 is
+only used for pages that still come from the browser MDT, such as Settings -> Config and Plugins.
+
+## Build And Run
+
+From this folder:
 
 ```powershell
-cd native
 dotnet build MDTProNative.sln -c Release
-```
-
-Run the WPF app:
-
-```powershell
 dotnet run --project src/MDTProNative.Wpf -c Release
 ```
 
-## Feature parity (vs browser MDT)
+Start GTA V, go on duty, then connect the app to the same host and port shown by MDT Pro.
 
-| Area | Native behavior |
-|------|-----------------|
-| Reports | Native structured forms per report type; same `/post` create/save APIs as the web MDT (no WebView). |
-| Shift history | Native list + **Court** native docket (`Shift/Court` tab). |
-| Court (cases, resolve, attach reports) | Native `NativeCourtView` (pending-case actions). |
-| Person / vehicle / firearms / BOLO | Native WPF views (same `/data` + `/post` as web). |
-| Map | Native tactical position readout (same data the plugin exposes to the web map). |
-| Active Call | Native Dashboard (WebSocket callouts + GPS post). |
-| Config & plugins | Settings → embedded `page/customization` |
-| Officer profile, shift start/end | Native WPF (same `/post` routes as web) |
-| Panic, backup menu, ALPR clear | Native quick actions |
-| Callouts list + GPS from overview | Native WebSocket + `setGpsWaypoint` |
+## Current Coverage
 
-**Plugin-only or extra windows:** use **Settings → About → Open web home (full desktop) in browser** (`page/index`). That is the same desktop as opening the MDT in Chrome/Edge, including `/plugin/.../page/...` windows.
+| Area | Native client behavior |
+| --- | --- |
+| Reports | Native structured forms using the same `/post` save routes as the browser MDT. |
+| Shift history and court | Native lists, docket view, case actions, evidence, and dispositions. |
+| Person, vehicle, firearms, BOLO | Native views using the same `/data` and `/post` routes as the browser MDT. |
+| Map | Native tactical position readout from the plugin map data. |
+| Active Call | Native dashboard with WebSocket callouts and GPS actions. |
+| Settings and plugins | Embedded browser page for `page/customization`. |
+| Officer profile and shifts | Native profile, start shift, and end shift actions. |
+| Quick actions | Panic, backup menu, tow/transport, and ALPR clear. |
+
+For plugin-only windows or the full browser desktop, open **Settings** -> **About** -> **Open web home**.
+That launches the same `page/index` experience you get in Chrome or Edge.
 
 ## Projects
 
 | Project | Role |
-|---------|------|
-| `MDTProNative.Core` | Shared types (`MdtServerEndpoint`). |
-| `MDTProNative.Client` | HTTP + WebSocket client for the plugin. |
-| `MDTProNative.Wpf` | WPF UI + `MdtWebPageView` host. |
+| --- | --- |
+| `MDTProNative.Core` | Shared types such as `MdtServerEndpoint`. |
+| `MDTProNative.Client` | HTTP and WebSocket client for the plugin server. |
+| `MDTProNative.Wpf` | WPF shell, views, and embedded web host. |
 
-## Optional next work
+## Future Ideas
 
-- Real-time push for lists without polling — plugin WebSocket fan-out.
-- **macOS**: .NET MAUI or SwiftUI using the same HTTP/WS contract.
+- Push updates for list views without polling.
+- A macOS client using the same HTTP/WebSocket contract.

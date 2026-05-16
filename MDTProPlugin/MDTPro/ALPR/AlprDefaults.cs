@@ -1,5 +1,5 @@
 namespace MDTPro.ALPR {
-    /// <summary>Built-in ALPR tuning (not exposed in F7 settings — only enable + HUD position are user-facing).</summary>
+    /// <summary>Built-in ALPR tuning (not exposed in the in-game MDT Pro menu — only enable + HUD position are user-facing).</summary>
     internal static class AlprDefaults {
         /// <summary>Slower tick = fewer scans per second (CDF tags many nearby cars with paperwork flags).</summary>
         internal const int AdvancedTickMs = 160;

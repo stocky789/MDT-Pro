@@ -17,30 +17,94 @@
       await loadSearchHistory()
     })
 
-  // Auto-refresh Recent IDs and search history for real-time updates (3s to avoid excessive server/game load)
-  const REFRESH_INTERVAL_MS = 3000
-  let refreshTimer = null
-  function startRefreshTimer() {
-    if (refreshTimer) return
-    refreshTimer = setInterval(async () => {
-      if (document.hidden) return
-      await loadRecentIds()
-      await loadSearchHistory()
-      filterPersonLists(document.querySelector('.searchInputWrapper #pedSearchInput')?.value?.trim?.())
-    }, REFRESH_INTERVAL_MS)
+  const FALLBACK_REFRESH_INTERVAL_MS = 30000
+  let fallbackRefreshTimer = null
+  async function refreshPersonLists() {
+    if (document.hidden) return
+    await loadRecentIds()
+    await loadSearchHistory()
+    filterPersonLists(document.querySelector('.searchInputWrapper #pedSearchInput')?.value?.trim?.())
   }
-  function stopRefreshTimer() {
-    if (refreshTimer) {
-      clearInterval(refreshTimer)
-      refreshTimer = null
+  function startFallbackRefreshTimer() {
+    if (fallbackRefreshTimer) return
+    fallbackRefreshTimer = setInterval(refreshPersonLists, FALLBACK_REFRESH_INTERVAL_MS)
+  }
+  function stopFallbackRefreshTimer() {
+    if (fallbackRefreshTimer) {
+      clearInterval(fallbackRefreshTimer)
+      fallbackRefreshTimer = null
     }
   }
-  document.addEventListener('visibilitychange', () => {
-    document.hidden ? stopRefreshTimer() : startRefreshTimer()
+  function connectInvalidationSocket() {
+    let reconnectTimer = null
+    let socket = null
+    let stopped = false
+    const scheduleReconnect = () => {
+      if (stopped || reconnectTimer) return
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null
+        connect()
+      }, 3000)
+    }
+    const connect = () => {
+      if (stopped) return
+      try {
+        const scheme = location.protocol === 'https:' ? 'wss' : 'ws'
+        const ws = new WebSocket(`${scheme}://${location.host}/ws`)
+        socket = ws
+        ws.onopen = () => {
+          stopFallbackRefreshTimer()
+          ws.send('dataInvalidationSubscribe')
+        }
+        ws.onmessage = async (event) => {
+          const msg = JSON.parse(event.data)
+          const scope = msg?.response?.scope || 'all'
+          if (scope === 'all' || scope === 'pedSearch') await refreshPersonLists()
+        }
+        ws.onclose = () => {
+          if (socket === ws) socket = null
+          startFallbackRefreshTimer()
+          scheduleReconnect()
+        }
+        ws.onerror = () => {
+          try { ws.close() } catch (_) {}
+        }
+      } catch (_) {
+        startFallbackRefreshTimer()
+        scheduleReconnect()
+      }
+    }
+    connect()
+    return () => {
+      stopped = true
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      if (socket) {
+        try { socket.close() } catch (_) {}
+        socket = null
+      }
+    }
+  }
+  const stopInvalidationSocket = connectInvalidationSocket()
+  startFallbackRefreshTimer()
+  document.addEventListener('visibilitychange', async () => {
+    if (document.hidden) {
+      stopFallbackRefreshTimer()
+    } else {
+      await refreshPersonLists()
+      startFallbackRefreshTimer()
+    }
   })
-  if (!document.hidden) startRefreshTimer()
-  window.addEventListener('pagehide', stopRefreshTimer)
+  window.addEventListener('pagehide', () => {
+    stopFallbackRefreshTimer()
+    stopInvalidationSocket?.()
+  })
 })()
+
+function getActiveWarrantsFromResponse(r) {
+  const raw = r.Warrants || r.warrants
+  if (!Array.isArray(raw)) return []
+  return raw.filter((w) => w && !(w.clearedAtUtc || w.ClearedAtUtc))
+}
 
 const searchInput = document.querySelector('.searchInputWrapper #pedSearchInput')
 
@@ -352,11 +416,12 @@ async function performSearch(query) {
   try {
   // Alert notifications for wanted/probation/parole/advisory
   if (response.IsWanted) {
-    topWindow.showNotification(
-      `${notifs.wanted || 'WANTED'}: ${response.Name} \u2014 ${response.WarrantText}`,
-      'warning',
-      -1
-    )
+    const aw = getActiveWarrantsFromResponse(response)
+    const detail =
+      aw.length > 0
+        ? aw.map((w) => `${w.name || w.Name || ''} (${w.severity || w.Severity || ''})`).join('; ')
+        : response.WarrantText || ''
+    topWindow.showNotification(`${notifs.wanted || 'WANTED'}: ${response.Name} \u2014 ${detail}`, 'warning', -1)
   }
   if (response.IsOnProbation) {
     topWindow.showNotification(
@@ -405,12 +470,16 @@ async function performSearch(query) {
           ).getFullYear() - 1970
         )
         break
-      case 'IsWanted':
+      case 'IsWanted': {
+        const aw = getActiveWarrantsFromResponse(response)
         el.value = response[key]
-          ? `${language.values.wanted} ${response.WarrantText}`
+          ? aw.length > 0
+            ? `${language.values.wanted} ${aw.map((w) => `${w.name || w.Name || ''} (${w.severity || w.Severity || ''})`).join('; ')}`
+            : `${language.values.wanted} ${response.WarrantText || ''}`.trim()
           : language.values.notWanted
         el.style.color = getColorForValue(response[key])
         break
+      }
       case 'AdvisoryText':
         el.value = removeGTAColorCodesFromString(response[key])
         if (response[key] != undefined) el.style.color = 'var(--color-error)'
@@ -456,6 +525,30 @@ async function performSearch(query) {
         el.value = await getLanguageValue(response[key])
         el.style.color = getColorForValue(response[key])
     }
+  }
+
+  const awSection = document.querySelector('.activeWarrantsSection')
+  const awList = document.querySelector('.activeWarrantsList')
+  if (awSection && awList) {
+    const aw = getActiveWarrantsFromResponse(response)
+    awList.innerHTML = ''
+    if (aw.length > 0) {
+      awSection.classList.remove('hidden')
+      for (const w of aw) {
+        const li = document.createElement('li')
+        const issued = w.issuedAtUtc || w.IssuedAtUtc
+        let issuedLabel = ''
+        if (issued) {
+          try {
+            issuedLabel = new Date(issued).toLocaleDateString()
+          } catch (_) {
+            issuedLabel = String(issued)
+          }
+        }
+        li.textContent = `${w.name || w.Name || ''} · ${w.severity || w.Severity || ''}${issuedLabel ? ' · ' + issuedLabel : ''}`
+        awList.appendChild(li)
+      }
+    } else awSection.classList.add('hidden')
   }
 
   await renderPedCourtCasesSection(response, language, stale)

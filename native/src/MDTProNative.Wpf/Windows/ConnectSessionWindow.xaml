@@ -41,7 +41,7 @@
                              Background="{StaticResource CadPanel}" Foreground="{StaticResource CadText}"
                              BorderBrush="{StaticResource CadBorder}" />
                 <TextBlock TextWrapping="Wrap" Foreground="{StaticResource CadMuted}" FontSize="11" Margin="0,0,0,16"
-                           Text="The MDT Pro game plugin does not check a password over the network today. This field is optional and is not saved or sent anywhere — it is here so the screen matches how you expect to sign in, and for possible future remote access controls." />
+                           Text="The game plugin does not validate this password yet. Leave it blank; nothing is saved or sent. The field stays for a future remote lock." />
 
                 <Border Background="{StaticResource CadElevated}" BorderBrush="{StaticResource CadBorder}" BorderThickness="1" Padding="12" Margin="0,0,0,12">
                     <StackPanel>

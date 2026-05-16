@@ -1,11 +1,11 @@
-# MDT Pro — by DEFAULT builds the full distribution: plugin DLL + MDTPro web + Windows native desktop (MDTProNative)
+# MDT Pro - by DEFAULT builds the full distribution: plugin DLL + MDTPro web + Windows native desktop (MDTProNative)
 # + dependencies, OpenIV .oiv, then mirrors Release\ into Native Release\.
 # Run from repo root: .\build.ps1
 #
 # Options:
 #   .\build.ps1                    Clean rebuild (wipes Release\ first). Includes **MDTProNative** (self-contained WPF app).
 #   .\build.ps1 -Incremental       Faster: no Release\ wipe, incremental. Still includes MDTProNative.
-#   .\build.ps1 -SkipWindowsApp    **Mod + web + OIV only** — does NOT run `dotnet publish` for the native Windows app
+#   .\build.ps1 -SkipWindowsApp    **Mod + web + OIV only** - does NOT run `dotnet publish` for the native Windows app
 #                                  (Release\MDTProNative is removed/omitted; use this only when you intentionally skip the desktop shell).
 #   .\build.ps1 -Deploy            Build then copy to GTA V (use -GamePath if not default)
 #   .\build.ps1 -Deploy -GamePath "D:\Games\GTA V"
@@ -44,7 +44,7 @@ function Get-DotNetProjectAssemblyName {
     return [System.IO.Path]::GetFileNameWithoutExtension($ProjectPath)
 }
 
-# Out-File -Encoding UTF8 uses no BOM on Windows PowerShell 5.1; Notepad then reads as ANSI and mangles bullets (â€¢). BOM makes UTF-8 explicit.
+# Out-File -Encoding UTF8 uses no BOM on Windows PowerShell 5.1; Notepad may treat the file as ANSI and mangle UTF-8. BOM makes UTF-8 explicit.
 function Write-TextFileUtf8Bom {
     param(
         [Parameter(Mandatory)][string]$Path,
@@ -114,7 +114,7 @@ if (Test-Path $dllDirect) {
     Copy-Item -Path $dllSource -Destination $dllDest -Force
     # Copy private dependencies (Newtonsoft.Json etc.) when build outputs to bin
     $binDir = Split-Path $dllNet48
-    foreach ($dep in @('Newtonsoft.Json.dll')) {
+    foreach ($dep in @('Newtonsoft.Json.dll', 'LemonUI.RagePluginHook.dll')) {
         $src = Join-Path $binDir $dep
         if (Test-Path $src) { Copy-Item -Path $src -Destination (Join-Path $dllDestDir $dep) -Force }
     }
@@ -124,7 +124,7 @@ if (Test-Path $dllDirect) {
     New-Item -ItemType Directory -Path $dllDestDir -Force | Out-Null
     Copy-Item -Path $dllSource -Destination $dllDest -Force
     $binDir = Split-Path $dllRelease
-    foreach ($dep in @('Newtonsoft.Json.dll')) {
+    foreach ($dep in @('Newtonsoft.Json.dll', 'LemonUI.RagePluginHook.dll')) {
         $src = Join-Path $binDir $dep
         if (Test-Path $src) { Copy-Item -Path $src -Destination (Join-Path $dllDestDir $dep) -Force }
     }
@@ -212,7 +212,7 @@ Or run from a clean clone: dotnet restore MDTProPlugin\MDTPro.sln ; .\build.ps1
     exit 1
 }
 
-# 6c) MDT Pro Native (Windows MDC) — publish into Release\MDTProNative so OpenIV / manual install match GTA V layout (folder next to MDTPro\).
+# 6c) MDT Pro Native (Windows MDC) - publish into Release\MDTProNative so OpenIV / manual install match GTA V layout (folder next to MDTPro\).
 $nativeAppExeName = $null
 if (-not $SkipWindowsApp) {
     if (-not (Test-Path $nativeWpfProj)) {
@@ -248,7 +248,7 @@ if (-not $SkipWindowsApp) {
 
     $nativeReadme = Join-Path $nativePublishInRelease 'README.txt'
     $nativeReadmeBody = @"
-MDT Pro — Native MDC (Windows desktop)
+MDT Pro - Native MDC (Windows desktop)
 ========================================
 
 This folder is the published Windows desktop MDC terminal. It talks to the same HTTP/WebSocket
@@ -260,11 +260,11 @@ API as the in-game browser MDT (your LSPDFR plugin must be running and on duty).
 
 When installed via OpenIV, this folder lives next to MDTPro\ in your GTA V directory.
 
-Requires the WebView2 Runtime for Settings → embedded customization page (usually already installed with Edge). Reports and most modules are native WPF.
+Requires the WebView2 Runtime for Settings -> embedded customization page (usually already installed with Edge). Reports and most modules are native WPF.
 
 The game mod, OpenIV packages, and full install notes are in the parent release folder.
 
-License: EPL-2.0 — see LICENSE next to README in the release.
+License: EPL-2.0 - see LICENSE next to README in the release.
 "@
     Write-TextFileUtf8Bom -Path $nativeReadme -Content $nativeReadmeBody
     Write-Host "  -> $nativeReadme"
@@ -288,8 +288,11 @@ if ($Deploy) {
     $dataBackup = Join-Path $env:TEMP ('MDTProDataBackup_' + [guid]::NewGuid().ToString('N'))
     if (Test-Path (Join-Path $mdtProDest 'data')) { Copy-Item (Join-Path $mdtProDest 'data') $dataBackup -Recurse }
 
-    # Deploy plugin DLL
-    Copy-Item $dllDest (Join-Path $pluginsDest 'MDTPro.dll') -Force
+    # Deploy every DLL from the release plugin folder (MDTPro + Newtonsoft, LemonUI, etc.).
+    # Copying only MDTPro.dll used to drop satellites and broke F7 -> MDT Cloud detection and startup.
+    Get-ChildItem -LiteralPath $dllDestDir -Filter '*.dll' -File -ErrorAction SilentlyContinue | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $pluginsDest $_.Name) -Force
+    }
 
     # Deploy web folder
     if (Test-Path $mdtProDest) { Remove-Item $mdtProDest -Recurse -Force }
@@ -354,7 +357,7 @@ if ($Deploy) {
         }
     }
 
-    # LSPDFR expects plugins\LSPDFR (caps). Build output uses plugins\lspdfr — normalize for the package.
+    # LSPDFR expects plugins\LSPDFR (caps). Build output uses plugins\lspdfr - normalize for the package.
     # NTFS is case-insensitive: renaming lspdfr -> LSPDFR in one step is a no-op; use a temp name.
     $oivPlugins = Join-Path $oivContent 'plugins'
     if (Test-Path -LiteralPath $oivPlugins) {
@@ -424,7 +427,7 @@ if ($Deploy) {
       <displayName>stocky789</displayName>
     </author>
     <description footerLink="https://www.lcpdfr.com/downloads/gta5mods/scripts/53627-mdtpro" footerLinkTitle="LCPDFR">
-      <![CDATA[Police MDT (Mobile Data Terminal) plugin for LSPDFR. Runs a local web server when you go on duty. Requires LSPDFR, CommonDataFramework, CalloutInterfaceAPI, and Policing Redefined. Install with OpenIV Package Installer.]]>
+      <![CDATA[Police MDT (Mobile Data Terminal) plugin for LSPDFR. Runs a local web server when you go on duty. Requires LSPDFR, CommonDataFramework, and one supported local integration stack. The installer includes MDT Pro support DLLs such as CalloutInterfaceAPI, LemonUI, Newtonsoft.Json, and SQLite. MDT Cloud login requires an account at https://mdt.stockhosting.com.au and Policing Redefined. Install with OpenIV Package Installer.]]>
     </description>
     <largeDescription displayName="GitHub" footerLink="https://github.com/stocky789/MDT-Pro" footerLinkTitle="GitHub">
       <![CDATA[Source code and releases: https://github.com/stocky789/MDT-Pro]]>
@@ -531,87 +534,105 @@ $deleteXml
 # README with install instructions (always)
 $readmePath = Join-Path $release 'README.txt'
 $releaseReadmeBody = @"
-MDT Pro — install & requirements
-=================================
+MDT Pro - quick install
+=======================
 
-MDT Pro runs a small web server while you are on duty so you can use the MDT in a browser (same PC or
-another device on your network).
-
-
-REQUIREMENTS (install these before MDT Pro)
---------------------------------------------
-  • LSPDFR and RagePluginHook
-  • Common Data Framework (CDF) — REQUIRED for every setup. The plugin will not load without it.
-    You still need CDF if you use StopThePed and Ultimate Backup instead of Policing Redefined.
-  • CalloutInterfaceAPI (GTA V root or plugins\LSPDFR\)
-  • CalloutInterface — required for the Active Call page (live callout details)
-
-  Stops, citations, and backup — pick ONE integration path (do not mix):
-
-  A) Policing Redefined
-     Install Policing Redefined. In the MDT: Customization → Config → Mod integration, choose settings
-     that match PR (stops, citations, backup via PR or Auto when PR is present).
-
-  B) StopThePed + Ultimate Backup
-     Install StopThePed and Ultimate Backup. In the MDT: Customization → Config → Mod integration, set
-     stop/traffic integration to StopThePed and backup to Ultimate Backup (or Auto if only UB is present).
-
-     IMPORTANT: If you use StopThePed + Ultimate Backup, do NOT install Policing Redefined. Running PR
-     together with that stack is unsupported and can cause broken or duplicate behavior. CDF is still
-     required.
+MDT Pro starts a local browser MDT when you go on duty with LSPDFR. You can use it on the same PC,
+Steam overlay, another device on your network, or the included native Windows MDT.
 
 
-OPENIV INSTALL (recommended)
------------------------------
-  • MDTPro-*.oiv          — Installs the same folder layout as this release (everything below except
-                           README.txt, LICENSE, and the .oiv files). Paths match the GTA V directory
-                           (plugins\LSPDFR, MDTPro\, MDTProNative\, game root DLLs, x64\, etc.).
-  • MDTPro-*-Uninstall.oiv — Removes MDT Pro plugin files, the MDTPro web folder, and MDTProNative\;
-                           leaves SQLite and Newtonsoft.Json so other mods can keep using them. Extra
-                           DLLs you merged into plugins\LSPDFR are not removed by the uninstaller.
+Requirements
+------------
+Install these external mods:
+
+  - LSPDFR and RagePluginHook
+  - CommonDataFramework (CDF), required for every setup
+
+The MDT Pro release installs these support files with the plugin:
+
+  - plugins\LSPDFR\MDTPro.dll
+  - plugins\LSPDFR\CalloutInterfaceAPI.dll
+  - plugins\LSPDFR\Newtonsoft.Json.dll
+  - plugins\LSPDFR\LemonUI.RagePluginHook.dll
+  - System.Data.SQLite.dll in the GTA V root
+  - x64\SQLite.Interop.dll
+  - MDTPro\
+  - MDTProNative\ when included in the release
+
+LemonUI is required. The release includes it, but you can get it here if you ever need to replace it:
+https://github.com/LemonUIbyLemon/LemonUI/releases/download/v2.2/LemonUI.zip
+
+Callout Interface is optional for loading, but needed for live Active Call details.
+
+Pick one local integration stack:
+
+  - Policing Redefined
+  - StopThePed + Ultimate Backup
+
+Do not run Policing Redefined together with StopThePed + Ultimate Backup. CDF is still required either way.
+
+In the MDT, open Settings -> Config and Plugins and set Traffic stops & events and Backup (Quick Actions)
+to match the stack you installed.
+
+MDT Cloud login:
+
+  - Register an account at https://mdt.stockhosting.com.au
+  - Use Policing Redefined only
+  - StopThePed + Ultimate Backup is local-MDT only and is not supported for Cloud login right now
 
 
-MANUAL INSTALL (no OpenIV)
---------------------------
-Copy into your GTA V folder (the folder that contains GTA5.exe). Do NOT copy the .oiv files into the game.
+OpenIV install
+--------------
+Use MDTPro-*.oiv for the normal install. It puts the plugin, web UI, native app, SQLite files, LemonUI,
+and support DLLs in the expected GTA V folders.
 
-Copy everything from this release except README.txt, LICENSE, and *.oiv — preserve paths. Typical layout:
-
-  From this release                    Into your GTA V folder
-  -------------------------            ------------------------
-  plugins\lspdfr\  (all files)         plugins\LSPDFR\  (merge; LSPDFR is the usual folder name)
-  MDTPro\  (entire folder)             MDTPro\
-  MDTProNative\  (entire folder)       MDTProNative\  (Windows desktop MDC; omitted if you used -SkipWindowsApp)
-  System.Data.SQLite.dll               (GTA V root, next to GTA5.exe)
-  Newtonsoft.Json.dll (if at release   (GTA V root, only if present in your release zip)
-   root)
-  x64\SQLite.Interop.dll               x64\SQLite.Interop.dll
-
-SQLite: System.Data.SQLite.dll MUST be in the game root (not only under plugins). The native loader uses
-the game directory. If the database fails to open, check both that DLL and x64\SQLite.Interop.dll.
+Use MDTPro-*-Uninstall.oiv to remove MDT Pro plugin files, the MDTPro web folder, and MDTProNative. It
+leaves shared dependencies such as SQLite and Newtonsoft.Json so other mods can keep using them.
 
 
-FIRST RUN & USE
+Manual install
+--------------
+Copy the release into your GTA V folder, the one with GTA5.exe. Do not copy the .oiv files into the game.
+
+Keep the folder layout intact:
+
+  From this release                     Into your GTA V folder
+  ------------------                    ------------------------
+  plugins\lspdfr\                      plugins\LSPDFR\  (includes MDTPro and support DLLs)
+  MDTPro\                               MDTPro\
+  MDTProNative\                         MDTProNative\
+  System.Data.SQLite.dll                GTA V root
+  x64\SQLite.Interop.dll                x64\SQLite.Interop.dll
+
+SQLite has one strict rule: System.Data.SQLite.dll belongs in the GTA V root, not only under plugins.
+If MDT Pro cannot open its database, check that file and x64\SQLite.Interop.dll first.
+
+
+Use
+---
+  1. Start GTA V and go on duty with LSPDFR.
+  2. MDT Pro shows one or more addresses, usually http://127.0.0.1:9000.
+  3. Open that address in Chrome, Edge, Brave, Steam overlay, or MDTProNative\MDTProNative.exe.
+
+Addresses are also written to MDTPro\ipAddresses.txt.
+
+If another device on your network cannot connect, add a Windows Firewall inbound rule on the game PC for
+the MDT port, usually 9000.
+
+
+Update
+------
+Overwrite the plugin files, MDTPro folder, MDTProNative folder, and SQLite files with the new release.
+
+Keep MDTPro\data\ and MDTPro\config.json if you want to keep your records and settings.
+
+
+Troubleshooting
 ---------------
-  1. Start the game, go on duty with LSPDFR.
-  2. MDT Pro shows notification(s) with addresses such as http://127.0.0.1:9000 (default port 9000).
-  3. Open that URL in a browser (Chrome / Brave recommended). Addresses are also in MDTPro\ipAddresses.txt.
-     Or run MDTProNative\MDTPro.exe (desktop MDC) and connect to the same host/port.
-
-  Another device (phone, tablet, PC) cannot connect: usually Windows Firewall on the game PC — add an
-  inbound rule for the port you use (9000 by default), or change the port under Customization → Config.
-
-
-UPDATING
---------
-  Overwrite the plugin DLLs, MDTPro, MDTProNative, and SQLite files with the new release. Your existing
-  MDTPro\data\ and MDTPro\config.json are kept if you do not delete the MDTPro folder outright.
-
-
-TROUBLESHOOTING
----------------
-  • Log file: MDTPro\MDTPro.log (next to config.json)
-  • Plugin load errors: also check RAGEPluginHook.log in the GTA V folder
+  - Log file: MDTPro\MDTPro.log (next to config.json)
+  - Plugin load errors: also check RAGEPluginHook.log in the GTA V folder
+  - Saved MDT addresses: MDTPro\ipAddresses.txt
+  - Default in-game MDT Pro menu key: F10
 
 
 Credits
@@ -635,7 +656,7 @@ if (Test-Path $licenseSrc) {
     Write-Host "  -> $licenseDest (EPL-2.0)"
 }
 
-# 9) Mirror Release → Native Release (full distribution folder; MDTProNative already built in Release\)
+# 9) Mirror Release -> Native Release (full distribution folder; MDTProNative already built in Release\)
 Write-Host "Staging Native Release\ (mirror of Release\)..."
 if (Test-Path $legacyReleasesDir) {
     Write-Host "  Removing legacy Releases\ (output is now Native Release\ only)..."

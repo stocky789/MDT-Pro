@@ -156,6 +156,10 @@ const CONFIG_SECTIONS = [
     keys: ['integrationStopEvents', 'integrationBackupProvider'],
   },
   {
+    title: 'Game bridge & scheduler',
+    keys: ['gameWorkMode', 'gameWorkBridgeBudgetMsPerTick', 'passivePickupFirearmScanEnabled'],
+  },
+  {
     title: 'Citations — StopThePed & handoff',
     keys: [
       'citationStpAppendMdtBrowserLink',
@@ -196,6 +200,53 @@ const CONFIG_SECTIONS = [
 
 const PRESET_CUSTOM = { label: 'Custom...', value: '__custom__' }
 
+const CLOUD_SERVER_OWNED_CONFIG_KEYS = new Set([
+  'cloudSyncFlushIntervalMs',
+  'cloudSyncMaxQueuedItems',
+  'webSocketUpdateInterval',
+  'databaseUpdateInterval',
+  'maxNumberOfNearbyPedsOrVehicles',
+  'databaseLimitMultiplier',
+  'hasPriorCitationsProbability',
+  'hasPriorArrestsProbability',
+  'hasPriorArrestsWithWarrantProbability',
+  'reEncounterChance',
+  'reEncounterVehicleChance',
+  'reEncounterVehicleChanceWhenPedKnown',
+  'maxNumberOfPriorCitations',
+  'maxNumberOfPriorArrests',
+  'maxNumberOfPriorArrestsWithWarrant',
+  'reportIdFormat',
+  'reportIdIndexPad',
+  'courtCaseNumberFormat',
+  'courtCaseNumberIndexPad',
+  'courtDatabaseMaxEntries',
+  'courtRosterRotationDays',
+  'courtJurySeverityThreshold',
+  'quickActionsBarEnabled',
+  'showAgencyInCalloutInfo',
+  'addCalloutSuspectNamesFromMessages',
+  'alprEnabled',
+  'mapEnabledInCloud',
+  'gpsEnabledInCloud',
+  'activeCalloutsEnabledInCloud',
+  'alprCloudEnabled',
+  'backupPanicCloudEnabled',
+  'pluginSessionStaleSeconds',
+  'syncBatchSize',
+  'hydrateBatchSize',
+  'alprWebToastPlateCooldownSeconds',
+])
+
+function isCloudServerOwnedConfigKey(key) {
+  return CLOUD_SERVER_OWNED_CONFIG_KEYS.has(key)
+    || key.startsWith('court')
+    || key.startsWith('citation')
+    || key.startsWith('stpCitation')
+    || key.startsWith('hasPrior')
+    || key.startsWith('reEncounter')
+}
+
 const CONFIG_FIELD_META = {
   port: {
     label: 'HTTP port',
@@ -214,7 +265,7 @@ const CONFIG_FIELD_META = {
   },
   webSocketUpdateInterval: {
     label: 'Taskbar & map update interval (ms)',
-    tooltip: 'How often the taskbar clock, location, and map position refresh (in milliseconds). Higher values (e.g. 1000) use less CPU; lower values feel snappier but may impact FPS.',
+    tooltip: 'How often the taskbar clock, location, and map refresh (ms). Larger intervals trim CPU; smaller ones react faster and can cost frames.',
     presets: [
       { label: '500 ms (snappy)', value: 500 },
       { label: '1000 ms (recommended)', value: 1000 },
@@ -587,6 +638,33 @@ const CONFIG_FIELD_META = {
       PRESET_CUSTOM,
     ],
   },
+  gameWorkMode: {
+    label: 'Game work mode',
+    tooltip:
+      'Background work for passive nearby lists and location refresh. Performance and Balanced still resolve street/postal about every 30s for reports; Live mirrors the old every-pass refresh and costs more CPU. Matches the MDT Pro in-game menu (MDTPro.ini SettingsMenuKey) and config.json gameWorkMode.',
+    presets: [
+      { label: 'Performance', value: 'Performance' },
+      { label: 'Balanced', value: 'Balanced' },
+      { label: 'Live', value: 'Live' },
+      PRESET_CUSTOM,
+    ],
+  },
+  gameWorkBridgeBudgetMsPerTick: {
+    label: 'Game bridge budget per tick (ms)',
+    tooltip:
+      'Max time per scheduler loop spent draining the HTTP/WebSocket game-bridge queue (1–25). Higher can clear backlogs faster; lower keeps frame time steadier.',
+    presets: [
+      { label: '2 ms (default)', value: 2 },
+      { label: '5 ms', value: 5 },
+      { label: '10 ms', value: 10 },
+      PRESET_CUSTOM,
+    ],
+  },
+  passivePickupFirearmScanEnabled: {
+    label: 'PR ground pickup firearm scan',
+    tooltip:
+      'When on, Performance mode still periodically scans for PR ground-pickup firearms. Off skips that scan in Performance only (Balanced/Live always scan). Player-held capture is unchanged.',
+  },
   citationStpAppendMdtBrowserLink: {
     label: 'Add MDT link to StopThePed citation notes',
     tooltip: 'When on, in-game citation messages (StopThePed path) also show your MDT web address so you can open the tablet in a browser. Turn off if you do not want that extra line.',
@@ -597,7 +675,7 @@ const CONFIG_FIELD_META = {
   },
   stpCitationHandoffMaxDistance: {
     label: 'Handoff menu — max distance (meters)',
-    tooltip: 'How close you must be to the suspect to open the in-game handoff menu or play the paperwork animation. The key that opens the menu is set in MDTPro.ini (CitationHandoffKey), not here.',
+    tooltip: 'How close you must be to the suspect to use Hand pending citation in the MDT Pro menu or to play the paperwork animation. The menu key is MDTPro.ini SettingsMenuKey, not here.',
     presets: [
       { label: '3 m', value: 3 },
       { label: '4 m (default)', value: 4 },
@@ -607,7 +685,7 @@ const CONFIG_FIELD_META = {
   },
   stpCitationHandoffPendingExpireMinutes: {
     label: 'Pending handoff expires after (minutes)',
-    tooltip: 'If you close a citation but have not used the in-game handoff menu yet, this is how long MDT Pro remembers it. Use 0 to never expire automatically.',
+    tooltip: 'If you close a citation but have not confirmed Hand pending citation in the MDT Pro menu yet, this is how long MDT Pro remembers it. Use 0 to never expire automatically.',
     presets: [
       { label: '30 minutes', value: 30 },
       { label: '45 minutes (default)', value: 45 },
@@ -638,7 +716,8 @@ const CONFIG_FIELD_META = {
   },
   citationPedReactionEnabled: {
     label: 'Suspect lines after a citation',
-    tooltip: 'After the ticket is handed off, show a short line of dialogue from the suspect at the bottom of the screen (matched loosely to the charges).',
+    tooltip:
+      'After the ticket is handed off, show a short line of dialogue from the suspect at the bottom of the screen (matched loosely to the charges). Turn off for streaming so nothing appears there. You can also toggle this in the MDT Pro in-game menu.',
   },
   citationPedReactionDurationMs: {
     label: 'Suspect line duration (ms)',
@@ -736,11 +815,18 @@ function getConfigFieldMeta(key) {
   const meta = CONFIG_FIELD_META[key]
   if (meta) {
     const tooltip = (meta.tooltip && String(meta.tooltip).trim()) ? meta.tooltip : `Setting: ${key}.`
-    return { ...meta, tooltip }
+    return {
+      ...meta,
+      cloudServerOwned: isCloudServerOwnedConfigKey(key),
+      tooltip: isCloudServerOwnedConfigKey(key)
+        ? `${tooltip} In cloud mode this value is controlled by the MDT Cloud server.`
+        : tooltip,
+    }
   }
   const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase()).trim()
   return {
     label,
+    cloudServerOwned: isCloudServerOwnedConfigKey(key),
     tooltip: `This option controls "${label}". See the documentation for details.`,
   }
 }

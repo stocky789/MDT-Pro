@@ -135,9 +135,11 @@ function createControls(language) {
 
   const searchInput = document.createElement('input')
   searchInput.type = 'text'
+  searchInput.setAttribute('aria-label', language.court.searchPlaceholder || 'Search case #, name, report')
   searchInput.placeholder = language.court.searchPlaceholder || 'Search case #, name, report'
 
   const statusSelect = document.createElement('select')
+  statusSelect.setAttribute('aria-label', language.court.status || 'Status')
   const statusMap = language.court.statusMap || ['Pending', 'Convicted', 'Acquitted', 'Dismissed']
   statusSelect.innerHTML = `<option value="all">${language.court.allStatuses || 'All statuses'}</option>`
   statusMap.forEach((label, index) => {
@@ -145,6 +147,7 @@ function createControls(language) {
   })
 
   const sortSelect = document.createElement('select')
+  sortSelect.setAttribute('aria-label', language.court.sortUpdated || 'Sort')
   sortSelect.innerHTML = `
     <option value="updatedDesc">${language.court.sortUpdated || 'Recently Updated'}</option>
     <option value="riskDesc">${language.court.sortRisk || 'Highest Risk First'}</option>
@@ -368,7 +371,7 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
     if (courtCase.Status === 0) {
       const attachedHelp = document.createElement('p')
       attachedHelp.className = 'courtAttachedReportsHelp'
-      attachedHelp.textContent = language.court.attachedReportsHelp || 'Attached reports count as evidence. Relevant ones (defendant named, or report type matches charges) carry full weight; others still count but carry less weight.'
+      attachedHelp.textContent = language.court.attachedReportsHelp || 'Court scores every attachment. Strong ties to the defendant and charges add the most; loose ties still register lower.'
       attachedSection.appendChild(attachedHelp)
     }
     const listWrap = document.createElement('div')
@@ -428,14 +431,12 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
         })
         row.appendChild(detachBtn)
       } else {
-        const linkSpan = document.createElement('span')
+        const linkSpan = document.createElement('button')
+        linkSpan.type = 'button'
         linkSpan.classList.add('courtAttachedReportLink')
-        linkSpan.textContent = 'View'
-        linkSpan.setAttribute('role', 'button')
-        linkSpan.tabIndex = 0
+        linkSpan.textContent = language.court.view || 'View'
         const reportType = sum?.type || null
         linkSpan.addEventListener('click', () => openIdInReport(reportId, reportType))
-        linkSpan.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openIdInReport(reportId, reportType) } })
         row.appendChild(linkSpan)
       }
       listWrap.appendChild(row)
@@ -457,7 +458,10 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
       attachBtn.textContent = language.court.attachReportToCase || 'Attach report to case'
       attachBtn.addEventListener('click', async function () {
         const reportId = (attachInput.value || '').trim()
-        if (!reportId) return
+        if (!reportId) {
+          topWindow.showNotification(language.court.attachReportMissingId || 'Enter a report ID.', 'error')
+          return
+        }
         if (attachBtn.classList.contains('loading')) return
         attachBtn.classList.add('loading')
         const res = await (
@@ -483,6 +487,11 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
       attachWrap.appendChild(attachInput)
       attachWrap.appendChild(attachBtn)
       attachedSection.appendChild(attachWrap)
+    } else if (courtCase.Status === 0) {
+      const lockedHint = document.createElement('p')
+      lockedHint.className = 'courtAttachLockedHint'
+      lockedHint.textContent = language.court.attachReportLockedHint || 'Evidence links are locked after the scheduled court date.'
+      attachedSection.appendChild(lockedHint)
     }
     inputWrapper.appendChild(attachedSection)
   }
@@ -575,11 +584,15 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   evidenceToggleBtn.classList.add('evidenceToggleBtn')
   evidenceToggleBtn.innerText = language.court.viewEvidenceBtn || 'View Evidence Breakdown'
   evidenceToggleBtn.title = language.court.viewEvidenceBtn || 'View prosecution exhibits'
+  const evidenceBreakdownId = `courtEvidenceBreakdown-${(courtCase.Number || 'case').replace(/[^a-zA-Z0-9_-]/g, '_')}`
+  evidenceToggleBtn.setAttribute('aria-expanded', 'false')
+  evidenceToggleBtn.setAttribute('aria-controls', evidenceBreakdownId)
   evidenceToggleWrapper.appendChild(evidenceToggleBtn)
   inputWrapper.appendChild(evidenceToggleWrapper)
 
   const evidenceBreakdown = document.createElement('div')
   evidenceBreakdown.classList.add('evidenceBreakdown')
+  evidenceBreakdown.id = evidenceBreakdownId
   evidenceBreakdown.style.display = 'none'
 
   const hasAnyRealEvidence = (courtCase.EvidenceHadWeapon ?? false) || (courtCase.EvidenceWasWanted ?? false) || (courtCase.EvidenceAssaultedPed ?? false) || (courtCase.EvidenceDamagedVehicle ?? false) || (courtCase.EvidenceResisted ?? false) || (courtCase.EvidenceHadDrugs ?? false) || (courtCase.EvidenceUseOfForce ?? false) || (courtCase.EvidenceWasDrunk ?? false) || (courtCase.EvidenceWasFleeing ?? false) || (courtCase.EvidenceViolatedSupervision ?? false) || (courtCase.EvidenceWasPatDown ?? false) || (courtCase.EvidenceIllegalWeapon ?? false)
@@ -680,6 +693,7 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
     const isVisible = evidenceBreakdown.style.display !== 'none'
     evidenceBreakdown.style.display = isVisible ? 'none' : 'block'
     evidenceToggleBtn.classList.toggle('active', !isVisible)
+    evidenceToggleBtn.setAttribute('aria-expanded', isVisible ? 'false' : 'true')
   })
 
   const prosecutionWrapper = document.createElement('div')
@@ -817,13 +831,17 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
 
   const statusWrapper = document.createElement('div')
   statusWrapper.classList.add('courtStatusWrapper')
+  const serverResolvedHint = document.createElement('p')
+  serverResolvedHint.className = 'courtServerResolvedHint'
+  serverResolvedHint.textContent = language.court.serverResolvedHint || 'Verdict and sentence are resolved centrally by MDT Cloud.'
+  statusWrapper.appendChild(serverResolvedHint)
   statusWrapper.appendChild(createLabel(language.court.status || 'Status'))
 
   const currentStatusLabel = createReadOnlyInput(statusMap[courtCase.Status] || 'Unknown')
   currentStatusLabel.style.borderColor = `var(--color-${courtStatusColorMap[courtCase.Status] || 'info'})`
   statusWrapper.appendChild(currentStatusLabel)
 
-  // Only show Save, Dismiss and Force Resolve when case is still pending
+  // Only show pending metadata save while case is pending.
   if (courtCase.Status === 0) {
     const statusButtonWrapper = document.createElement('div')
     statusButtonWrapper.classList.add('buttonWrapper')
@@ -863,125 +881,6 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
       hideLoadingOnButton(saveCaseBtn)
     })
     statusButtonWrapper.appendChild(saveCaseBtn)
-
-    const forceResolveBtn = document.createElement('button')
-    forceResolveBtn.className = 'forceResolveBtn'
-    forceResolveBtn.innerText = language.court.forceResolve || 'Force Resolve'
-    forceResolveBtn.style.borderColor = 'var(--color-accent)'
-    forceResolveBtn.addEventListener('click', async function () {
-      if (forceResolveBtn.classList.contains('loading')) return
-      forceResolveBtn.classList.add('loading')
-      forceResolveBtn.disabled = true
-
-      const stages = language.court.forceResolveStages || [
-        'Submitting case to court...',
-        'Prosecution and defense present...',
-        'Judge deliberating...',
-        'Verdict being entered...',
-        'Finalizing case record...',
-      ]
-      const totalMs = 5000
-      const stageInterval = totalMs / stages.length
-      const circumference = 2 * Math.PI * 36
-
-      const overlay = document.createElement('div')
-      overlay.className = 'courtProcessingOverlay'
-      overlay.innerHTML = `
-        <div class="courtProcessingModal">
-          <div class="courtProcessingTitle">${escapeHtml(language.court.forceResolveProcessing || 'Processing case...')}</div>
-          <svg class="courtProcessingCircle" viewBox="0 0 80 80">
-            <circle class="courtProcessingCircleBg" cx="40" cy="40" r="36" />
-            <circle class="courtProcessingCircleProgress" cx="40" cy="40" r="36" />
-          </svg>
-          <div class="courtProcessingStage">${escapeHtml(stages[0])}</div>
-        </div>
-      `
-      document.body.appendChild(overlay)
-      const progressCircle = overlay.querySelector('.courtProcessingCircleProgress')
-      const stageEl = overlay.querySelector('.courtProcessingStage')
-
-      let elapsed = 0
-      const tick = 50
-      const progressInterval = setInterval(() => {
-        elapsed += tick
-        const pct = Math.min(1, elapsed / totalMs)
-        const dashOffset = circumference * (1 - pct)
-        progressCircle.style.strokeDashoffset = dashOffset
-        const stageIdx = Math.min(stages.length - 1, Math.floor(pct * stages.length))
-        stageEl.textContent = stages[stageIdx]
-      }, tick)
-
-      await new Promise((r) => setTimeout(r, totalMs))
-      clearInterval(progressInterval)
-      overlay.remove()
-
-      let responseText
-      try {
-        const res = await fetch('/post/forceResolveCourtCase', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            Number: courtCase.Number,
-            Plea: pleaSelect.value,
-            OutcomeNotes: notesInput.value,
-          }),
-        })
-        responseText = await res.text()
-      } catch (_) {
-        responseText = ''
-      }
-
-      forceResolveBtn.classList.remove('loading')
-      forceResolveBtn.disabled = false
-
-      if (responseText === 'OK' && typeof refreshCourtList === 'function') {
-        topWindow.showNotification(language.court.forceResolveSuccess || 'Case resolved.', 'success')
-        await refreshCourtList()
-      } else {
-        topWindow.showNotification(language.court.forceResolveError || 'Could not resolve case.', 'error')
-      }
-    })
-    statusButtonWrapper.appendChild(forceResolveBtn)
-
-    const dismissBtn = document.createElement('button')
-    dismissBtn.innerHTML = statusMap[3] || 'Dismissed'
-    dismissBtn.style.borderColor = `var(--color-${courtStatusColorMap[3]})`
-    dismissBtn.addEventListener('click', async function () {
-      if (dismissBtn.classList.contains('loading')) return
-      showLoadingOnButton(dismissBtn)
-      const response = await (
-        await fetch('/post/updateCourtCaseStatus', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            Number: courtCase.Number,
-            Status: 3,
-            Plea: pleaSelect.value,
-            IsJuryTrial: courtCase.IsJuryTrial,
-            JurySize: courtCase.JurySize,
-            JuryVotesForConviction: courtCase.JuryVotesForConviction,
-            JuryVotesForAcquittal: courtCase.JuryVotesForAcquittal,
-            HasPublicDefender: courtCase.HasPublicDefender,
-            OutcomeNotes: notesInput.value,
-            OutcomeReasoning: courtCase.OutcomeReasoning ?? '',
-          }),
-        })
-      ).text()
-      if (response === 'OK') {
-        courtCase.Status = 3
-        courtCase.Plea = pleaSelect.value
-        courtCase.OutcomeNotes = notesInput.value
-        currentStatusLabel.value = statusMap[3] || 'Dismissed'
-        currentStatusLabel.style.borderColor = `var(--color-${courtStatusColorMap[3]})`
-        statusButtonWrapper.style.display = 'none'
-        topWindow.showNotification(language.court.statusUpdated || 'Court case updated', 'success')
-        if (typeof refreshCourtList === 'function') await refreshCourtList()
-      } else {
-        topWindow.showNotification(language.court.statusUpdateError || 'Failed to update status', 'error')
-      }
-      hideLoadingOnButton(dismissBtn)
-    })
-    statusButtonWrapper.appendChild(dismissBtn)
     statusWrapper.appendChild(statusButtonWrapper)
   }
 

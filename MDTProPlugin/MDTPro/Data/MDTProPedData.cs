@@ -38,6 +38,7 @@ namespace MDTPro.Data {
         public bool IsOnParole;
         public string LicenseStatus;
         public string LicenseExpiration;
+        public bool LicenseExpirationVerifiedFromLiveDocument;
         public string WeaponPermitStatus;
         public string WeaponPermitExpiration;
         public string WeaponPermitType;
@@ -50,6 +51,8 @@ namespace MDTPro.Data {
         public string DeceasedAt;
         public List<CitationGroup.Charge> Citations;
         public List<ArrestGroup.Charge> Arrests;
+        /// <summary>Active and historical warrant lines; persisted in <c>ped_warrants</c> and synced to MDT Cloud.</summary>
+        public List<WarrantCharge> Warrants;
         public List<IdentificationEntry> IdentificationHistory;
 
         /// <param name="forReconcileSnapshotOnly">When true, copies persona/documents from CDF without synthetic citations or mutating CDF counters (safe for a second read in the same STP flow).</param>
@@ -75,6 +78,19 @@ namespace MDTPro.Data {
         }
         public MDTProPedData() { }
 
+        internal static string FormatBirthday(DateTime birthday) {
+            return birthday == default ? null : birthday.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+
+        internal static string FormatBirthday(string birthday) {
+            if (string.IsNullOrWhiteSpace(birthday)) return birthday;
+            if (DateTime.TryParse(birthday.Trim(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out DateTime dt)
+                || DateTime.TryParse(birthday.Trim(), CultureInfo.CurrentCulture, DateTimeStyles.AllowWhiteSpaces, out dt)
+                || DateTime.TryParse(birthday.Trim(), out dt))
+                return FormatBirthday(dt);
+            return birthday.Trim();
+        }
+
         /// <summary>True when ped has name but no meaningful identity (DOB, license, address, gender). Used to avoid persisting or to trigger delayed CDF retry.</summary>
         public static bool IsMinimalIdentity(MDTProPedData p) {
             if (p == null) return true;
@@ -83,6 +99,11 @@ namespace MDTPro.Data {
             bool hasIdentity = !string.IsNullOrWhiteSpace(p.Birthday) || !string.IsNullOrWhiteSpace(p.LicenseStatus)
                 || !string.IsNullOrWhiteSpace(p.Address) || !string.IsNullOrWhiteSpace(p.Gender);
             return !hasIdentity;
+        }
+
+        /// <summary>Policing Redefined (<c>OnPedPatDown</c>, <c>OnIdentificationGiven</c>, …) and StopThePed (<c>patDownPedEvent</c>, <c>askIdEvent</c>, …) all record here via <see cref="DataController.AddIdentificationEvent"/>; used so <see cref="Database.SavePed"/> can mirror legacy in-memory Recent IDs for MDT Cloud.</summary>
+        internal static bool HasIdentificationHistory(MDTProPedData p) {
+            return p?.IdentificationHistory != null && p.IdentificationHistory.Count > 0;
         }
 
         private void PopulateParameters() {
@@ -102,7 +123,7 @@ namespace MDTPro.Data {
             PortraitFaceTexture = null;
             if (Holder != null && Holder.IsValid())
                 PedPortraitModelHelper.AssignPortraitFromPedIfSuitable(Holder, this);
-            Birthday = CDFPedData.Birthday.ToString("s");
+            Birthday = FormatBirthday(CDFPedData.Birthday);
             Gender = CDFPedData.Gender.ToString();
             IsWanted = CDFPedData.Wanted;
             IsOnProbation = CDFPedData.IsOnProbation;
@@ -114,6 +135,7 @@ namespace MDTPro.Data {
             try {
                 LicenseStatus = CDFPedData.DriversLicenseState.ToString();
                 LicenseExpiration = CDFPedData.DriversLicenseExpiration?.ToString("s");
+                LicenseExpirationVerifiedFromLiveDocument = false;
                 if (CDFPedData.WeaponPermit != null) {
                     WeaponPermitStatus = CDFPedData.WeaponPermit.Status.ToString();
                     WeaponPermitExpiration = CDFPedData.WeaponPermit.ExpirationDate?.ToString("s");
@@ -136,21 +158,15 @@ namespace MDTPro.Data {
                 }
             }
             AdvisoryText = CDFPedData.AdvisoryText;
-            WarrantText = IsWanted ? GetRandomWarrantCharge().name : null;
+            WarrantText = IsWanted ? CdfWarrantTextResolver.TryResolveWarrantText(CDFPedData, Holder) : null;
 
             Citations = SelectWithProbability(GetConfig().hasPriorCitationsProbability)
                 ? GetRandomCitationCharges(GetConfig().maxNumberOfPriorCitations)
                 : new List<CitationGroup.Charge>();
 
-            if (IsWanted) {
-                Arrests = SelectWithProbability(GetConfig().hasPriorArrestsWithWarrantProbability)
-                    ? GetRandomArrestCharges(GetConfig().maxNumberOfPriorArrestsWithWarrant)
-                    : new List<ArrestGroup.Charge>();
-            } else {
-                Arrests = SelectWithProbability(GetConfig().hasPriorArrestsProbability)
-                    ? GetRandomArrestCharges(GetConfig().maxNumberOfPriorArrests)
-                    : new List<ArrestGroup.Charge>();
-            }
+            Arrests = SelectWithProbability(GetConfig().hasPriorArrestsProbability)
+                ? GetRandomArrestCharges(GetConfig().maxNumberOfPriorArrests)
+                : new List<ArrestGroup.Charge>();
 
             // Synthetic PRIOR court dockets: only for CDF probation/parole, and only after LE contact — see DataController.EnsureSupervisionCourtBackstory.
 
@@ -162,6 +178,8 @@ namespace MDTPro.Data {
 
             TimesStopped = CDFPedData.TimesStopped;
 
+            EnsureWarrantsWhenWantedFromCdf();
+            ApplyActiveWarrantsKeepWanted();
             TryParseNameIntoFirstLast();
         }
 
@@ -171,6 +189,7 @@ namespace MDTPro.Data {
             try {
                 LicenseStatus = CDFPedData.DriversLicenseState.ToString();
                 LicenseExpiration = CDFPedData.DriversLicenseExpiration?.ToString("s");
+                LicenseExpirationVerifiedFromLiveDocument = false;
                 if (CDFPedData.WeaponPermit != null) {
                     WeaponPermitStatus = CDFPedData.WeaponPermit.Status.ToString();
                     WeaponPermitExpiration = CDFPedData.WeaponPermit.ExpirationDate?.ToString("s");
@@ -188,13 +207,15 @@ namespace MDTPro.Data {
         /// <summary>Re-read name, DOB, address, warrants, supervision, advisory, gang, and license/permit display fields from <see cref="CDFPedData"/> without touching MDT citation/arrest lists or mutating CDF stop counters. Use after merging SQLite so Person Search matches PR/STP/CDF.</summary>
         internal void ApplyCdfPersonaAndDocumentsToDisplayFields() {
             if (CDFPedData == null) return;
-            string warrantKeep = WarrantText;
+            // Drop any pre-existing WarrantText (legacy installs randomised it on every refresh, producing the
+            // "different reason every time" bug). Authoritative warrant text comes from CDF/Persona via
+            // CdfWarrantTextResolver; if neither has it, Person Search just shows the Wanted pill on its own.
             Name = CDFPedData.FullName;
             FirstName = CDFPedData.Firstname;
             LastName = CDFPedData.Lastname;
             if (Holder != null && Holder.IsValid())
                 PedPortraitModelHelper.AssignPortraitFromPedIfSuitable(Holder, this);
-            Birthday = CDFPedData.Birthday.ToString("s");
+            Birthday = FormatBirthday(CDFPedData.Birthday);
             Gender = CDFPedData.Gender.ToString();
             IsWanted = CDFPedData.Wanted;
             IsOnProbation = CDFPedData.IsOnProbation;
@@ -214,9 +235,9 @@ namespace MDTPro.Data {
                 }
             }
             AdvisoryText = CDFPedData.AdvisoryText;
-            if (!IsWanted) WarrantText = null;
-            else if (string.IsNullOrEmpty(warrantKeep)) WarrantText = GetRandomWarrantCharge().name;
-            else WarrantText = warrantKeep;
+            WarrantText = IsWanted ? CdfWarrantTextResolver.TryResolveWarrantText(CDFPedData, Holder) : null;
+            EnsureWarrantsWhenWantedFromCdf();
+            ApplyActiveWarrantsKeepWanted();
             TryParseNameIntoFirstLast();
         }
 
@@ -239,17 +260,19 @@ namespace MDTPro.Data {
             PortraitVariantTexture = liveRead.PortraitVariantTexture;
             PortraitFaceDrawable = liveRead.PortraitFaceDrawable;
             PortraitFaceTexture = liveRead.PortraitFaceTexture;
-            Birthday = liveRead.Birthday;
+            Birthday = FormatBirthday(liveRead.Birthday);
             Gender = liveRead.Gender;
             Address = liveRead.Address;
             IsInGang = liveRead.IsInGang;
             AdvisoryText = liveRead.AdvisoryText;
             IsWanted = liveRead.IsWanted;
             WarrantText = liveRead.WarrantText;
+            Warrants = CloneWarrantList(liveRead.Warrants);
             IsOnProbation = liveRead.IsOnProbation;
             IsOnParole = liveRead.IsOnParole;
             LicenseStatus = liveRead.LicenseStatus;
             LicenseExpiration = liveRead.LicenseExpiration;
+            LicenseExpirationVerifiedFromLiveDocument = liveRead.LicenseExpirationVerifiedFromLiveDocument;
             WeaponPermitStatus = liveRead.WeaponPermitStatus;
             WeaponPermitExpiration = liveRead.WeaponPermitExpiration;
             WeaponPermitType = liveRead.WeaponPermitType;
@@ -309,6 +332,7 @@ namespace MDTPro.Data {
         private void PopulateFromLSPDFRPersonaFallback() {
             Citations = new List<CitationGroup.Charge>();
             Arrests = new List<ArrestGroup.Charge>();
+            Warrants = new List<WarrantCharge>();
             IdentificationHistory = new List<IdentificationEntry>();
             if (Holder == null || !Holder.IsValid()) return;
             try {
@@ -378,6 +402,59 @@ namespace MDTPro.Data {
             return true;
         }
 
+        /// <summary>Selects the headline identification for Recent IDs. Must stay aligned with <c>HostedMdtLegacyRoutes.TryGetLatestIdentification</c> so StopThePed bursts (registration/insurance right after a license) still show Driver's License in the cloud portal.</summary>
+        internal static bool TryGetRecentIdentificationHeadlineForCloud(IReadOnlyList<IdentificationEntry> hist, out string type, out string timestamp, out DateTimeOffset sortParsed) {
+            type = "";
+            timestamp = null;
+            sortParsed = DateTimeOffset.MinValue;
+            if (hist == null || hist.Count == 0) return false;
+            var entries = new List<(string Type, string Ts, DateTimeOffset Parsed)>();
+            foreach (IdentificationEntry e in hist) {
+                if (e == null) continue;
+                string entryType = e.Type ?? "";
+                string entryTs = e.Timestamp;
+                DateTimeOffset parsed = DateTimeOffset.MinValue;
+                if (!string.IsNullOrWhiteSpace(entryTs)) {
+                    if (!DateTimeOffset.TryParse(entryTs, null, DateTimeStyles.RoundtripKind, out parsed))
+                        DateTimeOffset.TryParse(entryTs, out parsed);
+                }
+                entries.Add((entryType, entryTs, parsed));
+            }
+            if (entries.Count == 0) return false;
+            entries.Sort((a, b) => b.Parsed.CompareTo(a.Parsed));
+            var selected = entries[0];
+            if (IsVehiclePaperworkIdentificationType(selected.Type)) {
+                var driverLicense = entries.FirstOrDefault(e =>
+                    IsDriverLicenseIdentificationType(e.Type) &&
+                    selected.Parsed != DateTimeOffset.MinValue &&
+                    e.Parsed != DateTimeOffset.MinValue &&
+                    Math.Abs((selected.Parsed - e.Parsed).TotalSeconds) <= 12d);
+                if (!string.IsNullOrWhiteSpace(driverLicense.Type))
+                    selected = driverLicense;
+            }
+            // Policing Redefined "request all documents" (and similar bursts): the newest history line is often
+            // State ID or a permit even when a driver's licence was taken in the same stop. Prefer DL so Recent IDs
+            // and cloud MDT match StopThePed-style behaviour without forcing the officer to re-open the licence alone.
+            if (!IsDriverLicenseIdentificationType(selected.Type) && !IsVehiclePaperworkIdentificationType(selected.Type)) {
+                const double multiDocDlCoalesceSeconds = 20d;
+                var parsedEntries = entries.Where(e => e.Parsed != DateTimeOffset.MinValue).ToList();
+                if (parsedEntries.Count > 0) {
+                    var tMax = parsedEntries.Max(e => e.Parsed);
+                    var dlInBurst = parsedEntries
+                        .Where(e => IsDriverLicenseIdentificationType(e.Type))
+                        .Where(e => (tMax - e.Parsed).TotalSeconds >= 0 && (tMax - e.Parsed).TotalSeconds <= multiDocDlCoalesceSeconds)
+                        .OrderByDescending(e => e.Parsed)
+                        .FirstOrDefault();
+                    if (!string.IsNullOrWhiteSpace(dlInBurst.Type))
+                        selected = dlInBurst;
+                }
+            }
+            type = selected.Type;
+            timestamp = selected.Ts;
+            sortParsed = selected.Parsed;
+            return type.Length > 0 || !string.IsNullOrEmpty(timestamp);
+        }
+
         /// <summary>Apply persistent (SQLite) identity onto current ped. For string/identity fields, only overwrite when source has a value so we do not replace good CDF/current data with nulls from an old DB record.</summary>
         internal void ApplyPersistentIdentity(MDTProPedData source) {
             if (source == null) return;
@@ -393,10 +470,14 @@ namespace MDTPro.Data {
             TimesStopped = source.TimesStopped;
             IsWanted = source.IsWanted;
             WarrantText = source.WarrantText;
+            Warrants = CloneWarrantList(source.Warrants);
             IsOnProbation = source.IsOnProbation;
             IsOnParole = source.IsOnParole;
             if (!string.IsNullOrEmpty(source.LicenseStatus)) LicenseStatus = source.LicenseStatus;
-            if (!string.IsNullOrEmpty(source.LicenseExpiration)) LicenseExpiration = source.LicenseExpiration;
+            if (!string.IsNullOrEmpty(source.LicenseExpiration)) {
+                LicenseExpiration = source.LicenseExpiration;
+                LicenseExpirationVerifiedFromLiveDocument = source.LicenseExpirationVerifiedFromLiveDocument;
+            }
             if (!string.IsNullOrEmpty(source.WeaponPermitStatus)) WeaponPermitStatus = source.WeaponPermitStatus;
             if (!string.IsNullOrEmpty(source.WeaponPermitExpiration)) WeaponPermitExpiration = source.WeaponPermitExpiration;
             if (!string.IsNullOrEmpty(source.WeaponPermitType)) WeaponPermitType = source.WeaponPermitType;
@@ -441,10 +522,14 @@ namespace MDTPro.Data {
             TimesStopped = source.TimesStopped;
             IsWanted = source.IsWanted;
             WarrantText = source.WarrantText;
+            Warrants = CloneWarrantList(source.Warrants);
             IsOnProbation = source.IsOnProbation;
             IsOnParole = source.IsOnParole;
             if (!string.IsNullOrEmpty(source.LicenseStatus)) LicenseStatus = source.LicenseStatus;
-            if (!string.IsNullOrEmpty(source.LicenseExpiration)) LicenseExpiration = source.LicenseExpiration;
+            if (!string.IsNullOrEmpty(source.LicenseExpiration)) {
+                LicenseExpiration = source.LicenseExpiration;
+                LicenseExpirationVerifiedFromLiveDocument = source.LicenseExpirationVerifiedFromLiveDocument;
+            }
             if (!string.IsNullOrEmpty(source.WeaponPermitStatus)) WeaponPermitStatus = source.WeaponPermitStatus;
             if (!string.IsNullOrEmpty(source.WeaponPermitExpiration)) WeaponPermitExpiration = source.WeaponPermitExpiration;
             if (!string.IsNullOrEmpty(source.WeaponPermitType)) WeaponPermitType = source.WeaponPermitType;
@@ -479,6 +564,51 @@ namespace MDTPro.Data {
                     canBeWarrant = charge.canBeWarrant
                 })
                 .ToList() ?? new List<ArrestGroup.Charge>();
+        }
+
+        internal bool HasActiveWarrants() => Warrants != null && Warrants.Any(w => w != null && w.IsActive);
+
+        internal void ApplyActiveWarrantsKeepWanted() {
+            if (HasActiveWarrants())
+                IsWanted = true;
+        }
+
+        void EnsureWarrantsWhenWantedFromCdf() {
+            if (!IsWanted) return;
+            if (Warrants == null) Warrants = new List<WarrantCharge>();
+            if (HasActiveWarrants()) {
+                SyncWarrantTextFromActiveWarrants();
+                return;
+            }
+            string res = CdfWarrantTextResolver.TryResolveWarrantText(CDFPedData, Holder);
+            if (!string.IsNullOrWhiteSpace(res))
+                Warrants.Add(new WarrantCharge { Name = res.Trim(), Severity = "Misdemeanor", IssuedAtUtc = DateTime.UtcNow.ToString("o") });
+            else
+                Warrants.AddRange(WarrantBackstoryHelper.BuildActiveWarrants());
+            SyncWarrantTextFromActiveWarrants();
+        }
+
+        internal void SyncWarrantTextFromActiveWarrants() {
+            var names = (Warrants ?? Enumerable.Empty<WarrantCharge>())
+                .Where(w => w != null && w.IsActive && !string.IsNullOrWhiteSpace(w.Name))
+                .Select(w => w.Name.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (names.Count == 0) return;
+            if (string.IsNullOrWhiteSpace(WarrantText))
+                WarrantText = string.Join("; ", names);
+        }
+
+        internal static List<WarrantCharge> CloneWarrantList(IReadOnlyList<WarrantCharge> src) {
+            if (src == null || src.Count == 0) return new List<WarrantCharge>();
+            return src.Where(w => w != null).Select(w => new WarrantCharge {
+                Name = w.Name,
+                Severity = w.Severity,
+                IssuedAtUtc = w.IssuedAtUtc,
+                ClearedAtUtc = w.ClearedAtUtc,
+                ClearedByReportType = w.ClearedByReportType,
+                ClearedByReportId = w.ClearedByReportId
+            }).ToList();
         }
 
         /// <summary>Try to sync CDF PedData name to match persistent identity after re-encounter. Uses CDF API property names (Firstname/Lastname). Wrapped in try-catch.</summary>

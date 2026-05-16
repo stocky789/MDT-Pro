@@ -1,7 +1,8 @@
-// Pending StopThePed-path citation delivery: closed in MDT first, handed in-game via keybind + menu (see CitationHandoffKeybind).
+// Pending StopThePed-path citation delivery: closed in MDT first, handed in-game from MDT Pro settings menu (see SettingsMenu).
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MDTPro;
 using MDTPro.Data;
 using MDTPro.Setup;
 using MDTPro.UI;
@@ -21,6 +22,19 @@ namespace MDTPro.Utility {
                 _pedName = null;
                 _charges = null;
                 unchecked { _queueToken++; }
+            }
+        }
+
+        /// <summary>True when a citation is queued and not past the pending timeout (game thread may call <see cref="TryProcessKeyPress"/>).</summary>
+        internal static bool TryPeekPending(out string pedName) {
+            lock (Sync) {
+                pedName = null;
+                if (string.IsNullOrWhiteSpace(_pedName) || _charges == null || _charges.Count == 0)
+                    return false;
+                if (IsExpiredUnlocked())
+                    return false;
+                pedName = _pedName;
+                return true;
             }
         }
 
@@ -48,7 +62,28 @@ namespace MDTPro.Utility {
             return (DateTime.UtcNow - _queuedUtc).TotalMinutes > minutes;
         }
 
-        /// <summary>Game-thread only. Opens the handoff menu when a pending citation exists, the key was pressed, distance is OK, and the ped resolves.</summary>
+        /// <summary>While opening the MDT Pro menu: drop an expired pending handoff and show the same notice as when attempting handoff.</summary>
+        internal static void ClearExpiredPendingWhenMenuOpens() {
+            if (Main.usePR) return;
+            bool cleared = false;
+            lock (Sync) {
+                if (string.IsNullOrWhiteSpace(_pedName) || _charges == null || _charges.Count == 0)
+                    return;
+                if (!IsExpiredUnlocked()) return;
+                _pedName = null;
+                _charges = null;
+                unchecked { _queueToken++; }
+                cleared = true;
+            }
+            if (cleared) {
+                string expired = GetLanguage().inGame.stpCitationHandoffPendingExpired
+                    ?? "The pending citation handoff expired. Close the citation again from the MDT if needed.";
+                if (!string.IsNullOrWhiteSpace(expired))
+                    RageNotification.Show(expired, RageNotification.NotificationType.Info);
+            }
+        }
+
+        /// <summary>Game-thread only. Opens the handoff menu when a pending citation exists, distance is OK, and the ped resolves.</summary>
         internal static void TryProcessKeyPress() {
             if (Main.usePR) return; // PR handles citations via PedAPI; no MDT handoff menu
 

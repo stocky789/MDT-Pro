@@ -44,8 +44,9 @@ namespace MDTPro.ServerAPI {
                 buffer = Encoding.UTF8.GetBytes(Main.Version);
                 status = 200;
                 contentType = "text/plain";
+                ExtraResponseHeaders = new List<(string, string)> { ("X-MdtPro-Bridge-Token", BridgeSecurity.EnsureToken()) };
             } else if (path == "/config") {
-                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(SetupController.GetConfig()));
+                buffer = Encoding.UTF8.GetBytes(BridgeSecurity.SafeConfigJson());
                 status = 200;
                 contentType = "text/json";
             } else if (path == "/integration") {

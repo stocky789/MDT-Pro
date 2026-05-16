@@ -135,7 +135,7 @@ namespace MDTPro.Utility {
                     // No STP plugin API: queue for in-game keybind + menu (not instant popup).
                     StpCitationHandoffQueue.Enqueue(pedName, charges);
                     var lang = SetupController.GetLanguage().inGame;
-                    string keyLabel = UI.CitationHandoffKeybind.CurrentKeyLabel;
+                    string keyLabel = UI.SettingsMenu.CurrentMenuKeyLabel;
                     string queued = lang.stpCitationHandoffQueued
                         ?? "Citation saved. When you are ~g~close to the suspect~s~, press ~b~{0}~s~ to open the handoff menu.";
                     if (!string.IsNullOrWhiteSpace(queued))

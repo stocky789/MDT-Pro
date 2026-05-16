@@ -41,7 +41,7 @@ namespace MDTPro.Setup {
             public string model = "Model";
             public string openVehicleLookup = "Open Vehicle Lookup";
             public string clearAlpr = "Clear ALPR";
-            public string inGameNotEnabled = "In-game ALPR is off; enable it in the MDT Pro menu (F7) for browser hits from the built-in scanner.";
+            public string inGameNotEnabled = "In-game ALPR is off; enable it in the MDT Pro in-game menu (see MDTPro.ini SettingsMenuKey) for browser hits from the built-in scanner.";
         }
 
         public class InGame {
@@ -77,8 +77,14 @@ namespace MDTPro.Setup {
             public string stpCitationHandoffDeliverDescription = "Confirms in-game delivery. StopThePed does not expose a plugin ticket API, so MDT Pro completes the handoff here.";
             /// <summary>Shown when the officer closes the handoff menu without choosing Deliver.</summary>
             public string stpCitationHandoffMenuCancelled = "Citation saved in the MDT. You closed the menu without confirming delivery.";
-            /// <summary>After closing a citation (StopThePed path). {0} = key name (e.g. F10).</summary>
-            public string stpCitationHandoffQueued = "Citation saved. When you are ~g~close to the suspect~s~, press ~b~{0}~s~ to open the handoff menu.";
+            /// <summary>After closing a citation (StopThePed path). {0} = key name for the MDT Pro in-game menu (SettingsMenuKey).</summary>
+            public string stpCitationHandoffQueued = "Citation saved. When you are ~g~close to the suspect~s~, open the ~b~MDT Pro menu~s~ (~b~{0}~s~) and choose ~b~Hand pending citation~s~.";
+            /// <summary>Settings menu row title for StopThePed-path citation delivery.</summary>
+            public string stpCitationHandoffSettingsItemTitle = "Hand pending citation";
+            /// <summary>Tooltip when a citation is queued. {0} = offender name.</summary>
+            public string stpCitationHandoffSettingsItemReadyDescription = "Deliver the citation you closed in the MDT. Suspect: ~b~{0}~s~. Stand within range, then select this.";
+            /// <summary>Tooltip when nothing is queued.</summary>
+            public string stpCitationHandoffSettingsItemIdleDescription = "Appears after you close a citation in the MDT (StopThePed path). Open this menu when you are near the suspect.";
             /// <summary>Keybind pressed but player too far. {0} = max distance in meters (formatted).</summary>
             public string stpCitationHandoffTooFar = "Move closer to the suspect (within ~{0}m) to hand the citation.";
             /// <summary>Queued handoff was not completed before the time limit.</summary>
@@ -442,7 +448,7 @@ namespace MDTPro.Setup {
                 /// <summary>Title for the caution dialog shown after saving an arrest report.</summary>
                 public string arrestSaveCautionTitle = "Reminder";
                 /// <summary>Caution text reminding the player to attach relevant reports to the arrest for court evidence.</summary>
-                public string arrestSaveCautionMessage = "Remember to attach relevant reports (e.g. incident, injury) to this arrest report. The arrest report alone may not be enough evidence to secure a conviction in court—this depends on the case.";
+                public string arrestSaveCautionMessage = "Add incident, injury, or other supporting reports if you want this arrest to stand on its own in court.";
                 public string invalidTime = "Invalid time.";
                 public string invalidDate = "Invalid date.";
                 public string noCharges = "Add at least one charge.";
@@ -530,7 +536,7 @@ namespace MDTPro.Setup {
                     public string importRecentReportsNone = "No new recent reports to import (last 60 min).";
                     public string attachedReports = "Attached reports (evidence for court)";
                     /// <summary>Explains that attached reports count as evidence; relevant ones carry full weight, others still count but less.</summary>
-                    public string attachedReportsHelp = "Reports you attach here are used as evidence when this arrest goes to court. Reports that directly support the case (Incident/Citation naming this defendant, Injury documenting harm, Traffic Incident with defendant as driver or vehicle-related charges, Impound for vehicle-related charges) carry full weight. Other attached reports (e.g. impound on a drug case, incident that doesn't name the defendant) still count but carry less weight—so tangential evidence like a stolen firearm in a drug case is not ignored.";
+                    public string attachedReportsHelp = "Court reads every attachment you add here. Strong ties to the defendant and charges (incident or citation naming them, injury with harm, traffic with them as driver when charges fit, impound when charges are vehicle-led, PER for drugs or guns) add the most. Side reports still move the needle, only at lower weight.";
                     public string attachReport = "Attach report";
                     public string attachReportIdPlaceholder = "Report ID (e.g. INC-25-0001, INJ-25-0001)";
                     public string attachReportDraftHint = "Report will be attached when you save the arrest.";
@@ -760,7 +766,7 @@ namespace MDTPro.Setup {
             public string defenseStrength = "Defense Strength";
             public string docketPressure = "Docket Pressure";
             public string policyAdjustment = "District Policy Adjustment";
-            public string evidenceModelExplanation = "Evidence score estimates prosecution strength from charge severity, arrestability, and sentencing exposure. Calculated when the case is created and stored with the case.";
+            public string evidenceModelExplanation = "Evidence score blends charge severity, arrestability, and sentencing exposure. The case stores the value when it is created.";
             public string jury = "Jury";
             public string benchTrial = "Bench Trial";
             public string plea = "Plea";
@@ -775,7 +781,7 @@ namespace MDTPro.Setup {
             public string licenseRevocations = "License Revocations Ordered";
             public string attachedReports = "Attached reports (evidence)";
             /// <summary>Explains that relevant reports carry full weight, others still count but less.</summary>
-            public string attachedReportsHelp = "Attached reports count as evidence. Those that directly support the case (defendant named, or report type matches charges) carry full weight; other attached reports still count but carry less weight, so tangential evidence is not ignored.";
+            public string attachedReportsHelp = "Court scores every attachment. Strong ties to the defendant and charges add the most; loose ties still register lower.";
             public string attachReportToCase = "Attach report to case";
             public string attachReportIdPlaceholder = "Report ID";
             public string detach = "Detach";

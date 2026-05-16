@@ -10,6 +10,7 @@ namespace MDTProNative.Client;
 /// <summary>Read-only HTTP access to MDT Pro <c>/data/*</c> and root JSON routes.</summary>
 public sealed class MdtHttpClient : IDisposable
 {
+    public const string BridgeTokenHeaderName = "X-MDT-Bridge-Token";
     readonly HttpClient _http;
 
     public MdtHttpClient(MdtServerEndpoint endpoint)
@@ -22,6 +23,8 @@ public sealed class MdtHttpClient : IDisposable
         var baseUrl = endpoint.HttpBaseUrl.TrimEnd('/') + "/";
         // Plugin may block on the game fiber while GTA is paused; align with server-side infinite-wait saves.
         _http = new HttpClient(handler) { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromMinutes(5) };
+        if (!string.IsNullOrWhiteSpace(endpoint.BridgeAuthToken))
+            _http.DefaultRequestHeaders.TryAddWithoutValidation(BridgeTokenHeaderName, endpoint.BridgeAuthToken);
     }
 
     static bool IsLikelyLoopbackHost(string host)
@@ -68,6 +71,17 @@ public sealed class MdtHttpClient : IDisposable
         using var response = await _http.GetAsync("version", cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode) return null;
         return (await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false)).Trim();
+    }
+
+    public async Task<(string? Version, string? BridgeAuthToken)> ProbeVersionAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _http.GetAsync("version", cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) return (null, null);
+        var version = (await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false)).Trim();
+        string? token = null;
+        if (response.Headers.TryGetValues("X-MdtPro-Bridge-Token", out var values))
+            token = values.FirstOrDefault();
+        return (version, string.IsNullOrWhiteSpace(token) ? null : token);
     }
 
     public async Task<JObject?> GetIntegrationJsonAsync(CancellationToken cancellationToken = default)

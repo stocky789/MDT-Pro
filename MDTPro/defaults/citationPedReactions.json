@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "rules": [
     {
       "keywords": [
@@ -396,6 +396,18 @@
         "Kiss my ass — still a person under that uniform.",
         "Kiss my ass — whatever, I am done arguing.",
         "Cocksucker — hope that ticket was worth it."
+      ],
+      "normal": [
+        "Thank you, officer. I understand you are doing your job.",
+        "I will read the citation and take care of it.",
+        "Fair enough. I will pay the fine and be more careful.",
+        "I respect that you have to enforce the rules. I will follow what it says on the ticket.",
+        "Understood. Where do I pay or go if I need to contest this?",
+        "I appreciate you staying professional. I will handle this properly.",
+        "I accept the citation. Have a safe rest of your shift.",
+        "I am not thrilled, but I will comply.",
+        "Thank you for explaining. I will make sure I know what to do next.",
+        "Okay, officer. I will take care of it."
       ]
     },
     "cop_hostile": {
@@ -562,6 +574,18 @@
         "Piece of shit — revenue officer, not peace officer.",
         "Asshole — you are just a revenue collector.",
         "For fuck sake — fuck your quota and fuck this ticket."
+      ],
+      "normal": [
+        "I disagree with how this went, but I will still pay the fine and handle the rest the right way.",
+        "I will take this up through the court or a supervisor if I need to. For now I understand what you issued.",
+        "I am frustrated, but I am not looking for a scene. I will read the citation and go from there.",
+        "I hear you, officer. I will follow the instructions on the ticket.",
+        "I still respect the job even when I disagree with this stop.",
+        "I will keep my cool and sort this out properly.",
+        "Fair enough. I will handle the paperwork.",
+        "I understand you have procedures to follow. I will do my part on my end.",
+        "I am not going to argue further here. I will take care of the citation.",
+        "Thank you for staying calm. I will do the same."
       ]
     },
     "traffic_speed": {
@@ -691,6 +715,18 @@
         "Badge bully — everyone speeds here, you singled me out.",
         "Shove it — fuck your radar and fuck this fine.",
         "Shove it — flow of traffic means nothing to you?"
+      ],
+      "normal": [
+        "You are right, I should have slowed down. I will watch my speed more carefully.",
+        "I understand the citation. I will pay it and be more careful next time.",
+        "Fair enough, officer. I will take this as a wake-up call.",
+        "I accept it. I will check the limit signs more closely from here on.",
+        "I hear you. I will leave more time so I am not rushing.",
+        "Thank you for the stop. I will adjust how I drive.",
+        "I will own this and move on.",
+        "Understood. I will read the citation and follow the instructions.",
+        "I respect what you are telling me. I will slow down.",
+        "Okay. I will handle the fine and watch my speed."
       ]
     },
     "traffic_signal": {
@@ -782,6 +818,18 @@
         "Prick — i will fight this camera BS.",
         "Fuck this — bullshit intersection trap.",
         "Screw this — you were waiting to burn people."
+      ],
+      "normal": [
+        "I understand. I will be more careful at lights and signs.",
+        "Fair enough, officer. I will pay attention at intersections.",
+        "I hear you. I will stop earlier next time so there is no question.",
+        "I accept the citation. I will read it and take care of it.",
+        "Thank you for explaining what you saw. I will be more cautious.",
+        "Understood. I will not try to beat a yellow like that again.",
+        "I will follow the instructions on the ticket.",
+        "I respect the stop. I will handle this properly.",
+        "Okay, officer. I will use more margin at signals.",
+        "I will slow down and leave more room at crossings."
       ]
     },
     "parking": {
@@ -868,6 +916,18 @@
         "Prick — parking ticket for that is petty.",
         "Son of a bitch — fuck this parking fine.",
         "Dickhead — fuck this parking fine."
+      ],
+      "normal": [
+        "You are right, I should not have parked there. I will move it and pay the ticket.",
+        "I understand. I will find a legal spot next time.",
+        "Fair enough. I will read the citation and fix this.",
+        "I am sorry for the inconvenience. I will take care of it.",
+        "I accept the citation. I will follow the instructions.",
+        "Understood, officer. I will be more careful about signs and curbs.",
+        "I hear you. I will not block the lane like that again.",
+        "Thank you. I will handle the fine and park properly.",
+        "I will own this and move my car right away.",
+        "Okay. I will double-check parking rules here."
       ]
     },
     "dui": {
@@ -964,6 +1024,18 @@
         "Blow me — lawyer before another word.",
         "Motherfucker — this DUI stop is harassment.",
         "Son of a bitch — lawyer before another word."
+      ],
+      "normal": [
+        "I want to cooperate and I understand the process. I will follow your instructions.",
+        "I hear you, officer. I want to handle this the right way.",
+        "I understand this is serious. I will comply with what you need me to do.",
+        "I am willing to go through the proper testing and steps.",
+        "I respect the stop. I will listen to what comes next.",
+        "I want to stay calm and cooperate fully.",
+        "Understood. I will follow department procedure from here.",
+        "I will do what you ask and sort the rest afterward.",
+        "I am not trying to make this harder. I will cooperate.",
+        "Okay, officer. I understand the gravity of this."
       ]
     },
     "drugs": {
@@ -1055,6 +1127,18 @@
         "Tax collector with a gun — i am not saying another word.",
         "Asshole — i am not saying another word.",
         "Damn it — not mine, period."
+      ],
+      "normal": [
+        "I want to speak with an attorney before I say more. I will still cooperate with booking instructions.",
+        "I understand my rights. I will comply with your orders.",
+        "I hear you, officer. I want this documented properly.",
+        "I am willing to follow procedure calmly.",
+        "I will cooperate with how you need to handle this.",
+        "Understood. I will listen to what you tell me to do next.",
+        "I want to keep this respectful on my side.",
+        "I will comply with lawful instructions.",
+        "Fair enough. I will handle this through the proper channels.",
+        "Thank you for staying professional. I will do the same."
       ]
     },
     "assault": {
@@ -1141,6 +1225,18 @@
         "Are you shitting me — they threw first punch.",
         "Holy shit — i was protecting myself.",
         "Prick — this assault charge is backwards."
+      ],
+      "normal": [
+        "I want to give my side calmly when there is time. I will cooperate.",
+        "I understand you have to document this. I will follow instructions.",
+        "I am shaken up, but I will comply.",
+        "I hear you, officer. I want this sorted fairly.",
+        "I will cooperate with the process.",
+        "Understood. I am not trying to make this worse.",
+        "I respect that you have a job to do here.",
+        "I will answer what I should through the right process.",
+        "Okay. I will stay calm and do what you need.",
+        "I want everyone to be safe. I will comply."
       ]
     },
     "theft": {
@@ -1222,6 +1318,18 @@
         "Asshole — asset protection is lying.",
         "Up yours — receipt is on my phone.",
         "Badge bully — receipt is on my phone."
+      ],
+      "normal": [
+        "I am happy to show you my receipt or proof calmly.",
+        "I understand why this looks bad. I will cooperate and explain.",
+        "I want to clear this up the right way.",
+        "I will follow store or officer instructions and sort it out.",
+        "I hear you, officer. I am not trying to cause trouble.",
+        "I will cooperate fully with how you need to handle this.",
+        "Understood. I want this resolved properly.",
+        "I respect the stop. I will comply.",
+        "Okay. I will provide whatever proof I have.",
+        "I am willing to wait for a manager or the right person."
       ]
     },
     "arrestable": {
@@ -1338,6 +1446,18 @@
         "Shove it — arrest me, I will bond out.",
         "God damn it — that warrant is old news.",
         "Fuck this — arrest me, I will bond out."
+      ],
+      "normal": [
+        "I understand. I will cooperate and contact my attorney as soon as I can.",
+        "I hear you, officer. I want to fix any paperwork issue through the court.",
+        "I will comply with lawful instructions.",
+        "I am not trying to run from anything. I will follow procedure.",
+        "Understood. I want this cleared up properly.",
+        "I respect that you have to do your job.",
+        "I will cooperate with booking and sort the warrant or record afterward.",
+        "Fair enough. I will handle this through the system.",
+        "Thank you for explaining. I will do what I need to on my side.",
+        "Okay, officer. I will stay calm and cooperate."
       ]
     },
     "reckless": {
@@ -1414,6 +1534,18 @@
         "Badge bully — everyone drives like that here.",
         "Dickhead — reckless is exaggerated.",
         "Badge bully — reckless is exaggerated."
+      ],
+      "normal": [
+        "I hear you, officer. I will drive more carefully.",
+        "You are right that it looked bad. I will slow down and give more space.",
+        "I understand the citation. I will take a defensive driving course if I can.",
+        "Fair enough. I will own this and adjust my driving.",
+        "I accept it. I will be more patient in traffic.",
+        "Understood. I will not make tight moves like that again.",
+        "Thank you for the stop. I will leave more margin.",
+        "I will read the citation and follow the instructions.",
+        "Okay. I will be more aware around other road users.",
+        "I respect what you are telling me."
       ]
     },
     "seatbelt": {
@@ -1480,6 +1612,18 @@
         "Damn it — really, for that?",
         "This is bullshit — really, for that?",
         "Garbage cop — seatbelt ticket is nanny state BS."
+      ],
+      "normal": [
+        "You are right, I should have been buckled. I will click it now and keep it on.",
+        "I understand. Seat belts save lives. I slipped up.",
+        "Fair enough, officer. I usually wear it and I will from here on.",
+        "I accept the citation. I will be more consistent.",
+        "I hear you. That one was on me.",
+        "Understood. I will not ride unbuckled again.",
+        "Thank you for the reminder. I will fix my habit.",
+        "I will follow the instructions on the ticket.",
+        "Okay. I am sorry for the mistake.",
+        "I respect the stop. I will wear it every trip."
       ]
     },
     "distracted": {
@@ -1546,6 +1690,18 @@
         "Holy shit — hypocrite with a ticket book.",
         "Damn it — hypocrite with a ticket book.",
         "Cocksucker — hypocrite with a ticket book."
+      ],
+      "normal": [
+        "You are right about the phone. I will put it away while driving.",
+        "I understand. I will use hands-free or pull over next time.",
+        "Fair enough, officer. I will turn on Do Not Disturb while driving.",
+        "I accept the citation. I will change how I handle calls and maps.",
+        "I hear you. No excuse — I will fix it.",
+        "Understood. I will mount the phone properly or not touch it.",
+        "Thank you for calling it out. I will be safer.",
+        "I will read the citation and follow what it says.",
+        "Okay. I will keep my eyes on the road.",
+        "I respect the enforcement. I will comply."
       ]
     },
     "paperwork": {
@@ -1617,6 +1773,18 @@
         "Shove it — paperwork ticket is petty.",
         "Fuck off — victimless paperwork BS.",
         "Up yours — paperwork ticket is petty."
+      ],
+      "normal": [
+        "I understand. I will get my registration and insurance sorted today.",
+        "Fair enough, officer. I will fix the paperwork issue as soon as I can.",
+        "I hear you. I will carry the right cards in the vehicle.",
+        "I accept the citation. I will follow up with DMV or my insurer.",
+        "Understood. I will not drive without valid proof next time.",
+        "Thank you for explaining what is missing.",
+        "I will read the citation and take care of it.",
+        "Okay. I will upload or print what I need.",
+        "I respect the stop. I will get it corrected.",
+        "I am on it. I will handle the renewal or card replacement."
       ]
     },
     "disorderly": {
@@ -1683,6 +1851,18 @@
         "Screw this — party was tame.",
         "Fuck this — party was tame.",
         "Go to hell — noise complaint is weak."
+      ],
+      "normal": [
+        "I am sorry if we disturbed anyone. We will keep it down.",
+        "I understand, officer. We will wrap things up quietly.",
+        "Fair enough. I will respect the neighbors more.",
+        "I hear you. No more loud music after this.",
+        "I accept the warning or citation and I will adjust.",
+        "Understood. I will be more considerate.",
+        "Thank you. I will talk to everyone here.",
+        "I will follow whatever you need us to do.",
+        "Okay. I do not want trouble with the block.",
+        "I respect what you are asking."
       ]
     },
     "equipment": {
@@ -1754,6 +1934,18 @@
         "This is bullshit — fix-it ticket culture.",
         "Asshole — equipment ticket, really?",
         "Piss off — unroadworthy is harsh; I am fixing it."
+      ],
+      "normal": [
+        "I understand. I will get the light or equipment fixed right away.",
+        "Fair enough, officer. I will head to the shop as soon as I can.",
+        "I hear you. I will not put off the repair.",
+        "I accept the citation. I will make the vehicle roadworthy.",
+        "Understood. I will keep proof of repair with me.",
+        "Thank you for pointing it out before something worse happens.",
+        "I will read the citation and follow instructions.",
+        "Okay. I will order the part today.",
+        "I respect the stop. I want the car safe too.",
+        "I am on it. I will get bulbs or tires sorted."
       ]
     },
     "pedestrian": {
@@ -1818,6 +2010,18 @@
         "Eat shit — jaywalking ticket is a joke.",
         "Up yours — nobody was endangered.",
         "Fuck off — nobody was endangered."
+      ],
+      "normal": [
+        "You are right, I should have used the crosswalk. I will next time.",
+        "I understand, officer. I will be more careful walking here.",
+        "Fair enough. I will not cut across like that again.",
+        "I accept the citation. I will read it and comply.",
+        "I hear you. I was in a rush and that was dumb.",
+        "Understood. I will wait for the walk signal.",
+        "Thank you for the reminder. I will be safer.",
+        "I will follow the instructions on the ticket.",
+        "Okay. I will use marked crossings.",
+        "I respect what you are telling me."
       ]
     },
     "trespass": {
@@ -1879,6 +2083,18 @@
         "Fuck this — trespass is overstated.",
         "For fuck sake — i was not harming anything.",
         "Motherfucker — trespass is overstated."
+      ],
+      "normal": [
+        "I am sorry, officer. I did not realize I was over the line. I will leave now.",
+        "I understand. I will go back to public space right away.",
+        "Fair enough. I will not come back without permission.",
+        "I hear you. I misread the signs.",
+        "I accept the citation. I will handle it properly.",
+        "Understood. I respect private property.",
+        "Thank you for explaining. I will be more careful.",
+        "I will read the citation and follow instructions.",
+        "Okay. I am leaving now without argument.",
+        "I did not mean to cause trouble."
       ]
     },
     "sarcastic": {
@@ -1970,6 +2186,18 @@
         "Blow me — oscar performance writing this.",
         "Fuck this — wow, brave cop work.",
         "Kiss my ass — real hero, a ticket pad."
+      ],
+      "normal": [
+        "Fair enough, officer. I will take the citation and move on.",
+        "I understand. I will read it and do what I need to.",
+        "Message received. I will handle the ticket.",
+        "Understood. I will comply with what it says.",
+        "I hear you. I will keep the rest to myself and sort it out.",
+        "Okay, officer. I will pay it or contest it through the right process.",
+        "I will follow the instructions on the citation.",
+        "Thank you for staying professional.",
+        "I accept it. Have a good day.",
+        "I will take care of it."
       ]
     },
     "defeated": {
@@ -2061,6 +2289,18 @@
         "Piss off — i am too tired to fight.",
         "Fuck this — i am too tired to fight.",
         "Badge bully — screw it, not worth my energy."
+      ],
+      "normal": [
+        "Okay, officer. I will pay it and move on.",
+        "I am too tired to fight this. I will handle the citation.",
+        "Fair enough. I will take care of it.",
+        "I understand. I will read the ticket and do what it says.",
+        "It is what it is. I will comply.",
+        "I hear you. I will sign and go.",
+        "Understood. I will deal with the fine.",
+        "I will follow the instructions and get on with my day.",
+        "Thank you. I am done arguing.",
+        "I accept it and I will move on."
       ]
     }
   }

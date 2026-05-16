@@ -1,5 +1,6 @@
 using MDTPro.Data;
 using MDTPro.Data.Reports;
+using MDTPro.Setup;
 using MDTPro.Utility;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -15,14 +16,7 @@ namespace MDTPro.ServerAPI {
     internal class DataAPIResponse : APIResponse {
         /// <summary>Strip mod suffixes from serialized ped JSON so Person Search / context ped never show " (STP)" in ID history.</summary>
         private static void FormatIdentificationHistoryTypesForMdt(JObject jo) {
-            if (jo == null) return;
-            if (!(jo["IdentificationHistory"] is JArray arr)) return;
-            foreach (JToken token in arr) {
-                if (token is JObject entry && entry["Type"]?.Type == JTokenType.String) {
-                    string raw = entry.Value<string>("Type");
-                    entry["Type"] = MDTProPedData.FormatIdentificationTypeForMdtDisplay(raw);
-                }
-            }
+            MdtCompanionService.FormatIdentificationHistoryTypesForMdt(jo);
         }
 
         internal DataAPIResponse(HttpListenerRequest req) : base(null) {
@@ -38,131 +32,39 @@ namespace MDTPro.ServerAPI {
                 contentType = "text/json";
             } else if (path == "nearbyVehicles") {
                 int limit = Helper.ParsePostBodyAsPositiveInt(Helper.GetRequestPostData(req), 8);
-                if (limit < 1) limit = 1;
-                if (limit > 20) limit = 20;
+                NameValueCollection nearbyQuery = HttpUtility.ParseQueryString(req.Url.Query ?? "");
+                string scanMode = nearbyQuery["scan"] ?? nearbyQuery["refresh"] ?? "";
+                bool explicitScan = scanMode.Equals("explicit", StringComparison.OrdinalIgnoreCase)
+                    || scanMode.Equals("full", StringComparison.OrdinalIgnoreCase)
+                    || scanMode.Equals("true", StringComparison.OrdinalIgnoreCase)
+                    || scanMode == "1";
 
-                bool scanCompleted = DataController.RefreshCachedNearbyVehiclesOnGameFiberBlocking(900);
+                bool scanCompleted;
+                var nearbyVehicles = MdtCompanionService.GetNearbyVehicles(limit, explicitScan, out scanCompleted);
                 if (!scanCompleted)
                     ExtraResponseHeaders = new List<(string name, string value)> { ("X-MdtPro-Nearby-Scan", "deferred") };
-                var cached = DataController.GetCachedNearbyVehicles(limit);
-                var nearbyVehicles = cached.Select(x => new {
-                    x.LicensePlate,
-                    x.ModelDisplayName,
-                    Distance = x.Distance,
-                    x.IsStolen
-                });
 
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(nearbyVehicles));
                 status = 200;
                 contentType = "text/json";
             } else if (path == "specificPed") {
-                string name = Helper.GetRequestBodyAsString(req)?.Trim() ?? "";
-                string reversedName = string.Join(" ", name.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Reverse());
-
-                // Prefer context ped when it matches the search name (person in front of you just got ID)
-                MDTProPedData pedData = null;
-                if (!string.IsNullOrEmpty(name) && name != "context" && name != "%context" && !name.Equals("current", StringComparison.OrdinalIgnoreCase)) {
-                    var contextPed = DataController.GetContextPedIfValid();
-                    if (contextPed != null && (contextPed.Name?.Equals(name, StringComparison.OrdinalIgnoreCase) == true || contextPed.Name?.Equals(reversedName, StringComparison.OrdinalIgnoreCase) == true)) {
-                        pedData = contextPed;
-                    }
-                }
-                if (pedData == null) {
-                    pedData = DataController.GetPedDataByName(name) ?? DataController.GetPedDataByName(reversedName);
-                }
-                if (pedData == null) {
-                    pedData = DataController.PedDatabase.FirstOrDefault(o => o.Name?.ToLower() == name.ToLower() || o.Name?.ToLower() == reversedName.ToLower());
-                }
-                if (pedData == null && (name == "context" || name == "%context" || name.Equals("current", StringComparison.OrdinalIgnoreCase))) {
-                    pedData = DataController.GetContextPedIfValid();
-                }
-
-                Database.SaveSearchHistoryEntry("ped", name, pedData?.Name);
-                if (pedData != null) {
-                    DataController.RefreshPedPortraitForPersonSearchBlocking(pedData, name, reversedName);
-                    DataController.TryRefreshSupervisionFromLiveWorld(pedData, name, reversedName);
-                    DataController.KeepPedInDatabase(pedData);
-                    if (MDTProPedData.IsMinimalIdentity(pedData)) {
-                        Utility.Helper.Log($"[MDTPro] Person Search returning minimal-identity ped (will show N/A): {pedData.Name}", false, Utility.Helper.LogSeverity.Info);
-                    }
-                }
-
-                if (pedData != null) {
-                    var cases = DataController.GetCourtCasesForPedName(pedData.Name);
-                    var jo = JObject.Parse(JsonConvert.SerializeObject(pedData));
-                    FormatIdentificationHistoryTypesForMdt(jo);
-                    jo["CourtCases"] = JArray.FromObject(cases ?? new System.Collections.Generic.List<CourtData>());
-                    buffer = Encoding.UTF8.GetBytes(jo.ToString(Formatting.None));
-                } else {
-                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(pedData));
-                }
+                var ped = MdtCompanionService.LookupPed(Helper.GetRequestBodyAsString(req), saveSearchHistory: true);
+                buffer = Encoding.UTF8.GetBytes(ped.Json);
                 contentType = "text/json";
                 status = 200;
             } else if (path == "contextPed") {
-                MDTProPedData pedData = DataController.GetContextPedIfValid();
-                if (pedData != null) {
-                    string ctxName = pedData.Name?.Trim() ?? "";
-                    string ctxReversed = string.Join(" ", ctxName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Reverse());
-                    DataController.TryRefreshSupervisionFromLiveWorld(pedData, ctxName, ctxReversed);
-                    var ctxCases = DataController.GetCourtCasesForPedName(pedData.Name);
-                    var ctxJo = JObject.Parse(JsonConvert.SerializeObject(pedData));
-                    FormatIdentificationHistoryTypesForMdt(ctxJo);
-                    ctxJo["CourtCases"] = JArray.FromObject(ctxCases ?? new System.Collections.Generic.List<CourtData>());
-                    buffer = Encoding.UTF8.GetBytes(ctxJo.ToString(Formatting.None));
-                } else {
-                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(pedData));
-                }
+                var ped = MdtCompanionService.GetContextPed();
+                buffer = Encoding.UTF8.GetBytes(ped.Json);
                 contentType = "text/json";
                 status = 200;
             } else if (path == "specificVehicle") {
-                string licensePlateOrVin = Helper.GetRequestBodyAsString(req);
-                if (!string.IsNullOrEmpty(licensePlateOrVin)) licensePlateOrVin = licensePlateOrVin.Trim();
-
-                MDTProVehicleData vehicleData = null;
-                bool wantContextOnly = string.Equals(licensePlateOrVin, "context", StringComparison.OrdinalIgnoreCase)
-                    || licensePlateOrVin == "%context"
-                    || string.Equals(licensePlateOrVin, "current", StringComparison.OrdinalIgnoreCase);
-                if (wantContextOnly) {
-                    vehicleData = DataController.GetContextVehicleIfValid();
-                } else if (!string.IsNullOrEmpty(licensePlateOrVin)) {
-                    var contextVeh = DataController.GetContextVehicleIfValid();
-                    if (contextVeh != null) {
-                        string key = DataController.NormalizeVehiclePlateKey(licensePlateOrVin);
-                        if (!string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(contextVeh.LicensePlate)
-                            && DataController.NormalizeVehiclePlateKey(contextVeh.LicensePlate) == key)
-                            vehicleData = contextVeh;
-                        else if (!string.IsNullOrEmpty(contextVeh.VehicleIdentificationNumber)
-                            && string.Equals(contextVeh.VehicleIdentificationNumber.Trim(), licensePlateOrVin, StringComparison.OrdinalIgnoreCase))
-                            vehicleData = contextVeh;
-                    }
-                }
-                if (vehicleData == null && !string.IsNullOrEmpty(licensePlateOrVin) && !wantContextOnly)
-                    vehicleData = DataController.GetVehicleByPlateOrVin(licensePlateOrVin);
-                if (vehicleData == null && !string.IsNullOrEmpty(licensePlateOrVin) && !wantContextOnly)
-                    vehicleData = DataController.TryResolveVehicleFromLiveWorldByPlateOrVinBlocking(licensePlateOrVin, 500);
-
-                if (vehicleData != null && vehicleData.CDFVehicleData != null)
-                    DataController.MergeBOLOsFromStubByPlate(vehicleData);
-                if (vehicleData != null && ModIntegration.SubscribedStopThePedStopEvents)
-                    DataController.TryRefreshVehicleDocumentsFromLiveWorld(vehicleData);
-                if (vehicleData != null)
-                    DataController.TrySyncVehicleOwnerWantedFromCdf(vehicleData);
-
-                string historyQuery = wantContextOnly ? (vehicleData?.LicensePlate ?? "context") : licensePlateOrVin;
-                Database.SaveSearchHistoryEntry("vehicle", historyQuery, vehicleData?.LicensePlate);
-
-                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(vehicleData));
+                var vehicle = MdtCompanionService.LookupVehicle(Helper.GetRequestBodyAsString(req), saveSearchHistory: true);
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(vehicle.VehicleData));
                 contentType = "text/json";
                 status = 200;
             } else if (path == "contextVehicle") {
-                MDTProVehicleData ctxV = DataController.GetContextVehicleIfValid();
-                if (ctxV != null && ctxV.CDFVehicleData != null)
-                    DataController.MergeBOLOsFromStubByPlate(ctxV);
-                if (ctxV != null && ModIntegration.SubscribedStopThePedStopEvents)
-                    DataController.TryRefreshVehicleDocumentsFromLiveWorld(ctxV);
-                if (ctxV != null)
-                    DataController.TrySyncVehicleOwnerWantedFromCdf(ctxV);
-                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(ctxV));
+                var vehicle = MdtCompanionService.GetContextVehicle();
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(vehicle.VehicleData));
                 contentType = "text/json";
                 status = 200;
             } else if (path == "activeBolos") {
@@ -377,12 +279,7 @@ namespace MDTPro.ServerAPI {
                 status = 200;
                 contentType = "text/plain";
             } else if (path == "recentIds") {
-                var recentIds = DataController.PedDatabase
-                    .Where(p => p.IdentificationHistory != null && p.IdentificationHistory.Count > 0)
-                    .Select(p => new { p.Name, Latest = p.IdentificationHistory[0], p.IsDeceased })
-                    .OrderByDescending(x => x.Latest.Timestamp)
-                    .Take(8)
-                    .Select(x => new { x.Name, Type = MDTProPedData.FormatIdentificationTypeForMdtDisplay(x.Latest.Type), x.Latest.Timestamp, x.IsDeceased });
+                var recentIds = MdtCompanionService.GetRecentIds(8);
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(recentIds));
                 status = 200;
                 contentType = "text/json";
@@ -397,12 +294,13 @@ namespace MDTPro.ServerAPI {
                 contentType = "text/json";
             } else if (path == "firearmBySerial") {
                 string serial = Helper.GetRequestBodyAsString(req);
-                var firearm = Database.LoadFirearmBySerial(serial);
-                if (firearm != null && DataController.FilterToActualFirearms(new System.Collections.Generic.List<FirearmRecord> { firearm }).Count == 0)
-                    firearm = null; // Exclude melee/knives from serial lookup
-                if (firearm != null && !string.IsNullOrWhiteSpace(firearm.OwnerPedName))
-                    Database.TouchFirearmRecordsByOwner(firearm.OwnerPedName);
-                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(firearm ?? new object()));
+                var firearms = Database.LoadFirearmsBySerial(serial);
+                firearms = DataController.FilterToActualFirearms(firearms ?? new System.Collections.Generic.List<FirearmRecord>());
+                foreach (var firearm in firearms) {
+                    if (firearm != null && !string.IsNullOrWhiteSpace(firearm.OwnerPedName))
+                        Database.TouchFirearmRecordsByOwner(firearm.OwnerPedName);
+                }
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(firearms));
                 status = 200;
                 contentType = "text/json";
             } else if (path == "recentFirearmOwners") {

@@ -60,11 +60,6 @@
       <HintPath>..\packages\Newtonsoft.Json.13.0.4\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="PolicingRedefined, Version=0.0.9.2, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\References\PolicingRedefined.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="RagePluginHook, Version=0.0.0.0, Culture=neutral, processorArchitecture=AMD64">
       <HintPath>..\packages\RagePluginHook.1.124.0\lib\net472\RagePluginHook.dll</HintPath>
       <Private>False</Private>
@@ -72,6 +67,10 @@
     <Reference Include="RAGENativeUI">
       <HintPath>..\packages\RAGENativeUI.1.9.3\lib\net472\RAGENativeUI.dll</HintPath>
       <Private>False</Private>
+    </Reference>
+    <Reference Include="LemonUI.RagePluginHook">
+      <HintPath>..\packages\LemonUI.RagePluginHook.2.2.0\lib\net472\LemonUI.RagePluginHook.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="System.Data.SQLite, Version=1.0.119.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Data.SQLite.Core.1.0.119.0\lib\net46\System.Data.SQLite.dll</HintPath>
@@ -82,7 +81,9 @@
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Security" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Web" />
     <Reference Include="System.Xml" />
@@ -92,12 +93,30 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Cloud\CloudPublicApi.cs" />
+    <Compile Include="Cloud\CloudLemonLayout.cs" />
+    <Compile Include="Cloud\CloudBrandedBanner.cs" />
+    <Compile Include="Cloud\CloudLemonUiStyle.cs" />
+    <Compile Include="Cloud\CloudBusyOverlay.cs" />
+    <Compile Include="Cloud\InlineLemonTextInput.cs" />
+    <Compile Include="Cloud\CloudCredentialStore.cs" />
+    <Compile Include="Cloud\CloudLoginSession.cs" />
+    <Compile Include="Cloud\CloudIngameEntry.cs" />
+    <Compile Include="Cloud\CloudMode.cs" />
+    <Compile Include="Cloud\CloudAuthorityClient.cs" />
+    <Compile Include="Cloud\CloudPluginBridge.cs" />
+    <Compile Include="Cloud\CloudStopThePedBlock.cs" />
+    <Compile Include="Cloud\CloudIdentityCache.cs" />
+    <Compile Include="Cloud\CloudEncounterLeaseClient.cs" />
+    <Compile Include="Cloud\CloudSyncQueue.cs" />
     <Compile Include="Data\CourtData.cs" />
     <Compile Include="Data\JudgeProfile.cs" />
     <Compile Include="Data\PedEvidenceCacheEntry.cs" />
     <Compile Include="Data\VehicleSearchRecord.cs" />
     <Compile Include="Data\MDTProPedData.cs" />
+    <Compile Include="Data\WarrantCharge.cs" />
     <Compile Include="Data\Database.cs" />
+    <Compile Include="Data\MdtCompanionService.cs" />
     <Compile Include="Data\SearchHistoryEntry.cs" />
     <Compile Include="Data\DataController.cs" />
     <Compile Include="Data\ALPRHit.cs" />
@@ -123,6 +142,12 @@
     <Compile Include="Utility\Backup\NullBackupDispatcher.cs" />
     <Compile Include="Utility\Backup\PolicingRedefinedBackupDispatcher.cs" />
     <Compile Include="Utility\Backup\UltimateBackupBackupDispatcher.cs" />
+    <Compile Include="UI\InGameComputer\InGameComputerBanner.cs" />
+    <Compile Include="UI\InGameComputer\InGameComputerEntry.cs" />
+    <Compile Include="UI\InGameComputer\InGameComputerLayout.cs" />
+    <Compile Include="UI\InGameComputer\InGameComputerSession.cs" />
+    <Compile Include="UI\InGameComputer\InGameComputerStyle.cs" />
+    <Compile Include="UI\InGameComputer\InGameComputerTheme.cs" />
     <Compile Include="Utility\StpReflectionHelper.cs" />
     <Compile Include="Utility\ModIntegration.cs" />
     <Compile Include="Utility\DependencyCheck.cs" />
@@ -137,6 +162,7 @@
     <Compile Include="EventListeners\STPEvents.cs" />
     <Compile Include="Functions.cs" />
     <Compile Include="ServerAPI\ImageAPIResponse.cs" />
+    <Compile Include="ServerAPI\BridgeSecurity.cs" />
     <Compile Include="ServerAPI\PageAPIResponse.cs" />
     <Compile Include="ServerAPI\ScriptAPIResponse.cs" />
     <Compile Include="ServerAPI\StyleAPIResponse.cs" />
@@ -159,12 +185,14 @@
     <Compile Include="Setup\SeizureOptions.cs" />
     <Compile Include="Setup\Config.cs" />
     <Compile Include="Setup\Language.cs" />
+    <Compile Include="Utility\CdfWarrantTextResolver.cs" />
     <Compile Include="Utility\CitationArrestHelper.cs" />
     <Compile Include="Utility\CitationHandoffAnimation.cs" />
     <Compile Include="Utility\CitationHandoffPostEffects.cs" />
     <Compile Include="Utility\CitationPedReactionHelper.cs" />
     <Compile Include="Utility\CitationPostHandoffViolenceHelper.cs" />
     <Compile Include="Utility\SupervisionBackstoryHelper.cs" />
+    <Compile Include="Utility\WarrantBackstoryHelper.cs" />
     <Compile Include="Utility\PedPortraitModelHelper.cs" />
     <Compile Include="Utility\PlayerCoords.cs" />
     <Compile Include="ALPR\ALPRController.cs" />
@@ -178,17 +206,20 @@
     <Compile Include="ALPR\Sensors\PlateSensorConfig.cs" />
     <Compile Include="ALPR\Sensors\PlateSensorController.cs" />
     <Compile Include="Utility\PRHelper.cs" />
+    <Compile Include="Utility\PRFirearmSearchItemHelper.cs" />
     <Compile Include="Utility\StpCitationHandoffQueue.cs" />
     <Compile Include="Utility\StpCitationHelper.cs" />
     <Compile Include="Utility\BackupHelper.cs" />
     <Compile Include="Utility\GpsHelper.cs" />
     <Compile Include="Utility\GameFiberHttpBridge.cs" />
+    <Compile Include="Utility\GameThreadHeartbeat.cs" />
+    <Compile Include="Utility\GameWorkScheduler.cs" />
     <Compile Include="Utility\GtaLocationNatives.cs" />
-    <Compile Include="UI\CitationHandoffKeybind.cs" />
     <Compile Include="UI\CitationHandoffMenu.cs" />
     <Compile Include="UI\SettingsMenu.cs" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Cloud\Assets\mdt-cloud-logo.png" />
     <EmbeddedResource Include="Data\GtaVVehicleMakeModel.json" />
     <None Include="packages.config" />
   </ItemGroup>

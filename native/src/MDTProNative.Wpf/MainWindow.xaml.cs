@@ -403,7 +403,7 @@ public partial class MainWindow : Window
                 return;
             }
             var host = string.IsNullOrWhiteSpace(HostBox.Text) ? "127.0.0.1" : HostBox.Text.Trim();
-            await _connection.ConnectAsync(host, port);
+            await _connection.ConnectAsync(host, port, _session.BridgeAuthToken);
             try
             {
                 var http = _connection.Http!;

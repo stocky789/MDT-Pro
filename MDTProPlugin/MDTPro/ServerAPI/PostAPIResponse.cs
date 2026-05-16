@@ -32,6 +32,21 @@ namespace MDTPro.ServerAPI {
             return whenAvailableFail;
         }
 
+        private static void RefreshReportLocationIfNeeded(Report report) {
+            if (report == null) return;
+            DataController.RefreshMdtLocationOnGameFiberBlocking(350);
+            if (report.Location == null || IsEmptyLocation(report.Location))
+                report.Location = DataController.MdtPreferredLocation;
+        }
+
+        private static bool IsEmptyLocation(Location location) {
+            if (location == null) return true;
+            return string.IsNullOrWhiteSpace(location.Area)
+                && string.IsNullOrWhiteSpace(location.Street)
+                && string.IsNullOrWhiteSpace(location.County)
+                && string.IsNullOrWhiteSpace(location.Postal);
+        }
+
         internal PostAPIResponse(HttpListenerRequest req) : base(null) {
             string rawPath = req.Url?.AbsolutePath ?? "";
             if (!rawPath.StartsWith("/post/", StringComparison.OrdinalIgnoreCase)) return;
@@ -294,6 +309,7 @@ namespace MDTPro.ServerAPI {
                 try {
                     IncidentReport report = JsonConvert.DeserializeObject<IncidentReport>(body);
                     if (report == null) { buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid report data." })); contentType = "application/json"; status = 400; return; }
+                    RefreshReportLocationIfNeeded(report);
                     DataController.AddReport(report);
                     Database.SaveIncidentReport(report);
                     buffer = Encoding.UTF8.GetBytes("OK");
@@ -309,13 +325,16 @@ namespace MDTPro.ServerAPI {
             } else if (path == "createCitationReport") {
                 try {
                     CitationReport report = JsonConvert.DeserializeObject<CitationReport>(body);
-                    if (report == null) { buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid report data." })); contentType = "application/json"; status = 400; return; }
-                    if (report.Charges == null) report.Charges = new List<CitationReport.Charge>();
-                    DataController.AddReport(report);
-                    Database.SaveCitationReport(report);
-                    buffer = Encoding.UTF8.GetBytes("OK");
-                    contentType = "text/plain";
-                    status = 200;
+                    var result = MdtCompanionService.SaveCitationReport(report);
+                    if (result.Success) {
+                        buffer = Encoding.UTF8.GetBytes("OK");
+                        contentType = "text/plain";
+                        status = 200;
+                    } else {
+                        buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = result.Error ?? "Invalid report data." }));
+                        contentType = "application/json";
+                        status = report == null ? 400 : 500;
+                    }
                 } catch (Exception ex) {
                     Utility.Helper.Log($"[createCitationReport] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
                     try { System.IO.File.AppendAllText(Setup.SetupController.LogFilePath, $"\n[{DateTime.Now:O}] [Error] createCitationReport:\n{Helper.SanitizeExceptionForLog(ex)}"); } catch { }
@@ -327,6 +346,7 @@ namespace MDTPro.ServerAPI {
                 try {
                     ArrestReport report = JsonConvert.DeserializeObject<ArrestReport>(body);
                     if (report == null) { buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid report data." })); contentType = "application/json"; status = 400; return; }
+                    RefreshReportLocationIfNeeded(report);
                     if (report.Charges == null) report.Charges = new List<ArrestReport.Charge>();
                     if (report.AttachedReportIds == null) report.AttachedReportIds = new List<string>();
 
@@ -568,6 +588,7 @@ namespace MDTPro.ServerAPI {
                 try {
                     ImpoundReport report = JsonConvert.DeserializeObject<ImpoundReport>(body);
                     if (report == null) { buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid report data." })); contentType = "application/json"; status = 400; return; }
+                    RefreshReportLocationIfNeeded(report);
                     DataController.AddReport(report);
                     Database.SaveImpoundReport(report);
                     buffer = Encoding.UTF8.GetBytes("OK");
@@ -584,6 +605,7 @@ namespace MDTPro.ServerAPI {
                 try {
                     TrafficIncidentReport report = JsonConvert.DeserializeObject<TrafficIncidentReport>(body);
                     if (report == null) { buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid report data." })); contentType = "application/json"; status = 400; return; }
+                    RefreshReportLocationIfNeeded(report);
                     DataController.AddReport(report);
                     Database.SaveTrafficIncidentReport(report);
                     buffer = Encoding.UTF8.GetBytes("OK");
@@ -600,6 +622,7 @@ namespace MDTPro.ServerAPI {
                 try {
                     InjuryReport report = JsonConvert.DeserializeObject<InjuryReport>(body);
                     if (report == null) { buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid report data." })); contentType = "application/json"; status = 400; return; }
+                    RefreshReportLocationIfNeeded(report);
                     DataController.AddReport(report);
                     Database.SaveInjuryReport(report);
                     buffer = Encoding.UTF8.GetBytes("OK");
@@ -616,6 +639,7 @@ namespace MDTPro.ServerAPI {
                 try {
                     PropertyEvidenceReceiptReport report = JsonConvert.DeserializeObject<PropertyEvidenceReceiptReport>(body);
                     if (report == null) { buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Invalid report data." })); contentType = "application/json"; status = 400; return; }
+                    RefreshReportLocationIfNeeded(report);
                     DataController.AddReport(report);
                     Database.SavePropertyEvidenceReceiptReport(report);
                     buffer = Encoding.UTF8.GetBytes("OK");
@@ -670,25 +694,13 @@ namespace MDTPro.ServerAPI {
                     status = 404;
                 }
             } else if (path == "forceResolveCourtCase") {
-                var data = JsonConvert.DeserializeAnonymousType(body, new { Number = "", Plea = "", OutcomeNotes = "" });
-                if (data == null || string.IsNullOrWhiteSpace(data.Number)) {
-                    buffer = Encoding.UTF8.GetBytes("Bad Request");
-                    contentType = "text/plain";
-                    status = 400;
-                    return;
-                }
-                if (DataController.ForceResolveCourtCase(data.Number, data.Plea, data.OutcomeNotes)) {
-                    buffer = Encoding.UTF8.GetBytes("OK");
-                    contentType = "text/plain";
-                    status = 200;
-                } else {
-                    buffer = Encoding.UTF8.GetBytes("Not Found");
-                    contentType = "text/plain";
-                    status = 404;
-                }
+                buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Force Resolve is disabled. Court cases are resolved centrally by MDT Cloud." }));
+                contentType = "application/json";
+                status = 409;
             } else if (path == "clearSearchHistory") {
                 string searchType = string.IsNullOrWhiteSpace(body) ? "ped" : body.Trim();
                 Database.ClearSearchHistory(searchType);
+                WebSocketHandler.BroadcastDataInvalidation(searchType.Equals("vehicle", StringComparison.OrdinalIgnoreCase) ? "vehicleSearch" : "pedSearch");
                 buffer = Encoding.UTF8.GetBytes("OK");
                 contentType = "text/plain";
                 status = 200;

@@ -8,6 +8,8 @@ using System.Data.SQLite;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace MDTPro.Data {
     internal static class Database {
@@ -67,6 +69,255 @@ namespace MDTPro.Data {
                 connection?.Dispose();
                 connection = null;
             }
+        }
+
+        private static void EnqueueCloudSync(string entityType, string operation, Newtonsoft.Json.Linq.JObject payload, string idempotencyKey = null) {
+            try {
+                MDTPro.Cloud.CloudSyncQueue.Enqueue(entityType, operation, payload, idempotencyKey);
+            } catch (Exception ex) {
+                Helper.Log($"Cloud sync enqueue skipped for {entityType}: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        private static string StableCloudKeyPart(string value) {
+            return string.IsNullOrWhiteSpace(value)
+                ? "unknown"
+                : new string(value.Trim().ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
+        }
+
+        private static string BuildVehicleEncounterKey(MDTProVehicleData vehicle) {
+            if (vehicle == null) return null;
+            string vin = StableVehicleVinKeyPart(vehicle.VehicleIdentificationNumber);
+            if (!string.IsNullOrWhiteSpace(vin)) return $"vin|{vin}";
+            string installId = StableCloudKeyPart(SetupController.GetConfig()?.cloudInstallId);
+            if (string.Equals(installId, "unknown", StringComparison.OrdinalIgnoreCase)) return null;
+            string plate = StableCloudKeyPart(vehicle.LicensePlate);
+            return $"install|{installId}|plate|{plate}";
+        }
+
+        private static string BuildCloudPayloadHash(Newtonsoft.Json.Linq.JObject payload) {
+            string canonical = payload == null ? "" : payload.ToString(Newtonsoft.Json.Formatting.None);
+            using (var sha = SHA256.Create()) {
+                byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(canonical));
+                StringBuilder sb = new StringBuilder(hash.Length * 2);
+                for (int i = 0; i < hash.Length; i++) sb.Append(hash[i].ToString("x2"));
+                return sb.ToString();
+            }
+        }
+
+        private static string StableVehicleVinKeyPart(string value) {
+            string vin = StableCloudKeyPart(value);
+            if (string.IsNullOrWhiteSpace(vin) || vin.Length < 5 || vin == "unknown" || vin == "0" || vin == "unk" || vin == "na" || vin == "none" || vin == "null")
+                return null;
+            return vin;
+        }
+
+        private static void EnqueueReportCloudSync(string reportType, Report report) {
+            if (report?.Id == null) return;
+            PromoteReportLinkedPedsForCloud(reportType, report);
+            EnqueueCloudSync("report", "upsert", Newtonsoft.Json.Linq.JObject.FromObject(new {
+                reportType,
+                reportId = report.Id,
+                status = report.Status.ToString(),
+                payload = report
+            }), $"report:{reportType}:{report.Id}:upsert");
+        }
+
+        private static bool PedCarriesDurableJusticeStateForCloud(MDTProPedData ped) {
+            if (ped == null) return false;
+            if (ped.IsWanted) return true;
+            if (!string.IsNullOrWhiteSpace(ped.WarrantText)) return true;
+            if (ped.IsOnProbation || ped.IsOnParole) return true;
+            if (!string.IsNullOrWhiteSpace(ped.IncarceratedUntil)) return true;
+            return false;
+        }
+
+        private static void EnqueuePedCloudPromotion(MDTProPedData ped, string cloudPersistenceReason) {
+            if (ped == null || string.IsNullOrWhiteSpace(cloudPersistenceReason)) return;
+            var payload = BuildPedCloudPayload(ped);
+            payload["cloudPersistenceReason"] = cloudPersistenceReason.Trim();
+            string reasonKey = StableCloudKeyPart(cloudPersistenceReason);
+            EnqueueCloudSync("person", "upsert", payload, $"{BuildPedCloudIdempotencyKey(ped)}:promote:{reasonKey}");
+        }
+
+        private static void MaybeEnqueuePedCloudAfterLocalSave(MDTProPedData ped) {
+            if (ped == null) return;
+            if (PedCarriesDurableJusticeStateForCloud(ped))
+                EnqueueCloudSync("person", "upsert", BuildPedCloudPayload(ped), BuildPedCloudIdempotencyKey(ped));
+        }
+
+        private static void PromotePedNameForReportCloud(string cloudPersistenceReason, string pedName) {
+            if (string.IsNullOrWhiteSpace(pedName)) return;
+            try {
+                MDTProPedData ped = DataController.GetPedDataByName(pedName.Trim());
+                if (ped != null) EnqueuePedCloudPromotion(ped, cloudPersistenceReason);
+            } catch {
+                /* ignore */
+            }
+        }
+
+        private static void PromotePedNamesForReportCloud(string cloudPersistenceReason, IEnumerable<string> names) {
+            if (names == null) return;
+            foreach (var n in names)
+                PromotePedNameForReportCloud(cloudPersistenceReason, n);
+        }
+
+        private static void PromoteReportLinkedPedsForCloud(string reportType, Report report) {
+            if (report == null) return;
+            try {
+                switch ((reportType ?? "").Trim().ToLowerInvariant()) {
+                    case "citation":
+                        if (report is CitationReport cr) PromotePedNameForReportCloud("citation", cr.OffenderPedName);
+                        break;
+                    case "arrest":
+                        if (report is ArrestReport ar) PromotePedNameForReportCloud("arrest", ar.OffenderPedName);
+                        break;
+                    case "incident":
+                        if (report is IncidentReport ir) {
+                            PromotePedNamesForReportCloud("incident", ir.OffenderPedsNames);
+                            PromotePedNamesForReportCloud("incident", ir.WitnessPedsNames);
+                        }
+                        break;
+                    case "impound":
+                        if (report is ImpoundReport im) {
+                            PromotePedNameForReportCloud("impound", im.PersonAtFaultName);
+                            PromotePedNameForReportCloud("impound", im.Owner);
+                        }
+                        break;
+                    case "trafficincident":
+                        if (report is TrafficIncidentReport tir) {
+                            PromotePedNamesForReportCloud("trafficIncident", tir.DriverNames);
+                            PromotePedNamesForReportCloud("trafficIncident", tir.PassengerNames);
+                            PromotePedNamesForReportCloud("trafficIncident", tir.PedestrianNames);
+                        }
+                        break;
+                    case "injury":
+                        if (report is InjuryReport inj) PromotePedNameForReportCloud("injury", inj.InjuredPartyName);
+                        break;
+                    case "propertyevidence":
+                        if (report is PropertyEvidenceReceiptReport per) {
+                            PromotePedNameForReportCloud("propertyEvidence", per.SubjectPedName);
+                            PromotePedNamesForReportCloud("propertyEvidence", per.SubjectPedNames);
+                        }
+                        break;
+                }
+            } catch {
+                /* ignore */
+            }
+        }
+
+        private static Newtonsoft.Json.Linq.JObject BuildPedCloudPayload(MDTProPedData ped) {
+            var identificationHistory = ped.IdentificationHistory != null
+                ? Newtonsoft.Json.Linq.JArray.FromObject(ped.IdentificationHistory)
+                : new Newtonsoft.Json.Linq.JArray();
+            string installId = SetupController.GetConfig()?.cloudInstallId;
+            bool stpStops = ModIntegration.SubscribedStopThePedStopEvents;
+            string licenseExpirationForCloud = ped.LicenseExpiration;
+            if (stpStops && !ped.LicenseExpirationVerifiedFromLiveDocument)
+                licenseExpirationForCloud = "Error";
+
+            var payload = new Newtonsoft.Json.Linq.JObject {
+                ["name"] = ped.Name,
+                ["firstName"] = ped.FirstName,
+                ["lastName"] = ped.LastName,
+                ["birthday"] = ped.Birthday,
+                ["gender"] = ped.Gender,
+                ["address"] = ped.Address,
+                ["modelHash"] = ped.ModelHash,
+                ["modelName"] = ped.ModelName,
+                ["sourceInstallId"] = installId,
+                ["identificationHistory"] = identificationHistory,
+                ["payload"] = Newtonsoft.Json.Linq.JObject.FromObject(new {
+                    ped.Name,
+                    ped.FirstName,
+                    ped.LastName,
+                    ped.Birthday,
+                    ped.Gender,
+                    ped.Address,
+                    ped.ModelHash,
+                    ped.ModelName,
+                    ped.IsInGang,
+                    ped.AdvisoryText,
+                    ped.IsWanted,
+                    ped.WarrantText,
+                    ped.IsOnProbation,
+                    ped.IsOnParole,
+                    ped.LicenseStatus,
+                    LicenseExpiration = licenseExpirationForCloud,
+                    ped.LicenseExpirationVerifiedFromLiveDocument,
+                    ped.WeaponPermitStatus,
+                    ped.WeaponPermitExpiration,
+                    ped.WeaponPermitType,
+                    ped.FishingPermitStatus,
+                    ped.FishingPermitExpiration,
+                    ped.HuntingPermitStatus,
+                    ped.HuntingPermitExpiration,
+                    ped.TimesStopped,
+                    ped.IncarceratedUntil,
+                    ped.IsDeceased,
+                    ped.Citations,
+                    ped.Arrests,
+                    ped.IdentificationHistory
+                })
+            };
+            MDTPro.Cloud.CloudIdentityCache.ApplyPersonId(payload);
+            return payload;
+        }
+
+        private static string BuildPedCloudIdempotencyKey(MDTProPedData ped) {
+            string latestIdentification = "noid";
+            try {
+                var latest = ped?.IdentificationHistory?.FirstOrDefault();
+                if (latest != null && !string.IsNullOrWhiteSpace(latest.Timestamp))
+                    latestIdentification = StableCloudKeyPart(latest.Timestamp);
+            } catch { }
+            string documentState = string.Join("|",
+                StableCloudKeyPart(ped.LicenseStatus),
+                StableCloudKeyPart(ped.LicenseExpiration),
+                StableCloudKeyPart(ped.WeaponPermitStatus),
+                StableCloudKeyPart(ped.WeaponPermitExpiration),
+                StableCloudKeyPart(ped.WeaponPermitType));
+            return $"person:{StableCloudKeyPart(ped.Name)}:{StableCloudKeyPart(ped.Birthday)}:{StableCloudKeyPart(ped.Address)}:{latestIdentification}:{documentState}:upsert";
+        }
+
+        private static Newtonsoft.Json.Linq.JObject BuildVehicleCloudPayload(MDTProVehicleData vehicle) {
+            string installId = SetupController.GetConfig()?.cloudInstallId;
+            string encounterKey = BuildVehicleEncounterKey(vehicle);
+            var payload = new Newtonsoft.Json.Linq.JObject {
+                ["licensePlate"] = vehicle.LicensePlate,
+                ["vehicleIdentificationNumber"] = vehicle.VehicleIdentificationNumber,
+                ["ownerName"] = vehicle.Owner,
+                ["modelName"] = vehicle.ModelName,
+                ["sourceInstallId"] = installId,
+                ["encounterKey"] = encounterKey,
+                ["isBolo"] = vehicle.BOLOs != null && vehicle.BOLOs.Length > 0,
+                ["boloReason"] = vehicle.BOLOs != null && vehicle.BOLOs.Length > 0 ? Newtonsoft.Json.JsonConvert.SerializeObject(vehicle.BOLOs) : null,
+                ["registrationStatus"] = vehicle.RegistrationStatus,
+                ["registrationExpiration"] = vehicle.RegistrationExpirationVerifiedFromLiveDocument ? vehicle.RegistrationExpiration : null,
+                ["registrationExpirationVerifiedFromLiveDocument"] = vehicle.RegistrationExpirationVerifiedFromLiveDocument,
+                ["insuranceStatus"] = vehicle.InsuranceStatus,
+                ["insuranceExpiration"] = vehicle.InsuranceExpirationVerifiedFromLiveDocument ? vehicle.InsuranceExpiration : null,
+                ["insuranceExpirationVerifiedFromLiveDocument"] = vehicle.InsuranceExpirationVerifiedFromLiveDocument,
+                ["payload"] = Newtonsoft.Json.Linq.JObject.FromObject(new {
+                    vehicle.LicensePlate,
+                    vehicle.VehicleIdentificationNumber,
+                    vehicle.Owner,
+                    vehicle.ModelName,
+                    vehicle.ModelDisplayName,
+                    vehicle.IsStolen,
+                    vehicle.RegistrationStatus,
+                    RegistrationExpiration = vehicle.RegistrationExpirationVerifiedFromLiveDocument ? vehicle.RegistrationExpiration : null,
+                    vehicle.RegistrationExpirationVerifiedFromLiveDocument,
+                    vehicle.InsuranceStatus,
+                    InsuranceExpiration = vehicle.InsuranceExpirationVerifiedFromLiveDocument ? vehicle.InsuranceExpiration : null,
+                    vehicle.InsuranceExpirationVerifiedFromLiveDocument,
+                    vehicle.BOLOs,
+                    SourceInstallId = installId,
+                    EncounterKey = encounterKey
+                })
+            };
+            MDTPro.Cloud.CloudIdentityCache.ApplyVehicleId(payload);
+            return payload;
         }
 
         #region Schema
@@ -152,6 +403,18 @@ namespace MDTPro.Data {
                     canBeWarrant     INTEGER NOT NULL DEFAULT 0
                 );
                 CREATE INDEX IF NOT EXISTS idx_ped_arrests_ped ON ped_arrests(PedName);
+
+                CREATE TABLE IF NOT EXISTS ped_warrants (
+                    Id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                    PedName              TEXT NOT NULL REFERENCES peds(Name) ON DELETE CASCADE,
+                    Name                 TEXT,
+                    Severity             TEXT,
+                    IssuedAtUtc          TEXT NOT NULL,
+                    ClearedAtUtc         TEXT,
+                    ClearedByReportType  TEXT,
+                    ClearedByReportId    TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_ped_warrants_ped ON ped_warrants(PedName);
 
                 CREATE TABLE IF NOT EXISTS vehicles (
                     LicensePlate                TEXT PRIMARY KEY,
@@ -560,6 +823,16 @@ namespace MDTPro.Data {
                     );
                     CREATE INDEX IF NOT EXISTS idx_search_history_type ON search_history(SearchType);
                     CREATE INDEX IF NOT EXISTS idx_search_history_timestamp ON search_history(Timestamp);
+
+                CREATE TABLE IF NOT EXISTS cloud_hydrate_records (
+                    EntityType TEXT NOT NULL,
+                    EntityKey TEXT NOT NULL,
+                    PayloadJson TEXT NOT NULL,
+                    UpdatedAtUtc TEXT,
+                    DeletedAtUtc TEXT,
+                    PRIMARY KEY (EntityType, EntityKey)
+                );
+                CREATE INDEX IF NOT EXISTS idx_cloud_hydrate_records_updated ON cloud_hydrate_records(UpdatedAtUtc);
                 ", connection)) {
                     cmd.ExecuteNonQuery();
                 }
@@ -995,6 +1268,9 @@ namespace MDTPro.Data {
         private static void EnsureAllMissingSchemaColumns() {
             if (connection == null) return;
             try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS search_history (Id INTEGER PRIMARY KEY AUTOINCREMENT, SearchType TEXT NOT NULL, SearchQuery TEXT NOT NULL, ResultName TEXT, Timestamp TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_search_history_type ON search_history(SearchType); CREATE INDEX IF NOT EXISTS idx_search_history_timestamp ON search_history(Timestamp);", connection)) { cmd.ExecuteNonQuery(); } } catch { }
+            // Additive: existing installs upgrade in place, gaining DOB-aware grouping. Ignore "duplicate column" on subsequent runs.
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE search_history ADD COLUMN ResultDob TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS cloud_hydrate_records (EntityType TEXT NOT NULL, EntityKey TEXT NOT NULL, PayloadJson TEXT NOT NULL, UpdatedAtUtc TEXT, DeletedAtUtc TEXT, PRIMARY KEY (EntityType, EntityKey)); CREATE INDEX IF NOT EXISTS idx_cloud_hydrate_records_updated ON cloud_hydrate_records(UpdatedAtUtc);", connection)) { cmd.ExecuteNonQuery(); } } catch { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN Status INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN ModelHash INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN ModelName TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
@@ -1076,6 +1352,20 @@ namespace MDTPro.Data {
             try { using (var cmd = new SQLiteCommand("ALTER TABLE property_evidence_reports ADD COLUMN SubjectPedNames TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE property_evidence_reports ADD COLUMN SeizedDrugs TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS ped_evidence_cache (PedName TEXT PRIMARY KEY, CapturedAt TEXT NOT NULL, HadWeapon INTEGER NOT NULL DEFAULT 0, WasWanted INTEGER NOT NULL DEFAULT 0, WasPatDown INTEGER NOT NULL DEFAULT 0, WasDrunk INTEGER NOT NULL DEFAULT 0, WasFleeing INTEGER NOT NULL DEFAULT 0, AssaultedPed INTEGER NOT NULL DEFAULT 0, DamagedVehicle INTEGER NOT NULL DEFAULT 0, HadIllegalWeapon INTEGER NOT NULL DEFAULT 0, ViolatedSupervision INTEGER NOT NULL DEFAULT 0, Resisted INTEGER NOT NULL DEFAULT 0)", connection)) { cmd.ExecuteNonQuery(); } } catch { }
+            try {
+                using (var cmd = new SQLiteCommand(@"
+                    CREATE TABLE IF NOT EXISTS ped_warrants (
+                        Id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                        PedName              TEXT NOT NULL REFERENCES peds(Name) ON DELETE CASCADE,
+                        Name                 TEXT,
+                        Severity             TEXT,
+                        IssuedAtUtc          TEXT NOT NULL,
+                        ClearedAtUtc         TEXT,
+                        ClearedByReportType  TEXT,
+                        ClearedByReportId    TEXT
+                    )", connection)) { cmd.ExecuteNonQuery(); }
+                using (var cmd = new SQLiteCommand("CREATE INDEX IF NOT EXISTS idx_ped_warrants_ped ON ped_warrants(PedName)", connection)) { cmd.ExecuteNonQuery(); }
+            } catch { }
         }
 
         #endregion
@@ -1099,6 +1389,11 @@ namespace MDTPro.Data {
                 foreach (var ped in peds) {
                     ped.Citations = LoadPedCitations(ped.Name);
                     ped.Arrests = LoadPedArrests(ped.Name);
+                    ped.Warrants = LoadPedWarrants(ped.Name);
+                    if (ped.HasActiveWarrants()) {
+                        ped.IsWanted = true;
+                        ped.SyncWarrantTextFromActiveWarrants();
+                    }
                     bool portraitNormalized = PedPortraitModelHelper.NormalizeStoredPortraitRow(ped);
                     if (PedPortraitModelHelper.StripInvalidPortraitModelIfNeeded(ped)) {
                         if (MDTProPedData.IsMinimalIdentity(ped))
@@ -1173,6 +1468,26 @@ namespace MDTPro.Data {
             }
 
             return charges;
+        }
+
+        private static List<WarrantCharge> LoadPedWarrants(string pedName) {
+            var list = new List<WarrantCharge>();
+            using (var cmd = new SQLiteCommand("SELECT * FROM ped_warrants WHERE PedName = @name ORDER BY Id", connection)) {
+                cmd.Parameters.AddWithValue("@name", pedName);
+                using (var reader = cmd.ExecuteReader()) {
+                    while (reader.Read()) {
+                        list.Add(new WarrantCharge {
+                            Name = reader["Name"] as string,
+                            Severity = reader["Severity"] as string,
+                            IssuedAtUtc = reader["IssuedAtUtc"] as string,
+                            ClearedAtUtc = reader["ClearedAtUtc"] as string,
+                            ClearedByReportType = reader["ClearedByReportType"] as string,
+                            ClearedByReportId = reader["ClearedByReportId"] as string
+                        });
+                    }
+                }
+            }
+            return list;
         }
 
         private static List<ArrestGroup.Charge> LoadPedArrests(string pedName) {
@@ -1829,7 +2144,9 @@ namespace MDTPro.Data {
 
         internal static void SavePed(MDTProPedData ped) {
             if (ped?.Name == null) return;
-            if (MDTProPedData.IsMinimalIdentity(ped)) {
+            // Legacy /data/recentIds lists anyone with IdentificationHistory even before CDF fills DOB/address.
+            // Cloud Recent IDs read Postgres (Policing Redefined + StopThePed both use AddIdentificationEvent for pat-down / ID).
+            if (MDTProPedData.IsMinimalIdentity(ped) && !MDTProPedData.HasIdentificationHistory(ped)) {
                 Utility.Helper.Log($"[MDTPro] Skipping save of minimal-identity ped (would show N/A in Person Search): {ped.Name}", false, Utility.Helper.LogSeverity.Info);
                 return;
             }
@@ -1842,6 +2159,7 @@ namespace MDTPro.Data {
                     transaction.Commit();
                 }
             }
+            MaybeEnqueuePedCloudAfterLocalSave(ped);
         }
 
         internal static void SavePeds(List<MDTProPedData> peds) {
@@ -1964,6 +2282,30 @@ namespace MDTPro.Data {
                     }
                 }
             }
+
+            using (var cmd = new SQLiteCommand("DELETE FROM ped_warrants WHERE PedName = @name", connection, transaction)) {
+                cmd.Parameters.AddWithValue("@name", ped.Name);
+                cmd.ExecuteNonQuery();
+            }
+
+            if (ped.Warrants != null) {
+                foreach (var w in ped.Warrants) {
+                    if (w == null) continue;
+                    using (var cmd = new SQLiteCommand(@"
+                        INSERT INTO ped_warrants (PedName, Name, Severity, IssuedAtUtc, ClearedAtUtc, ClearedByReportType, ClearedByReportId)
+                        VALUES (@PedName, @Name, @Severity, @IssuedAtUtc, @ClearedAtUtc, @ClearedByReportType, @ClearedByReportId)",
+                        connection, transaction)) {
+                        cmd.Parameters.AddWithValue("@PedName", ped.Name);
+                        cmd.Parameters.AddWithValue("@Name", (object)w.Name ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@Severity", (object)w.Severity ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@IssuedAtUtc", (object)w.IssuedAtUtc ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@ClearedAtUtc", (object)w.ClearedAtUtc ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@ClearedByReportType", (object)w.ClearedByReportType ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@ClearedByReportId", (object)w.ClearedByReportId ?? DBNull.Value);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
         }
 
         /// <summary>Marks a ped as deceased. Persists to DB and updates in-memory ped if present.</summary>
@@ -1979,6 +2321,10 @@ namespace MDTPro.Data {
                     cmd.ExecuteNonQuery();
                 }
             }
+            EnqueueCloudSync("person", "deceased", new Newtonsoft.Json.Linq.JObject {
+                ["name"] = pedName,
+                ["deceasedAtUtc"] = deceasedAtUtc
+            }, $"person:{StableCloudKeyPart(pedName)}:deceased");
         }
 
         /// <summary>Saves a damage cache entry to SQL for permanent injury report lookup.</summary>
@@ -2050,6 +2396,8 @@ namespace MDTPro.Data {
                     transaction.Commit();
                 }
             }
+            var payload = BuildVehicleCloudPayload(vehicle);
+            EnqueueCloudSync("vehicle", "upsert", payload, $"vehicle:{BuildCloudPayloadHash(payload)}:upsert");
         }
 
         internal static void SaveVehicles(List<MDTProVehicleData> vehicles) {
@@ -2118,6 +2466,23 @@ namespace MDTPro.Data {
                     transaction.Commit();
                 }
             }
+            var courtSync = Newtonsoft.Json.Linq.JObject.FromObject(new {
+                caseNumber = courtCase.Number,
+                pedName = courtCase.PedName,
+                reportId = courtCase.ReportId,
+                status = courtCase.Status.ToString(),
+                payload = courtCase
+            });
+            try {
+                MDTProPedData pedRow = DataController.GetPedDataByName(courtCase.PedName);
+                if (pedRow != null) EnqueuePedCloudPromotion(pedRow, "court");
+                string cloudPersonId = pedRow != null ? MDTPro.Cloud.CloudIdentityCache.GetPersonId(pedRow) : null;
+                if (!string.IsNullOrWhiteSpace(cloudPersonId))
+                    courtSync["personId"] = cloudPersonId;
+            } catch {
+                /* ignore — court row still syncs; PersonId can be filled on next save after person upsert */
+            }
+            EnqueueCloudSync("courtCase", "upsert", courtSync, $"courtCase:{courtCase.Number}:upsert");
         }
 
         private static void SaveCourtCaseInternal(CourtData courtCase, SQLiteTransaction transaction) {
@@ -2279,6 +2644,14 @@ namespace MDTPro.Data {
                     cmd.ExecuteNonQuery();
                 }
             }
+            EnqueueCloudSync("officerProfile", "upsert", Newtonsoft.Json.Linq.JObject.FromObject(new {
+                firstName = data.firstName,
+                lastName = data.lastName,
+                rank = data.rank,
+                callSign = data.callSign,
+                agency = data.agency,
+                badgeNumber = data.badgeNumber
+            }), "officerProfile:current:upsert");
         }
 
         internal static void SaveShift(ShiftData shift) {
@@ -2292,6 +2665,9 @@ namespace MDTPro.Data {
                     transaction.Commit();
                 }
             }
+            // Cloud shift rows are owned by LSPDFR session lifecycle (CloudPluginBridge POST /api/mdt/shifts).
+            // Do not enqueue a second shift upsert here: a different shiftId (local startTime ISO vs cloud-…)
+            // caused duplicate open rows and wrong portal On duty / Off duty.
         }
 
         internal static void SaveShifts(List<ShiftData> shifts) {
@@ -2382,6 +2758,7 @@ namespace MDTPro.Data {
                     transaction.Commit();
                 }
             }
+            EnqueueReportCloudSync("incident", report);
         }
 
         internal static void SaveCitationReport(CitationReport report) {
@@ -2439,6 +2816,7 @@ namespace MDTPro.Data {
                     transaction.Commit();
                 }
             }
+            EnqueueReportCloudSync("citation", report);
         }
 
         internal static void SaveArrestReport(ArrestReport report) {
@@ -2521,6 +2899,7 @@ namespace MDTPro.Data {
                     transaction.Commit();
                 }
             }
+            EnqueueReportCloudSync("arrest", report);
         }
 
         internal static void SaveImpoundReport(ImpoundReport report) {
@@ -2558,6 +2937,7 @@ namespace MDTPro.Data {
                     transaction.Commit();
                 }
             }
+            EnqueueReportCloudSync("impound", report);
         }
 
         internal static void SaveTrafficIncidentReport(TrafficIncidentReport report) {
@@ -2593,6 +2973,7 @@ namespace MDTPro.Data {
                     transaction.Commit();
                 }
             }
+            EnqueueReportCloudSync("trafficIncident", report);
         }
 
         internal static void SaveInjuryReport(InjuryReport report) {
@@ -2627,6 +3008,7 @@ namespace MDTPro.Data {
                     transaction.Commit();
                 }
             }
+            EnqueueReportCloudSync("injury", report);
         }
 
         internal static void SavePropertyEvidenceReceiptReport(PropertyEvidenceReceiptReport report) {
@@ -2658,6 +3040,7 @@ namespace MDTPro.Data {
                     transaction.Commit();
                 }
             }
+            EnqueueReportCloudSync("propertyEvidence", report);
         }
 
         private static void WriteReportBase(string tableName, Report report, SQLiteTransaction transaction) {
@@ -2700,17 +3083,57 @@ namespace MDTPro.Data {
 
         #region Search History
 
-        internal static void SaveSearchHistoryEntry(string searchType, string query, string resultName) {
+        internal static void SaveSearchHistoryEntry(string searchType, string query, string resultName, string resultDob = null) {
+            string normalizedDob = string.IsNullOrWhiteSpace(resultDob) ? null : MDTProPedData.FormatBirthday(resultDob);
             lock (dbLock) {
                 if (connection == null) return;
 
                 using (var cmd = new SQLiteCommand(@"
-                    INSERT INTO search_history (SearchType, SearchQuery, ResultName, Timestamp)
-                    VALUES (@type, @query, @result, @ts)", connection)) {
+                    INSERT INTO search_history (SearchType, SearchQuery, ResultName, ResultDob, Timestamp)
+                    VALUES (@type, @query, @result, @dob, @ts)", connection)) {
                     cmd.Parameters.AddWithValue("@type", searchType);
                     cmd.Parameters.AddWithValue("@query", query);
                     cmd.Parameters.AddWithValue("@result", (object)resultName ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@dob", (object)normalizedDob ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@ts", DateTime.UtcNow.ToString("o"));
+                    cmd.ExecuteNonQuery();
+                }
+            }
+
+            var payload = new Newtonsoft.Json.Linq.JObject {
+                ["type"] = searchType,
+                ["query"] = query,
+                ["resultKey"] = resultName
+            };
+            if (!string.IsNullOrWhiteSpace(normalizedDob))
+                payload["resultDob"] = normalizedDob;
+            EnqueueCloudSync("searchHistory", "upsert", payload);
+        }
+
+        internal static void SaveCloudHydrateRecord(string entityType, string entityKey, Newtonsoft.Json.Linq.JObject payload) {
+            if (string.IsNullOrWhiteSpace(entityType) || string.IsNullOrWhiteSpace(entityKey) || payload == null) return;
+            lock (dbLock) {
+                if (connection == null) return;
+                using (var cmd = new SQLiteCommand(@"
+                    INSERT OR REPLACE INTO cloud_hydrate_records (EntityType, EntityKey, PayloadJson, UpdatedAtUtc, DeletedAtUtc)
+                    VALUES (@type, @key, @payload, @updated, @deleted)", connection)) {
+                    cmd.Parameters.AddWithValue("@type", entityType);
+                    cmd.Parameters.AddWithValue("@key", entityKey);
+                    cmd.Parameters.AddWithValue("@payload", payload.ToString(Newtonsoft.Json.Formatting.None));
+                    cmd.Parameters.AddWithValue("@updated", (object)(payload.Value<string>("updatedAtUtc") ?? DateTime.UtcNow.ToString("o")));
+                    cmd.Parameters.AddWithValue("@deleted", (object)payload.Value<string>("deletedAtUtc") ?? DBNull.Value);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        internal static void DeleteCloudHydrateRecord(string entityType, string entityKey) {
+            if (string.IsNullOrWhiteSpace(entityType) || string.IsNullOrWhiteSpace(entityKey)) return;
+            lock (dbLock) {
+                if (connection == null) return;
+                using (var cmd = new SQLiteCommand("DELETE FROM cloud_hydrate_records WHERE EntityType = @type AND EntityKey = @key", connection)) {
+                    cmd.Parameters.AddWithValue("@type", entityType);
+                    cmd.Parameters.AddWithValue("@key", entityKey);
                     cmd.ExecuteNonQuery();
                 }
             }
@@ -2722,11 +3145,13 @@ namespace MDTPro.Data {
 
                 var entries = new List<SearchHistoryEntry>();
 
+                // Group by both name and DOB so two peds called "Dave Darren" born on different days
+                // surface as two distinct chips instead of collapsing into one.
                 using (var cmd = new SQLiteCommand(@"
-                    SELECT ResultName, MAX(Timestamp) AS LastSearched, COUNT(*) AS SearchCount
+                    SELECT ResultName, ResultDob, MAX(Timestamp) AS LastSearched, COUNT(*) AS SearchCount
                     FROM search_history
                     WHERE SearchType = @type AND ResultName IS NOT NULL AND TRIM(ResultName) <> ''
-                    GROUP BY ResultName COLLATE NOCASE
+                    GROUP BY ResultName COLLATE NOCASE, COALESCE(ResultDob, '')
                     ORDER BY LastSearched DESC
                     LIMIT @limit", connection)) {
                     cmd.Parameters.AddWithValue("@type", searchType);
@@ -2740,8 +3165,11 @@ namespace MDTPro.Data {
                                 if (sc != null && sc != DBNull.Value)
                                     cnt = Convert.ToInt32(sc);
                             } catch { /* ignore */ }
+                            string dob = null;
+                            try { dob = reader["ResultDob"] as string; } catch { /* legacy schema lacked the column */ }
                             entries.Add(new SearchHistoryEntry {
                                 ResultName = reader["ResultName"] as string,
+                                ResultDob = dob,
                                 LastSearched = reader["LastSearched"] as string,
                                 SearchCount = cnt
                             });
@@ -2769,14 +3197,17 @@ namespace MDTPro.Data {
 
         internal static void SaveFirearmRecords(List<FirearmRecord> records) {
             if (records == null || records.Count == 0) return;
-            foreach (var r in records) UpsertFirearmRecord(r);
+            foreach (var r in records) {
+                int localId = UpsertFirearmRecord(r);
+                if (localId > 0) EnqueueFirearmCloudSync(r);
+            }
         }
 
         /// <summary>Upserts a single firearm. Matches existing by OwnerPedName + SerialNumber/empty + WeaponModelHash; updates LastSeenAt or inserts new.</summary>
-        internal static void UpsertFirearmRecord(FirearmRecord r) {
-            if (r == null || string.IsNullOrWhiteSpace(r.OwnerPedName)) return;
+        internal static int UpsertFirearmRecord(FirearmRecord r) {
+            if (r == null || string.IsNullOrWhiteSpace(r.OwnerPedName)) return 0;
             lock (dbLock) {
-                if (connection == null) return;
+                if (connection == null) return 0;
                 string now = DateTime.UtcNow.ToString("o");
                 r.FirstSeenAt = r.FirstSeenAt ?? now;
                 r.LastSeenAt = r.LastSeenAt ?? now;
@@ -2801,6 +3232,7 @@ namespace MDTPro.Data {
                         cmd.Parameters.AddWithValue("@id", existingId.Value);
                         cmd.ExecuteNonQuery();
                     }
+                    r.Id = existingId.Value;
                 } else {
                     using (var cmd = new SQLiteCommand(@"
                         INSERT INTO firearm_records (SerialNumber, IsSerialScratched, OwnerPedName, WeaponModelId, WeaponDisplayName, WeaponModelHash, IsStolen, Description, Source, FirstSeenAt, LastSeenAt)
@@ -2819,8 +3251,55 @@ namespace MDTPro.Data {
                         cmd.Parameters.AddWithValue("@last", r.LastSeenAt);
                         cmd.ExecuteNonQuery();
                     }
+                    using (var cmd = new SQLiteCommand("SELECT last_insert_rowid()", connection)) {
+                        object id = cmd.ExecuteScalar();
+                        if (id != null) r.Id = Convert.ToInt32(id);
+                    }
                 }
+                return r.Id;
             }
+        }
+
+        private static void EnqueueFirearmCloudSync(FirearmRecord r) {
+            if (r == null || r.Id <= 0) return;
+            PromotePedNameForReportCloud("firearm", r.OwnerPedName);
+            string sourceRecordKey = BuildFirearmSourceRecordKey(r);
+            var payload = new Newtonsoft.Json.Linq.JObject {
+                ["localRecordId"] = r.Id,
+                ["sourceRecordKey"] = sourceRecordKey,
+                ["serialNumber"] = string.IsNullOrWhiteSpace(r.SerialNumber) ? null : r.SerialNumber.Trim(),
+                ["normalizedSerial"] = NormalizeFirearmSerialKey(r.SerialNumber),
+                ["isSerialScratched"] = r.IsSerialScratched,
+                ["ownerPedName"] = r.OwnerPedName,
+                ["weaponModelId"] = r.WeaponModelId,
+                ["weaponDisplayName"] = r.WeaponDisplayName,
+                ["weaponModelHash"] = r.WeaponModelHash,
+                ["isStolen"] = r.IsStolen,
+                ["description"] = r.Description,
+                ["source"] = r.Source,
+                ["sourceInstallId"] = SetupController.GetConfig()?.cloudInstallId,
+                ["firstSeenAt"] = r.FirstSeenAt,
+                ["lastSeenAt"] = r.LastSeenAt,
+                ["observedAtUtc"] = r.LastSeenAt
+            };
+            EnqueueCloudSync("firearm", "upsert", payload, $"firearm:{sourceRecordKey}:upsert");
+        }
+
+        private static string BuildFirearmSourceRecordKey(FirearmRecord r) {
+            string serial = NormalizeFirearmSerialKey(r.SerialNumber);
+            string owner = StableCloudKeyPart(r.OwnerPedName);
+            string model = StableCloudKeyPart(r.WeaponModelId);
+            string hash = r.WeaponModelHash.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            string source = StableCloudKeyPart(r.Source);
+            if (!string.IsNullOrWhiteSpace(serial) && !r.IsSerialScratched)
+                return $"serial|{serial}|owner|{owner}|model|{model}|hash|{hash}|source|{source}";
+            return $"local|{r.Id}";
+        }
+
+        private static string NormalizeFirearmSerialKey(string serial) {
+            if (string.IsNullOrWhiteSpace(serial)) return null;
+            string normalized = new string(serial.Trim().ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
+            return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
         }
 
         /// <summary>Loads firearms by owner name. Uses case-insensitive matching so "John Doe" matches "john doe".</summary>
@@ -2845,22 +3324,33 @@ namespace MDTPro.Data {
             }
         }
 
-        /// <summary>Loads a firearm by serial number. Returns null for scratched-serial firearms (cannot be looked up).</summary>
-        internal static FirearmRecord LoadFirearmBySerial(string serialNumber) {
-            if (string.IsNullOrWhiteSpace(serialNumber)) return null;
+        /// <summary>Loads firearms by serial number. Serial numbers are not globally unique, so callers must handle multiple matches.</summary>
+        internal static List<FirearmRecord> LoadFirearmsBySerial(string serialNumber, int limit = 50) {
+            var list = new List<FirearmRecord>();
+            if (string.IsNullOrWhiteSpace(serialNumber)) return list;
             lock (dbLock) {
-                if (connection == null) return null;
+                if (connection == null) return list;
+                string normalized = NormalizeFirearmSerialKey(serialNumber);
                 using (var cmd = new SQLiteCommand(@"
                     SELECT Id, SerialNumber, IsSerialScratched, OwnerPedName, WeaponModelId, WeaponDisplayName, WeaponModelHash, IsStolen, Description, Source, FirstSeenAt, LastSeenAt
-                    FROM firearm_records WHERE SerialNumber IS NOT NULL AND SerialNumber = @serial ORDER BY LastSeenAt DESC LIMIT 1
+                    FROM firearm_records
+                    WHERE SerialNumber IS NOT NULL
+                      AND REPLACE(REPLACE(REPLACE(UPPER(SerialNumber), '-', ''), ' ', ''), '_', '') = @serial
+                    ORDER BY LastSeenAt DESC LIMIT @limit
                 ", connection)) {
-                    cmd.Parameters.AddWithValue("@serial", serialNumber.Trim());
+                    cmd.Parameters.AddWithValue("@serial", normalized ?? serialNumber.Trim().ToUpperInvariant());
+                    cmd.Parameters.AddWithValue("@limit", Math.Max(1, Math.Min(limit, 100)));
                     using (var rdr = cmd.ExecuteReader()) {
-                        if (rdr.Read()) return ReadFirearmFromReader(rdr);
+                        while (rdr.Read()) list.Add(ReadFirearmFromReader(rdr));
                     }
                 }
-                return null;
+                return list;
             }
+        }
+
+        /// <summary>Loads the newest firearm by serial number. Prefer <see cref="LoadFirearmsBySerial"/> for collision-safe callers.</summary>
+        internal static FirearmRecord LoadFirearmBySerial(string serialNumber) {
+            return LoadFirearmsBySerial(serialNumber, 1).FirstOrDefault();
         }
 
         /// <summary>Updates LastSeenAt to now for all firearm records with this owner. Call when owner's firearms are viewed (Person Search or Firearms Search) so they appear in Recent IDs.</summary>

@@ -1,6 +1,94 @@
 const isInIframe = window.self !== window.top
-const topWindow = isInIframe ? window.top : window
-const topDoc = isInIframe ? window.top.document : document
+
+const mdtBridgeAuth = (() => {
+  const header = 'X-MDT-Bridge-Token'
+  const cookie = 'MDTProBridge'
+
+  function readCookie() {
+    try {
+      for (const part of document.cookie.split(';')) {
+        const trimmed = part.trim()
+        if (!trimmed.startsWith(`${cookie}=`)) continue
+        return decodeURIComponent(trimmed.slice(cookie.length + 1))
+      }
+    } catch (_) {}
+    return ''
+  }
+
+  function isProtectedPath(input) {
+    try {
+      const url = new URL(typeof input === 'string' ? input : input.url, location.href)
+      if (url.origin !== location.origin) return false
+      return (
+        url.pathname === '/config' ||
+        url.pathname === '/integration' ||
+        url.pathname.startsWith('/data/') ||
+        url.pathname.startsWith('/post/')
+      )
+    } catch (_) {
+      return false
+    }
+  }
+
+  let token = readCookie()
+  const ready = token
+    ? Promise.resolve(token)
+    : fetch('/version', { cache: 'no-store' })
+        .then((r) => {
+          token = r.headers.get('X-MdtPro-Bridge-Token') || readCookie() || ''
+          return token
+        })
+        .catch(() => '')
+
+  const originalFetch = window.fetch.bind(window)
+  window.fetch = async function (input, init = {}) {
+    if (!isProtectedPath(input)) return originalFetch(input, init)
+    const bridgeToken = token || (await ready)
+    if (!bridgeToken) return originalFetch(input, init)
+    const headers = new Headers(init.headers || (typeof input !== 'string' ? input.headers : undefined))
+    if (!headers.has(header)) headers.set(header, bridgeToken)
+    return originalFetch(input, { ...init, headers })
+  }
+
+  const NativeWebSocket = window.WebSocket
+  window.WebSocket = function (url, protocols) {
+    const bridgeToken = token || readCookie()
+    if (bridgeToken) {
+      try {
+        const wsUrl = new URL(url, location.href)
+        if (wsUrl.host === location.host && wsUrl.pathname === '/ws')
+          wsUrl.searchParams.set('bridgeAuth', bridgeToken)
+        url = wsUrl.toString()
+      } catch (_) {}
+    }
+    return protocols === undefined ? new NativeWebSocket(url) : new NativeWebSocket(url, protocols)
+  }
+  window.WebSocket.prototype = NativeWebSocket.prototype
+  Object.defineProperty(window.WebSocket, 'CONNECTING', { value: NativeWebSocket.CONNECTING })
+  Object.defineProperty(window.WebSocket, 'OPEN', { value: NativeWebSocket.OPEN })
+  Object.defineProperty(window.WebSocket, 'CLOSING', { value: NativeWebSocket.CLOSING })
+  Object.defineProperty(window.WebSocket, 'CLOSED', { value: NativeWebSocket.CLOSED })
+
+  return { ready }
+})()
+
+/** True when the parent page is the real MDT shell (notifications + icon strip), not e.g. the cloud portal. */
+function parentLooksLikeMdtShell() {
+  if (!isInIframe) return false
+  try {
+    const d = window.top.document
+    return !!(
+      d.querySelector('.overlay .notifications') &&
+      d.querySelector('.iconAccess')
+    )
+  } catch (_) {
+    return false
+  }
+}
+
+const useParentMdtShell = parentLooksLikeMdtShell()
+const topWindow = useParentMdtShell ? window.top : window
+const topDoc = useParentMdtShell ? window.top.document : document
 
 if (!isInIframe) {
   localStorage.removeItem('config')

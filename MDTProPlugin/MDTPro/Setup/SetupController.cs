@@ -1,4 +1,5 @@
 using MDTPro;
+using MDTPro.Cloud;
 using MDTPro.Data;
 using MDTPro.Data.Reports;
 using MDTPro.Utility;
@@ -6,16 +7,25 @@ using Newtonsoft.Json;
 using Rage;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace MDTPro.Setup {
+    internal enum GameWorkModeKind {
+        Performance,
+        Balanced,
+        Live
+    }
+
     internal class SetupController {
         private static string _mdtProPathRoot;
+        private static volatile bool _backgroundWorkersEnabled = true;
 
         /// <summary>Resolves MDTPro folder from plugin location (GTA/plugins/LSPDFR -> GTA/MDTPro) so it works regardless of process current directory.</summary>
         internal static string MDTProPath {
@@ -55,6 +65,7 @@ namespace MDTPro.Setup {
         internal static string CourtDataPath => Path.Combine(DataPath, "court.json");
         internal static string ShiftHistoryDataPath => Path.Combine(DataPath, "shiftHistory.json");
         internal static string OfficerInformationDataPath => Path.Combine(DataPath, "officerInformation.json");
+        internal static string BridgeAuthTokenPath => Path.Combine(DataPath, "bridgeAuthToken.txt");
         internal static string LogFilePath => Path.Combine(MDTProPath, "MDTPro.log");
         internal static string ImgDefaultsDirPath => Path.Combine(MDTProPath, "imgDefaults");
         internal static string ImgDirPath => Path.Combine(MDTProPath, "img");
@@ -87,7 +98,13 @@ namespace MDTPro.Setup {
                 Directory.CreateDirectory(PluginsPath);
             }
 
+            if (!File.Exists(ConfigPath)) {
+                Helper.WriteToJsonFile(ConfigPath, new Config());
+            }
+            CloudAuthorityClient.ApplyEffectiveConfig();
             Database.Initialize();
+            CloudSyncQueue.FlushSynchronously();
+            CloudAuthorityClient.HydrateLocalCache();
 
             DataController.OfficerInformationData = Database.LoadOfficerInformation() ?? new OfficerInformationData();
             DataController.courtDatabase = Database.LoadCourtCases() ?? new List<CourtData>();
@@ -112,45 +129,27 @@ namespace MDTPro.Setup {
                 Helper.Log($"Could not read PostalCodeController.ActivePostalCodeSet: {e.Message}", false, Helper.LogSeverity.Warning);
             }
 
-            if (!File.Exists(ConfigPath)) {
-                Helper.WriteToJsonFile(ConfigPath, new Config());
-            }
-
             if (!File.Exists(LanguagePath)) {
                 Helper.WriteToJsonFile(LanguagePath, new Language());
             }
 
+            // Database, WebSocket/dynamic, firearm, and HTTP game-bridge work run on one fiber via GameWorkScheduler (started from Main after GameFiberHttpBridge.Start).
             // Fibers start during SetupDirectory(), before Main starts Server.Start() on a background thread.
             // RunServer stays false until the listener is up (~120ms sleep inside Server.Start), so we must
-            // wait first — otherwise while (Server.RunServer) exits immediately and SetDynamicData / DB refresh never run.
+            // wait first — otherwise while (Server.RunServer) exits immediately and cloud flush never runs.
             GameFiber.StartNew(() => {
-                GameFiber.WaitUntil(() => Server.RunServer, 60000);
-                if (!Server.RunServer) return;
-                while (Server.RunServer) {
-                    DataController.SetDatabases();
-                    DataController.CheckAndResolvePendingCases();
-                    DataController.TryCaptureVehicleSearches();
-                    GameFiber.Wait(GetConfig().databaseUpdateInterval);
+                var waitForServer = Stopwatch.StartNew();
+                while (!Server.RunServer && _backgroundWorkersEnabled && waitForServer.ElapsedMilliseconds < 60000) {
+                    GameFiber.Wait(50);
                 }
-            }, "data-update-interval");
-
-            GameFiber.StartNew(() => {
-                GameFiber.WaitUntil(() => Server.RunServer, 60000);
-                if (!Server.RunServer) return;
-                while (Server.RunServer) {
-                    DataController.TryCapturePickupAndPlayerFirearms();
-                    GameFiber.Wait(500);
+                if (!_backgroundWorkersEnabled || !Server.RunServer) return;
+                CloudPluginBridge.Start();
+                CloudSyncQueue.TryFlushInBackground(respectFlushInterval: true);
+                while (Server.RunServer && _backgroundWorkersEnabled) {
+                    CloudSyncQueue.TryFlushInBackground(respectFlushInterval: true);
+                    GameFiber.Wait(GetConfig().cloudSyncFlushIntervalMs <= 0 ? Config.PerfCaptureIntervalMs.CloudSyncFlush : GetConfig().cloudSyncFlushIntervalMs);
                 }
-            }, "firearm-capture-interval");
-
-            GameFiber.StartNew(() => {
-                GameFiber.WaitUntil(() => Server.RunServer, 60000);
-                if (!Server.RunServer) return;
-                while (Server.RunServer) {
-                    DataController.SetDynamicData();
-                    GameFiber.Wait(GetConfig().webSocketUpdateInterval);
-                }
-            }, "dynamic-data-update-interval");
+            }, "cloud-sync-and-bridge");
 
             string[] imgDefaultsDir = Directory.GetFiles(ImgDefaultsDirPath).Select(item => item.Split('\\')[item.Split('\\').Length - 1]).ToArray();
             if (!Directory.Exists(ImgDirPath)) Directory.CreateDirectory(ImgDirPath);
@@ -181,6 +180,14 @@ namespace MDTPro.Setup {
 
         static readonly object ConfigCacheLock = new object();
 
+        internal static void EnableBackgroundWorkers() {
+            _backgroundWorkersEnabled = true;
+        }
+
+        internal static void DisableBackgroundWorkers() {
+            _backgroundWorkersEnabled = false;
+        }
+
         internal static void ClearCache() {
             lock (ConfigCacheLock) {
                 cachedConfig = null;
@@ -200,11 +207,13 @@ namespace MDTPro.Setup {
                 cachedConfig = Helper.ReadFromJsonFile<Config>(ConfigPath) ?? def;
                 EnsureALPRDefaults(cachedConfig, def);
                 EnsureLogFileDefaults(cachedConfig, def);
+                EnsureGameWorkDefaults(cachedConfig, def);
                 EnsureCitationArrestOptionsFromDefaults(cachedConfig, def);
                 Helper.WriteToJsonFile(ConfigPath, cachedConfig);
                 return cachedConfig;
             }
         }
+
 
         /// <summary>Ensures ALPR config values are sensible. User-facing ALPR options are enable, popup duration, and HUD position only.</summary>
         private static void EnsureALPRDefaults(Config cfg, Config def) {
@@ -218,6 +227,37 @@ namespace MDTPro.Setup {
         private static void EnsureLogFileDefaults(Config cfg, Config def) {
             if (cfg.logFileMaxSizeKb < 0) cfg.logFileMaxSizeKb = 0;
             if (cfg.logFileMaxSizeKb > 102400) cfg.logFileMaxSizeKb = 102400;
+        }
+
+        private static void EnsureGameWorkDefaults(Config cfg, Config def) {
+            string original = cfg.gameWorkMode;
+            if (string.IsNullOrWhiteSpace(cfg.gameWorkMode))
+                cfg.gameWorkMode = def.gameWorkMode ?? "Performance";
+            string m = cfg.gameWorkMode.Trim();
+            if (!m.Equals("Performance", StringComparison.OrdinalIgnoreCase)
+                && !m.Equals("Balanced", StringComparison.OrdinalIgnoreCase)
+                && !m.Equals("Live", StringComparison.OrdinalIgnoreCase)) {
+                cfg.gameWorkMode = "Performance";
+                if (!string.IsNullOrWhiteSpace(original))
+                    Helper.Log($"Config gameWorkMode '{original}' is not recognized; defaulting to Performance. Valid values: Performance, Balanced, Live.", false, Helper.LogSeverity.Warning);
+            } else if (!string.Equals(cfg.gameWorkMode, m, StringComparison.Ordinal)) {
+                cfg.gameWorkMode = m.Length <= 1 ? m.ToUpperInvariant() : char.ToUpperInvariant(m[0]) + m.Substring(1).ToLowerInvariant();
+            }
+            if (cfg.gameWorkBridgeBudgetMsPerTick <= 0)
+                cfg.gameWorkBridgeBudgetMsPerTick = def.gameWorkBridgeBudgetMsPerTick > 0 ? def.gameWorkBridgeBudgetMsPerTick : 2;
+            if (cfg.gameWorkBridgeBudgetMsPerTick > 25)
+                cfg.gameWorkBridgeBudgetMsPerTick = 25;
+        }
+
+        internal static GameWorkModeKind GetGameWorkModeKind() {
+            try {
+                string m = GetConfig()?.gameWorkMode;
+                if (string.Equals(m, "Live", StringComparison.OrdinalIgnoreCase)) return GameWorkModeKind.Live;
+                if (string.Equals(m, "Balanced", StringComparison.OrdinalIgnoreCase)) return GameWorkModeKind.Balanced;
+            } catch {
+                /* ignore */
+            }
+            return GameWorkModeKind.Performance;
         }
 
         /// <summary>One-time migration: overwrite citation and arrest options from defaults so upgraders get updated charges. Bump version when adding charges (RICO, Federal, Wildlife, etc.) or expanding citations.</summary>

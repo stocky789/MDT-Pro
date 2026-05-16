@@ -5,6 +5,9 @@ using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 using MDTPro.EventListeners;
+using MDTPro.Cloud;
+using MDTPro.UI.InGameComputer;
+using MDTPro.Setup;
 using MDTPro.Utility;
 using MDTPro.Utility.Backup;
 using static MDTPro.Setup.SetupController;
@@ -26,22 +29,10 @@ namespace MDTPro {
         }
 
         public override void Finally() {
-            try {
-                CalloutEvents.RemoveCalloutEventHandlers();
-                STPEvents.UnsubscribeAll();
-                PREvents.UnsubscribeAll();
-                CDFEvents.UnsubscribeAll();
-                LSPDFREvents.UnsubscribeAll();
-            } catch {
-                /* do not block unload if a host event API throws */
-            }
-            UI.SettingsMenu.Stop();
-            UI.CitationHandoffKeybind.Stop();
-            StpCitationHandoffQueue.Clear();
-            ALPR.ALPRController.Stop();
-            Data.DataController.EndCurrentShift();
-            Server.Stop();
-            GameFiberHttpBridge.Stop();
+            CloudPluginBridge.TryEndTrackedLspdfrShiftBlocking();
+            CloudIngameEntry.RequestAbortFromHost();
+            InGameComputerEntry.RequestAbortFromHost();
+            ShutdownRuntime(isFinalUnload: true);
             Data.Database.Close();
             ClearCache();
             RageNotification.Show(GetLanguage().inGame.unloaded, RageNotification.NotificationType.Info);
@@ -49,12 +40,17 @@ namespace MDTPro {
 
         private static void Functions_OnOnDutyStateChanged(bool OnDuty) {
             if (!OnDuty) {
-                UI.SettingsMenu.Stop();
-                UI.CitationHandoffKeybind.Stop();
-                StpCitationHandoffQueue.Clear();
-                ALPR.ALPRController.Stop();
-                Server.Stop();
-                GameFiberHttpBridge.Stop();
+                CloudPluginBridge.TryEndTrackedLspdfrShiftBlocking();
+                Exception bridgeEndErr;
+                bool ranEndShift = GameFiberHttpBridge.TryExecuteBlocking(() => {
+                    try { Data.DataController.EndCurrentShift(); }
+                    catch (Exception ex) { Log($"EndCurrentShift: {ex.Message}", false, LogSeverity.Warning); }
+                }, 5000, out bridgeEndErr);
+                if (!ranEndShift)
+                    Log("EndCurrentShift timed out on off-duty (game busy or bridge stopped).", false, LogSeverity.Warning);
+                if (bridgeEndErr != null)
+                    Log($"EndCurrentShift bridge: {bridgeEndErr.Message}", false, LogSeverity.Warning);
+                ShutdownRuntime(isFinalUnload: false);
                 return;
             }
             {
@@ -105,7 +101,9 @@ namespace MDTPro {
                         Server.Stop();
                         GameFiber.Wait(400);
 
+                        SetupController.EnableBackgroundWorkers();
                         GameFiberHttpBridge.Start();
+                        GameWorkScheduler.Start();
                         GameFiber.Wait(50);
 
                         Thread serverThread = new Thread(Server.Start) {
@@ -123,6 +121,22 @@ namespace MDTPro {
                         Log($"CI: {useCI}", true, useCI ? LogSeverity.Info : LogSeverity.Warning);
                         Log($"PR: {usePR}", true, usePR ? LogSeverity.Info : LogSeverity.Warning);
                         Log($"STP: {useSTP}", true, useSTP ? LogSeverity.Info : LogSeverity.Warning);
+
+                        {
+                            Config c = GetConfig();
+                            Game.LogTrivial(
+                                "MDT Pro gameWork=" + (c.gameWorkMode ?? "Performance") +
+                                " scheduler timers (ms): Ws=" + c.webSocketUpdateInterval +
+                                " Db=" + c.databaseUpdateInterval +
+                                " Ploc=" + c.passiveLocationRefreshIntervalMs +
+                                " Pnv=" + c.passiveNearbyVehicleRefreshIntervalMs +
+                                " FHeld=" + c.firearmPlayerHeldScanIntervalMs +
+                                " FPkup=" + c.firearmPickupScanIntervalMs +
+                                " Cloud=" + c.cloudSyncFlushIntervalMs +
+                                " ExVehCd=" + c.explicitNearbyVehicleScanCooldownMs +
+                                " LiveLocAge=" + c.liveLocationRefreshMaxAgeMs
+                            );
+                        }
 
                         // Always track callouts via LSPDFR events; resolve Callout from LSPDFR API first (Callout Interface alone can break after CI updates).
                         CalloutEvents.AddCalloutEventHandlers();
@@ -142,24 +156,25 @@ namespace MDTPro {
                         RageNotification.ShowSuccess($"{GetLanguage().inGame.loaded} v{Version}");
 
                         string iniPath = Path.Combine(MDTProPath, "MDTPro.ini");
+                        // Menu key: always from ini when valid (players set SettingsMenuKey to any free F-key they want).
+                        // F10 is only the fallback when the ini omits both keys or the values are not valid key names.
                         string menuKeyStr = ReadIniValue(iniPath, "MDTPro", "SettingsMenuKey");
-                        Keys parsedKey;
-                        if (!string.IsNullOrWhiteSpace(menuKeyStr) && Enum.TryParse<Keys>(menuKeyStr.Trim(), true, out parsedKey))
-                            UI.SettingsMenu.MenuKey = parsedKey;
+                        string legacyHandoffKeyStr = ReadIniValue(iniPath, "MDTPro", "CitationHandoffKey");
+                        if (!string.IsNullOrWhiteSpace(menuKeyStr) && Enum.TryParse<Keys>(menuKeyStr.Trim(), true, out Keys parsedMenu))
+                            UI.SettingsMenu.MenuKey = parsedMenu;
+                        else if (!string.IsNullOrWhiteSpace(legacyHandoffKeyStr) && Enum.TryParse<Keys>(legacyHandoffKeyStr.Trim(), true, out Keys parsedLegacy))
+                            UI.SettingsMenu.MenuKey = parsedLegacy;
+                        else
+                            UI.SettingsMenu.MenuKey = Keys.F10;
 
-                        // MDT Pro citation handoff menu + keybind when PR is not issuing tickets (native RAGENativeUI; works without StopThePed.dll name detection).
-                        if (!Main.usePR) {
-                            string handoffKeyStr = ReadIniValue(iniPath, "MDTPro", "CitationHandoffKey");
-                            if (!string.IsNullOrWhiteSpace(handoffKeyStr) && Enum.TryParse<Keys>(handoffKeyStr.Trim(), true, out Keys handoffKey))
-                                UI.CitationHandoffKeybind.HandoffKey = handoffKey;
-                            UI.CitationHandoffKeybind.Start();
-                        } else {
-                            UI.CitationHandoffKeybind.Stop();
+                        // StopThePed-path citation handoff runs from the in-game settings menu (same RAGENativeUI pool); no separate key.
+                        if (Main.usePR)
                             StpCitationHandoffQueue.Clear();
-                        }
 
                         ALPR.ALPRController.Start();
                         UI.SettingsMenu.Start();
+
+                        CloudPluginBridge.RequestLspdfrDutyShiftStartFromBridge();
 
                         var cfg = GetConfig();
                         if (cfg.checkForUpdates && !string.IsNullOrWhiteSpace(cfg.githubReleasesRepo)) {
@@ -172,6 +187,34 @@ namespace MDTPro {
                     });
                 });
             } 
+        }
+
+        private static void ShutdownRuntime(bool isFinalUnload) {
+            try {
+                Game.LogTrivial("[Lifecycle] MDT Pro runtime shutdown start");
+                SetupController.DisableBackgroundWorkers();
+                // Stop accepting new game-thread work before tearing down listeners/fibers.
+                GameFiberHttpBridge.Stop();
+                try {
+                    CalloutEvents.RemoveCalloutEventHandlers();
+                    STPEvents.UnsubscribeAll();
+                    PREvents.UnsubscribeAll();
+                    CDFEvents.UnsubscribeAll();
+                    LSPDFREvents.UnsubscribeAll();
+                } catch {
+                    /* do not block unload if a host event API throws */
+                }
+                UI.SettingsMenu.Stop();
+                StpCitationHandoffQueue.Clear();
+                ALPR.ALPRController.Stop();
+                Data.DataController.EndCurrentShift();
+                GameWorkScheduler.Stop();
+                Server.Stop();
+                if (!isFinalUnload)
+                    ClearCache();
+            } finally {
+                Game.LogTrivial("[Lifecycle] MDT Pro runtime shutdown complete");
+            }
         }
     }
 }

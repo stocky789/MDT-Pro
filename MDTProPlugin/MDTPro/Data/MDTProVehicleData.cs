@@ -29,7 +29,11 @@ namespace MDTPro.Data {
         public string RegistrationExpiration;
         public string InsuranceStatus;
         public string InsuranceExpiration;
+        public bool RegistrationExpirationVerifiedFromLiveDocument;
+        public bool InsuranceExpirationVerifiedFromLiveDocument;
         public VehicleBOLO[] BOLOs;
+        public string VehicleId;
+        public string OwnerPersonId;
 
         /// <summary>True when vehicle is in world and BOLOs can be added/removed via CDF.</summary>
         public bool CanModifyBOLOs {
@@ -81,12 +85,14 @@ namespace MDTPro.Data {
                 try {
                     RegistrationStatus = CDFVehicleData.Registration.Status.ToString();
                     RegistrationExpiration = CDFVehicleData.Registration.ExpirationDate?.ToString("s");
+                    RegistrationExpirationVerifiedFromLiveDocument = !string.IsNullOrWhiteSpace(RegistrationExpiration);
                 } catch { /* CDF version differences */ }
             }
             if (CDFVehicleData.Insurance != null) {
                 try {
                     InsuranceStatus = CDFVehicleData.Insurance.Status.ToString();
                     InsuranceExpiration = CDFVehicleData.Insurance.ExpirationDate?.ToString("s");
+                    InsuranceExpirationVerifiedFromLiveDocument = !string.IsNullOrWhiteSpace(InsuranceExpiration);
                 } catch { }
             }
 
@@ -160,12 +166,14 @@ namespace MDTPro.Data {
                 if (CDFVehicleData.Registration != null) {
                     RegistrationStatus = CDFVehicleData.Registration.Status.ToString();
                     RegistrationExpiration = CDFVehicleData.Registration.ExpirationDate?.ToString("s");
+                    RegistrationExpirationVerifiedFromLiveDocument = !string.IsNullOrWhiteSpace(RegistrationExpiration);
                 }
             } catch { }
             try {
                 if (CDFVehicleData.Insurance != null) {
                     InsuranceStatus = CDFVehicleData.Insurance.Status.ToString();
                     InsuranceExpiration = CDFVehicleData.Insurance.ExpirationDate?.ToString("s");
+                    InsuranceExpirationVerifiedFromLiveDocument = !string.IsNullOrWhiteSpace(InsuranceExpiration);
                 }
             } catch { }
             VehicleIdentificationNumber = CDFVehicleData.Vin?.Number;
@@ -197,12 +205,14 @@ namespace MDTPro.Data {
                 if (cdf.Registration != null) {
                     RegistrationStatus = cdf.Registration.Status.ToString();
                     RegistrationExpiration = cdf.Registration.ExpirationDate?.ToString("s");
+                    RegistrationExpirationVerifiedFromLiveDocument = !string.IsNullOrWhiteSpace(RegistrationExpiration);
                 }
             } catch { /* CDF version differences */ }
             try {
                 if (cdf.Insurance != null) {
                     InsuranceStatus = cdf.Insurance.Status.ToString();
                     InsuranceExpiration = cdf.Insurance.ExpirationDate?.ToString("s");
+                    InsuranceExpirationVerifiedFromLiveDocument = !string.IsNullOrWhiteSpace(InsuranceExpiration);
                 }
             } catch { }
         }

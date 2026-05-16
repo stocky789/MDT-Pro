@@ -43,9 +43,10 @@ public partial class ConnectSessionWindow : Window
             var endpoint = new MdtServerEndpoint(host, port);
             using var probe = new MdtHttpClient(endpoint);
             string? ver;
+            string? bridgeAuthToken;
             try
             {
-                ver = await probe.GetVersionPlainAsync().ConfigureAwait(true);
+                (ver, bridgeAuthToken) = await probe.ProbeVersionAsync().ConfigureAwait(true);
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
             {
@@ -76,7 +77,8 @@ public partial class ConnectSessionWindow : Window
             ResultConfig = new TerminalSessionConfig(
                 string.IsNullOrEmpty(display) ? "Operator" : display,
                 host,
-                port);
+                port,
+                bridgeAuthToken);
 
             ok = true;
             DialogResult = true;

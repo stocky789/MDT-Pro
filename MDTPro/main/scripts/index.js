@@ -542,10 +542,18 @@ async function openWindow(name, pluginId = null) {
   if (name === 'court') {
     size = [Math.max(size[0], 720), Math.max(size[1], 420)]
   }
-  const windowDimensions = [window.innerWidth, window.innerHeight]
+  const rootStyle = getComputedStyle(document.querySelector(':root'))
+  const shellTop = parseInt(rootStyle.getPropertyValue('--tb-height'), 10) || 0
+  const shellLeft = parseInt(rootStyle.getPropertyValue('--sidebar-width'), 10) || 0
+  const shellBottom = parseInt(rootStyle.getPropertyValue('--status-height'), 10) || 0
+  const workspaceDimensions = [
+    Math.max(window.innerWidth - shellLeft, 320),
+    Math.max(window.innerHeight - shellTop - shellBottom, 220),
+  ]
+  size = [Math.min(size[0], workspaceDimensions[0] - 24), Math.min(size[1], workspaceDimensions[1] - 24)]
   const offset = [
-    windowDimensions[0] / 2 - size[0] / 2,
-    windowDimensions[1] / 2 - size[1] / 2,
+    shellLeft + workspaceDimensions[0] / 2 - size[0] / 2,
+    shellTop + workspaceDimensions[1] / 2 - size[1] / 2,
   ]
 
   const existingWindows = document.querySelectorAll('.overlay .windows .window')
@@ -595,10 +603,10 @@ async function openWindow(name, pluginId = null) {
     }
     document.onmousemove = function (e) {
       if (
-        e.clientX < 0 ||
-        e.clientY < 0 ||
+        e.clientX < shellLeft ||
+        e.clientY < shellTop ||
         e.clientX > document.querySelector('.desktop').clientWidth ||
-        e.clientY > document.querySelector('.desktop').clientHeight
+        e.clientY > window.innerHeight - shellBottom
       ) {
         document.onmouseup()
       }
@@ -712,10 +720,10 @@ async function openWindow(name, pluginId = null) {
     } else {
       lastSize = [windowElement.style.width, windowElement.style.height]
       lastOffset = [windowElement.style.left, windowElement.style.top]
-      windowElement.style.width = 'calc(100% - 2px)'
-      windowElement.style.height = `calc(100% - var(--tb-height))`
-      windowElement.style.left = '0'
-      windowElement.style.top = '' /* use CSS .window.maximized top so window sits below taskbar */
+      windowElement.style.width = `calc(100% - var(--sidebar-width) - 1px)`
+      windowElement.style.height = `calc(100% - var(--tb-height) - var(--status-height))`
+      windowElement.style.left = 'var(--sidebar-width)'
+      windowElement.style.top = 'var(--tb-height)'
       windowElement.style.minWidth = `${
         iconTitleWrapper.offsetWidth + windowControls.offsetWidth
       }px`

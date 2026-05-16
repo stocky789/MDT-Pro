@@ -35,9 +35,14 @@ namespace MDTPro.Utility {
         }
 
         private class ReactionPool {
+            /// <summary>Polite or cooperative lines (streamer-safe). Optional; older JSON omits this.</summary>
+            public List<string> normal = new List<string>();
             public List<string> clean = new List<string>();
             public List<string> mature = new List<string>();
         }
+
+        /// <summary>Chance (0–9999) to pick only from <c>normal</c> when that list exists; otherwise legacy clean/mature mix.</summary>
+        private const int NormalOnlyRollMaxExclusive = 4000;
 
         /// <summary>Shows a contextual suspect line at the bottom of the screen after citation handoff. Game thread only.</summary>
         internal static void TryShowSuspectReaction(Ped ped, IEnumerable<PRHelper.CitationHandoutCharge> charges) {
@@ -123,9 +128,19 @@ namespace MDTPro.Utility {
 
             if (pool == null) return null;
 
+            var normalOnly = new List<string>();
+            if (pool.normal != null)
+                normalOnly.AddRange(pool.normal.Where(s => !string.IsNullOrWhiteSpace(s)));
+
+            if (normalOnly.Count > 0 && Helper.GetRandomInt(0, 9999) < NormalOnlyRollMaxExclusive)
+                return normalOnly[Helper.GetRandomInt(0, normalOnly.Count - 1)];
+
             var candidates = new List<string>();
             if (pool.clean != null) candidates.AddRange(pool.clean.Where(s => !string.IsNullOrWhiteSpace(s)));
             if (allowProfanity && pool.mature != null) candidates.AddRange(pool.mature.Where(s => !string.IsNullOrWhiteSpace(s)));
+
+            if (candidates.Count == 0 && pool.normal != null)
+                candidates.AddRange(pool.normal.Where(s => !string.IsNullOrWhiteSpace(s)));
 
             if (candidates.Count == 0 && pool.clean != null)
                 candidates.AddRange(pool.clean.Where(s => !string.IsNullOrWhiteSpace(s)));

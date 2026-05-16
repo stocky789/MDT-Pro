@@ -2,10 +2,11 @@
 // API: GiveCitationToPed(Ped, Citation) — https://policing-redefined.netlify.app/docs/developer-docs/pr/ped-api/ped-detain-resist
 // Docs require the Citation's Ped to match the GiveCitationToPed ped parameter; we use the same ped for both.
 // Must run on game thread: PR API and ped menu expect game-thread execution.
+// Compile-time: no PolicingRedefined assembly reference — types are resolved at runtime when PR is loaded.
 using MDTPro.Data;
 using MDTPro.Setup;
-using PolicingRedefined.Interaction.Assets.PedAttributes;
 using Rage;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -94,11 +95,12 @@ namespace MDTPro.Utility {
             try {
                 if (!inVehicle) {
                     // On-foot: ensure PR knows the ped is stopped so hand-citation is available; avoid duplicate SetPedAsStopped when already stopped.
-                    var pedApiType = System.Type.GetType("PolicingRedefined.API.PedAPI, PolicingRedefined");
-                    if (pedApiType != null) {
+                    Type pedApiForStopped = ModIntegration.FindTypeInLoadedAssemblies("PolicingRedefined.API.PedAPI")
+                        ?? Type.GetType("PolicingRedefined.API.PedAPI, PolicingRedefined");
+                    if (pedApiForStopped != null) {
                         const BindingFlags pedApiFlags = BindingFlags.Public | BindingFlags.Static;
-                        MethodInfo setStopped = pedApiType.GetMethod("SetPedAsStopped", pedApiFlags);
-                        MethodInfo isStopped = pedApiType.GetMethod("IsPedStopped", pedApiFlags);
+                        MethodInfo setStopped = pedApiForStopped.GetMethod("SetPedAsStopped", pedApiFlags);
+                        MethodInfo isStopped = pedApiForStopped.GetMethod("IsPedStopped", pedApiFlags);
                         bool shouldSetStopped = true;
                         if (isStopped != null) {
                             try {
@@ -124,11 +126,34 @@ namespace MDTPro.Utility {
                 // Ignore PedAPI reflection failures
             }
 
+            Type citationType = ModIntegration.FindTypeInLoadedAssemblies("PolicingRedefined.Interaction.Assets.PedAttributes.Citation")
+                ?? Type.GetType("PolicingRedefined.Interaction.Assets.PedAttributes.Citation, PolicingRedefined");
+            Type pedApiType = ModIntegration.FindTypeInLoadedAssemblies("PolicingRedefined.API.PedAPI")
+                ?? Type.GetType("PolicingRedefined.API.PedAPI, PolicingRedefined");
+            MethodInfo giveCitation = pedApiType?.GetMethod("GiveCitationToPed", BindingFlags.Public | BindingFlags.Static);
+            if (citationType == null || giveCitation == null) {
+                Game.LogTrivial("[MDT Pro] PR citation handoff: Policing Redefined not loaded or API mismatch.");
+                return;
+            }
+
             foreach (CitationHandoutCharge charge in charges) {
                 if (charge == null || string.IsNullOrWhiteSpace(charge.Name)) continue;
-
-                Citation citation = new Citation(ped, charge.Name, charge.Fine, SetupController.GetLanguage().units.currencySymbol, SetupController.GetConfig().displayCurrencySymbolBeforeNumber, charge.IsArrestable);
-                PolicingRedefined.API.PedAPI.GiveCitationToPed(ped, citation);
+                object citation;
+                try {
+                    citation = Activator.CreateInstance(citationType, ped, charge.Name, charge.Fine,
+                        SetupController.GetLanguage().units.currencySymbol,
+                        SetupController.GetConfig().displayCurrencySymbolBeforeNumber,
+                        charge.IsArrestable);
+                } catch {
+                    Game.LogTrivial("[MDT Pro] PR citation handoff: could not construct Citation (API mismatch?).");
+                    return;
+                }
+                try {
+                    giveCitation.Invoke(null, new object[] { ped, citation });
+                } catch {
+                    Game.LogTrivial("[MDT Pro] PR citation handoff: GiveCitationToPed failed.");
+                    return;
+                }
             }
 
             string message = string.Format(SetupController.GetLanguage().inGame.handCitationTo ?? "Hand citation to {0}", pedName);

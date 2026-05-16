@@ -561,8 +561,8 @@ async function renderReports(reports, type) {
       case 'incident':
         const involvedPartiesElement = document.createElement('div')
         const involvedParties = [
-          ...report.OffenderPedsNames,
-          ...report.WitnessPedsNames,
+          ...(Array.isArray(report.OffenderPedsNames) ? report.OffenderPedsNames : []),
+          ...(Array.isArray(report.WitnessPedsNames) ? report.WitnessPedsNames : []),
         ]
         involvedPartiesElement.innerHTML = `${
           language.reports.list.involvedParties
@@ -777,6 +777,8 @@ async function renderReportInformation(report, type, isList) {
 
   switch (type) {
     case 'incident':
+      report.OffenderPedsNames = Array.isArray(report.OffenderPedsNames) ? report.OffenderPedsNames : []
+      report.WitnessPedsNames = Array.isArray(report.WitnessPedsNames) ? report.WitnessPedsNames : []
       if (!isList || report.OffenderPedsNames.length > 0) {
         reportBodyMount.appendChild(
           await getMultipleNameInputsSection(
@@ -1077,7 +1079,7 @@ async function getArrestAttachedReportsSection(report) {
 
   const help = document.createElement('p')
   help.className = 'arrestAttachedReportsHelp'
-  help.textContent = language.reports?.sections?.arrest?.attachedReportsHelp ?? 'Reports you attach are used as evidence. Those that directly support the case carry full weight; other attached reports still count but carry less weight (e.g. impound on a drug case, or a stolen firearm report—not ignored, just weighted less).'
+  help.textContent = language.reports?.sections?.arrest?.attachedReportsHelp ?? 'Court reads every attachment. Tight links to the defendant and charges add the most; side reports still help, only at lower weight.'
   section.appendChild(help)
 
   const listWrap = document.createElement('div')
@@ -1425,7 +1427,7 @@ async function onCreatePageTypeSelectorButtonClick(type) {
       hideLoadingOnButton(fillFromPriorBtn)
       return
     }
-    const latest = reports[reports.length - 1]
+    const latest = reports[0]
     const loc = latest?.Location
     const el = document.querySelector('.createPage .reportInformation')
     const fields = {
@@ -1549,6 +1551,17 @@ async function saveReport(type, options = {}) {
 
   let response
 
+  const postCreateReport = async (path, payload) => {
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const serverId = res.headers.get('X-Mdt-Report-Id')?.trim()
+    if (serverId) payload.Id = serverId
+    return res.text()
+  }
+
   switch (type) {
     case 'incident':
       report.OffenderPedsNames = []
@@ -1571,15 +1584,7 @@ async function saveReport(type, options = {}) {
         }
       }
 
-      response = await (
-        await fetch('/post/createIncidentReport', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(report),
-        })
-      ).text()
+      response = await postCreateReport('/post/createIncidentReport', report)
       break
     case 'citation':
       report.OffenderPedName = el
@@ -1614,15 +1619,7 @@ async function saveReport(type, options = {}) {
 
       report.CourtCaseNumber = null
 
-      response = await (
-        await fetch('/post/createCitationReport', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(report),
-        })
-      ).text()
+      response = await postCreateReport('/post/createCitationReport', report)
       break
     case 'arrest':
       report.OffenderPedName = el
@@ -1682,15 +1679,7 @@ async function saveReport(type, options = {}) {
       report.DocumentedDrugs = drugsEl ? drugsEl.checked === true : el.dataset.documentedDrugs === 'true'
       report.DocumentedFirearms = firearmsEl ? firearmsEl.checked === true : el.dataset.documentedFirearms === 'true'
 
-      response = await (
-        await fetch('/post/createArrestReport', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(report),
-        })
-      ).text()
+      response = await postCreateReport('/post/createArrestReport', report)
       break
     case 'impound':
       report.PersonAtFaultName = el.querySelector('#impoundSectionPersonAtFaultInput')?.value?.trim() || null
@@ -1701,13 +1690,7 @@ async function saveReport(type, options = {}) {
       report.ImpoundReason = el.querySelector('#impoundSectionReasonInput')?.value?.trim() || ''
       report.TowCompany = el.querySelector('#impoundSectionTowInput')?.value?.trim() || ''
       report.ImpoundLot = el.querySelector('#impoundSectionLotInput')?.value?.trim() || ''
-      response = await (
-        await fetch('/post/createImpoundReport', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(report),
-        })
-      ).text()
+      response = await postCreateReport('/post/createImpoundReport', report)
       break
     case 'trafficIncident': {
       const tiLabels = language.reports?.sections?.trafficIncident || {}
@@ -1727,13 +1710,7 @@ async function saveReport(type, options = {}) {
       report.InjuryReported = el.querySelector('#trafficIncidentInjuryCheck')?.checked === true
       report.InjuryDetails = el.querySelector('#trafficIncidentInjuryDetailsInput')?.value?.trim() || null
       report.CollisionType = el.querySelector('#trafficIncidentCollisionInput')?.value?.trim() || null
-      response = await (
-        await fetch('/post/createTrafficIncidentReport', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(report),
-        })
-      ).text()
+      response = await postCreateReport('/post/createTrafficIncidentReport', report)
       break
     }
     case 'propertyEvidence': {
@@ -1746,13 +1723,7 @@ async function saveReport(type, options = {}) {
       report.SeizedDrugTypes = report.SeizedDrugs.map(d => d.DrugType)
       report.SeizedFirearmTypes = Array.from(el.querySelectorAll('.propertyEvidenceFirearmItem')).map(item => item.dataset.firearmType || '').filter(Boolean)
       report.OtherContrabandNotes = el.querySelector('#propertyEvidenceOtherInput')?.value?.trim() || null
-      response = await (
-        await fetch('/post/createPropertyEvidenceReceiptReport', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(report)
-        })
-      ).text()
+      response = await postCreateReport('/post/createPropertyEvidenceReceiptReport', report)
       break
     }
     case 'injury': {
@@ -1764,13 +1735,7 @@ async function saveReport(type, options = {}) {
       report.IncidentContext = el.querySelector('#injurySectionContextInput')?.value?.trim() || null
       report.LinkedReportId = el.querySelector('#injurySectionLinkedReportInput')?.value?.trim() || null
       report.GameInjurySnapshot = injurySection?.dataset?.gameInjurySnapshot || null
-      response = await (
-        await fetch('/post/createInjuryReport', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(report),
-        })
-      ).text()
+      response = await postCreateReport('/post/createInjuryReport', report)
       break
     }
   }
@@ -1784,6 +1749,8 @@ async function saveReport(type, options = {}) {
     topWindow.showNotification(msg, 'error')
     return false
   }
+  const reportIdInput = el.querySelector('#generalInformationSectionReportIdInput')
+  if (reportIdInput && report.Id) reportIdInput.value = report.Id
   const attachToArrestId = sessionStorage.getItem('mdtproAttachPropertyEvidenceToArrestId')
   if (type === 'propertyEvidence' && attachToArrestId && report.Id) {
     sessionStorage.removeItem('mdtproAttachPropertyEvidenceToArrestId')
@@ -1851,7 +1818,7 @@ function showArrestSaveCautionDialog(language) {
     message.className = 'arrestCautionMessage'
     message.style.cssText = 'color:var(--color-text, #e0e0e0);line-height:1.45;margin-bottom:1rem;'
     message.textContent = language.reports?.notifications?.arrestSaveCautionMessage ||
-      'Remember to attach relevant reports (e.g. incident, injury) to this arrest report. The arrest report alone may not be enough evidence to secure a conviction in court—this depends on the case.'
+      'Add incident, injury, or other supporting reports if you want this arrest to stand on its own in court.'
 
     const okBtn = doc.createElement('button')
     okBtn.className = 'arrestCautionOk'

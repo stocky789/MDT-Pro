@@ -3,6 +3,7 @@
 using System;
 using MDTPro.Setup;
 using Rage;
+using Rage.Native;
 
 namespace MDTPro.Utility {
     internal static class CitationHandoffAnimation {
@@ -51,12 +52,42 @@ namespace MDTPro.Utility {
                 flags |= AnimationFlags.UpperBodyOnly | AnimationFlags.SecondaryTask;
 
             try {
-                Rage.Task t = player.Tasks.PlayAnimation(animDict, ClipName, 5f, flags);
-                t?.WaitForCompletion(8000);
+                // Do not use Task.WaitForCompletion here: on a GameFiber it can return before the clip ends,
+                // so citation follow-up (toast + suspect subtitle) would appear mid-animation. Poll the native instead.
+                Rage.Task started = player.Tasks.PlayAnimation(animDict, ClipName, 5f, flags);
+                if (started != null)
+                    WaitForClipboardAnimToFinish(player, animDict, ClipName);
             } catch {
                 /* ignore — dict or clip mismatch on some builds */
             } finally {
                 try { dict.Dismiss(); } catch { /* ignore */ }
+            }
+        }
+
+        /// <summary>Waits until the clipboard idle is no longer playing (natural end or player moved / cleared task). Yields the current fiber; does not hard-lock input.</summary>
+        private static void WaitForClipboardAnimToFinish(Ped player, string animDict, string clipName) {
+            try {
+                uint waitSeenStart = Game.GameTime + 900;
+                while (Game.GameTime < waitSeenStart) {
+                    if (IsEntityPlayingAnim(player, animDict, clipName)) break;
+                    GameFiber.Yield();
+                }
+
+                uint waitEnd = Game.GameTime + 12000;
+                while (Game.GameTime < waitEnd) {
+                    if (!IsEntityPlayingAnim(player, animDict, clipName)) break;
+                    GameFiber.Yield();
+                }
+            } catch {
+                /* ignore */
+            }
+        }
+
+        private static bool IsEntityPlayingAnim(Ped ped, string animDict, string animName) {
+            try {
+                return NativeFunction.Natives.IS_ENTITY_PLAYING_ANIM<bool>(ped, animDict, animName, 3);
+            } catch {
+                return false;
             }
         }
 

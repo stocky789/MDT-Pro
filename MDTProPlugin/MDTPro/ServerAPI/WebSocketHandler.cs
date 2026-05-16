@@ -19,6 +19,9 @@ namespace MDTPro.ServerAPI {
         private static readonly List<WebSocket> WebSockets = new List<WebSocket>();
         private static readonly HashSet<WebSocket> AlprSubscribers = new HashSet<WebSocket>();
         private static readonly HashSet<WebSocket> CalloutSubscribers = new HashSet<WebSocket>();
+        private static readonly HashSet<WebSocket> DataInvalidationSubscribers = new HashSet<WebSocket>();
+        private static readonly Dictionary<string, DateTime> DataInvalidationLastSentUtc = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        private const int DataInvalidationCoalesceMs = 250;
         private static readonly object WebSocketLock = new Object();
         private static readonly Dictionary<WebSocket, CancellationTokenSource> IntervalTokens = new Dictionary<WebSocket, CancellationTokenSource>();
 
@@ -92,6 +95,10 @@ namespace MDTPro.ServerAPI {
                                 };
                                 CalloutEvents.OnCalloutEvent += calloutEventHandler;
                                 break;
+                            case "dataInvalidationSubscribe":
+                                lock (WebSocketLock) { DataInvalidationSubscribers.Add(webSocket); }
+                                await SendData(webSocket, "{\"scope\":\"all\"}", clientMsg);
+                                break;
                             default:
                                 await SendData(webSocket, $"\"Unknown command: '{clientMsg}'\"", clientMsg);
                                 break;
@@ -107,6 +114,7 @@ namespace MDTPro.ServerAPI {
                         WebSockets.Remove(webSocket);
                         AlprSubscribers.Remove(webSocket);
                         CalloutSubscribers.Remove(webSocket);
+                        DataInvalidationSubscribers.Remove(webSocket);
                         if (IntervalTokens.TryGetValue(webSocket, out var cts)) {
                             try { cts.Cancel(); } catch { }
                             IntervalTokens.Remove(webSocket);
@@ -125,7 +133,7 @@ namespace MDTPro.ServerAPI {
             return Task.Run(async () => {
                 if (IsPerformanceDiagnosticLoggingEnabled())
                     Log($"[Perf] WebSocket interval started: {clientMsg}", false, LogSeverity.Info);
-                int intervalMs = 1000;
+                int intervalMs = Config.PerfCaptureIntervalMs.WebSocket;
                 try {
                     int iv = SetupController.GetConfig().webSocketUpdateInterval;
                     if (iv < 50) iv = 50;
@@ -140,12 +148,9 @@ namespace MDTPro.ServerAPI {
                         string responseMsg;
                         switch (clientMsg) {
                             case "playerLocation":
-                                // Location is already refreshed on the game fiber by SetupController's
-                                // "dynamic-data-update-interval" loop at the same webSocketUpdateInterval.
-                                // Do not call RefreshMdtLocationOnGameFiberBlocking here: it duplicated
-                                // expensive address resolution (zone/street/postal) and queued blocking work
-                                // that starved GameFiberHttpBridge and caused stutter when any MDT client
-                                // held a location WebSocket open.
+                                // Mark visible taskbar demand; the scheduler resolves address data on its passive cadence
+                                // only while a client is actively watching it.
+                                DataController.MarkMdtLocationDemand();
                                 responseMsg = JsonConvert.SerializeObject(DataController.MdtPreferredLocation);
 
                                 if (responseMsg != lastLocationJson) {
@@ -206,6 +211,33 @@ namespace MDTPro.ServerAPI {
             }
         }
 
+        /// <summary>Notify subscribed clients that <paramref name="scope"/> data changed. Per-scope coalesce
+        /// (~250 ms) absorbs event bursts (e.g. STP firing license + registration + insurance back-to-back)
+        /// without flooding the WS or the client refresh handlers.</summary>
+        internal static void BroadcastDataInvalidation(string scope) {
+            string safeScope = string.IsNullOrWhiteSpace(scope) ? "all" : scope.Trim();
+            DateTime now = DateTime.UtcNow;
+            byte[] bytes;
+            List<WebSocket> targets;
+            lock (WebSocketLock) {
+                if (DataInvalidationSubscribers.Count == 0) return;
+                if (DataInvalidationLastSentUtc.TryGetValue(safeScope, out DateTime last)
+                    && (now - last).TotalMilliseconds < DataInvalidationCoalesceMs)
+                    return;
+                DataInvalidationLastSentUtc[safeScope] = now;
+                string inner = JsonConvert.SerializeObject(new { scope = safeScope });
+                string msg = $"{{\"response\":{inner},\"request\":\"dataInvalidationSubscribe\"}}";
+                bytes = Encoding.UTF8.GetBytes(msg);
+                targets = new List<WebSocket>(DataInvalidationSubscribers);
+            }
+            foreach (var ws in targets) {
+                try {
+                    if (ws.State == WebSocketState.Open)
+                        ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
+                } catch { }
+            }
+        }
+
         private static async Task SendData(WebSocket webSocket, string data, string clientMsg, CancellationToken token = default) {
             string responseMsg = $"{{ \"response\": {data}, \"request\": \"{clientMsg}\" }}";
 
@@ -249,6 +281,8 @@ namespace MDTPro.ServerAPI {
                 IntervalTokens.Clear();
                 AlprSubscribers.Clear();
                 CalloutSubscribers.Clear();
+                DataInvalidationSubscribers.Clear();
+                DataInvalidationLastSentUtc.Clear();
 
                 webSocketsArr = WebSockets.ToArray();
                 WebSockets.Clear();

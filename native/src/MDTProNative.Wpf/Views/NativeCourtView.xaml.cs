@@ -306,7 +306,12 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
         body.Children.Add(BuildAttachedReportsSection(c, synth, status));
 
         if (status == 0 && !synth)
-            body.Children.Add(BuildActionsPanel(c));
+        {
+            var evidenceAttachAllowed = true;
+            if (c["ResolveAtUtc"]?.ToString() is { } ru && NativeMdtFormat.TryParseMdtDateTime(ru, out var resolveAt))
+                evidenceAttachAllowed = DateTime.UtcNow < resolveAt.ToUniversalTime();
+            body.Children.Add(BuildActionsPanel(c, evidenceAttachAllowed));
+        }
 
         return new Expander
         {
@@ -886,7 +891,7 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
         }
     };
 
-    Border BuildActionsPanel(JObject c)
+    Border BuildActionsPanel(JObject c, bool evidenceAttachAllowed)
     {
         var num = c["Number"]?.ToString() ?? "";
         if (string.IsNullOrWhiteSpace(num))
@@ -938,6 +943,8 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
             ToolTip = "Attach or detach one report ID at a time."
         };
         sp.Children.Add(attachTb);
+        if (!evidenceAttachAllowed)
+            sp.Children.Add(Muted("Evidence links are locked after the scheduled court date."));
 
         var btnRow = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
         var applyBtn = new Button
@@ -946,29 +953,19 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
             Style = (Style)FindResource("CadPrimaryActionButton"),
             Margin = new Thickness(0, 0, 8, 8)
         };
-        var dismissBtn = new Button
-        {
-            Content = "DISMISS CASE",
-            Style = (Style)FindResource("CadRailOutlineButton"),
-            Margin = new Thickness(0, 0, 8, 8)
-        };
-        var forceBtn = new Button
-        {
-            Content = "AUTO-RESOLVE",
-            Style = (Style)FindResource("CadRailOutlineButton"),
-            Margin = new Thickness(0, 0, 8, 8)
-        };
         var attachBtn = new Button
         {
             Content = "ATTACH",
             Style = (Style)FindResource("CadRailOutlineButton"),
-            Margin = new Thickness(0, 0, 8, 8)
+            Margin = new Thickness(0, 0, 8, 8),
+            IsEnabled = evidenceAttachAllowed
         };
         var detachBtn = new Button
         {
             Content = "DETACH",
             Style = (Style)FindResource("CadRailOutlineButton"),
-            Margin = new Thickness(0, 0, 8, 8)
+            Margin = new Thickness(0, 0, 8, 8),
+            IsEnabled = evidenceAttachAllowed
         };
 
         JObject BuildStatusPayload(int newStatus) => new JObject
@@ -1002,55 +999,6 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
                     }
                     else
                         MessageBox.Show($"Update failed ({(int)code}).\n\n{resp}", "Court", MessageBoxButton.OK, MessageBoxImage.Warning);
-                });
-                if (code == HttpStatusCode.OK)
-                    await LoadCoreAsync();
-            }, minimumVisibleMs: 540);
-        };
-
-        dismissBtn.Click += async (_, _) =>
-        {
-            var http = _connection?.Http;
-            if (http == null) return;
-            var payload = BuildStatusPayload(3);
-            await MdtBusyUi.RunAsync(DocketBusy, "COURT", "Dismissing case…", async () =>
-            {
-                var (code, resp) = await http.PostActionAsync("updateCourtCaseStatus", payload.ToString(Formatting.None)).ConfigureAwait(false);
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    if (code == HttpStatusCode.OK)
-                    {
-                        CadCourtCaseSound.TryPlay();
-                        MessageBox.Show("Case dismissed.", "Court", MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
-                    else
-                        MessageBox.Show($"Dismiss failed ({(int)code}).\n\n{resp}", "Court", MessageBoxButton.OK, MessageBoxImage.Warning);
-                });
-                if (code == HttpStatusCode.OK)
-                    await LoadCoreAsync();
-            }, minimumVisibleMs: 540);
-        };
-
-        forceBtn.Click += async (_, _) =>
-        {
-            var http = _connection?.Http;
-            if (http == null) return;
-            var pleaValForce = pleaCb.SelectedItem as string ?? pleaOptions[0];
-            var payload = new JObject
-            {
-                ["Number"] = num,
-                ["Plea"] = pleaValForce,
-                ["OutcomeNotes"] = notesTb.Text ?? ""
-            };
-            await MdtBusyUi.RunAsync(DocketBusy, "COURT", "Running automated resolution…", async () =>
-            {
-                var (code, resp) = await http.PostActionAsync("forceResolveCourtCase", payload.ToString(Formatting.None)).ConfigureAwait(false);
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    if (code == HttpStatusCode.OK)
-                        MessageBox.Show("Case resolved (simulation).", "Court", MessageBoxButton.OK, MessageBoxImage.Information);
-                    else
-                        MessageBox.Show($"Auto-resolve failed ({(int)code}).\n\n{resp}", "Court", MessageBoxButton.OK, MessageBoxImage.Warning);
                 });
                 if (code == HttpStatusCode.OK)
                     await LoadCoreAsync();
@@ -1114,8 +1062,6 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
         };
 
         btnRow.Children.Add(applyBtn);
-        btnRow.Children.Add(dismissBtn);
-        btnRow.Children.Add(forceBtn);
         btnRow.Children.Add(attachBtn);
         btnRow.Children.Add(detachBtn);
         sp.Children.Add(btnRow);

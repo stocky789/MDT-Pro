@@ -303,11 +303,8 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
             ("Plate", NativeMdtFormat.Text(v["LicensePlate"]), text),
             ("VIN", NativeMdtFormat.Text(v["VehicleIdentificationNumber"]), text),
             ("VIN status", NativeMdtFormat.Text(v["VinStatus"]), NativeVehicleSearchBrushes.ForVinStatus(v["VinStatus"], text, ok, warn, bad)),
-            ("Model", NativeMdtFormat.Text(v["ModelDisplayName"]), text),
-            ("Make / model", JoinMakeModel(v), text),
+            ("Display name", NativeMdtFormat.Text(v["ModelDisplayName"]), text),
             ("Color", NativeMdtFormat.Text(v["Color"]), text),
-            ("Primary", NativeMdtFormat.Text(v["PrimaryColor"]), text),
-            ("Secondary", NativeMdtFormat.Text(v["SecondaryColor"]), text),
             ("Owner", NativeMdtFormat.Text(v["Owner"]), text),
             ("Stolen", NativeMdtFormat.YesNo(v["IsStolen"]), NativeVehicleSearchBrushes.ForVehicleField(v["IsStolen"], text, ok, warn, bad)),
             ("Registration", NativeMdtFormat.Text(v["RegistrationStatus"]), NativeVehicleSearchBrushes.ForVehicleField(v["RegistrationStatus"], text, ok, warn, bad)),
@@ -625,16 +622,6 @@ public partial class VehicleSearchView : UserControl, IMdtBoundView
             if (!VehicleDataPropertyNames.Contains(p.Name))
                 p.Remove();
         }
-    }
-
-    static string JoinMakeModel(JObject v)
-    {
-        var mk = v["Make"]?.ToString()?.Trim();
-        var md = v["Model"]?.ToString()?.Trim();
-        if (string.IsNullOrEmpty(mk) && string.IsNullOrEmpty(md)) return "—";
-        if (string.IsNullOrEmpty(mk)) return md ?? "—";
-        if (string.IsNullOrEmpty(md)) return mk ?? "—";
-        return $"{mk} {md}";
     }
 
     async Task TryAddBoloAsync(string plate, string reason, string modelDisplay)

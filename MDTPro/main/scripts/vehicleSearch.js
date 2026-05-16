@@ -38,28 +38,86 @@
   await loadNearbyVehicles()
   await loadSearchHistory()
 
-  // Auto-refresh nearby vehicles and search history for real-time updates (3s to avoid excessive server/game load)
-  const REFRESH_INTERVAL_MS = 3000
-  let refreshTimer = null
-  function startRefreshTimer() {
-    if (refreshTimer) return
-    refreshTimer = setInterval(async () => {
-      if (document.hidden) return
-      await loadNearbyVehicles()
-      await loadSearchHistory()
-    }, REFRESH_INTERVAL_MS)
+  const FALLBACK_REFRESH_INTERVAL_MS = 30000
+  let fallbackRefreshTimer = null
+  async function refreshVehicleLists() {
+    if (document.hidden) return
+    await loadNearbyVehicles()
+    await loadSearchHistory()
   }
-  function stopRefreshTimer() {
-    if (refreshTimer) {
-      clearInterval(refreshTimer)
-      refreshTimer = null
+  function startFallbackRefreshTimer() {
+    if (fallbackRefreshTimer) return
+    fallbackRefreshTimer = setInterval(refreshVehicleLists, FALLBACK_REFRESH_INTERVAL_MS)
+  }
+  function stopFallbackRefreshTimer() {
+    if (fallbackRefreshTimer) {
+      clearInterval(fallbackRefreshTimer)
+      fallbackRefreshTimer = null
     }
   }
-  document.addEventListener('visibilitychange', () => {
-    document.hidden ? stopRefreshTimer() : startRefreshTimer()
+  function connectInvalidationSocket() {
+    let reconnectTimer = null
+    let socket = null
+    let stopped = false
+    const scheduleReconnect = () => {
+      if (stopped || reconnectTimer) return
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null
+        connect()
+      }, 3000)
+    }
+    const connect = () => {
+      if (stopped) return
+      try {
+        const scheme = location.protocol === 'https:' ? 'wss' : 'ws'
+        const ws = new WebSocket(`${scheme}://${location.host}/ws`)
+        socket = ws
+        ws.onopen = () => {
+          stopFallbackRefreshTimer()
+          ws.send('dataInvalidationSubscribe')
+        }
+        ws.onmessage = async (event) => {
+          const msg = JSON.parse(event.data)
+          const scope = msg?.response?.scope || 'all'
+          if (scope === 'all' || scope === 'vehicleSearch') await refreshVehicleLists()
+        }
+        ws.onclose = () => {
+          if (socket === ws) socket = null
+          startFallbackRefreshTimer()
+          scheduleReconnect()
+        }
+        ws.onerror = () => {
+          try { ws.close() } catch (_) {}
+        }
+      } catch (_) {
+        startFallbackRefreshTimer()
+        scheduleReconnect()
+      }
+    }
+    connect()
+    return () => {
+      stopped = true
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      if (socket) {
+        try { socket.close() } catch (_) {}
+        socket = null
+      }
+    }
+  }
+  const stopInvalidationSocket = connectInvalidationSocket()
+  startFallbackRefreshTimer()
+  document.addEventListener('visibilitychange', async () => {
+    if (document.hidden) {
+      stopFallbackRefreshTimer()
+    } else {
+      await refreshVehicleLists()
+      startFallbackRefreshTimer()
+    }
   })
-  if (!document.hidden) startRefreshTimer()
-  window.addEventListener('pagehide', stopRefreshTimer)
+  window.addEventListener('pagehide', () => {
+    stopFallbackRefreshTimer()
+    stopInvalidationSocket?.()
+  })
 })()
 
 document
@@ -92,14 +150,17 @@ document
   .addEventListener('click', async function () {
     if (this.classList.contains('loading')) return
     showLoadingOnButton(this)
-    await loadNearbyVehicles()
+    await loadNearbyVehicles({ explicitScan: true })
     hideLoadingOnButton(this)
   })
 
-async function loadNearbyVehicles() {
+async function loadNearbyVehicles(options = {}) {
   const language = await getLanguage()
+  const url = options.explicitScan
+    ? '/data/nearbyVehicles?scan=explicit'
+    : '/data/nearbyVehicles'
   const nearbyVehicles = await (
-    await fetch('/data/nearbyVehicles', {
+    await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: '8',
@@ -210,6 +271,13 @@ async function performSearch(query) {
     return
   }
 
+  if (typeof response === 'object' && response !== null) {
+    const o = response
+    const ownerEmpty = o.Owner == null || String(o.Owner).trim() === ''
+    if (ownerEmpty && o.ownerName) o.Owner = o.ownerName
+    else if (ownerEmpty && o.OwnerName) o.Owner = o.OwnerName
+  }
+
   // Alert notification for stolen vehicles
   if (response.IsStolen) {
     topWindow.showNotification(
@@ -222,6 +290,10 @@ async function performSearch(query) {
   document.title = `${language.vehicleSearch.static.title}: ${response.LicensePlate}`
 
   document.querySelector('.searchResponseWrapper').classList.remove('hidden')
+
+  document.querySelectorAll('.searchResponseWrapper .basicInfo > div').forEach((w) => {
+    w.classList.remove('hidden')
+  })
 
   for (const key of Object.keys(response)) {
     const el = document.querySelector(
@@ -317,6 +389,26 @@ async function performSearch(query) {
       default:
         el.value = await getLanguageValue(response[key])
         el.style.color = getColorForValue(response[key])
+    }
+  }
+
+  const emptyToken = language.values.empty
+  const basicInfo = document.querySelector('.searchResponseWrapper .basicInfo')
+  if (basicInfo) {
+    for (const wrap of basicInfo.querySelectorAll(':scope > div')) {
+      const colorDiv = wrap.querySelector('[data-property="Color"]')
+      if (colorDiv) {
+        const t = (colorDiv.textContent || '').trim()
+        const hasRgbBg = !!(colorDiv.style && colorDiv.style.backgroundColor)
+        if (!t && !hasRgbBg) wrap.classList.add('hidden')
+        continue
+      }
+      const inp = wrap.querySelector('input[data-property]')
+      if (!inp) continue
+      const prop = inp.getAttribute('data-property')
+      if (prop !== 'Owner' && prop !== 'VinStatus') continue
+      const v = (inp.value || '').trim()
+      if (!v || v === emptyToken) wrap.classList.add('hidden')
     }
   }
 

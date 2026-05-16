@@ -2,7 +2,46 @@
 
 namespace MDTPro.Setup {
     internal class Config {
+        /// <summary>Production scheduler defaults. Decoder: Ws=dynamic/WebSocket tick, Db=data pass, Ploc=passive street resolve, Pnv=passive nearby-vehicle cache, FHeld=firearm held pass, FPkup=PR pickup scan, Cloud=cloud flush, ExVehCd=manual nearby-veh scan cooldown, LiveLocAge=blocking location max age.</summary>
+        internal static class PerfCaptureIntervalMs {
+            internal const int WebSocket = 2000;
+            internal const int Database = 8000;
+            internal const int PassiveLocation = 10000;
+            internal const int PassiveNearbyVehicle = 10000;
+            internal const int FirearmPlayerHeld = 2000;
+            internal const int FirearmPickup = 30000;
+            internal const int CloudSyncFlush = 10000;
+            internal const int ExplicitNearbyVehicleCooldown = 2000;
+            internal const int LiveLocationMaxAge = 5000;
+        }
+
         public int port = 9000;
+        /// <summary>Local keeps the existing SQLite + localhost server workflow. Cloud keeps local game/CDF integration but syncs persistent records through the central API.</summary>
+        public string storageMode = "Local";
+        /// <summary>Default MDT Cloud API and hosted portal origin.</summary>
+        public string cloudApiBaseUrl = MDTPro.Cloud.CloudPublicApi.NormalizedBase();
+        /// <summary>Stable local install id for cloud device linking. Generated when missing.</summary>
+        public string cloudInstallId = "";
+        /// <summary>Legacy migration only. Runtime cloud tokens are stored with Windows DPAPI.</summary>
+        public string cloudAccessToken = "";
+        /// <summary>Legacy migration only. Runtime cloud tokens are stored with Windows DPAPI.</summary>
+        public string cloudRefreshToken = "";
+        /// <summary>Minimum delay between queued cloud sync flushes. Prevents CDF/game polling loops from hammering the API.</summary>
+        public int cloudSyncFlushIntervalMs = PerfCaptureIntervalMs.CloudSyncFlush;
+        /// <summary>Maximum queued sync envelopes retained locally before oldest entries are dropped.</summary>
+        public int cloudSyncMaxQueuedItems = 1000;
+        /// <summary>When true, cloud mode keeps using local SQLite/cache if the central API is temporarily unavailable.</summary>
+        public bool cloudOfflineFallbackEnabled = true;
+        /// <summary>Last successful cloud hydrate watermark. Used for delta pulls after the initial shared-world bootstrap.</summary>
+        public string cloudHydrateSinceUtc = "";
+        public bool mapEnabledInCloud = false;
+        public bool gpsEnabledInCloud = false;
+        public bool activeCalloutsEnabledInCloud = false;
+        public bool alprCloudEnabled = true;
+        public bool backupPanicCloudEnabled = true;
+        public int pluginSessionStaleSeconds = 120;
+        public int syncBatchSize = 50;
+        public int hydrateBatchSize = 1000;
         /// <summary>When true, show the in-game notification with MDT URLs (local IP and PC name) when the HTTP server starts. Disable for streaming to avoid exposing host/network info on screen; URLs remain in MDTPro/ipAddresses.txt and the log.</summary>
         public bool showListeningAddressNotification = true;
         /// <summary>After a StopThePed citation handoff attempt (when Policing Redefined is not handling citations), play a short vanilla GTA clipboard idle on the player for a paperwork moment. Uses amb@world_human_clipboard clips, not StopThePed internals.</summary>
@@ -53,9 +92,27 @@ namespace MDTPro.Setup {
         public int maxNumberOfNearbyPedsOrVehicles = 15;
         public int databaseLimitMultiplier = 10;
         /// <summary>Milliseconds between WebSocket pushes for time, location, and map coords. Higher = less CPU; 1000 is smooth for taskbar/map.</summary>
-        public int webSocketUpdateInterval = 1000;
-        /// <summary>Milliseconds between <see cref="DataController.SetDatabases"/> runs on the data-update fiber (nearby ped/vehicle scan, pending cases, vehicle-search capture). Lower = peds/vehicles enter the MDT pool sooner; higher = less CPU.</summary>
-        public int databaseUpdateInterval = 5000;
+        public int webSocketUpdateInterval = PerfCaptureIntervalMs.WebSocket;
+        /// <summary>Milliseconds between <see cref="DataController.SetDatabases"/> runs on the combined game-work scheduler (nearby ped/vehicle scan when enabled by game work mode, pending cases, vehicle-search capture). Lower = peds/vehicles enter the MDT pool sooner; higher = less CPU.</summary>
+        public int databaseUpdateInterval = PerfCaptureIntervalMs.Database;
+        /// <summary>Minimum milliseconds between passive street/area/postal resolves. Explicit report/search paths can still force a refresh when needed.</summary>
+        public int passiveLocationRefreshIntervalMs = PerfCaptureIntervalMs.PassiveLocation;
+        /// <summary>Minimum movement before passive location resolves run again. Coords still update every WebSocket tick.</summary>
+        public float passiveLocationRefreshDistanceMeters = 12f;
+        /// <summary>Maximum tolerated address age for report/location actions before forcing a fresh location resolve.</summary>
+        public int liveLocationRefreshMaxAgeMs = PerfCaptureIntervalMs.LiveLocationMaxAge;
+        /// <summary>Minimum milliseconds between passive nearby-vehicle cache refreshes.</summary>
+        public int passiveNearbyVehicleRefreshIntervalMs = PerfCaptureIntervalMs.PassiveNearbyVehicle;
+        /// <summary>Cooldown for explicit wider nearby-vehicle scans requested by manual refreshes.</summary>
+        public int explicitNearbyVehicleScanCooldownMs = PerfCaptureIntervalMs.ExplicitNearbyVehicleCooldown;
+        /// <summary>Radius in meters for explicit nearby vehicle searches before falling back to full streamed-pool enumeration.</summary>
+        public float explicitNearbyVehicleScanRadiusMeters = 95f;
+        /// <summary>Minimum milliseconds between player-held firearm checks.</summary>
+        public int firearmPlayerHeldScanIntervalMs = PerfCaptureIntervalMs.FirearmPlayerHeld;
+        /// <summary>Minimum milliseconds between PR ground-pickup firearm scans.</summary>
+        public int firearmPickupScanIntervalMs = PerfCaptureIntervalMs.FirearmPickup;
+        /// <summary>Maximum PR vehicle-search records inspected per database-update tick.</summary>
+        public int prVehicleSearchCaptureMaxPerPass = 16;
         public bool updateDomWithLanguageOnLoad = false;
         public bool useInGameTime = false;
         public bool showSecondsInTaskbarClock = false;
@@ -70,6 +127,8 @@ namespace MDTPro.Setup {
         public float reEncounterVehicleChance = 0.08f;
         /// <summary>Chance (0-1) for vehicle re-encounter when driver is a known/persistent ped (same person, same car).</summary>
         public float reEncounterVehicleChanceWhenPedKnown = 0.85f;
+        /// <summary>Chance (0-1) for PED re-encounter when the PED model matches and the driven vehicle matches a vehicle owned by that PED.</summary>
+        public float reEncounterPedChanceWhenOwnedVehicleMatches = 0.85f;
         public int maxNumberOfPriorCitations = 5;
         public int maxNumberOfPriorArrests = 3;
         public int maxNumberOfPriorArrestsWithWarrant = 8;
@@ -230,6 +289,13 @@ namespace MDTPro.Setup {
         public bool verboseFileLogging = false;
         /// <summary>When true, writes <c>[Perf]</c> lines to MDTPro.log (WebSocket/HTTP/bridge as implemented). Periodic location+nearby timing is throttled so the game fiber does not sync-append to disk every second. Turn off after testing.</summary>
         public bool performanceDiagnosticLogging = false;
+
+        /// <summary>Performance = no passive full world hydration; street/postal still refresh about every 30s for reports. Balanced = demand-gated location plus that same 30s poll. Live = prior-style frequent passive refresh every pass.</summary>
+        public string gameWorkMode = "Performance";
+        /// <summary>Max milliseconds per scheduler loop spent draining HTTP/WebSocket game-bridge queue (1–25).</summary>
+        public int gameWorkBridgeBudgetMsPerTick = 2;
+        /// <summary>When false, PR ground-pickup firearm enumeration is skipped in Performance mode; player-held capture still follows its interval. Ignored for Balanced/Live (pickup scans stay on).</summary>
+        public bool passivePickupFirearmScanEnabled = false;
         /// <summary>When the log file exceeds this size (KB), it is shortened automatically (newest half kept). 0 = no limit.</summary>
         public int logFileMaxSizeKb = 5120;
     }

@@ -6,6 +6,7 @@ using MDTPro.Utility;
 using MDTPro.ALPR.Sensors;
 using Rage;
 using System;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
 using static MDTPro.Setup.SetupController;
@@ -173,7 +174,14 @@ namespace MDTPro.ALPR {
                         TerminalSession.Prune(AlprDefaults.TerminalMaxRows, AlprDefaults.TerminalHistoryMinutes);
                     }
 
+                    bool perfDiag = IsPerformanceDiagnosticLoggingEnabled();
+                    var swAlpr = perfDiag ? Stopwatch.StartNew() : null;
                     RunAdvancedScan(cfg, playerVehicle);
+                    if (perfDiag && swAlpr != null) {
+                        long ms = swAlpr.ElapsedMilliseconds;
+                        if (ms >= 5)
+                            Log($"[Perf] ALPR RunAdvancedScan {ms}ms", false, LogSeverity.Info);
+                    }
                 } catch (Exception ex) {
                     Log($"ALPR scan error: {ex.Message}", false, LogSeverity.Error);
                 }
@@ -240,7 +248,7 @@ namespace MDTPro.ALPR {
             CommitAlprReadToTerminalAndAlerts(chosen.read, chosen.hit, chosen.plateKey, cooldownSec);
         }
 
-        /// <summary>Writes one read to the terminal, detail hold, and severe web/sound path (after any random gate).</summary>
+        /// <summary>Writes one read to the terminal, detail hold, optional cloud sync for compact-flag reads, and severe-only sound/blip (after any random gate).</summary>
         private static void CommitAlprReadToTerminalAndAlerts(PlateReadResult read, ALPRHit hit, string plateKey, int cooldownSec) {
             Vehicle v = read.Target;
             if (v == null || !v.Exists()) return;
@@ -257,8 +265,13 @@ namespace MDTPro.ALPR {
                 TryPromoteOrRefreshDisplayedHit(hit, holdSec, severe);
             }
 
-            if (!severe)
+            if (string.IsNullOrWhiteSpace(compact))
                 return;
+
+            if (!severe) {
+                TryEnqueueWebToastFromScanner(hit);
+                return;
+            }
 
             bool plateFresh;
             lock (Lock) {
@@ -323,9 +336,33 @@ namespace MDTPro.ALPR {
 
         /// <summary>Queues a web/native MDT ALPR toast from the built-in scanner (same WebSocket path as the browser plugin).</summary>
         internal static void TryEnqueueWebToastFromScanner(ALPRHit hit) {
-            if (hit == null || !AlprHitBuilder.HasSevereAlertForPromotion(hit)) return;
+            if (hit?.Flags == null || hit.Flags.Count == 0) return;
+            string installId = GetConfig()?.cloudInstallId;
+            var payload = Newtonsoft.Json.Linq.JObject.FromObject(new {
+                plate = hit.Plate,
+                sourceInstallId = installId,
+                encounterKey = BuildAlprEncounterKey(installId, hit.Plate),
+                hitType = hit.Flags != null ? string.Join(", ", hit.Flags) : null,
+                observedAtUtc = hit.TimeScanned == default(DateTime) ? DateTime.UtcNow.ToString("o") : hit.TimeScanned.ToUniversalTime().ToString("o"),
+                payload = hit
+            });
+            MDTPro.Cloud.CloudIdentityCache.ApplyVehicleId(payload);
+            MDTPro.Cloud.CloudSyncQueue.Enqueue("alpr", "upsert", payload);
             var copy = hit;
             System.Threading.ThreadPool.QueueUserWorkItem(_ => WebSocketHandler.BroadcastALPRHit(copy));
+        }
+
+        private static string BuildAlprEncounterKey(string installId, string plate) {
+            string normalizedInstall = NormalizeAlprIdentity(installId);
+            string normalizedPlate = NormalizeAlprIdentity(plate);
+            return string.IsNullOrWhiteSpace(normalizedInstall) || string.IsNullOrWhiteSpace(normalizedPlate)
+                ? null
+                : "install|" + normalizedInstall + "|plate|" + normalizedPlate;
+        }
+
+        private static string NormalizeAlprIdentity(string value) {
+            if (string.IsNullOrWhiteSpace(value)) return "";
+            return new string(value.Trim().ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
         }
 
         private static void PlayAlprHitSound() {

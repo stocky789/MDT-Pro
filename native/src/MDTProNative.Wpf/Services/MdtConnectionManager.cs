@@ -32,10 +32,16 @@ public sealed class MdtConnectionManager : IAsyncDisposable
     public event Action<JArray?, int, string?>? CalloutsUpdated;
     public event Action<string>? Log;
 
-    public async Task ConnectAsync(string host, int port, CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(string host, int port, string? bridgeAuthToken = null, CancellationToken cancellationToken = default)
     {
         await DisconnectAsync().ConfigureAwait(false);
-        var endpoint = new MdtServerEndpoint(host, port);
+        if (string.IsNullOrWhiteSpace(bridgeAuthToken))
+        {
+            using var probe = new MdtHttpClient(new MdtServerEndpoint(host, port));
+            var (_, token) = await probe.ProbeVersionAsync(cancellationToken).ConfigureAwait(false);
+            bridgeAuthToken = token;
+        }
+        var endpoint = new MdtServerEndpoint(host, port, bridgeAuthToken);
         Endpoint = endpoint;
         _http = new MdtHttpClient(endpoint);
 

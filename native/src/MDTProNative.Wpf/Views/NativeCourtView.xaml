@@ -38,7 +38,7 @@
                    Foreground="{StaticResource CadMuted}"
                    FontSize="11"
                    Margin="0,0,0,8"
-                   Text="Docket matches the browser Court module: expand a case for timeline, scoring, trial model, evidence breakdown, attached reports, and disposition text. Pending cases: save plea/notes, dismiss, attach/detach evidence, or auto-resolve. Use defendant / report links to jump to Person or Reports." />
+                   Text="Same docket as browser Court. Expand a row for timeline, scores, trial mode, evidence, attachments, and disposition. MDT Cloud resolves outcomes. Defendant and report links open Person or Reports." />
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel x:Name="CaseStack" />
         </ScrollViewer>

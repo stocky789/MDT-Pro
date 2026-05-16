@@ -53,6 +53,13 @@ namespace MDTPro.EventListeners {
 
         private static readonly List<(EventInfo Event, Delegate Handler)> _prHandlerRegistrations = new List<(EventInfo, Delegate)>();
 
+        /// <summary><see cref="Type.GetType(string)"/> often fails for plugin assemblies; prefer scanning loaded assemblies first.</summary>
+        static Type ResolvePolicingRedefinedType(string fullName, string assemblyQualifiedName) {
+            Type t = ModIntegration.FindTypeInLoadedAssemblies(fullName);
+            if (t != null) return t;
+            return Type.GetType(assemblyQualifiedName, throwOnError: false, ignoreCase: false);
+        }
+
         private static void RegisterPrHandler(EventInfo eventInfo, Delegate handler) {
             eventInfo.AddEventHandler(null, handler);
             _prHandlerRegistrations.Add((eventInfo, handler));
@@ -76,7 +83,7 @@ namespace MDTPro.EventListeners {
             if (subscribed) return;
 
             try {
-                Type eventsApiType = Type.GetType("PolicingRedefined.API.EventsAPI, PolicingRedefined");
+                Type eventsApiType = ResolvePolicingRedefinedType("PolicingRedefined.API.EventsAPI", "PolicingRedefined.API.EventsAPI, PolicingRedefined");
                 if (eventsApiType == null) return;
 
                 foreach (string eventName in eventNames) {
@@ -99,7 +106,7 @@ namespace MDTPro.EventListeners {
 
         private static void SubscribeToOnFootTrafficStopStarted() {
             try {
-                Type apiType = Type.GetType("PolicingRedefined.API.OnFootTrafficStopAPI, PolicingRedefined");
+                Type apiType = ResolvePolicingRedefinedType("PolicingRedefined.API.OnFootTrafficStopAPI", "PolicingRedefined.API.OnFootTrafficStopAPI, PolicingRedefined");
                 if (apiType == null) return;
                 EventInfo eventInfo = apiType.GetEvent("OnFootTrafficStopStarted", BindingFlags.Public | BindingFlags.Static);
                 if (eventInfo == null) return;
@@ -155,7 +162,7 @@ namespace MDTPro.EventListeners {
 
         private static void SubscribeToOnFootTrafficStopEnded() {
             try {
-                Type apiType = Type.GetType("PolicingRedefined.API.OnFootTrafficStopAPI, PolicingRedefined");
+                Type apiType = ResolvePolicingRedefinedType("PolicingRedefined.API.OnFootTrafficStopAPI", "PolicingRedefined.API.OnFootTrafficStopAPI, PolicingRedefined");
                 if (apiType == null) return;
                 EventInfo eventInfo = apiType.GetEvent("OnFootTrafficStopEnded", BindingFlags.Public | BindingFlags.Static);
                 if (eventInfo == null) return;
@@ -256,6 +263,7 @@ namespace MDTPro.EventListeners {
                     if (dispatchPed != null && dispatchPed.IsValid()) {
                         DataController.RefreshPedWantedStatusFromCDF(dispatchPed);
                         DataController.CaptureFirearmsFromPed(dispatchPed, "Firearm check (dispatch)");
+                        DataController.ScheduleDelayedPedDocumentRefresh(dispatchPed, "Dispatch (PR)");
                     }
                 } catch (Exception ex) {
                     Game.LogTrivial($"MDT Pro: [Warning] OnPedRanThroughDispatch capture: {ex.Message}");
@@ -331,7 +339,7 @@ namespace MDTPro.EventListeners {
         private static void HandleOnFootTrafficStopStarted(object handle) {
             if (handle == null) return;
             try {
-                Type apiType = Type.GetType("PolicingRedefined.API.OnFootTrafficStopAPI, PolicingRedefined");
+                Type apiType = ResolvePolicingRedefinedType("PolicingRedefined.API.OnFootTrafficStopAPI", "PolicingRedefined.API.OnFootTrafficStopAPI, PolicingRedefined");
                 if (apiType == null) return;
                 MethodInfo getVehicle = apiType.GetMethod("GetOnFootTrafficStopVehicle", BindingFlags.Public | BindingFlags.Static);
                 MethodInfo getSuspect = apiType.GetMethod("GetOnFootTrafficStopSuspect", BindingFlags.Public | BindingFlags.Static);

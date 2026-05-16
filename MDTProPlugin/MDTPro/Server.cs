@@ -73,7 +73,16 @@ namespace MDTPro {
         }
 
         private static void HandleRequest(HttpListenerContext ctx) {
-            if (ctx.Request.IsWebSocketRequest && ctx.Request.RawUrl == "/ws") {
+            if (ctx.Request.IsWebSocketRequest && (ctx.Request.RawUrl ?? "").StartsWith("/ws", StringComparison.OrdinalIgnoreCase)) {
+                if (!BridgeSecurity.HasSameOrigin(ctx.Request) || !BridgeSecurity.IsAuthorized(ctx.Request, requireExplicitToken: true)) {
+                    ctx.Response.StatusCode = 401;
+                    byte[] denied = BridgeSecurity.UnauthorizedBody();
+                    ctx.Response.ContentType = "application/json";
+                    ctx.Response.ContentLength64 = denied.LongLength;
+                    ctx.Response.OutputStream.Write(denied, 0, denied.Length);
+                    ctx.Response.OutputStream.Close();
+                    return;
+                }
                 WebSocketHandler.HandleWebSocket(ctx);
                 return;
             }
@@ -82,6 +91,17 @@ namespace MDTPro {
             HttpListenerResponse res = ctx.Response;
 
             try {
+                if (BridgeSecurity.IsProtectedHttpPath(req.Url.AbsolutePath)) {
+                    bool requireExplicit = BridgeSecurity.IsUnsafeMethod(req.HttpMethod);
+                    if (!BridgeSecurity.HasSameOrigin(req) || !BridgeSecurity.IsAuthorized(req, requireExplicit)) {
+                        byte[] denied = BridgeSecurity.UnauthorizedBody();
+                        res.StatusCode = 401;
+                        res.ContentType = "application/json";
+                        res.ContentLength64 = denied.LongLength;
+                        res.OutputStream.Write(denied, 0, denied.Length);
+                        return;
+                    }
+                }
                 bool perf = IsPerformanceDiagnosticLoggingEnabled();
                 var sw = perf ? Stopwatch.StartNew() : null;
                 APIResponse apiRes = GetAPIResponse(req);
@@ -95,6 +115,8 @@ namespace MDTPro {
 
                 res.ContentType = apiRes.contentType;
                 res.StatusCode = apiRes.status;
+                if (apiRes.status == 200 && string.Equals(apiRes.contentType, "text/html", StringComparison.OrdinalIgnoreCase))
+                    BridgeSecurity.AppendBridgeCookie(res);
                 if (apiRes.ExtraResponseHeaders != null) {
                     foreach (var (name, value) in apiRes.ExtraResponseHeaders) {
                         if (string.IsNullOrEmpty(name)) continue;

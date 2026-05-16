@@ -84,10 +84,16 @@ const placeholderVehicles = [
 ];
 
 function getRecentIds() {
+  const personIdFor = name => {
+    const h = crypto.createHash('sha1').update(name).digest('hex').slice(0, 32);
+    return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+  };
   return placeholderPeds
     .filter(p => p.IdentificationHistory && p.IdentificationHistory.length > 0)
+    .map(p => ({ p, latest: p.IdentificationHistory[0] }))
+    .sort((a, b) => new Date(b.latest.Timestamp).getTime() - new Date(a.latest.Timestamp).getTime())
     .slice(0, 8)
-    .map(p => ({ Name: p.Name, Type: p.IdentificationHistory[0].Type, Timestamp: p.IdentificationHistory[0].Timestamp }));
+    .map(({ p, latest }) => ({ Name: p.Name, PersonId: personIdFor(p.Name), Type: latest.Type, Timestamp: latest.Timestamp }));
 }
 
 /** Shared document titles for all report types (matches ReportBrandingResolver.AddStandardReportDocumentTitles). */
@@ -667,7 +673,9 @@ const server = http.createServer((req, res) => {
       const limit = Math.min(20, Math.max(1, parseInt(body, 10) || 8));
       const list = placeholderVehicles.slice(0, limit).map(v => ({
         LicensePlate: v.LicensePlate,
+        VehicleIdentificationNumber: v.VehicleIdentificationNumber,
         ModelDisplayName: v.ModelDisplayName,
+        Owner: v.Owner,
         Distance: 10 + Math.floor(Math.random() * 50),
         IsStolen: v.IsStolen,
       }));

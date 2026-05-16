@@ -1,4 +1,4 @@
-// Deferred suspect subtitle + hostility after citation handoff (separate fiber so paperwork anim does not block the officer).
+// Deferred success toast, suspect subtitle, and hostility after citation handoff (runs on a GameFiber; paperwork anim is polled until it ends so subtitles do not appear mid-clip).
 using MDTPro;
 using MDTPro.Data;
 using System.Collections.Generic;

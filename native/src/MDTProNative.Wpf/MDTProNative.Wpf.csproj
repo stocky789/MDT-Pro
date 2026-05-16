@@ -5,7 +5,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3856.49" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3967.48" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 
@@ -16,9 +16,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <Version>0.9.9.2</Version>
-    <AssemblyName>MDTPro</AssemblyName>
-    <AssemblyTitle>MDTPro</AssemblyTitle>
-    <Product>MDTPro</Product>
+    <!-- Different from LSPDFR plugin MDTPro.dll — same filename there would break RPH. -->
+    <AssemblyName>MDTProNative</AssemblyName>
+    <AssemblyTitle>MDT Pro</AssemblyTitle>
+    <Product>MDT Pro</Product>
     <ApplicationIcon>Assets\MdtProApp.ico</ApplicationIcon>
   </PropertyGroup>
 

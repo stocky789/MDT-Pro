@@ -30,6 +30,7 @@ namespace MDTPro.UI {
 
             var pool = new MenuPool();
             var menu = new UIMenu("MDT Pro", subtitle);
+            menu.ResetCursorOnOpen = false;
             pool.Add(menu);
 
             string sym = GetLanguage().units?.currencySymbol ?? "$";

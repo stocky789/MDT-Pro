@@ -190,6 +190,10 @@ function filterConfigBySearch(query) {
 
 async function renderConfigPage() {
   const language = await getLanguage()
+  // Always reload from the plugin so stale iframe localStorage (e.g. old gameWorkMode) cannot overwrite disk when saving other fields.
+  try {
+    localStorage.removeItem('config')
+  } catch (_) {}
   const config = await getConfig()
 
   const stickyBar = document.createElement('div')
@@ -295,6 +299,7 @@ async function renderConfigPage() {
   const sectionsToRender = otherKeys.length > 0
     ? [...CONFIG_SECTIONS, { title: 'Other', keys: otherKeys }]
     : CONFIG_SECTIONS
+  const isCloudMode = String(config.storageMode || '').toLowerCase() === 'cloud'
 
   sectionsToRender.forEach((section) => {
     const sectionEl = document.createElement('div')
@@ -338,6 +343,7 @@ async function renderConfigPage() {
       labelRow.appendChild(label)
       labelRow.appendChild(infoIcon)
       wrapper.appendChild(labelRow)
+      if (isCloudMode && meta.cloudServerOwned) wrapper.classList.add('cloudServerOwnedConfig')
 
       const valueCol = document.createElement('div')
       valueCol.classList.add('configItemValue')
@@ -349,6 +355,7 @@ async function renderConfigPage() {
         checkbox.id = `config-${key}`
         checkbox.dataset.configKey = key
         checkbox.classList.add('configCheckbox')
+        if (isCloudMode && meta.cloudServerOwned) checkbox.disabled = true
         valueCol.appendChild(checkbox)
       } else if (presets && presets.length > 0) {
         const select = document.createElement('select')
@@ -356,6 +363,7 @@ async function renderConfigPage() {
         select.id = `config-${key}`
         select.dataset.configKey = key
         select.dataset.valueType = isNumber ? 'number' : 'text'
+        if (isCloudMode && meta.cloudServerOwned) select.disabled = true
         const strVal = String(value)
         let matchedPreset = false
         presets.forEach((p) => {
@@ -388,6 +396,7 @@ async function renderConfigPage() {
         manualInput.dataset.configKey = key
         manualInput.dataset.valueType = isNumber ? 'number' : 'text'
         manualInput.value = value
+        if (isCloudMode && meta.cloudServerOwned) manualInput.disabled = true
         manualWrapper.appendChild(manualLabel)
         manualWrapper.appendChild(manualInput)
 
@@ -428,7 +437,15 @@ async function renderConfigPage() {
         inputElement.dataset.configKey = key
         inputElement.dataset.valueType = isNumber ? 'number' : 'text'
         inputElement.classList.add('configManualInput')
+        if (isCloudMode && meta.cloudServerOwned) inputElement.disabled = true
         valueCol.appendChild(inputElement)
+      }
+
+      if (isCloudMode && meta.cloudServerOwned) {
+        const locked = document.createElement('div')
+        locked.classList.add('configCloudLockNote')
+        locked.textContent = 'Controlled by MDT Cloud'
+        valueCol.appendChild(locked)
       }
 
       wrapper.appendChild(valueCol)

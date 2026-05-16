@@ -1,6 +1,7 @@
 using CommonDataFramework.Modules;
 using CommonDataFramework.Modules.PedDatabase;
 using CommonDataFramework.Modules.VehicleDatabase;
+using MDTPro.Cloud;
 using MDTPro.Data.Reports;
 using MDTPro.Setup;
 using MDTPro.Utility;
@@ -104,6 +105,18 @@ namespace MDTPro.Data {
         private static readonly object _pedDbLock = new object();
         private static List<MDTProPedData> pedDatabase = new List<MDTProPedData>();
         public static IReadOnlyList<MDTProPedData> PedDatabase { get { return GetPedDatabase(); } }
+
+        /// <summary>Snapshot of active and held ped rows for MDT Cloud recent-ID session payloads (same lock as ped DB mutations).</summary>
+        internal static List<MDTProPedData> GetPedSnapshotForRecentIds() {
+            lock (_pedDbLock) {
+                var list = new List<MDTProPedData>(pedDatabase.Count + keepInPedDatabase.Count);
+                list.AddRange(pedDatabase);
+                foreach (MDTProPedData p in keepInPedDatabase) {
+                    if (!list.Contains(p)) list.Add(p);
+                }
+                return list;
+            }
+        }
 
         private static List<MDTProPedData> keepInPedDatabase = new List<MDTProPedData>();
 
@@ -295,14 +308,74 @@ namespace MDTPro.Data {
         private static int _emptyLocationTicksWhilePlaced;
         private static bool _warnedEmptyWorldAddressOnce;
         private static DateTime _lastPerfSetDynamicDataLogUtc = DateTime.MinValue;
+        private static DateTime _lastPlayerLocationResolvedUtc = DateTime.MinValue;
+        private static Vector3? _lastPlayerLocationResolvedPosition;
+        private static DateTime _lastPassiveNearbyVehicleRefreshUtc = DateTime.MinValue;
+        private static DateTime _lastExplicitNearbyVehicleScanUtc = DateTime.MinValue;
+        private static DateTime _lastMdtLocationDemandUtc = DateTime.MinValue;
+        private static DateTime _lastNearbyVehicleDemandUtc = DateTime.MinValue;
+        /// <summary>Performance/Balanced: last full <see cref="UpdatePlayerLocation"/> from the reduced-mode poll (street/postal for reports when no WS demand).</summary>
+        private static DateTime _lastReducedModeLocationPollUtc = DateTime.MinValue;
+        private const int ReducedGameWorkLocationPollIntervalMs = 30000;
+        private static Vector3? _lastStpPreferredResolvedPosition;
+        private static Location _lastStpPreferredLocation;
+        private static bool _worldGetEntitiesRadiusResolved;
+        private static MethodInfo _worldGetEntitiesRadiusMethod;
+        private static object _worldGetEntitiesVehiclesFlag;
+        private static DateTime _lastFirearmPlayerScanUtc = DateTime.MinValue;
+        private static DateTime _lastFirearmPickupScanUtc = DateTime.MinValue;
+        private static MethodInfo _prGetHasVehicleBeenSearchedMethod;
+        private static bool _prGetHasVehicleBeenSearchedResolved;
+        private static MethodInfo _prGetPickupSearchItemsMethod;
+        private static bool _prGetPickupSearchItemsResolved;
+        private static MethodInfo _rageGetAllPickupObjectsMethod;
+        private static bool _rageGetAllPickupObjectsResolved;
+        private static int _vehicleSearchCaptureCursor;
+        private static int _balancedDynamicPass;
+        private static int _performanceVehicleSearchPass;
         internal static string CurrentTime = World.TimeOfDay.ToString();
         internal static PlayerCoords PlayerCoords = new PlayerCoords();
 
         internal static string ActivePostalCodeSet;
 
+        internal static string GetGameWorkDiagnosticsSummary() {
+            try {
+                int peds;
+                int keptPeds;
+                int vehicles;
+                int keptVehicles;
+                int nearby;
+                lock (_pedDbLock) {
+                    peds = pedDatabase?.Count ?? 0;
+                    keptPeds = keepInPedDatabase?.Count ?? 0;
+                }
+                lock (_vehicleDbLock) {
+                    vehicles = vehicleDatabase?.Count ?? 0;
+                    keptVehicles = keepInVehicleDatabase?.Count ?? 0;
+                }
+                lock (_cachedNearbyLock) {
+                    nearby = CachedNearbyVehicles?.Count ?? 0;
+                }
+                return $"entities=peds:{peds}/{keptPeds} vehicles:{vehicles}/{keptVehicles} nearby:{nearby}";
+            } catch {
+                return "entities=unknown";
+            }
+        }
+
         internal static void SetDatabases() {
-            SetPedDatabase();
-            SetVehicleDatabase();
+            bool hydrateNearby = ShouldPassiveHydrateWorldEntitiesThisPass();
+            SetPedDatabase(hydrateNearby);
+            // Nearby ped + nearby vehicle refresh back-to-back can hitch one script tick in dense LS;
+            // yield so the game can render/process other fibers before vehicle work.
+            GameFiber.Yield();
+            SetVehicleDatabase(hydrateNearby);
+        }
+
+        /// <summary>Only Live mode keeps old passive full ped/vehicle hydration; Performance and Balanced rely on events, explicit requests, lightweight snapshots, and a 30s location poll (see <see cref="TryRefreshLocationForReducedGameWorkModes"/>).</summary>
+        private static bool ShouldPassiveHydrateWorldEntitiesThisPass() {
+            GameWorkModeKind mode = SetupController.GetGameWorkModeKind();
+            if (mode == GameWorkModeKind.Live) return true;
+            return false;
         }
 
         /// <summary>Cached on game thread for /data/nearbyVehicles so the HTTP handler never touches game entities. Built from a live world scan (not only vehicleDatabase) so plates appear even when CDF has not registered vehicles yet.</summary>
@@ -312,9 +385,139 @@ namespace MDTPro.Data {
         private static readonly object _httpNearbyRefreshLock = new object();
         internal struct CachedNearbyVehicleEntry {
             public string LicensePlate;
+            public string VehicleIdentificationNumber;
+            public string ModelName;
             public string ModelDisplayName;
+            public string Owner;
+            public string Color;
+            public string VinStatus;
+            public string Make;
+            public string Model;
+            public string PrimaryColor;
+            public string SecondaryColor;
+            public string PrimaryColorSpecific;
+            public string SecondaryColorSpecific;
+            public string RegistrationStatus;
+            public string RegistrationExpiration;
+            public bool RegistrationExpirationVerifiedFromLiveDocument;
+            public string InsuranceStatus;
+            public string InsuranceExpiration;
+            public bool InsuranceExpirationVerifiedFromLiveDocument;
             public float? Distance;
             public bool IsStolen;
+        }
+
+        private static int ClampIntervalMs(int value, int fallback, int min, int max) {
+            int v = value > 0 ? value : fallback;
+            if (v < min) return min;
+            if (v > max) return max;
+            return v;
+        }
+
+        private static float ClampDistanceMeters(float value, float fallback, float min, float max) {
+            float v = value > 0f ? value : fallback;
+            if (v < min) return min;
+            if (v > max) return max;
+            return v;
+        }
+
+        private static double DistanceMeters(Vector3 a, Vector3 b) {
+            double dx = a.X - b.X;
+            double dy = a.Y - b.Y;
+            double dz = a.Z - b.Z;
+            return Math.Sqrt(dx * dx + dy * dy + dz * dz);
+        }
+
+        private static bool TryGetPlayerPosition(out Vector3 position, out float heading) {
+            position = default;
+            heading = 0f;
+            try {
+                Ped p = Main.Player;
+                if (p != null && (p.Exists() || p.IsValid())) {
+                    position = p.Position;
+                    heading = p.Heading;
+                    return true;
+                }
+            } catch {
+                /* ignore */
+            }
+            return false;
+        }
+
+        internal static void MarkMdtLocationDemand() {
+            _lastMdtLocationDemandUtc = DateTime.UtcNow;
+        }
+
+        internal static void MarkNearbyVehicleDemand() {
+            _lastNearbyVehicleDemandUtc = DateTime.UtcNow;
+        }
+
+        private static bool HasRecentMdtLocationDemand() {
+            return (DateTime.UtcNow - _lastMdtLocationDemandUtc).TotalSeconds <= 10d;
+        }
+
+        private static bool HasRecentNearbyVehicleDemand() {
+            return (DateTime.UtcNow - _lastNearbyVehicleDemandUtc).TotalSeconds <= 15d;
+        }
+
+        private static bool ShouldRefreshLiveLocation(Vector3 position, int maxAgeMs, float movementMeters) {
+            DateTime now = DateTime.UtcNow;
+            if (_lastPlayerLocationResolvedUtc == DateTime.MinValue || !_lastPlayerLocationResolvedPosition.HasValue)
+                return true;
+            if ((now - _lastPlayerLocationResolvedUtc).TotalMilliseconds >= maxAgeMs)
+                return true;
+            return DistanceMeters(position, _lastPlayerLocationResolvedPosition.Value) >= movementMeters;
+        }
+
+        private static bool ShouldRefreshPassiveLocation(Vector3 position, int intervalMs, float movementMeters) {
+            DateTime now = DateTime.UtcNow;
+            if (_lastPlayerLocationResolvedUtc == DateTime.MinValue || !_lastPlayerLocationResolvedPosition.HasValue)
+                return true;
+            double ageMs = (now - _lastPlayerLocationResolvedUtc).TotalMilliseconds;
+            if (ageMs < intervalMs)
+                return false;
+            if (DistanceMeters(position, _lastPlayerLocationResolvedPosition.Value) >= movementMeters)
+                return true;
+            return ageMs >= Math.Max(intervalMs * 4, 20000);
+        }
+
+        private static void UpdatePlayerCoordsOnly() {
+            if (TryGetPlayerPosition(out Vector3 position, out float heading)) {
+                PlayerCoords = new PlayerCoords(position, heading);
+            } else {
+                LogMdtLocationPlayerSkippedThrottled();
+            }
+        }
+
+        private static bool RefreshPassiveLocationIfDue() {
+            if (!TryGetPlayerPosition(out Vector3 position, out _)) {
+                LogMdtLocationPlayerSkippedThrottled();
+                RecomputeMdtPreferredLocation();
+                return false;
+            }
+            Config cfg = SetupController.GetConfig();
+            int intervalMs = ClampIntervalMs(cfg.passiveLocationRefreshIntervalMs, Config.PerfCaptureIntervalMs.PassiveLocation, 500, 30000);
+            float movementMeters = ClampDistanceMeters(cfg.passiveLocationRefreshDistanceMeters, 12f, 1f, 100f);
+            if (!ShouldRefreshPassiveLocation(position, intervalMs, movementMeters)) {
+                RecomputeMdtPreferredLocation();
+                return false;
+            }
+            UpdatePlayerLocation();
+            return true;
+        }
+
+        /// <summary>Performance and Balanced: run a full location resolve at most every 30s so <see cref="MdtPreferredLocation"/> stays usable for report prefill and the taskbar when no client marks <see cref="MarkMdtLocationDemand"/>.</summary>
+        private static void TryRefreshLocationForReducedGameWorkModes() {
+            DateTime now = DateTime.UtcNow;
+            if ((now - _lastReducedModeLocationPollUtc).TotalMilliseconds < ReducedGameWorkLocationPollIntervalMs)
+                return;
+            _lastReducedModeLocationPollUtc = now;
+            if (!TryGetPlayerPosition(out Vector3 _, out _)) {
+                LogMdtLocationPlayerSkippedThrottled();
+                RecomputeMdtPreferredLocation();
+                return;
+            }
+            UpdatePlayerLocation();
         }
 
         internal static void SetDynamicData() {
@@ -322,13 +525,45 @@ namespace MDTPro.Data {
             Stopwatch sw = null;
             long msLoc = 0, msNear = 0;
             if (perf) sw = Stopwatch.StartNew();
-            UpdatePlayerLocation();
+            UpdatePlayerCoordsOnly();
+            GameWorkModeKind workMode = SetupController.GetGameWorkModeKind();
+            bool locationDemand = HasRecentMdtLocationDemand();
+            switch (workMode) {
+                case GameWorkModeKind.Live:
+                    RefreshPassiveLocationIfDue();
+                    break;
+                case GameWorkModeKind.Balanced:
+                    _balancedDynamicPass++;
+                    if (locationDemand && (_balancedDynamicPass & 1) == 0)
+                        RefreshPassiveLocationIfDue();
+                    TryRefreshLocationForReducedGameWorkModes();
+                    break;
+                default:
+                    if (locationDemand)
+                        RefreshPassiveLocationIfDue();
+                    TryRefreshLocationForReducedGameWorkModes();
+                    break;
+            }
             if (perf) {
                 msLoc = sw.ElapsedMilliseconds;
                 sw.Restart();
             }
             CurrentTime = World.TimeOfDay.ToString();
-            UpdateCachedNearbyVehicles(fullWorldScan: false);
+            bool nearbyDemand = HasRecentNearbyVehicleDemand();
+            switch (workMode) {
+                case GameWorkModeKind.Live:
+                    RefreshCachedNearbyVehiclesPassive();
+                    break;
+                case GameWorkModeKind.Balanced:
+                    if (nearbyDemand && _balancedDynamicPass % 3 == 0)
+                        RefreshCachedNearbyVehiclesPassive();
+                    break;
+                default:
+                    // Performance skips passive ped/vehicle DB hydration, but nearby cache must still advance:
+                    // cloud plugin session POSTs CachedNearbyVehicles to the portal; without this, Vehicle Search / reports see empty lists.
+                    RefreshCachedNearbyVehiclesPassive();
+                    break;
+            }
             if (perf) {
                 msNear = sw.ElapsedMilliseconds;
                 // Avoid appending to MDTPro.log every second on the game fiber (sync disk I/O can hitch GTA,
@@ -345,11 +580,12 @@ namespace MDTPro.Data {
 
         /// <summary>HTTP runs on the pool; refresh nearby-vehicle cache on the game fiber before Vehicle Search reads it (same idea as <see cref="RefreshMdtLocationOnGameFiberBlocking"/>).</summary>
         /// <returns><c>true</c> if the game fiber finished the scan; <c>false</c> on timeout or setup failure (common when GTA V is unfocused and the frame loop is paused).</returns>
-        internal static bool RefreshCachedNearbyVehiclesOnGameFiberBlocking(int timeoutMs = 4500) {
+        internal static bool RefreshCachedNearbyVehiclesOnGameFiberBlocking(int timeoutMs = 4500, bool explicitScan = false) {
             try {
+                MarkNearbyVehicleDemand();
                 if (!GameFiberHttpBridge.TryExecuteBlocking(() => {
                     try {
-                        UpdateCachedNearbyVehicles(fullWorldScan: true);
+                        RefreshCachedNearbyVehicles(explicitScan);
                     } catch (Exception ex) {
                         Helper.Log($"RefreshCachedNearbyVehiclesOnGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
                     }
@@ -366,6 +602,34 @@ namespace MDTPro.Data {
             }
         }
 
+        private static bool RefreshCachedNearbyVehiclesPassive() {
+            Config cfg = SetupController.GetConfig();
+            int intervalMs = ClampIntervalMs(cfg.passiveNearbyVehicleRefreshIntervalMs, Config.PerfCaptureIntervalMs.PassiveNearbyVehicle, 500, 30000);
+            DateTime now = DateTime.UtcNow;
+            if ((now - _lastPassiveNearbyVehicleRefreshUtc).TotalMilliseconds < intervalMs)
+                return false;
+            RefreshCachedNearbyVehicles(explicitScan: false);
+            return true;
+        }
+
+        private static bool RefreshCachedNearbyVehicles(bool explicitScan) {
+            DateTime now = DateTime.UtcNow;
+            if (explicitScan) {
+                Config cfg = SetupController.GetConfig();
+                int cooldownMs = ClampIntervalMs(cfg.explicitNearbyVehicleScanCooldownMs, Config.PerfCaptureIntervalMs.ExplicitNearbyVehicleCooldown, 250, 30000);
+                if ((now - _lastExplicitNearbyVehicleScanUtc).TotalMilliseconds < cooldownMs)
+                    return false;
+                UpdateCachedNearbyVehicles(fullWorldScan: true, hydrateFullVehicle: true);
+                _lastExplicitNearbyVehicleScanUtc = now;
+                _lastPassiveNearbyVehicleRefreshUtc = now;
+                return true;
+            }
+
+            UpdateCachedNearbyVehicles(fullWorldScan: true, hydrateFullVehicle: false);
+            _lastPassiveNearbyVehicleRefreshUtc = now;
+            return true;
+        }
+
         /// <summary>Visible vehicles you have not stopped or saved: merge BOLO stubs and keep a session row in the in-memory vehicle list only (no SQLite). Lets Vehicle Search find the same plate again without a full world walk.</summary>
         private static void RegisterVisibleVehicleLookupSessionOnly(MDTProVehicleData mdt) {
             if (mdt == null || string.IsNullOrWhiteSpace(mdt.LicensePlate)) return;
@@ -378,33 +642,122 @@ namespace MDTPro.Data {
             }
         }
 
-        /// <summary>When <see cref="GetVehicleByPlateOrVin"/> misses, scan live vehicles (same radius/walk as nearby refresh) on the game fiber. Does not require SQLite or a prior stop — any spawned car in range with a readable plate (or VIN on CDF) can be opened in Vehicle Search.</summary>
-        internal static MDTProVehicleData TryResolveVehicleFromLiveWorldByPlateOrVinBlocking(string plateOrVin, int timeoutMs = 2000) {
-            if (string.IsNullOrWhiteSpace(plateOrVin)) return null;
-            MDTProVehicleData found = null;
+        private static void UpsertCachedNearbyVehicleFromResolvedVehicle(MDTProVehicleData vehicleData) {
+            if (vehicleData == null || string.IsNullOrWhiteSpace(vehicleData.LicensePlate)) return;
+            float? distance = null;
             try {
-                string q = plateOrVin.Trim();
-                if (!GameFiberHttpBridge.TryExecuteBlocking(() => {
-                    try {
-                        found = TryFindLiveWorldVehicleDataForPlateOrVin(q);
-                    } catch (Exception ex) {
-                        Helper.Log($"TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
-                    }
-                }, timeoutMs, out _)) {
-                    Helper.Log("TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: timed out (game paused or overloaded).", false, Helper.LogSeverity.Warning);
-                }
-            } catch (Exception ex) {
-                Helper.Log($"TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
+                if (Main.Player != null && Main.Player.Exists() && vehicleData.Holder != null && vehicleData.Holder.Exists())
+                    distance = (float)Math.Round(Main.Player.DistanceTo(vehicleData.Holder), 1);
+            } catch { }
+
+            var entry = new CachedNearbyVehicleEntry {
+                LicensePlate = vehicleData.LicensePlate,
+                VehicleIdentificationNumber = vehicleData.VehicleIdentificationNumber,
+                ModelName = vehicleData.ModelName,
+                ModelDisplayName = vehicleData.ModelDisplayName,
+                Owner = vehicleData.Owner,
+                Color = vehicleData.Color,
+                VinStatus = vehicleData.VinStatus,
+                Make = vehicleData.Make,
+                Model = vehicleData.Model,
+                PrimaryColor = vehicleData.PrimaryColor,
+                SecondaryColor = vehicleData.SecondaryColor,
+                PrimaryColorSpecific = vehicleData.PrimaryColorSpecific,
+                SecondaryColorSpecific = vehicleData.SecondaryColorSpecific,
+                RegistrationStatus = vehicleData.RegistrationStatus,
+                RegistrationExpiration = vehicleData.RegistrationExpiration,
+                RegistrationExpirationVerifiedFromLiveDocument = vehicleData.RegistrationExpirationVerifiedFromLiveDocument,
+                InsuranceStatus = vehicleData.InsuranceStatus,
+                InsuranceExpiration = vehicleData.InsuranceExpiration,
+                InsuranceExpirationVerifiedFromLiveDocument = vehicleData.InsuranceExpirationVerifiedFromLiveDocument,
+                Distance = distance,
+                IsStolen = vehicleData.IsStolen
+            };
+
+            lock (_cachedNearbyLock) {
+                var list = (CachedNearbyVehicles ?? new List<CachedNearbyVehicleEntry>())
+                    .Where(x => !string.Equals(x.LicensePlate, vehicleData.LicensePlate, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                list.Add(entry);
+                CachedNearbyVehicles = list
+                    .OrderBy(x => x.Distance ?? float.MaxValue)
+                    .ThenBy(x => x.LicensePlate ?? "", StringComparer.OrdinalIgnoreCase)
+                    .ToList();
             }
+            CloudPluginBridge.RequestSessionRefresh();
+        }
+
+        /// <summary>When <see cref="GetVehicleByPlateOrVin"/> misses, scan live vehicles (same radius/walk as nearby refresh) on the game fiber. Does not require SQLite or a prior stop — any spawned car in range with a readable plate (or VIN on CDF) can be opened in Vehicle Search.</summary>
+        internal static MDTProVehicleData TryResolveVehicleFromLiveWorldByPlateOrVinBlocking(
+            string plateOrVin,
+            int timeoutMs = 2000,
+            GameWorkJobTrigger trigger = GameWorkJobTrigger.UserRequest,
+            string jobName = "live-vehicle-lookup") {
+            TryResolveVehicleFromLiveWorldByPlateOrVinBlocking(plateOrVin, timeoutMs, out var found, out _, trigger, jobName);
             return found;
         }
 
-        /// <summary>HTTP/WebSocket run on the thread pool; schedule <see cref="UpdatePlayerLocation"/> on the game fiber then wait so reads are not stale or never filled.</summary>
-        internal static void RefreshMdtLocationOnGameFiberBlocking(int timeoutMs = 1500) {
+        internal static bool TryResolveVehicleFromLiveWorldByPlateOrVinBlocking(
+            string plateOrVin,
+            int timeoutMs,
+            out MDTProVehicleData found,
+            out string failureReason,
+            GameWorkJobTrigger trigger = GameWorkJobTrigger.UserRequest,
+            string jobName = "live-vehicle-lookup") {
+            found = null;
+            failureReason = null;
+            if (string.IsNullOrWhiteSpace(plateOrVin)) {
+                failureReason = "not_found";
+                return true;
+            }
+            try {
+                string q = plateOrVin.Trim();
+                MDTProVehicleData localFound = null;
+                bool ran = GameFiberHttpBridge.TryExecuteBlocking(() => {
+                    try {
+                        localFound = TryFindLiveWorldVehicleDataForPlateOrVin(q);
+                    } catch (Exception ex) {
+                        Helper.Log($"TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
+                    }
+                }, timeoutMs, out var caught, jobName, trigger, GameWorkPriority.Interactive);
+                found = localFound;
+                if (!ran) {
+                    Helper.Log("TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: timed out (game paused or overloaded).", false, Helper.LogSeverity.Warning);
+                    failureReason = "game_busy";
+                    return false;
+                }
+                if (caught != null) {
+                    failureReason = "game_busy";
+                    return false;
+                }
+            } catch (Exception ex) {
+                Helper.Log($"TryResolveVehicleFromLiveWorldByPlateOrVinBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
+                failureReason = "game_busy";
+                return false;
+            }
+            if (found == null) failureReason = "not_found";
+            return true;
+        }
+
+        /// <summary>HTTP/WebSocket run on the thread pool; schedule a bounded location refresh on the game fiber so reads are not stale or never filled.</summary>
+        internal static void RefreshMdtLocationOnGameFiberBlocking(int timeoutMs = 1500, bool force = false) {
             try {
                 bool ran = GameFiberHttpBridge.TryExecuteBlocking(() => {
                     try {
-                        UpdatePlayerLocation();
+                        if (force || !TryGetPlayerPosition(out Vector3 position, out _)) {
+                            UpdatePlayerLocation();
+                            return;
+                        }
+
+                        Config cfg = SetupController.GetConfig();
+                        int maxAgeMs = ClampIntervalMs(cfg.liveLocationRefreshMaxAgeMs, Config.PerfCaptureIntervalMs.LiveLocationMaxAge, 500, 30000);
+                        float movementMeters = ClampDistanceMeters(cfg.passiveLocationRefreshDistanceMeters, 12f, 1f, 100f);
+                        if (ShouldRefreshLiveLocation(position, maxAgeMs, movementMeters)) {
+                            UpdatePlayerLocation();
+                        } else {
+                            UpdatePlayerCoordsOnly();
+                            RecomputeMdtPreferredLocation();
+                        }
                     } catch (Exception ex) {
                         Helper.Log($"RefreshMdtLocationOnGameFiberBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
                     }
@@ -457,7 +810,7 @@ namespace MDTPro.Data {
             return null;
         }
 
-        private static void TryAddNearbyVehicleEntry(Vehicle v, Dictionary<string, CachedNearbyVehicleEntry> bestByPlate, ref NearbyVehicleScanStats stats) {
+        private static void TryAddNearbyVehicleEntry(Vehicle v, Dictionary<string, CachedNearbyVehicleEntry> bestByPlate, ref NearbyVehicleScanStats stats, bool hydrateFullVehicle) {
             if (Main.Player == null || !Main.Player.Exists()) return;
             if (v == null || !v.Exists()) {
                 stats.SkippedNullOrDead++;
@@ -488,14 +841,37 @@ namespace MDTPro.Data {
             } catch { }
 
             bool stolen = false;
-            try {
-                var cdf = v.GetVehicleData();
-                if (cdf != null) stolen = cdf.IsStolen;
-            } catch { }
+            string vin = null;
+            MDTProVehicleData mdtVehicle = null;
+            if (hydrateFullVehicle) {
+                try {
+                    mdtVehicle = new MDTProVehicleData(v);
+                    stolen = mdtVehicle.IsStolen;
+                    vin = mdtVehicle.VehicleIdentificationNumber;
+                    if (!string.IsNullOrWhiteSpace(mdtVehicle.ModelDisplayName)) modelDisplay = mdtVehicle.ModelDisplayName;
+                } catch { }
+            }
 
             var entry = new CachedNearbyVehicleEntry {
                 LicensePlate = plate,
+                VehicleIdentificationNumber = vin,
+                ModelName = mdtVehicle?.ModelName,
                 ModelDisplayName = modelDisplay,
+                Owner = mdtVehicle?.Owner,
+                Color = mdtVehicle?.Color,
+                VinStatus = mdtVehicle?.VinStatus,
+                Make = mdtVehicle?.Make,
+                Model = mdtVehicle?.Model,
+                PrimaryColor = mdtVehicle?.PrimaryColor,
+                SecondaryColor = mdtVehicle?.SecondaryColor,
+                PrimaryColorSpecific = mdtVehicle?.PrimaryColorSpecific,
+                SecondaryColorSpecific = mdtVehicle?.SecondaryColorSpecific,
+                RegistrationStatus = mdtVehicle?.RegistrationStatus,
+                RegistrationExpiration = mdtVehicle?.RegistrationExpiration,
+                RegistrationExpirationVerifiedFromLiveDocument = mdtVehicle != null && mdtVehicle.RegistrationExpirationVerifiedFromLiveDocument,
+                InsuranceStatus = mdtVehicle?.InsuranceStatus,
+                InsuranceExpiration = mdtVehicle?.InsuranceExpiration,
+                InsuranceExpirationVerifiedFromLiveDocument = mdtVehicle != null && mdtVehicle.InsuranceExpirationVerifiedFromLiveDocument,
                 Distance = dist,
                 IsStolen = stolen
             };
@@ -503,8 +879,65 @@ namespace MDTPro.Data {
                 bestByPlate[plate] = entry;
         }
 
-        /// <param name="fullWorldScan">When true (Vehicle Search HTTP refresh), also walk <see cref="World.GetAllVehicles"/> within range so the list is not empty if <see cref="Ped.GetNearbyVehicles"/> omits traffic.</param>
-        private static void UpdateCachedNearbyVehicles(bool fullWorldScan) {
+        private static bool TryResolveWorldGetEntitiesVehicles() {
+            if (_worldGetEntitiesRadiusResolved)
+                return _worldGetEntitiesRadiusMethod != null && _worldGetEntitiesVehiclesFlag != null;
+            _worldGetEntitiesRadiusResolved = true;
+            try {
+                foreach (MethodInfo method in typeof(World).GetMethods(BindingFlags.Public | BindingFlags.Static)) {
+                    if (method.Name != "GetEntities") continue;
+                    ParameterInfo[] p = method.GetParameters();
+                    if (p.Length != 3) continue;
+                    if (p[0].ParameterType != typeof(Vector3) || p[1].ParameterType != typeof(float) || !p[2].ParameterType.IsEnum) continue;
+                    object flag = Enum.Parse(p[2].ParameterType, "Vehicles", true);
+                    _worldGetEntitiesRadiusMethod = method;
+                    _worldGetEntitiesVehiclesFlag = flag;
+                    return true;
+                }
+            } catch {
+                _worldGetEntitiesRadiusMethod = null;
+                _worldGetEntitiesVehiclesFlag = null;
+            }
+            return false;
+        }
+
+        private static List<Vehicle> GetVehiclesNearPosition(Vector3 origin, float radiusMeters) {
+            var vehicles = new List<Vehicle>();
+            if (radiusMeters <= 0f) radiusMeters = 95f;
+            if (TryResolveWorldGetEntitiesVehicles()) {
+                try {
+                    object result = _worldGetEntitiesRadiusMethod.Invoke(null, new object[] { origin, radiusMeters, _worldGetEntitiesVehiclesFlag });
+                    if (result is Entity[] entities) {
+                        foreach (Entity ent in entities) {
+                            if (ent is Vehicle v && v.Exists())
+                                vehicles.Add(v);
+                        }
+                        return vehicles;
+                    }
+                } catch (Exception ex) {
+                    Helper.Log($"GetVehiclesNearPosition radius scan failed: {ex.Message}", false, Helper.LogSeverity.Warning);
+                    _worldGetEntitiesRadiusMethod = null;
+                    _worldGetEntitiesVehiclesFlag = null;
+                }
+            }
+
+            try {
+                foreach (Vehicle v in World.GetAllVehicles()) {
+                    if (v == null || !v.Exists()) continue;
+                    float d;
+                    try { d = (float)DistanceMeters(origin, v.Position); } catch { continue; }
+                    if (d <= radiusMeters)
+                        vehicles.Add(v);
+                }
+            } catch (Exception ex) {
+                Helper.Log($"GetVehiclesNearPosition full scan failed: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+            return vehicles;
+        }
+
+        /// <param name="fullWorldScan">When true, also walk streamed world vehicles within range so the list is not empty if <see cref="Ped.GetNearbyVehicles"/> omits traffic.</param>
+        /// <param name="hydrateFullVehicle">When true, construct full CDF-backed vehicle rows. Passive cloud snapshots keep this false to avoid document hydration work in Performance/Balanced modes.</param>
+        private static void UpdateCachedNearbyVehicles(bool fullWorldScan, bool hydrateFullVehicle = false) {
             var list = new List<CachedNearbyVehicleEntry>();
             int withDist = 0;
             if (Main.Player != null && Main.Player.Exists()) {
@@ -519,21 +952,15 @@ namespace MDTPro.Data {
                     Vehicle[] nearby = Main.Player.GetNearbyVehicles(scanCount);
                     if (nearby != null) {
                         for (int i = 0; i < nearby.Length; i++)
-                            TryAddNearbyVehicleEntry(nearby[i], bestByPlate, ref stNearby);
+                            TryAddNearbyVehicleEntry(nearby[i], bestByPlate, ref stNearby, hydrateFullVehicle);
                     }
 
                     if (fullWorldScan) {
-                        // Scan the full streamed vehicle pool (no early break). A cap on iteration count
-                        // skipped cars that were "later" in enumeration order, so the closest N plates were
-                        // wrong once Take(limit) ran — e.g. nothing within ~15m while farther cars appeared.
-                        const float maxWorldScanMeters = 95f;
+                        float maxWorldScanMeters = ClampDistanceMeters(SetupController.GetConfig().explicitNearbyVehicleScanRadiusMeters, 95f, 25f, 250f);
                         try {
-                            foreach (Vehicle v in World.GetAllVehicles()) {
+                            foreach (Vehicle v in GetVehiclesNearPosition(Main.Player.Position, maxWorldScanMeters)) {
                                 if (v == null || !v.Exists()) continue;
-                                float d;
-                                try { d = Main.Player.DistanceTo(v); } catch { continue; }
-                                if (d > maxWorldScanMeters) continue;
-                                TryAddNearbyVehicleEntry(v, bestByPlate, ref stWorld);
+                                TryAddNearbyVehicleEntry(v, bestByPlate, ref stWorld, hydrateFullVehicle);
                             }
                         } catch (Exception ex) {
                             Helper.Log($"UpdateCachedNearbyVehicles world scan: {ex.Message}", false, Helper.LogSeverity.Warning);
@@ -578,13 +1005,10 @@ namespace MDTPro.Data {
                 }
             }
 
-            const float maxWorldScanMeters = 95f;
+            float maxWorldScanMeters = ClampDistanceMeters(SetupController.GetConfig().explicitNearbyVehicleScanRadiusMeters, 95f, 25f, 250f);
             try {
-                foreach (Vehicle v in World.GetAllVehicles()) {
+                foreach (Vehicle v in GetVehiclesNearPosition(Main.Player.Position, maxWorldScanMeters)) {
                     if (v == null || !v.Exists()) continue;
-                    float d;
-                    try { d = Main.Player.DistanceTo(v); } catch { continue; }
-                    if (d > maxWorldScanMeters) continue;
                     var hit = TryBuildMdtVehicleIfMatchesPlateOrVin(v, q, qNorm);
                     if (hit != null) {
                         RegisterVisibleVehicleLookupSessionOnly(hit);
@@ -622,10 +1046,12 @@ namespace MDTPro.Data {
                 } catch (Exception ex) {
                     Helper.Log($"Skipping ped in PopulatePedDatabase: {ex.Message}", false, Helper.LogSeverity.Warning);
                 }
+                if ((i & 3) == 3)
+                    GameFiber.Yield();
             }
         }
 
-        private static void PopulateVehicleDatabase() {
+        private static void PopulateVehicleDatabase(bool hydrateNearbyWorld) {
             if (!Main.Player.Exists()) {
                 Helper.Log("Failed to get nearby vehicles; Invalid player", true, Helper.LogSeverity.Error);
                 return;
@@ -640,6 +1066,7 @@ namespace MDTPro.Data {
                     }
                 }
             }
+            if (!hydrateNearbyWorld) return;
             Vehicle[] nearbyVehicles = Main.Player.GetNearbyVehicles(ClampRageNearbyPoolQueryCount(SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles));
             for (int i = 0; i < nearbyVehicles.Length; i++) {
                 Vehicle v = nearbyVehicles[i];
@@ -662,6 +1089,8 @@ namespace MDTPro.Data {
                 } catch (Exception ex) {
                     Helper.Log($"Skipping vehicle in PopulateVehicleDatabase: {ex.Message}", false, Helper.LogSeverity.Warning);
                 }
+                if ((i & 3) == 3)
+                    GameFiber.Yield();
             }
         }
 
@@ -713,7 +1142,11 @@ namespace MDTPro.Data {
                     if (contextSource.CDFVehicleData != null)
                         MergeBOLOsFromStubByPlate(contextSource);
                     SetContextVehicle(contextSource);
+                    UpsertCachedNearbyVehicleFromResolvedVehicle(contextSource);
+                } else {
+                    UpsertCachedNearbyVehicleFromResolvedVehicle(mdtProVehicleData);
                 }
+                ServerAPI.WebSocketHandler.BroadcastDataInvalidation("vehicleSearch");
             } catch (Exception ex) {
                 Helper.Log($"ResolveVehicleAndDriverForStop: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
@@ -761,7 +1194,7 @@ namespace MDTPro.Data {
             return candidates[random.Next(candidates.Count)];
         }
 
-        private static void SetPedDatabase() {
+        private static void SetPedDatabase(bool hydrateNearbyWorld) {
             lock (_pedDbLock) {
                 if (pedDatabase.Count > SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles * SetupController.GetConfig().databaseLimitMultiplier) {
                     List<MDTProPedData> keysToRemove = pedDatabase.Take(SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles).ToList();
@@ -771,11 +1204,12 @@ namespace MDTPro.Data {
                     }
                 }
             }
+            if (!hydrateNearbyWorld) return;
             PopulatePedDatabase();
         }
 
-        private static void SetVehicleDatabase() {
-            PopulateVehicleDatabase();
+        private static void SetVehicleDatabase(bool hydrateNearbyWorld) {
+            PopulateVehicleDatabase(hydrateNearbyWorld);
         }
 
         private static List<MDTProPedData> GetPedDatabase() {
@@ -806,18 +1240,24 @@ namespace MDTPro.Data {
             }
         }
 
-        /// <summary>Look up vehicle by plate or VIN. Checks both vehicleDatabase and keepInVehicleDatabase. Plate matching ignores spaces/case; VIN ignores spaces and hyphens.</summary>
+        /// <summary>Look up vehicle by plate or VIN. Checks both vehicleDatabase and keepInVehicleDatabase. Plate/VIN matching ignores casing and separators.</summary>
         internal static MDTProVehicleData GetVehicleByPlateOrVin(string plateOrVin) {
             if (string.IsNullOrWhiteSpace(plateOrVin)) return null;
             string key = plateOrVin.Trim();
+            string plateKey = NormalizeVehiclePlateKey(key);
+            string vinKey = NormalizeVehicleVinKey(key);
             lock (_vehicleDbLock) {
                 var v = vehicleDatabase.FirstOrDefault(x =>
                     string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(x.VehicleIdentificationNumber, key, StringComparison.OrdinalIgnoreCase));
+                    || (!string.IsNullOrEmpty(plateKey) && !string.IsNullOrEmpty(x.LicensePlate) && NormalizeVehiclePlateKey(x.LicensePlate) == plateKey)
+                    || string.Equals(x.VehicleIdentificationNumber, key, StringComparison.OrdinalIgnoreCase)
+                    || (!string.IsNullOrEmpty(vinKey) && !string.IsNullOrEmpty(x.VehicleIdentificationNumber) && NormalizeVehicleVinKey(x.VehicleIdentificationNumber) == vinKey));
                 if (v != null) return v;
                 return keepInVehicleDatabase.FirstOrDefault(x =>
                     string.Equals(x.LicensePlate, key, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(x.VehicleIdentificationNumber, key, StringComparison.OrdinalIgnoreCase));
+                    || (!string.IsNullOrEmpty(plateKey) && !string.IsNullOrEmpty(x.LicensePlate) && NormalizeVehiclePlateKey(x.LicensePlate) == plateKey)
+                    || string.Equals(x.VehicleIdentificationNumber, key, StringComparison.OrdinalIgnoreCase)
+                    || (!string.IsNullOrEmpty(vinKey) && !string.IsNullOrEmpty(x.VehicleIdentificationNumber) && NormalizeVehicleVinKey(x.VehicleIdentificationNumber) == vinKey));
             }
         }
 
@@ -923,31 +1363,52 @@ namespace MDTPro.Data {
                 cdf.TimesStopped = databasePed.TimesStopped;
                 try { cdf.AdvisoryText = databasePed.AdvisoryText ?? ""; } catch { }
 
+                // With StopThePed active, live LSPDFR/STP/CDF document state wins. SQLite can hold older document
+                // strings, so only push court revocations back into CDF; normal live document checks refresh MDT instead.
+                bool stpStops = ModIntegration.SubscribedStopThePedStopEvents;
+                bool courtRevokedDriver = IsCourtRevokedDriverLicense(databasePed.LicenseStatus);
                 if (!string.IsNullOrEmpty(databasePed.LicenseStatus) && Enum.TryParse(databasePed.LicenseStatus, true, out ELicenseState licenseStatusValue)) {
-                    cdf.DriversLicenseState = licenseStatusValue;
+                    try {
+                        if (!stpStops || courtRevokedDriver)
+                            cdf.DriversLicenseState = licenseStatusValue;
+                    } catch { }
                 }
-                if (!string.IsNullOrEmpty(databasePed.LicenseExpiration) && DateTime.TryParse(databasePed.LicenseExpiration, out DateTime licenseExp)) {
+                if (!stpStops
+                    && !string.IsNullOrEmpty(databasePed.LicenseExpiration)
+                    && DateTime.TryParse(databasePed.LicenseExpiration, out DateTime licenseExp)) {
                     try { cdf.DriversLicenseExpiration = licenseExp; } catch { }
                 }
 
+                bool courtRevokedWeapon = IsCourtRevokedDocumentStatus(databasePed.WeaponPermitStatus);
                 if (cdf.WeaponPermit != null && !string.IsNullOrEmpty(databasePed.WeaponPermitStatus) && Enum.TryParse(databasePed.WeaponPermitStatus, true, out EDocumentStatus weaponStatus)) {
-                    try { cdf.WeaponPermit.Status = weaponStatus; } catch { }
+                    try {
+                        if (!stpStops || courtRevokedWeapon)
+                            cdf.WeaponPermit.Status = weaponStatus;
+                    } catch { }
                 }
-                if (cdf.WeaponPermit != null && !string.IsNullOrEmpty(databasePed.WeaponPermitExpiration) && DateTime.TryParse(databasePed.WeaponPermitExpiration, out DateTime weaponExp)) {
+                if (cdf.WeaponPermit != null && (!stpStops || courtRevokedWeapon) && !string.IsNullOrEmpty(databasePed.WeaponPermitExpiration) && DateTime.TryParse(databasePed.WeaponPermitExpiration, out DateTime weaponExp)) {
                     try { cdf.WeaponPermit.ExpirationDate = weaponExp; } catch { }
                 }
 
+                bool courtRevokedFishing = IsCourtRevokedDocumentStatus(databasePed.FishingPermitStatus);
                 if (cdf.FishingPermit != null && !string.IsNullOrEmpty(databasePed.FishingPermitStatus) && Enum.TryParse(databasePed.FishingPermitStatus, true, out EDocumentStatus fishingStatus)) {
-                    try { cdf.FishingPermit.Status = fishingStatus; } catch { }
+                    try {
+                        if (!stpStops || courtRevokedFishing)
+                            cdf.FishingPermit.Status = fishingStatus;
+                    } catch { }
                 }
-                if (cdf.FishingPermit != null && !string.IsNullOrEmpty(databasePed.FishingPermitExpiration) && DateTime.TryParse(databasePed.FishingPermitExpiration, out DateTime fishingExp)) {
+                if (cdf.FishingPermit != null && (!stpStops || courtRevokedFishing) && !string.IsNullOrEmpty(databasePed.FishingPermitExpiration) && DateTime.TryParse(databasePed.FishingPermitExpiration, out DateTime fishingExp)) {
                     try { cdf.FishingPermit.ExpirationDate = fishingExp; } catch { }
                 }
 
+                bool courtRevokedHunting = IsCourtRevokedDocumentStatus(databasePed.HuntingPermitStatus);
                 if (cdf.HuntingPermit != null && !string.IsNullOrEmpty(databasePed.HuntingPermitStatus) && Enum.TryParse(databasePed.HuntingPermitStatus, true, out EDocumentStatus huntingStatus)) {
-                    try { cdf.HuntingPermit.Status = huntingStatus; } catch { }
+                    try {
+                        if (!stpStops || courtRevokedHunting)
+                            cdf.HuntingPermit.Status = huntingStatus;
+                    } catch { }
                 }
-                if (cdf.HuntingPermit != null && !string.IsNullOrEmpty(databasePed.HuntingPermitExpiration) && DateTime.TryParse(databasePed.HuntingPermitExpiration, out DateTime huntingExp)) {
+                if (cdf.HuntingPermit != null && (!stpStops || courtRevokedHunting) && !string.IsNullOrEmpty(databasePed.HuntingPermitExpiration) && DateTime.TryParse(databasePed.HuntingPermitExpiration, out DateTime huntingExp)) {
                     try { cdf.HuntingPermit.ExpirationDate = huntingExp; } catch { }
                 }
             } catch (Exception ex) {
@@ -981,6 +1442,7 @@ namespace MDTPro.Data {
             void Push() {
                 PedData cdf = databasePed.CDFPedData ?? TryGetLivePedDataByFullName(databasePed.Name);
                 if (cdf == null) return;
+                if (!CloudEncounterLeaseClient.CanPushPedToCdf(databasePed)) return;
                 PushPedSnapshotOntoCdf(cdf, databasePed);
             }
             try {
@@ -1042,11 +1504,248 @@ namespace MDTPro.Data {
             string sh = persistedRow.HuntingPermitStatus;
             int persistedTimes = persistedRow.TimesStopped;
             persistedRow.CopyCdfMirroredDisplayFieldsFrom(liveRead);
+            NormalizeStopThePedLicenseExpirationFromBirthdayAndCdfYear(persistedRow, liveRead);
             persistedRow.TimesStopped = Math.Max(liveRead.TimesStopped, persistedTimes);
             if (IsCourtRevokedDriverLicense(sl)) persistedRow.LicenseStatus = sl;
             if (IsCourtRevokedDocumentStatus(sw)) persistedRow.WeaponPermitStatus = sw;
             if (IsCourtRevokedDocumentStatus(sf)) persistedRow.FishingPermitStatus = sf;
             if (IsCourtRevokedDocumentStatus(sh)) persistedRow.HuntingPermitStatus = sh;
+        }
+
+        private static bool SamePedDocumentFields(MDTProPedData a, MDTProPedData b) {
+            if (a == null || b == null) return false;
+            return string.Equals(a.LicenseStatus, b.LicenseStatus, StringComparison.Ordinal)
+                && string.Equals(a.LicenseExpiration, b.LicenseExpiration, StringComparison.Ordinal)
+                && string.Equals(a.WeaponPermitStatus, b.WeaponPermitStatus, StringComparison.Ordinal)
+                && string.Equals(a.WeaponPermitExpiration, b.WeaponPermitExpiration, StringComparison.Ordinal)
+                && string.Equals(a.WeaponPermitType, b.WeaponPermitType, StringComparison.Ordinal)
+                && string.Equals(a.FishingPermitStatus, b.FishingPermitStatus, StringComparison.Ordinal)
+                && string.Equals(a.FishingPermitExpiration, b.FishingPermitExpiration, StringComparison.Ordinal)
+                && string.Equals(a.HuntingPermitStatus, b.HuntingPermitStatus, StringComparison.Ordinal)
+                && string.Equals(a.HuntingPermitExpiration, b.HuntingPermitExpiration, StringComparison.Ordinal);
+        }
+
+        private static string TryGetPedIdentityName(Ped ped) {
+            if (ped == null || !ped.IsValid()) return null;
+            try {
+                string cdfName = ped.GetPedData()?.FullName;
+                if (!string.IsNullOrWhiteSpace(cdfName)) return cdfName.Trim();
+            } catch { }
+            try {
+                var persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped);
+                if (!string.IsNullOrWhiteSpace(persona?.FullName)) return persona.FullName.Trim();
+            } catch { }
+            // StopThePed: pat-down / ID events can fire before CDF or LSPDFR persona exposes a name; we may already
+            // have this pool ped as Holder from stopPedEvent / ResolvePedForReEncounter — use that row for Recent IDs (MDT Cloud session).
+            try {
+                PoolHandle h = ped.Handle;
+                lock (_pedDbLock) {
+                    MDTProPedData held = pedDatabase.FirstOrDefault(x => x.Holder != null && x.Holder.IsValid() && x.Holder.Handle == h)
+                        ?? keepInPedDatabase.FirstOrDefault(x => x.Holder != null && x.Holder.IsValid() && x.Holder.Handle == h);
+                    if (!string.IsNullOrWhiteSpace(held?.Name)) return held.Name.Trim();
+                }
+            } catch { }
+            return null;
+        }
+
+        private static bool TryRefreshPedDocumentsFromLivePed(PoolHandle pedHandle, string knownPedName, string source) {
+            Ped ped = null;
+            try { ped = World.GetEntityByHandle<Ped>(pedHandle); } catch { }
+            if (ped == null || !ped.IsValid()) return false;
+
+            string pedName = TryGetPedIdentityName(ped);
+            if (string.IsNullOrWhiteSpace(pedName)) pedName = knownPedName;
+            if (string.IsNullOrWhiteSpace(pedName)) return false;
+
+            MDTProPedData liveRead;
+            try {
+                liveRead = new MDTProPedData(ped, forReconcileSnapshotOnly: true);
+            } catch (Exception ex) {
+                Helper.Log($"Delayed ped document refresh failed ({source}): {ex.Message}", false, Helper.LogSeverity.Warning);
+                return false;
+            }
+            if (liveRead == null || string.IsNullOrWhiteSpace(liveRead.Name)) return false;
+            if (liveRead.CDFPedData == null) return false;
+
+            MDTProPedData existing;
+            bool changed;
+            lock (_pedDbLock) {
+                existing = pedDatabase.FirstOrDefault(x => x.Holder != null && x.Holder.IsValid() && x.Holder.Handle == pedHandle)
+                    ?? pedDatabase.FirstOrDefault(x => x.Name?.Equals(pedName, StringComparison.OrdinalIgnoreCase) == true)
+                    ?? keepInPedDatabase.FirstOrDefault(x => x.Name?.Equals(pedName, StringComparison.OrdinalIgnoreCase) == true);
+
+                if (existing == null) {
+                    existing = liveRead;
+                    existing.TryParseNameIntoFirstLast();
+                    if (!pedDatabase.Any(x => x.Name?.Equals(existing.Name, StringComparison.OrdinalIgnoreCase) == true))
+                        pedDatabase.Add(existing);
+                    changed = true;
+                } else {
+                    MDTProPedData before = new MDTProPedData {
+                        LicenseStatus = existing.LicenseStatus,
+                        LicenseExpiration = existing.LicenseExpiration,
+                        WeaponPermitStatus = existing.WeaponPermitStatus,
+                        WeaponPermitExpiration = existing.WeaponPermitExpiration,
+                        WeaponPermitType = existing.WeaponPermitType,
+                        FishingPermitStatus = existing.FishingPermitStatus,
+                        FishingPermitExpiration = existing.FishingPermitExpiration,
+                        HuntingPermitStatus = existing.HuntingPermitStatus,
+                        HuntingPermitExpiration = existing.HuntingPermitExpiration
+                    };
+                    ReconcilePedCdfBackedFieldsWithLiveSnapshot(existing, liveRead);
+                    changed = !SamePedDocumentFields(before, existing);
+                    if (!pedDatabase.Any(x => x.Name?.Equals(existing.Name, StringComparison.OrdinalIgnoreCase) == true))
+                        pedDatabase.Add(existing);
+                }
+            }
+
+            if (!changed) return false;
+            PedPortraitModelHelper.AssignPortraitFromPedIfSuitable(ped, existing);
+            if (existing.IsOnProbation || existing.IsOnParole)
+                EnsureSupervisionCourtBackstory(existing);
+            KeepPedInDatabase(existing);
+            Database.SavePed(existing);
+            SetContextPed(existing);
+            ServerAPI.WebSocketHandler.BroadcastDataInvalidation("pedSearch");
+            CloudPluginBridge.RequestSessionRefresh();
+            return true;
+        }
+
+        /// <summary>StopThePed and Policing Redefined can update CDF permit data shortly after an event; re-read so driver licence, weapon/CCW, hunting, and fishing permit fields reach MDT Cloud.</summary>
+        internal static void ScheduleDelayedPedDocumentRefresh(Ped ped, string source) {
+            if (ped == null || !ped.IsValid()) return;
+            PoolHandle handle = ped.Handle;
+            if (handle == 0) return;
+            string pedName = TryGetPedIdentityName(ped);
+            try {
+                GameFiber.StartNew(() => {
+                    int[] waits = { 750, 1750 };
+                    foreach (int wait in waits) {
+                        GameFiber.Wait(wait);
+                        try {
+                            if (TryRefreshPedDocumentsFromLivePed(handle, pedName, source))
+                                return;
+                        } catch (Exception ex) {
+                            Helper.Log($"Delayed ped document refresh error ({source}): {ex.Message}", false, Helper.LogSeverity.Warning);
+                        }
+                    }
+                }, "mdtpro-ped-document-refresh");
+            } catch (Exception ex) {
+                Helper.Log($"ScheduleDelayedPedDocumentRefresh: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
+        internal static bool TryRefreshContextPedDocumentsForCloudLookup(string query, out MDTProPedData pedData, out bool refreshed) {
+            refreshed = false;
+            pedData = null;
+            MDTProPedData context = GetContextPedIfValid();
+            if (context == null) return false;
+            if (!PedMatchesLookup(context, query)) return false;
+            pedData = context;
+            string knownName = context.Name;
+            try {
+                if (GameFiber.CanSleepNow) {
+                    MDTProPedData current = GetContextPedIfValid();
+                    if (current?.Holder != null && PedMatchesLookup(current, query)) {
+                        try {
+                            if (current.Holder.IsValid())
+                                refreshed = TryRefreshPedDocumentsFromLivePed(current.Holder.Handle, knownName, "cloud-ped-lookup");
+                        } catch { /* stale entity */ }
+                    }
+                } else {
+                    if (GameThreadHeartbeat.IsGameThreadFrozen())
+                        return true;
+                    bool localRefreshed = false;
+                    if (GameFiberHttpBridge.TryExecuteBlocking(() => {
+                        MDTProPedData current = GetContextPedIfValid();
+                        if (current?.Holder != null && PedMatchesLookup(current, query)) {
+                            try {
+                                if (current.Holder.IsValid())
+                                    localRefreshed = TryRefreshPedDocumentsFromLivePed(current.Holder.Handle, knownName, "cloud-ped-lookup");
+                            } catch { /* stale entity */ }
+                        }
+                    }, 1200, out var caught, "cloud-ped-document-refresh", GameWorkJobTrigger.CloudCommand, GameWorkPriority.Interactive)) {
+                        if (caught != null)
+                            Helper.Log($"TryRefreshContextPedDocumentsForCloudLookup: {caught.Message}", false, Helper.LogSeverity.Warning);
+                        refreshed = localRefreshed;
+                    }
+                }
+            } catch (Exception ex) {
+                Helper.Log($"TryRefreshContextPedDocumentsForCloudLookup: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+            MDTProPedData refreshedContext = GetContextPedIfValid();
+            pedData = refreshedContext != null && PedMatchesLookup(refreshedContext, query) ? refreshedContext : context;
+            return pedData != null;
+        }
+
+        internal static bool TryResolvePedFromLiveWorldByNameBlocking(
+            string query,
+            int timeoutMs,
+            out MDTProPedData found,
+            out string failureReason,
+            GameWorkJobTrigger trigger = GameWorkJobTrigger.UserRequest,
+            string jobName = "live-ped-lookup") {
+            found = null;
+            failureReason = null;
+            if (string.IsNullOrWhiteSpace(query)) {
+                failureReason = "not_found";
+                return true;
+            }
+
+            try {
+                string q = query.Trim();
+                MDTProPedData localFound = null;
+                bool ran = GameFiberHttpBridge.TryExecuteBlocking(() => {
+                    try {
+                        MDTProPedData context = GetContextPedIfValid();
+                        if (context != null && PedMatchesLookup(context, q)) {
+                            localFound = context;
+                        } else {
+                            foreach (Ped p in World.GetAllPeds()) {
+                                if (p == null || !p.IsValid()) continue;
+                                string pedName = TryGetPedIdentityName(p);
+                                if (string.IsNullOrWhiteSpace(pedName)) continue;
+                                string reversed = string.Join(" ", q.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Reverse());
+                                if (!pedName.Equals(q, StringComparison.OrdinalIgnoreCase) &&
+                                    (reversed.Length == 0 || !pedName.Equals(reversed, StringComparison.OrdinalIgnoreCase)))
+                                    continue;
+                                localFound = new MDTProPedData(p, forReconcileSnapshotOnly: true);
+                                break;
+                            }
+                        }
+
+                        if (localFound?.Holder != null && localFound.Holder.IsValid()) {
+                            TryRefreshPedDocumentsFromLivePed(localFound.Holder.Handle, localFound.Name, "cloud-ped-live-lookup");
+                            MDTProPedData byHolder = GetPedDataForPed(localFound.Holder);
+                            if (byHolder != null && PedMatchesLookup(byHolder, q))
+                                localFound = byHolder;
+                        }
+                        MDTProPedData refreshedContext = GetContextPedIfValid();
+                        if (refreshedContext != null && PedMatchesLookup(refreshedContext, q))
+                            localFound = refreshedContext;
+                    } catch (Exception ex) {
+                        Helper.Log($"TryResolvePedFromLiveWorldByNameBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
+                    }
+                }, timeoutMs, out var caught, jobName, trigger, GameWorkPriority.Interactive);
+                found = localFound;
+                if (!ran) {
+                    Helper.Log("TryResolvePedFromLiveWorldByNameBlocking: timed out (game paused or overloaded).", false, Helper.LogSeverity.Warning);
+                    failureReason = "game_busy";
+                    return false;
+                }
+                if (caught != null) {
+                    failureReason = "game_busy";
+                    return false;
+                }
+            } catch (Exception ex) {
+                Helper.Log($"TryResolvePedFromLiveWorldByNameBlocking: {ex.Message}", false, Helper.LogSeverity.Warning);
+                failureReason = "game_busy";
+                return false;
+            }
+            if (found != null && !PedMatchesLookup(found, query))
+                found = null;
+            if (found == null) failureReason = "not_found";
+            return true;
         }
 
         /// <summary>Add a BOLO to a vehicle. Works for in-world vehicles (via CDF) or persistent/stub records. Accepts optional modelDisplayName for new stubs.</summary>
@@ -1240,25 +1939,27 @@ namespace MDTPro.Data {
             }
         }
 
-        /// <summary>Push MDT vehicle data to CDF VehicleData so PR and other mods see IsStolen, Registration, Insurance, and BOLOs.</summary>
+        /// <summary>Push MDT vehicle data to CDF VehicleData so PR and other mods see IsStolen and BOLOs. With StopThePed, live registration/insurance checks refresh MDT instead of SQLite overwriting CDF.</summary>
         private static void SyncSingleVehicleToCDF(MDTProVehicleData databaseVehicle) {
             if (databaseVehicle?.CDFVehicleData == null) return;
             try {
                 databaseVehicle.CDFVehicleData.IsStolen = databaseVehicle.IsStolen;
-                if (databaseVehicle.CDFVehicleData.Registration != null) {
-                    if (!string.IsNullOrEmpty(databaseVehicle.RegistrationStatus) && Enum.TryParse(databaseVehicle.RegistrationStatus, true, out EDocumentStatus rs)) {
-                        try { databaseVehicle.CDFVehicleData.Registration.Status = rs; } catch { }
+                if (!ModIntegration.SubscribedStopThePedStopEvents) {
+                    if (databaseVehicle.CDFVehicleData.Registration != null) {
+                        if (!string.IsNullOrEmpty(databaseVehicle.RegistrationStatus) && Enum.TryParse(databaseVehicle.RegistrationStatus, true, out EDocumentStatus rs)) {
+                            try { databaseVehicle.CDFVehicleData.Registration.Status = rs; } catch { }
+                        }
+                        if (!string.IsNullOrEmpty(databaseVehicle.RegistrationExpiration) && DateTime.TryParse(databaseVehicle.RegistrationExpiration, out DateTime regExp)) {
+                            try { databaseVehicle.CDFVehicleData.Registration.ExpirationDate = regExp; } catch { }
+                        }
                     }
-                    if (!string.IsNullOrEmpty(databaseVehicle.RegistrationExpiration) && DateTime.TryParse(databaseVehicle.RegistrationExpiration, out DateTime regExp)) {
-                        try { databaseVehicle.CDFVehicleData.Registration.ExpirationDate = regExp; } catch { }
-                    }
-                }
-                if (databaseVehicle.CDFVehicleData.Insurance != null) {
-                    if (!string.IsNullOrEmpty(databaseVehicle.InsuranceStatus) && Enum.TryParse(databaseVehicle.InsuranceStatus, true, out EDocumentStatus ins)) {
-                        try { databaseVehicle.CDFVehicleData.Insurance.Status = ins; } catch { }
-                    }
-                    if (!string.IsNullOrEmpty(databaseVehicle.InsuranceExpiration) && DateTime.TryParse(databaseVehicle.InsuranceExpiration, out DateTime insExp)) {
-                        try { databaseVehicle.CDFVehicleData.Insurance.ExpirationDate = insExp; } catch { }
+                    if (databaseVehicle.CDFVehicleData.Insurance != null) {
+                        if (!string.IsNullOrEmpty(databaseVehicle.InsuranceStatus) && Enum.TryParse(databaseVehicle.InsuranceStatus, true, out EDocumentStatus ins)) {
+                            try { databaseVehicle.CDFVehicleData.Insurance.Status = ins; } catch { }
+                        }
+                        if (!string.IsNullOrEmpty(databaseVehicle.InsuranceExpiration) && DateTime.TryParse(databaseVehicle.InsuranceExpiration, out DateTime insExp)) {
+                            try { databaseVehicle.CDFVehicleData.Insurance.ExpirationDate = insExp; } catch { }
+                        }
                     }
                 }
                 // Sync persisted BOLOs to CDF so PR and other mods see them on re-encountered vehicles
@@ -1358,14 +2059,21 @@ namespace MDTPro.Data {
                 string name = cdf.FullName.Trim();
                 MDTProPedData ourPed = GetPedDataByName(name);
                 if (ourPed == null) return;
-                ourPed.IsWanted = cdf.Wanted;
-                ourPed.WarrantText = cdf.Wanted ? CitationArrestHelper.GetRandomWarrantCharge().name : null;
+                bool cdfWanted = cdf.Wanted;
+                string cdfWarrant = cdfWanted ? CdfWarrantTextResolver.TryResolveWarrantText(cdf, ped) : null;
+                ourPed.IsWanted = cdfWanted;
+                ourPed.WarrantText = cdfWarrant;
+                if (ourPed.HasActiveWarrants()) {
+                    ourPed.IsWanted = true;
+                    ourPed.SyncWarrantTextFromActiveWarrants();
+                }
                 ourPed.IsOnProbation = cdf.IsOnProbation;
                 ourPed.IsOnParole = cdf.IsOnParole;
                 if (ourPed.IsOnProbation || ourPed.IsOnParole)
                     EnsureSupervisionCourtBackstory(ourPed, allowNewSyntheticWithoutLeContact: true);
                 KeepPedInDatabase(ourPed);
                 Database.SavePed(ourPed);
+                ServerAPI.WebSocketHandler.BroadcastDataInvalidation("pedSearch");
             } catch (Exception ex) {
                 Helper.Log($"RefreshPedWantedStatusFromCDF: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
@@ -1373,14 +2081,7 @@ namespace MDTPro.Data {
 
         internal static void AddIdentificationEvent(Ped ped, string eventType) {
             if (ped == null || !ped.IsValid()) return;
-            string pedName = null;
-            try { pedName = ped.GetPedData()?.FullName; } catch { }
-            if (string.IsNullOrEmpty(pedName)) {
-                try {
-                    var persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped);
-                    if (persona != null && !string.IsNullOrEmpty(persona.FullName)) pedName = persona.FullName;
-                } catch { }
-            }
+            string pedName = TryGetPedIdentityName(ped);
             if (string.IsNullOrEmpty(pedName)) return;
 
             StoreIdentifiedPedHandle(pedName, ped.Handle, ped);
@@ -1460,6 +2161,201 @@ namespace MDTPro.Data {
             PedPortraitModelHelper.AssignPortraitFromPedIfSuitable(ped, pedData);
             KeepPedInDatabase(pedData);
             Database.SavePed(pedData);
+            ServerAPI.WebSocketHandler.BroadcastDataInvalidation("pedSearch");
+            CloudPluginBridge.RequestSessionRefresh();
+            if (ModIntegration.SubscribedPolicingRedefinedStopEvents && !ModIntegration.SubscribedStopThePedStopEvents)
+                ScheduleDelayedPedDocumentRefresh(ped, "Identification (PR)");
+        }
+
+        /// <summary>After CDF merge, STP licence cards use persona DOB day/month while CDF supplies the renewal year (CDF date’s MD can be wrong).</summary>
+        static void NormalizeStopThePedLicenseExpirationFromBirthdayAndCdfYear(MDTProPedData target, MDTProPedData liveCdfSnapshot) {
+            if (!ModIntegration.SubscribedStopThePedStopEvents || target == null || liveCdfSnapshot == null) return;
+            if (TryComposeStopThePedLicenseExpiryIsoFromCdfYearAndBirthday(liveCdfSnapshot, out string iso)) {
+                target.LicenseExpiration = iso;
+                target.LicenseExpirationVerifiedFromLiveDocument = true;
+            }
+        }
+
+        static bool TryParsePedBirthdayForStpLicense(string raw, out DateTime birthday) {
+            birthday = default;
+            if (string.IsNullOrWhiteSpace(raw)) return false;
+            return DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeLocal, out birthday)
+                || DateTime.TryParse(raw, CultureInfo.CurrentCulture, DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeLocal, out birthday)
+                || DateTime.TryParse(raw, out birthday);
+        }
+
+        /// <summary>StopThePed: expiry shows birthday month/day; take <paramref name="liveCdfSnapshot"/>.CDF year from <c>DriversLicenseExpiration</c>.</summary>
+        static bool TryComposeStopThePedLicenseExpiryIsoFromCdfYearAndBirthday(MDTProPedData liveCdfSnapshot, out string iso) {
+            iso = null;
+            if (liveCdfSnapshot?.CDFPedData == null) return false;
+            DateTime? cdfExpOpt = null;
+            try { cdfExpOpt = liveCdfSnapshot.CDFPedData.DriversLicenseExpiration; } catch { }
+            if (!cdfExpOpt.HasValue) {
+                if (string.IsNullOrWhiteSpace(liveCdfSnapshot.LicenseExpiration)) return false;
+                if (!DateTime.TryParse(liveCdfSnapshot.LicenseExpiration, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.RoundtripKind, out DateTime parsed)
+                    && !DateTime.TryParse(liveCdfSnapshot.LicenseExpiration, out parsed))
+                    return false;
+                cdfExpOpt = parsed;
+            }
+            if (!TryParsePedBirthdayForStpLicense(liveCdfSnapshot.Birthday, out DateTime birthday)) return false;
+            int year = cdfExpOpt.Value.Year;
+            int month = birthday.Month;
+            int day = Math.Min(birthday.Day, DateTime.DaysInMonth(year, month));
+            try {
+                iso = new DateTime(year, month, day).ToString("s", CultureInfo.InvariantCulture);
+                return true;
+            } catch {
+                return false;
+            }
+        }
+
+        /// <summary>Merge licence and permit display fields from live CDF on <paramref name="ped"/>. With StopThePed, licence <b>day/month</b> follow persona birthday (card display) and <b>year</b> comes from CDF—CDF often has the renewal year right but the wrong calendar date.</summary>
+        internal static void MergeLivePedDocumentFieldsFromCdf(MDTProPedData pedData, Ped ped) {
+            if (pedData == null || ped == null || !ped.IsValid()) return;
+            try {
+                var live = new MDTProPedData(ped, forReconcileSnapshotOnly: true);
+                if (live.CDFPedData == null) return;
+                pedData.LicenseStatus = live.LicenseStatus;
+                if (ModIntegration.SubscribedStopThePedStopEvents && TryComposeStopThePedLicenseExpiryIsoFromCdfYearAndBirthday(live, out string stpLicIso)) {
+                    pedData.LicenseExpiration = stpLicIso;
+                    pedData.LicenseExpirationVerifiedFromLiveDocument = true;
+                } else {
+                    pedData.LicenseExpiration = live.LicenseExpiration;
+                    pedData.LicenseExpirationVerifiedFromLiveDocument = !string.IsNullOrWhiteSpace(live.LicenseExpiration);
+                }
+                pedData.WeaponPermitStatus = live.WeaponPermitStatus;
+                pedData.WeaponPermitExpiration = live.WeaponPermitExpiration;
+                pedData.WeaponPermitType = live.WeaponPermitType;
+                pedData.FishingPermitStatus = live.FishingPermitStatus;
+                pedData.FishingPermitExpiration = live.FishingPermitExpiration;
+                pedData.HuntingPermitStatus = live.HuntingPermitStatus;
+                pedData.HuntingPermitExpiration = live.HuntingPermitExpiration;
+            } catch { }
+        }
+
+        /// <summary>One authoritative read from the live pooled ped holder for MDT Cloud bridge / portal (not stale SQLite document fields).</summary>
+        internal static void HydrateDriverLicenseFromLivePedForCloudBridge(MDTProPedData pedData, Ped ped) {
+            if (pedData == null || ped == null || !ped.IsValid()) return;
+            MergeLivePedDocumentFieldsFromCdf(pedData, ped);
+            if (ModIntegration.SubscribedStopThePedStopEvents)
+                return;
+            try {
+                PedData cdf = ped.GetPedData();
+                if (cdf == null) {
+                    pedData.LicenseExpiration = "Error";
+                    pedData.LicenseExpirationVerifiedFromLiveDocument = false;
+                }
+            } catch {
+                pedData.LicenseExpiration = "Error";
+                pedData.LicenseExpirationVerifiedFromLiveDocument = false;
+            }
+        }
+
+        /// <summary>Live CDF licence/permit merge from <see cref="MDTProPedData.Holder"/> when valid; otherwise a recently identified pool ped matching <paramref name="lookupNameForRecentFallback"/> (same data path as <see cref="TryApplyRecentStopThePedDriverLicenseCardForLookup"/>).</summary>
+        /// <returns><c>true</c> when hydration used a live Holder, or recent-ped merge succeeded.</returns>
+        internal static bool TryHydratePedDocumentsForCloudDisplay(MDTProPedData pedData, string lookupNameForRecentFallback) {
+            if (pedData == null) return false;
+            if (pedData.Holder != null && pedData.Holder.IsValid()) {
+                if (!GameFiber.CanSleepNow && GameThreadHeartbeat.IsGameThreadFrozen()) {
+                    if (string.IsNullOrWhiteSpace(lookupNameForRecentFallback)) return false;
+                    return TryApplyRecentStopThePedDriverLicenseCardForLookup(pedData, lookupNameForRecentFallback);
+                }
+                HydrateDriverLicenseFromLivePedForCloudBridge(pedData, pedData.Holder);
+                return true;
+            }
+            if (string.IsNullOrWhiteSpace(lookupNameForRecentFallback)) return false;
+            return TryApplyRecentStopThePedDriverLicenseCardForLookup(pedData, lookupNameForRecentFallback);
+        }
+
+        internal static bool TryApplyRecentStopThePedDriverLicenseCardForLookup(MDTProPedData pedData, string lookupName = null) {
+            if (pedData == null || !ModIntegration.SubscribedStopThePedStopEvents) return false;
+            string name = !string.IsNullOrWhiteSpace(lookupName) ? lookupName.Trim() : pedData.Name;
+            if (string.IsNullOrWhiteSpace(name)) return false;
+            var handleOpt = GetRecentlyIdentifiedPedHandle(name, pedData.Birthday, pedData.ModelHash != 0 ? (uint?)pedData.ModelHash : null);
+            if (!handleOpt.HasValue && !string.IsNullOrWhiteSpace(pedData.Name) && !string.Equals(name, pedData.Name.Trim(), StringComparison.OrdinalIgnoreCase))
+                handleOpt = GetRecentlyIdentifiedPedHandle(pedData.Name, pedData.Birthday, pedData.ModelHash != 0 ? (uint?)pedData.ModelHash : null);
+            if (!handleOpt.HasValue) return false;
+            try {
+                Ped live = World.GetEntityByHandle<Ped>(handleOpt.Value);
+                if (live == null || !live.IsValid()) return false;
+                if (!LivePedIdentityMatchesRecord(live, pedData)) return false;
+                MergeLivePedDocumentFieldsFromCdf(pedData, live);
+                return true;
+            } catch {
+                return false;
+            }
+        }
+
+
+        internal static bool AddVehicleDocumentIdentificationEventForOwner(Vehicle vehicle, string eventType) {
+            if (!MDTProPedData.IsVehiclePaperworkIdentificationType(eventType)) return false;
+
+            MDTProVehicleData vehicleData = null;
+            try {
+                if (vehicle != null && vehicle.Exists())
+                    vehicleData = new MDTProVehicleData(vehicle);
+            } catch { /* fall back to context vehicle below */ }
+
+            if (vehicleData?.CDFVehicleData?.Owner == null)
+                vehicleData = GetContextVehicleIfValid();
+
+            PedData owner = vehicleData?.CDFVehicleData?.Owner;
+            string ownerName = owner?.FullName?.Trim();
+            if (string.IsNullOrWhiteSpace(ownerName) || ownerName.Equals("Government", StringComparison.OrdinalIgnoreCase))
+                return false;
+            bool activeDriverLicenseShouldStayPrimary = HasRecentContextDriverLicenseIdentification();
+
+            MDTProPedData ownerData;
+            try {
+                ownerData = new MDTProPedData(owner);
+            } catch (Exception ex) {
+                Helper.Log($"AddVehicleDocumentIdentificationEventForOwner: {ex.Message}", false, Helper.LogSeverity.Warning);
+                return false;
+            }
+            if (ownerData == null || string.IsNullOrWhiteSpace(ownerData.Name)) return false;
+
+            lock (_pedDbLock) {
+                MDTProPedData existing = pedDatabase.FirstOrDefault(x => x.Name?.Equals(ownerData.Name, StringComparison.OrdinalIgnoreCase) == true)
+                    ?? keepInPedDatabase.FirstOrDefault(x => x.Name?.Equals(ownerData.Name, StringComparison.OrdinalIgnoreCase) == true);
+
+                if (existing == null) {
+                    ownerData.IdentificationHistory = new List<MDTProPedData.IdentificationEntry>();
+                    pedDatabase.Add(ownerData);
+                } else {
+                    ReconcilePedCdfBackedFieldsWithLiveSnapshot(existing, ownerData);
+                    ownerData = existing;
+                    if (!pedDatabase.Any(x => x.Name?.Equals(ownerData.Name, StringComparison.OrdinalIgnoreCase) == true))
+                        pedDatabase.Add(ownerData);
+                }
+
+                if (ownerData.IdentificationHistory == null)
+                    ownerData.IdentificationHistory = new List<MDTProPedData.IdentificationEntry>();
+                if (!activeDriverLicenseShouldStayPrimary) {
+                    ownerData.IdentificationHistory.Insert(0, new MDTProPedData.IdentificationEntry {
+                        Type = eventType,
+                        Timestamp = System.DateTime.UtcNow.ToString("o")
+                    });
+                    if (ownerData.IdentificationHistory.Count > 10)
+                        ownerData.IdentificationHistory.RemoveAt(ownerData.IdentificationHistory.Count - 1);
+                }
+            }
+
+            KeepPedInDatabase(ownerData);
+            if (ownerData.IsOnProbation || ownerData.IsOnParole)
+                EnsureSupervisionCourtBackstory(ownerData);
+            Database.SavePed(ownerData);
+            ServerAPI.WebSocketHandler.BroadcastDataInvalidation("pedSearch");
+            return true;
+        }
+
+        private static bool HasRecentContextDriverLicenseIdentification() {
+            MDTProPedData context = GetContextPedIfValid();
+            if (context?.IdentificationHistory == null || context.IdentificationHistory.Count == 0) return false;
+            var latest = context.IdentificationHistory[0];
+            if (!MDTProPedData.IsDriverLicenseIdentificationType(latest.Type)) return false;
+            if (!MDTProPedData.TryParseIdentificationTimestampUtc(latest.Timestamp, out System.DateTime latestUtc)) return false;
+            double ageSec = (System.DateTime.UtcNow - latestUtc).TotalSeconds;
+            return ageSec >= 0 && ageSec <= 12.0;
         }
 
         /// <summary>StopThePed passenger ID flow supplies a vehicle; record ID history for the driver when possible.</summary>
@@ -1563,7 +2459,7 @@ namespace MDTPro.Data {
                     MDTProPedData existingByName = pedDatabase.FirstOrDefault(x => x.Name != null && x.Name.Equals(mdtProPedData.Name, StringComparison.OrdinalIgnoreCase));
                     if (existingByName != null) {
                         ReconcilePedCdfBackedFieldsWithLiveSnapshot(existingByName, mdtProPedData);
-                        if (existingByName.CDFPedData != null) {
+                        if (existingByName.CDFPedData != null && CloudEncounterLeaseClient.CanPushPedToCdf(existingByName)) {
                             existingByName.CDFPedData.Wanted = existingByName.IsWanted;
                             existingByName.CDFPedData.IsOnProbation = existingByName.IsOnProbation;
                             existingByName.CDFPedData.IsOnParole = existingByName.IsOnParole;
@@ -1733,10 +2629,20 @@ namespace MDTPro.Data {
                         pedDataToAdd.Arrests ??= new List<ArrestGroup.Charge>();
                         pedDataToAdd.Arrests.AddRange((arrestReport.Charges ?? Enumerable.Empty<ArrestReport.Charge>()).Where(x => x != null && !x.addedByReportInEdit));
 
-                        // Arrest satisfies warrant: clear wanted status and sync to CDF so MDT and PR stay consistent
-                        pedDataToAdd.IsWanted = false;
-                        pedDataToAdd.WarrantText = null;
-                        SyncSinglePedToCDF(pedDataToAdd);
+                        if (arrestReport.Status == ReportStatus.Closed) {
+                            pedDataToAdd.IsWanted = false;
+                            pedDataToAdd.WarrantText = null;
+                            if (pedDataToAdd.Warrants != null) {
+                                string clearedAt = DateTime.UtcNow.ToString("o");
+                                foreach (WarrantCharge w in pedDataToAdd.Warrants) {
+                                    if (w == null || !w.IsActive) continue;
+                                    w.ClearedAtUtc = clearedAt;
+                                    w.ClearedByReportType = "arrest";
+                                    w.ClearedByReportId = arrestReport.Id;
+                                }
+                            }
+                            SyncSinglePedToCDF(pedDataToAdd);
+                        }
 
                         KeepPedInDatabase(pedDataToAdd);
                     }
@@ -1970,14 +2876,14 @@ namespace MDTPro.Data {
             AddReportToCurrentShift(report.Id);
         }
 
-        private static void TryApplyReEncounterProfile(MDTProPedData currentPedData, bool persistToSql = true) {
-            MDTProPedData persistentMatch = GetReEncounterCandidate(currentPedData);
+        private static void TryApplyReEncounterProfile(MDTProPedData currentPedData, bool persistToSql = true, Ped livePed = null) {
+            MDTProPedData persistentMatch = GetReEncounterCandidate(currentPedData, livePed);
             if (persistentMatch == null) return;
 
             string liveName = currentPedData.Name;
             int cdfTimesStoppedBefore = currentPedData.CDFPedData?.TimesStopped ?? 0;
             currentPedData.ApplyPersistentRecordPreservingLiveIdentity(persistentMatch);
-            if (currentPedData.CDFPedData != null) {
+            if (currentPedData.CDFPedData != null && CloudEncounterLeaseClient.CanPushPedToCdf(currentPedData)) {
                 currentPedData.ApplyCdfPersonaAndDocumentsToDisplayFields();
                 ApplyCourtRevokedPermitHintsFrom(currentPedData, persistentMatch);
                 currentPedData.TimesStopped = Math.Max(cdfTimesStoppedBefore, persistentMatch.TimesStopped + 1);
@@ -2153,14 +3059,14 @@ namespace MDTPro.Data {
                 return;
             }
 
-            TryApplyReEncounterProfile(mdtProPedData, persistToSql);
+            TryApplyReEncounterProfile(mdtProPedData, persistToSql, ped);
             if (mdtProPedData.IsOnProbation || mdtProPedData.IsOnParole)
                 EnsureSupervisionCourtBackstory(mdtProPedData);
             lock (_pedDbLock) {
                 if (pedDatabase.Any(x => x != null && x.Name != null && x.Name.Equals(mdtProPedData.Name, StringComparison.OrdinalIgnoreCase))) return;
                 pedDatabase.Add(mdtProPedData);
             }
-            if (persistToSql && !MDTProPedData.IsMinimalIdentity(mdtProPedData))
+            if (persistToSql && (!MDTProPedData.IsMinimalIdentity(mdtProPedData) || MDTProPedData.HasIdentificationHistory(mdtProPedData)))
                 Database.SavePed(mdtProPedData);
             SetContextPed(mdtProPedData);
             // Push MDT row (incl. court revocations from TryApply merge) onto CDF before STP/PR read another layer.
@@ -2243,6 +3149,18 @@ namespace MDTPro.Data {
             }
         }
 
+        internal static bool PedMatchesLookup(MDTProPedData pedData, string query) {
+            if (pedData == null) return false;
+            string q = (query ?? "").Trim();
+            if (q.Length == 0 || q.Equals("context", StringComparison.OrdinalIgnoreCase) || q == "%context" || q.Equals("current", StringComparison.OrdinalIgnoreCase))
+                return true;
+            string name = pedData.Name?.Trim() ?? "";
+            if (name.Length == 0) return false;
+            if (name.Equals(q, StringComparison.OrdinalIgnoreCase)) return true;
+            string reversed = string.Join(" ", q.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Reverse());
+            return reversed.Length > 0 && name.Equals(reversed, StringComparison.OrdinalIgnoreCase);
+        }
+
         internal static void SetContextVehicle(MDTProVehicleData vehicleData) {
             if (vehicleData == null || string.IsNullOrWhiteSpace(vehicleData.LicensePlate)) return;
             lock (_contextVehicleLock) {
@@ -2262,10 +3180,39 @@ namespace MDTPro.Data {
             }
         }
 
-        /// <summary>Compare plates ignoring spaces and case (Person / Vehicle Search context matching).</summary>
+        internal static bool VehicleMatchesLookup(MDTProVehicleData vehicleData, string query) {
+            if (vehicleData == null) return false;
+            string q = (query ?? "").Trim();
+            if (q.Length == 0 || q.Equals("context", StringComparison.OrdinalIgnoreCase) || q == "%context" || q.Equals("current", StringComparison.OrdinalIgnoreCase))
+                return true;
+            string plateKey = NormalizeVehiclePlateKey(q);
+            string vinKey = NormalizeVehicleVinKey(q);
+            return (!string.IsNullOrEmpty(plateKey) && !string.IsNullOrEmpty(vehicleData.LicensePlate) && NormalizeVehiclePlateKey(vehicleData.LicensePlate) == plateKey)
+                || string.Equals(vehicleData.VehicleIdentificationNumber, q, StringComparison.OrdinalIgnoreCase)
+                || (!string.IsNullOrEmpty(vinKey) && !string.IsNullOrEmpty(vehicleData.VehicleIdentificationNumber) && NormalizeVehicleVinKey(vehicleData.VehicleIdentificationNumber) == vinKey);
+        }
+
+        internal static bool IsContextVehicleLookup(MDTProVehicleData vehicleData, string query = null) {
+            MDTProVehicleData context = GetContextVehicleIfValid();
+            if (context == null || vehicleData == null) return false;
+            bool samePlate = !string.IsNullOrWhiteSpace(vehicleData.LicensePlate) && VehicleMatchesLookup(context, vehicleData.LicensePlate);
+            bool sameVin = !string.IsNullOrWhiteSpace(vehicleData.VehicleIdentificationNumber) && VehicleMatchesLookup(context, vehicleData.VehicleIdentificationNumber);
+            if (!samePlate && !sameVin) return false;
+            return string.IsNullOrWhiteSpace(query) || VehicleMatchesLookup(context, query);
+        }
+
+        /// <summary>Compare plates ignoring casing and separators (Person / Vehicle Search context matching).</summary>
         internal static string NormalizeVehiclePlateKey(string plate) {
             if (string.IsNullOrWhiteSpace(plate)) return "";
-            return plate.Trim().Replace(" ", "").ToUpperInvariant();
+            return new string(plate.Trim().ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
+        }
+
+        private static string NormalizeVehicleVinKey(string vin) {
+            string normalized = NormalizeVehiclePlateKey(vin);
+            if (normalized.Length < 5) return "";
+            return normalized == "UNKNOWN" || normalized == "UNK" || normalized == "NONE" || normalized == "NULL" || normalized == "NA"
+                ? ""
+                : normalized;
         }
 
         /// <summary>StopThePed-only: resolves live <see cref="Vehicle"/> (Holder or world scan by plate), copies CDF reg/ins, then STP status API. Must run on the game fiber — <see cref="TryRefreshVehicleDocumentsFromLiveWorld"/> marshals from HTTP.</summary>
@@ -2281,7 +3228,9 @@ namespace MDTPro.Data {
             } catch { /* entity disposed */ }
             if (live == null) {
                 try {
-                    foreach (Vehicle v in World.GetAllVehicles()) {
+                    float maxWorldScanMeters = ClampDistanceMeters(SetupController.GetConfig().explicitNearbyVehicleScanRadiusMeters, 95f, 25f, 250f);
+                    Vector3 origin = Main.Player != null && Main.Player.Exists() ? Main.Player.Position : default;
+                    foreach (Vehicle v in GetVehiclesNearPosition(origin, maxWorldScanMeters)) {
                         if (v == null || !v.Exists()) continue;
                         string plate = TryResolveLiveVehiclePlate(v, out _);
                         if (string.IsNullOrEmpty(plate) || NormalizeVehiclePlateKey(plate) != want) continue;
@@ -2310,6 +3259,8 @@ namespace MDTPro.Data {
                 if (GameFiber.CanSleepNow) {
                     result = TryRefreshVehicleDocumentsFromLiveWorldExecute(vehicleData);
                 } else {
+                    if (GameThreadHeartbeat.IsGameThreadFrozen())
+                        return false;
                     if (!GameFiberHttpBridge.TryExecuteBlocking(() => {
                         result = TryRefreshVehicleDocumentsFromLiveWorldExecute(vehicleData);
                     }, 2500, out var docEx)) {
@@ -2324,19 +3275,96 @@ namespace MDTPro.Data {
             return result;
         }
 
+        internal static bool TryRefreshVehicleDocumentsForCloudLookup(MDTProVehicleData vehicleData, string query) {
+            if (vehicleData == null || !IsContextVehicleLookup(vehicleData, query)) return false;
+            bool refreshed = TryRefreshVehicleDocumentsFromLiveWorld(vehicleData);
+            if (!refreshed) return false;
+            try {
+                if (vehicleData.CDFVehicleData != null)
+                    MergeBOLOsFromStubByPlate(vehicleData);
+                TrySyncVehicleOwnerWantedFromCdf(vehicleData);
+                SetContextVehicle(vehicleData);
+                UpsertCachedNearbyVehicleFromResolvedVehicle(vehicleData);
+                KeepVehicleInDatabase(vehicleData);
+                ServerAPI.WebSocketHandler.BroadcastDataInvalidation("vehicleSearch");
+            } catch (Exception ex) {
+                Helper.Log($"TryRefreshVehicleDocumentsForCloudLookup: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+            return true;
+        }
+
+        internal static void ScheduleDelayedVehicleDocumentRefresh(Vehicle vehicle, string source) {
+            if (vehicle == null || !vehicle.Exists()) return;
+            PoolHandle handle = vehicle.Handle;
+            string plate = null;
+            try { plate = vehicle.LicensePlate?.Trim(); } catch { }
+            if (string.IsNullOrWhiteSpace(plate)) return;
+            try {
+                GameFiber.StartNew(() => {
+                    int[] waits = { 750, 1750 };
+                    foreach (int wait in waits) {
+                        GameFiber.Wait(wait);
+                        try {
+                            Vehicle live = null;
+                            try { live = World.GetEntityByHandle<Vehicle>(handle); } catch { }
+                            if (live == null || !live.Exists()) return;
+                            MDTProVehicleData vehicleData = GetVehicleByPlateOrVin(plate) ?? new MDTProVehicleData(live);
+                            if (string.IsNullOrWhiteSpace(vehicleData.LicensePlate)) return;
+                            bool refreshed = TryRefreshVehicleDocumentsFromLiveWorld(vehicleData);
+                            if (!refreshed) continue;
+                            if (vehicleData.CDFVehicleData != null)
+                                MergeBOLOsFromStubByPlate(vehicleData);
+                            TrySyncVehicleOwnerWantedFromCdf(vehicleData);
+                            SetContextVehicle(vehicleData);
+                            UpsertCachedNearbyVehicleFromResolvedVehicle(vehicleData);
+                            KeepVehicleInDatabase(vehicleData);
+                            ServerAPI.WebSocketHandler.BroadcastDataInvalidation("vehicleSearch");
+                            return;
+                        } catch (Exception ex) {
+                            Helper.Log($"Delayed vehicle document refresh error ({source}): {ex.Message}", false, Helper.LogSeverity.Warning);
+                        }
+                    }
+                }, "mdtpro-vehicle-document-refresh");
+            } catch (Exception ex) {
+                Helper.Log($"ScheduleDelayedVehicleDocumentRefresh: {ex.Message}", false, Helper.LogSeverity.Warning);
+            }
+        }
+
         /// <summary>STP stop integration: sets registration/insurance status strings from StopThePed public API (matches in-game plate/doc checks). Call on game thread.</summary>
         internal static bool TryOverlayStopThePedVehicleDocStatusFromApi(MDTProVehicleData vehicleData, Vehicle live) {
             if (!ModIntegration.SubscribedStopThePedStopEvents || vehicleData == null || live == null || !live.Exists()) return false;
             bool any = false;
-            if (StpReflectionHelper.TryGetVehicleRegistrationStatusStp(live, out string reg)) {
-                vehicleData.RegistrationStatus = reg;
+            if (StpReflectionHelper.TryGetVehicleRegistrationDocumentStp(live, out string reg, out string regExpiration)) {
+                vehicleData.RegistrationStatus = string.IsNullOrWhiteSpace(reg) ? "Error" : reg;
+                ApplyStopThePedVehicleDocumentExpiration(regExpiration, ref vehicleData.RegistrationExpiration, ref vehicleData.RegistrationExpirationVerifiedFromLiveDocument);
+                any = true;
+            } else {
+                vehicleData.RegistrationStatus = "Error";
+                ApplyStopThePedVehicleDocumentExpiration(null, ref vehicleData.RegistrationExpiration, ref vehicleData.RegistrationExpirationVerifiedFromLiveDocument);
                 any = true;
             }
-            if (StpReflectionHelper.TryGetVehicleInsuranceStatusStp(live, out string ins)) {
-                vehicleData.InsuranceStatus = ins;
+            if (StpReflectionHelper.TryGetVehicleInsuranceDocumentStp(live, out string ins, out string insExpiration)) {
+                vehicleData.InsuranceStatus = string.IsNullOrWhiteSpace(ins) ? "Error" : ins;
+                ApplyStopThePedVehicleDocumentExpiration(insExpiration, ref vehicleData.InsuranceExpiration, ref vehicleData.InsuranceExpirationVerifiedFromLiveDocument);
+                any = true;
+            } else {
+                vehicleData.InsuranceStatus = "Error";
+                ApplyStopThePedVehicleDocumentExpiration(null, ref vehicleData.InsuranceExpiration, ref vehicleData.InsuranceExpirationVerifiedFromLiveDocument);
                 any = true;
             }
             return any;
+        }
+
+        private static void ApplyStopThePedVehicleDocumentExpiration(string stpExpiration, ref string expiration, ref bool verifiedFromLiveDocument) {
+            if (string.IsNullOrWhiteSpace(stpExpiration)) {
+                // StopThePed's public status API does not always expose an expiration date. Do not
+                // promote the CDF/random vehicle date as a verified STP document date.
+                expiration = null;
+                verifiedFromLiveDocument = false;
+                return;
+            }
+            expiration = stpExpiration;
+            verifiedFromLiveDocument = true;
         }
 
         /// <summary>Align Person Search warrant/supervision with CDF vehicle owner (same source STP uses after a plate check). Fixes stale MDT rows when owner was already in pedDatabase.</summary>
@@ -2763,15 +3791,10 @@ namespace MDTPro.Data {
             return string.Equals(pFirst, lFirst, StringComparison.OrdinalIgnoreCase);
         }
 
-        private static MDTProPedData GetReEncounterCandidate(MDTProPedData currentPedData) {
+        private static MDTProPedData GetReEncounterCandidate(MDTProPedData currentPedData, Ped livePed = null) {
             if (currentPedData == null) return null;
             bool hasModel = (currentPedData.ModelHash != 0) || !string.IsNullOrEmpty(currentPedData.ModelName);
             if (!hasModel) return null;
-
-            float chance = SetupController.GetConfig().reEncounterChance;
-            if (chance <= 0f) return null;
-            if (chance >= 1f) chance = 1f;
-            if (random.NextDouble() > chance) return null;
 
             List<MDTProPedData> candidates;
             lock (_pedDbLock) {
@@ -2793,7 +3816,54 @@ namespace MDTPro.Data {
             }
 
             if (candidates.Count == 0) return null;
-            return candidates[random.Next(candidates.Count)];
+
+            List<MDTProPedData> ownedVehicleMatches = GetOwnedVehiclePedCandidates(currentPedData, livePed, candidates);
+            float chance = ownedVehicleMatches.Count > 0
+                ? SetupController.GetConfig().reEncounterPedChanceWhenOwnedVehicleMatches
+                : SetupController.GetConfig().reEncounterChance;
+            if (chance <= 0f) return null;
+            if (chance >= 1f) chance = 1f;
+            if (random.NextDouble() > chance) return null;
+
+            var pool = ownedVehicleMatches.Count > 0 ? ownedVehicleMatches : candidates;
+            return pool[random.Next(pool.Count)];
+        }
+
+        private static List<MDTProPedData> GetOwnedVehiclePedCandidates(MDTProPedData currentPedData, Ped livePed, List<MDTProPedData> candidates) {
+            var result = new List<MDTProPedData>();
+            if (currentPedData == null || livePed == null || candidates == null || candidates.Count == 0) return result;
+
+            MDTProVehicleData liveVehicle = null;
+            try {
+                Vehicle v = livePed.CurrentVehicle;
+                if (v == null || !v.Exists()) return result;
+                liveVehicle = new MDTProVehicleData(v);
+            } catch {
+                return result;
+            }
+            if (liveVehicle == null || string.IsNullOrWhiteSpace(liveVehicle.ModelName)) return result;
+
+            string liveModel = liveVehicle.ModelName.Trim();
+            HashSet<string> candidateNames = new HashSet<string>(
+                candidates.Select(c => c?.Name).Where(n => !string.IsNullOrWhiteSpace(n)),
+                StringComparer.OrdinalIgnoreCase);
+            HashSet<string> ownerNamesWithMatchingVehicle = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            lock (_vehicleDbLock) {
+                foreach (MDTProVehicleData vehicle in keepInVehicleDatabase) {
+                    if (vehicle == null || string.IsNullOrWhiteSpace(vehicle.Owner) || string.IsNullOrWhiteSpace(vehicle.ModelName)) continue;
+                    if (!candidateNames.Contains(vehicle.Owner)) continue;
+                    if (!string.Equals(vehicle.ModelName.Trim(), liveModel, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (vehicleDatabase.Any(active => active != null && !string.IsNullOrWhiteSpace(active.LicensePlate) && string.Equals(active.LicensePlate, vehicle.LicensePlate, StringComparison.OrdinalIgnoreCase))) continue;
+                    ownerNamesWithMatchingVehicle.Add(vehicle.Owner);
+                }
+            }
+
+            if (ownerNamesWithMatchingVehicle.Count == 0) return result;
+            result = candidates
+                .Where(candidate => candidate != null && ownerNamesWithMatchingVehicle.Contains(candidate.Name))
+                .ToList();
+            return result;
         }
 
         private static bool IsPedAvailableForEncounter(MDTProPedData pedData) {
@@ -3108,6 +4178,7 @@ namespace MDTPro.Data {
             bool firearmsRevoked = false;
             string firearmsDuration = null; // "Lifetime" or "10 years"
             bool fishingRevoked = false;
+            bool huntingRevoked = false;
 
             foreach (CourtData.Charge charge in courtData.Charges) {
                 if (charge == null) continue;
@@ -3137,11 +4208,13 @@ namespace MDTPro.Data {
                     }
                 }
 
-                // Fishing: only for fish/wildlife code violations (poaching, illegal take, etc.)
-                if (!fishingRevoked && (name.IndexOf("Fish", StringComparison.OrdinalIgnoreCase) >= 0
-                    || name.IndexOf("Wildlife", StringComparison.OrdinalIgnoreCase) >= 0
-                    || name.IndexOf("Poach", StringComparison.OrdinalIgnoreCase) >= 0
-                    || name.IndexOf("Game", StringComparison.OrdinalIgnoreCase) >= 0 && name.IndexOf("Grand Theft", StringComparison.OrdinalIgnoreCase) < 0)) {
+                // Hunting: poaching / illegal hunting / wildlife "take" (CDFW practice — not generic animal cruelty)
+                if (!huntingRevoked && IsHuntingOffenceName(name)) {
+                    huntingRevoked = true;
+                }
+
+                // Fishing: only for fish-code violations (poaching, illegal take, fishing without license, etc.)
+                if (!fishingRevoked && IsFishingOffenceName(name)) {
                     fishingRevoked = true;
                 }
             }
@@ -3149,8 +4222,32 @@ namespace MDTPro.Data {
             if (driversLicenseRevoked) revocations.Add("Driver's License Revoked");
             if (firearmsRevoked) revocations.Add(string.IsNullOrEmpty(firearmsDuration) ? "Firearms Permit Revoked" : $"Firearms Permit Revoked ({firearmsDuration})");
             if (fishingRevoked) revocations.Add("Sport Fishing Privileges Revoked");
+            if (huntingRevoked) revocations.Add("Hunting Privileges Revoked");
 
             return revocations;
+        }
+
+        /// <summary>Hunting-side wildlife offences. Mirrors cloud-side <c>IsHuntingOffence</c> so manual and synced cases stay in lockstep.</summary>
+        private static bool IsHuntingOffenceName(string name) {
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.ToLowerInvariant();
+            if (n.Contains("manhunt")) return false;
+            return n.Contains("hunting without license") || n.Contains("hunting without permit")
+                || n.Contains("poaching") || n.Contains("illegal hunt") || n.Contains("illegal take")
+                || n.Contains("unlawful take") || n.Contains("spotlighting")
+                || n.Contains("hunt")
+                || (n.Contains("wildlife") && !n.Contains("fish"))
+                || n.Contains("game animal") || n.Contains("take of game") || n.Contains("take of deer")
+                || n.Contains("take of bear") || n.Contains("take of elk") || n.Contains("take of bird") || n.Contains("take of mammal");
+        }
+
+        /// <summary>Fishing-side wildlife offences. Generic animal cruelty no longer pulls a fishing licence.</summary>
+        private static bool IsFishingOffenceName(string name) {
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.ToLowerInvariant();
+            return n.Contains("fishing without license") || n.Contains("fishing without permit")
+                || n.Contains("illegal fishing") || n.Contains("unlawful fishing")
+                || n.Contains("poaching") || n.Contains("fishery") || n.Contains("sport fishing") || n.Contains("fish");
         }
 
         private static bool IsFelonyChargeName(string name) {
@@ -3425,7 +4522,7 @@ namespace MDTPro.Data {
             return Math.Max(15, Math.Min(85, chance));
         }
 
-        /// <summary>Applies court-ordered license revocations to ped data. Sets LicenseStatus, WeaponPermitStatus, FishingPermitStatus when applicable. Uses CDF/PR enums: DriversLicenseState (ELicenseState), WeaponPermit/FishingPermit.Status (EDocumentStatus) per https://policing-redefined.netlify.app/docs/developer-docs/cdf/peds/permits</summary>
+        /// <summary>Applies court-ordered license revocations to ped data. Sets LicenseStatus, WeaponPermitStatus, FishingPermitStatus, HuntingPermitStatus when applicable. Uses CDF/PR enums: DriversLicenseState (ELicenseState), WeaponPermit/FishingPermit/HuntingPermit.Status (EDocumentStatus) per https://policing-redefined.netlify.app/docs/developer-docs/cdf/peds/permits</summary>
         private static void ApplyLicenseRevocationsToPed(MDTProPedData pedData, List<string> revocations) {
             if (pedData == null || revocations == null || revocations.Count == 0) return;
             foreach (string r in revocations) {
@@ -3444,6 +4541,12 @@ namespace MDTPro.Data {
             foreach (string r in revocations) {
                 if (r?.IndexOf("Fishing", StringComparison.OrdinalIgnoreCase) >= 0) {
                     pedData.FishingPermitStatus = EDocumentStatus.Revoked.ToString();
+                    break;
+                }
+            }
+            foreach (string r in revocations) {
+                if (r?.IndexOf("Hunting", StringComparison.OrdinalIgnoreCase) >= 0) {
+                    pedData.HuntingPermitStatus = EDocumentStatus.Revoked.ToString();
                     break;
                 }
             }
@@ -3863,6 +4966,7 @@ namespace MDTPro.Data {
                 Helper.Log($"[Firearm] PR assembly ({asm.GetName().Name} {asm.GetName().Version}): {relevant.Count} relevant types/events:\n  " + string.Join("\n  ", relevant.Take(60)), false, Helper.LogSeverity.Info);
                 if (relevant.Count > 60)
                     Helper.Log($"[Firearm] ... and {relevant.Count - 60} more.", false, Helper.LogSeverity.Info);
+                PRFirearmSearchItemHelper.InspectCapabilities();
             } catch (Exception ex) {
                 Helper.Log($"[Firearm] PR assembly diagnostics failed: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
@@ -4039,28 +5143,32 @@ namespace MDTPro.Data {
         /// <summary>Poll-based: for vehicles in vehicleDatabase with valid Holder, if PR reports vehicle searched and we haven't captured yet, persist search items.</summary>
         internal static void TryCaptureVehicleSearches() {
             if (!ModIntegration.HasPolicingRedefinedSearchItemsApi) return;
+            if (SetupController.GetGameWorkModeKind() == GameWorkModeKind.Performance) {
+                _performanceVehicleSearchPass++;
+                if ((_performanceVehicleSearchPass & 7) != 0) return;
+            }
             try {
-                MethodInfo getHasSearched = null;
-                var searchApiTypeNames = new[] {
-                    "PolicingRedefined.API.SearchItemsAPI, PolicingRedefined",
-                    "PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined",
-                    "PolicingRedefined.API.VehicleAPI, PolicingRedefined"
-                };
-                foreach (string typeName in searchApiTypeNames) {
-                    Type apiType = Type.GetType(typeName);
-                    if (apiType == null) continue;
-                    getHasSearched = apiType.GetMethod("GetHasVehicleBeenSearched",
-                        BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase,
-                        null, new[] { typeof(Rage.Vehicle) }, null);
-                    if (getHasSearched != null) break;
-                }
+                MethodInfo getHasSearched = GetPrHasVehicleBeenSearchedMethod();
                 if (getHasSearched == null) return;
 
                 List<MDTProVehicleData> vehiclesToCheck;
                 lock (_vehicleDbLock) {
                     vehiclesToCheck = vehicleDatabase.Where(v => v?.Holder != null && v.Holder.Exists() && !string.IsNullOrEmpty(v.LicensePlate)).ToList();
                 }
-                foreach (var vData in vehiclesToCheck) {
+                if (vehiclesToCheck.Count == 0) {
+                    _vehicleSearchCaptureCursor = 0;
+                    return;
+                }
+
+                int maxPerPass = ClampIntervalMs(SetupController.GetConfig().prVehicleSearchCaptureMaxPerPass, 16, 1, 64);
+                int start = _vehicleSearchCaptureCursor;
+                if (start < 0 || start >= vehiclesToCheck.Count) start = 0;
+                int examined = 0;
+                while (examined < vehiclesToCheck.Count && examined < maxPerPass) {
+                    if (examined > 0 && (examined & 3) == 0)
+                        GameFiber.Yield();
+                    var vData = vehiclesToCheck[(start + examined) % vehiclesToCheck.Count];
+                    examined++;
                     Vehicle v = vData.Holder;
                     if (v == null || !v.Exists()) continue;
                     string plate = vData.LicensePlate?.Trim();
@@ -4085,9 +5193,29 @@ namespace MDTPro.Data {
                         }
                     }
                 }
+                _vehicleSearchCaptureCursor = (start + examined) % vehiclesToCheck.Count;
             } catch (Exception e) {
                 Helper.Log($"TryCaptureVehicleSearches failed: {e.Message}", false, Helper.LogSeverity.Warning);
             }
+        }
+
+        private static MethodInfo GetPrHasVehicleBeenSearchedMethod() {
+            if (_prGetHasVehicleBeenSearchedResolved) return _prGetHasVehicleBeenSearchedMethod;
+            _prGetHasVehicleBeenSearchedResolved = true;
+            var searchApiTypeNames = new[] {
+                "PolicingRedefined.API.SearchItemsAPI, PolicingRedefined",
+                "PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined",
+                "PolicingRedefined.API.VehicleAPI, PolicingRedefined"
+            };
+            foreach (string typeName in searchApiTypeNames) {
+                Type apiType = Type.GetType(typeName);
+                if (apiType == null) continue;
+                _prGetHasVehicleBeenSearchedMethod = apiType.GetMethod("GetHasVehicleBeenSearched",
+                    BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase,
+                    null, new[] { typeof(Rage.Vehicle) }, null);
+                if (_prGetHasVehicleBeenSearchedMethod != null) break;
+            }
+            return _prGetHasVehicleBeenSearchedMethod;
         }
 
         /// <summary>Captures firearms from (1) player's held weapon when PR has run a check on it, (2) weapon pickups on the ground via GetPickupSearchItems if PR exposes it. Ground/pickup weapons use "Evidence (ground)" as owner.</summary>
@@ -4096,40 +5224,55 @@ namespace MDTPro.Data {
             bool prSearch = ModIntegration.HasPolicingRedefinedSearchItemsApi;
             bool stpStops = ModIntegration.SubscribedStopThePedStopEvents;
             if (!prSearch && !stpStops) return;
+            Config cfg = SetupController.GetConfig();
+            DateTime now = DateTime.UtcNow;
+            int playerIntervalMs = ClampIntervalMs(cfg.firearmPlayerHeldScanIntervalMs, Config.PerfCaptureIntervalMs.FirearmPlayerHeld, 250, 30000);
+            int pickupIntervalMs = ClampIntervalMs(cfg.firearmPickupScanIntervalMs, Config.PerfCaptureIntervalMs.FirearmPickup, 1000, 60000);
+            bool runPlayerScan = (now - _lastFirearmPlayerScanUtc).TotalMilliseconds >= playerIntervalMs;
+            bool allowPickupEnumeration = SetupController.GetGameWorkModeKind() != GameWorkModeKind.Performance
+                || cfg.passivePickupFirearmScanEnabled;
+            bool runPickupScan = allowPickupEnumeration && prSearch && (now - _lastFirearmPickupScanUtc).TotalMilliseconds >= pickupIntervalMs;
+            if (!runPlayerScan && !runPickupScan) return;
             if (!prSearch && stpStops) {
+                if (!runPlayerScan) return;
+                _lastFirearmPlayerScanUtc = now;
                 TryCapturePlayerHeldWeaponFallback();
                 return;
             }
             try {
                 // Try GetPedSearchItems on the player - when you pick up a weapon and run a firearm check, PR may add it to the player's search items. Use "Evidence (pickup)" as owner so it appears in Firearms Check.
-                int prCount = CaptureFirearmsFromPedWithOwner(Main.Player, "Evidence (pickup)", "Evidence (pickup)");
-                if (SetupController.GetConfig().firearmDebugLogging && prCount == 0) {
-                    var now = DateTime.UtcNow;
-                    if ((now - lastFirearmPollDebugLog).TotalSeconds >= 15) {
-                        lastFirearmPollDebugLog = now;
-                        uint heldHash = NativeFunction.Natives.GET_SELECTED_PED_WEAPON<uint>(Main.Player, false);
-                        string heldName = heldHash == 0u || heldHash == 0xA2719263u ? "none" : (GetWeaponDisplayNameFromHash(heldHash) ?? $"hash_{heldHash}");
-                        Helper.Log($"[Firearm] Poll: PR returned 0 for player, holding {heldName}, fallback would run={!IsMeleeOrNonFirearm(heldHash, null)}", false, Helper.LogSeverity.Info);
+                int prCount = 0;
+                if (runPlayerScan) {
+                    _lastFirearmPlayerScanUtc = now;
+                    prCount = CaptureFirearmsFromPedWithOwner(Main.Player, "Evidence (pickup)", "Evidence (pickup)");
+                    if (SetupController.GetConfig().firearmDebugLogging && prCount == 0) {
+                        if ((now - lastFirearmPollDebugLog).TotalSeconds >= 15) {
+                            lastFirearmPollDebugLog = now;
+                            uint heldHash = NativeFunction.Natives.GET_SELECTED_PED_WEAPON<uint>(Main.Player, false);
+                            string heldName = heldHash == 0u || heldHash == 0xA2719263u ? "none" : (GetWeaponDisplayNameFromHash(heldHash) ?? $"hash_{heldHash}");
+                            Helper.Log($"[Firearm] Poll: PR returned 0 for player, holding {heldName}, fallback would run={!IsMeleeOrNonFirearm(heldHash, null)}", false, Helper.LogSeverity.Info);
+                        }
                     }
+                    // Fallback: PR often doesn't add pickup weapons to player search items. When holding a firearm, capture via game native so it at least shows in Recent.
+                    if (prCount == 0) TryCapturePlayerHeldWeaponFallback();
                 }
-                // Fallback: PR often doesn't add pickup weapons to player search items. When holding a firearm, capture via game native so it at least shows in Recent.
-                if (prCount == 0) TryCapturePlayerHeldWeaponFallback();
 
                 // Try GetPickupSearchItems via reflection - PR WeaponItem supports (item, Pickup pickup, weaponModelId). Use Object type for Rage compatibility.
-                Type searchApiType = Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined")
-                    ?? Type.GetType("PolicingRedefined.API.SearchItemAPI, PolicingRedefined")
-                    ?? Type.GetType("PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined");
-                if (searchApiType == null) return;
-
-                MethodInfo getPickupItems = searchApiType.GetMethod("GetPickupSearchItems", BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase, null, new[] { typeof(Rage.Object) }, null);
+                if (!runPickupScan) return;
+                _lastFirearmPickupScanUtc = now;
+                MethodInfo getPickupItems = GetPrPickupSearchItemsMethod();
                 if (getPickupItems == null) return;
 
                 try {
-                    var getAllPickups = typeof(Rage.World).GetMethod("GetAllPickupObjects", BindingFlags.Public | BindingFlags.Static);
+                    MethodInfo getAllPickups = GetRageGetAllPickupObjectsMethod();
                     if (getAllPickups != null) {
                         object pickupsObj = getAllPickups.Invoke(null, null);
                         if (pickupsObj is System.Array pickups && pickups.Length > 0) {
+                            int pickupIdx = 0;
                             foreach (object obj in pickups) {
+                                pickupIdx++;
+                                if ((pickupIdx & 15) == 0)
+                                    GameFiber.Yield();
                                 if (obj == null) continue;
                                 if (!(obj is Rage.Entity ent) || !ent.Exists()) continue;
                                 if (Main.Player.DistanceTo(ent.Position) > 25f) continue;
@@ -4162,6 +5305,23 @@ namespace MDTPro.Data {
             } catch (Exception e) {
                 Helper.Log($"TryCapturePickupAndPlayerFirearms failed: {e.Message}", false, Helper.LogSeverity.Warning);
             }
+        }
+
+        private static MethodInfo GetPrPickupSearchItemsMethod() {
+            if (_prGetPickupSearchItemsResolved) return _prGetPickupSearchItemsMethod;
+            _prGetPickupSearchItemsResolved = true;
+            Type searchApiType = Type.GetType("PolicingRedefined.API.SearchItemsAPI, PolicingRedefined")
+                ?? Type.GetType("PolicingRedefined.API.SearchItemAPI, PolicingRedefined")
+                ?? Type.GetType("PolicingRedefined.Interaction.Assets.SearchItemsAPI, PolicingRedefined");
+            _prGetPickupSearchItemsMethod = searchApiType?.GetMethod("GetPickupSearchItems", BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase, null, new[] { typeof(Rage.Object) }, null);
+            return _prGetPickupSearchItemsMethod;
+        }
+
+        private static MethodInfo GetRageGetAllPickupObjectsMethod() {
+            if (_rageGetAllPickupObjectsResolved) return _rageGetAllPickupObjectsMethod;
+            _rageGetAllPickupObjectsResolved = true;
+            _rageGetAllPickupObjectsMethod = typeof(Rage.World).GetMethod("GetAllPickupObjects", BindingFlags.Public | BindingFlags.Static);
+            return _rageGetAllPickupObjectsMethod;
         }
 
         /// <summary>Accepts firearm check result from Dispatch or external system. Call when Dispatch returns serial/owner so it shows in MDT Firearms Check. Source will be "Dispatch".</summary>
@@ -4255,6 +5415,27 @@ namespace MDTPro.Data {
             } catch { /* ignore */ }
         }
 
+        private static void ApplyCloudFirearmLabelHint(string text, ref string serial, ref bool isSerialScratched) {
+            if (string.IsNullOrWhiteSpace(text)) return;
+            if (text.IndexOf("scratch", StringComparison.OrdinalIgnoreCase) >= 0 && text.IndexOf("serial", StringComparison.OrdinalIgnoreCase) >= 0) {
+                isSerialScratched = true;
+                serial = null;
+                return;
+            }
+            if (isSerialScratched || !string.IsNullOrWhiteSpace(serial)) return;
+
+            var match = Regex.Match(text, @"(?:\bSN\b|\bS/N\b|\bSerial(?:\s*Number)?)\s*[:#-]\s*([^|;,]+)", RegexOptions.IgnoreCase);
+            if (!match.Success) return;
+            string candidate = match.Groups[1].Value?.Trim();
+            if (string.IsNullOrWhiteSpace(candidate)) return;
+            if (candidate.IndexOf("scratch", StringComparison.OrdinalIgnoreCase) >= 0) {
+                isSerialScratched = true;
+                serial = null;
+                return;
+            }
+            serial = candidate;
+        }
+
         /// <summary>STP/PR weapon search items may expose serial on <c>WeaponSerial</c>, non-public members, etc. Runs after named-property pass.</summary>
         private static void RefineFirearmSerialFromReflection(object item, Type t, ref string serial, ref bool isSerialScratched) {
             if (item == null || t == null) return;
@@ -4336,6 +5517,7 @@ namespace MDTPro.Data {
                     } catch { }
                 }
                 RefineFirearmSerialFromReflection(item, t, ref serial, ref isSerialScratched);
+                ApplyCloudFirearmLabelHint(description, ref serial, ref isSerialScratched);
                 if (hash == 0u) continue;
                 if (IsMeleeOrNonFirearm(hash, modelId)) continue; // Knives, bats, etc. don't belong in Firearms Check
                 if (isSerialScratched) serial = null;
@@ -4590,6 +5772,7 @@ namespace MDTPro.Data {
                 }
                 if (SetupController.GetConfig().firearmDebugLogging)
                     Helper.Log($"Vehicle search captured {records.Count} item(s) for plate {plate}", false, Helper.LogSeverity.Info);
+                ServerAPI.WebSocketHandler.BroadcastDataInvalidation("vehicleSearch");
             }
             if (firearmRecords.Count > 0) {
                 Database.SaveFirearmRecords(firearmRecords);
@@ -5856,23 +7039,23 @@ namespace MDTPro.Data {
             } else if (resolvedStatus == 2) {
                 if (mismatchAcquittal) {
                     var highEvidenceAcquittal = new (string text, string[] chargeKeywords)[] {
-                        ("Despite strong prosecution evidence, the {0} returned a not guilty verdict. The defence successfully challenged key aspects of the case and raised sufficient reasonable doubt.", null),
-                        ("In an unexpected outcome, the {0} acquitted the defendant. Procedural issues and defence challenges to the evidence ultimately prevailed.", null),
-                        ("The {0} returned a not guilty verdict despite a robust prosecution case. The defence's challenge to witness identification and chain of custody created reasonable doubt.", null),
-                        ("Although the prosecution presented substantial evidence, the {0} found the defendant not guilty. Credibility issues and defence arguments raised sufficient doubt.", null),
-                        ("Despite compelling prosecution evidence, the {0} acquitted the defendant. Defence counsel successfully attacked the legality of the search and seizure.", null),
+                        ("The {0} acquitted. The defence opened enough gaps in the prosecution story that doubt stuck.", null),
+                        ("The {0} acquitted. Procedural fights and weak spots in the evidence carried the day.", null),
+                        ("The {0} acquitted. Witness IDs and custody paperwork failed under defence pressure.", null),
+                        ("The {0} acquitted. Credibility breaks and defence angles beat a prosecution case that still looked full on paper.", null),
+                        ("The {0} acquitted after the defence gutted the search and seizure.", null),
                         ("The {0} returned a not guilty verdict despite strong evidence. Miranda violations and inadmissible statements undermined the prosecution's case.", null),
                         ("In a surprising outcome, the {0} found the defendant not guilty. The defence's alibi evidence and conflicting testimony created reasonable doubt.", null),
                         ("Although the prosecution presented a strong case, the {0} acquitted the defendant. Problems with identification procedures and mistaken identity concerns prevailed.", null),
                         ("Despite substantial physical evidence, the {0} returned a not guilty verdict. Chain of custody breaches and forensic reliability challenges favoured the defence.", null),
-                        ("The {0} acquitted the defendant despite a robust prosecution. Defence arguments on lack of intent and self-defence raised sufficient reasonable doubt.", null),
+                        ("The {0} acquitted. Lack-of-intent and self-defence frames held even with a thick prosecution file.", null),
                         ("In an unexpected verdict, the {0} found the defendant not guilty. Procedural defects and exclusion of key evidence tipped the balance toward acquittal.", null),
                         ("Despite significant evidence against the defendant, the {0} returned a not guilty verdict. Witness credibility issues and conflicting testimony doomed the prosecution's case.", null),
                         ("The {0} acquitted the defendant despite strong circumstantial evidence. The defence successfully argued mistaken identity and lack of corroboration.", null),
                         ("Although the prosecution marshalled substantial proof, the {0} found the defendant not guilty. Search illegality and Fourth Amendment violations led to acquittal.", null),
                         ("The {0} acquitted the defendant despite compelling evidence. The defence successfully challenged the traffic stop and field sobriety procedures.", new[] { "__dui_charge__" }),
                         ("Despite strong DUI evidence, the {0} returned a not guilty verdict. Breath test calibration and chain of custody were successfully challenged.", new[] { "__dui_charge__" }),
-                        ("The {0} acquitted the defendant on DUI charges despite substantial evidence. The defence attacked the legality of the stop and testing protocol.", new[] { "__dui_charge__" }),
+                        ("The {0} acquitted on DUI. The defence shredded the stop and testing protocol.", new[] { "__dui_charge__" }),
                         ("The {0} acquitted the defendant on DUI charges. The defence successfully challenged the prosecution's impairment evidence and raised reasonable doubt.", new[] { "__dui_charge__" }),
                         ("Despite drug evidence, the {0} acquitted the defendant. The defence successfully challenged the search and chain of custody.", new[] { "__drug_crime__" }),
                         ("The {0} returned a not guilty verdict on drug charges. Search warrant defects and evidence handling were successfully challenged.", new[] { "__drug_crime__" }),
@@ -5897,19 +7080,19 @@ namespace MDTPro.Data {
                         ("Despite kidnapping evidence, the {0} acquitted the defendant. Consent and unlawful restraint were successfully challenged.", new[] { "kidnapping" }),
                         ("The {0} returned a not guilty verdict on arson charges. Origin and cause were successfully challenged by the defence.", new[] { "arson" }),
                         ("Despite strong prosecution evidence, the {0} acquitted the defendant. The defence successfully excluded key evidence on procedural grounds.", null),
-                        ("The {0} acquitted the defendant. Expert testimony was successfully impeached; reasonable doubt remained.", null),
+                        ("The {0} acquitted after experts fell apart on cross.", null),
                         ("In a surprising verdict, the {0} found the defendant not guilty. The defence's challenge to eyewitness identification prevailed.", null),
                         ("The {0} acquitted the defendant despite a strong case. Discovery violations and withheld evidence favoured the defence.", null),
-                        ("Despite overwhelming evidence, the {0} returned a not guilty verdict. Juror nullification or credibility determinations may have factored.", null),
+                        ("The {0} acquitted while the paper record still looked damning. The jury trusted the witnesses less than the file.", null),
                         ("The {0} acquitted the defendant. The defence successfully argued that the prosecution's theory did not fit the evidence.", null),
                     };
                     var chosen = SelectChargeAwarePhrase(courtData, highEvidenceAcquittal);
-                    b.AppendFormat(string.IsNullOrEmpty(chosen) ? "Despite strong prosecution evidence, the {0} returned a not guilty verdict. The defence successfully challenged key aspects of the case." : chosen, tribunal);
+                    b.AppendFormat(string.IsNullOrEmpty(chosen) ? "The {0} acquitted. The defence opened enough gaps that reasonable doubt held." : chosen, tribunal);
                 } else {
                 var acquittalPool = new (string text, string[] evidenceTags)[] {
                     ("The {0} found the defendant not guilty. The prosecution failed to establish guilt beyond a reasonable doubt.", null),
                     ("The {0} returned a not guilty verdict. The defence successfully raised reasonable doubt.", null),
-                    ("Despite a strong prosecution case, the {0} returned a not guilty verdict.", null),
+                    ("Even with a tidy prosecution case, the {0} returned not guilty.", null),
                     ("The {0} acquitted the defendant. The evidence was deemed insufficient to support a conviction.", null),
                     ("The {0} found the defendant not guilty. The prosecution's case rested largely on circumstantial evidence.", null),
                     ("The {0} returned a not guilty verdict. Witness credibility and inconsistent testimony favoured the defence.", null),
@@ -7181,13 +8364,25 @@ namespace MDTPro.Data {
                     && _stpStopScenePosition.HasValue
                     && (DateTime.UtcNow - _stpStopSceneUtc) <= StpStopLocationMaxAge) {
                     try {
-                        MdtPreferredLocation = new Location(_stpStopScenePosition.Value);
+                        Vector3 stopPos = _stpStopScenePosition.Value;
+                        bool reuseCachedStopLocation = _lastStpPreferredLocation != null
+                            && _lastStpPreferredResolvedPosition.HasValue
+                            && DistanceMeters(stopPos, _lastStpPreferredResolvedPosition.Value) < 1f;
+                        if (reuseCachedStopLocation) {
+                            MdtPreferredLocation = _lastStpPreferredLocation;
+                        } else {
+                            MdtPreferredLocation = new Location(stopPos);
+                            _lastStpPreferredLocation = MdtPreferredLocation;
+                            _lastStpPreferredResolvedPosition = stopPos;
+                        }
                         source = "stp_scene";
                     } catch {
                         MdtPreferredLocation = PlayerLocation;
                         source = "stp_scene_ctor_failed";
                     }
                 } else {
+                    _lastStpPreferredLocation = null;
+                    _lastStpPreferredResolvedPosition = null;
                     MdtPreferredLocation = PlayerLocation;
                 }
             } catch {
@@ -7276,8 +8471,11 @@ namespace MDTPro.Data {
             if (p != null) {
                 try {
                     if (p.Exists() || p.IsValid()) {
-                        PlayerLocation = new Location(p.Position);
-                        PlayerCoords = new PlayerCoords(p.Position, p.Heading);
+                        Vector3 position = p.Position;
+                        PlayerLocation = new Location(position);
+                        PlayerCoords = new PlayerCoords(position, p.Heading);
+                        _lastPlayerLocationResolvedPosition = position;
+                        _lastPlayerLocationResolvedUtc = DateTime.UtcNow;
                         placed = true;
                     }
                 } catch (Exception ex) {
