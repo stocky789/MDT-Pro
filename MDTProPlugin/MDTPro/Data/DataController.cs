@@ -4401,7 +4401,10 @@ namespace MDTPro.Data
 
         internal static bool TryRefreshVehicleDocumentsForCloudLookup(MDTProVehicleData vehicleData, string query)
         {
-            if (vehicleData == null || !IsContextVehicleLookup(vehicleData, query)) return false;
+            if (vehicleData == null) return false;
+            bool liveContext = IsContextVehicleLookup(vehicleData, query);
+            // Non-context cloud lookups may still point at a live nearby vehicle; refresh only succeeds when the
+            // vehicle can be resolved in the live world by holder or nearby plate scan.
             bool refreshed = TryRefreshVehicleDocumentsFromLiveWorld(vehicleData);
             if (!refreshed) return false;
             try
@@ -4409,9 +4412,13 @@ namespace MDTPro.Data
                 if (vehicleData.CDFVehicleData != null)
                     MergeBOLOsFromStubByPlate(vehicleData);
                 TrySyncVehicleOwnerWantedFromCdf(vehicleData);
-                SetContextVehicle(vehicleData);
+                AddOrReplaceVehicleInLiveVehicleDatabase(vehicleData);
                 UpsertCachedNearbyVehicleFromResolvedVehicle(vehicleData);
-                KeepVehicleInDatabase(vehicleData);
+                if (liveContext)
+                {
+                    SetContextVehicle(vehicleData);
+                    KeepVehicleInDatabase(vehicleData);
+                }
                 ServerAPI.WebSocketHandler.BroadcastDataInvalidation("vehicleSearch");
             }
             catch (Exception ex)

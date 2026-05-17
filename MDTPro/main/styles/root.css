@@ -90,6 +90,88 @@ body {
   color: var(--color-text-primary);
 }
 
+body.mdtCloudLocalLocked > :not(.mdtCloudLocalLockOverlay) {
+  filter: blur(7px);
+  pointer-events: none !important;
+  user-select: none;
+}
+
+.mdtCloudLocalLockOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(5, 12, 24, 0.66);
+  backdrop-filter: blur(10px);
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+.mdtCloudLocalLockCard {
+  width: min(520px, 100%);
+  padding: 30px;
+  background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface));
+  border: 1px solid var(--color-accent-half);
+  box-shadow: 0 24px 70px var(--color-shadow), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  text-align: center;
+}
+
+.mdtCloudLocalLockEyebrow {
+  margin-bottom: 10px;
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.mdtCloudLocalLockCard h1 {
+  margin: 0 0 12px;
+  color: var(--color-text-primary);
+  font-size: 28px;
+  line-height: 1.15;
+}
+
+.mdtCloudLocalLockCard p {
+  margin: 0 auto 22px;
+  max-width: 420px;
+  color: var(--color-text-primary-dimmed);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.mdtCloudLocalLockCard a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 18px;
+  background: var(--color-accent);
+  color: #08101d;
+  border: 1px solid var(--color-accent);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mdtCloudLocalLockCard a:hover,
+.mdtCloudLocalLockCard a:focus {
+  background: var(--color-accent-secondary);
+  border-color: var(--color-accent-secondary);
+}
+
+.mdtCloudLocalLockDetail {
+  min-height: 18px;
+  margin-top: 14px;
+  color: var(--color-text-primary-half);
+  font-size: 12px;
+}
+
 .hidden {
   visibility: hidden !important;
   display: none !important;

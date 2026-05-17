@@ -284,9 +284,10 @@ namespace MDTPro.Cloud {
                     result["error"] = "identity_mismatch";
                     return false;
                 }
-                bool refreshedForContext = DataController.TryRefreshVehicleDocumentsForCloudLookup(vehicle, query);
                 bool liveContext = DataController.IsContextVehicleLookup(vehicle, query);
-                if (refreshedForContext || DataController.IsContextVehicleLookup(vehicle, query))
+                bool refreshedDocuments = DataController.TryRefreshVehicleDocumentsForCloudLookup(vehicle, query);
+                bool refreshedForContext = refreshedDocuments && liveContext;
+                if (liveContext)
                     resultSource = "live-context";
                 JObject vehiclePayload = JObject.FromObject(new {
                     vehicle.LicensePlate,
@@ -313,6 +314,7 @@ namespace MDTPro.Cloud {
                     CanModifyBOLOs = liveContext,
                     resultSource,
                     isLiveContext = liveContext,
+                    refreshedDocuments,
                     refreshedForContext
                 });
                 CloudIdentityCache.ApplyVehicleId(vehiclePayload);

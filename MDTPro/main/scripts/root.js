@@ -156,6 +156,57 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms))
 }
 
+const mdtCloudLocalLock = (() => {
+  if (isInIframe) return null
+
+  const pollIntervalMs = 5000
+  let overlay = null
+  let lastLocked = false
+
+  function ensureOverlay() {
+    if (overlay) return overlay
+    overlay = document.createElement('div')
+    overlay.className = 'mdtCloudLocalLockOverlay hidden'
+    overlay.setAttribute('role', 'dialog')
+    overlay.setAttribute('aria-modal', 'true')
+    overlay.setAttribute('aria-live', 'polite')
+    overlay.innerHTML = `
+      <div class="mdtCloudLocalLockCard">
+        <div class="mdtCloudLocalLockEyebrow">MDT Cloud connected</div>
+        <h1>Local MDT disabled</h1>
+        <p>When connected to MDT Cloud, the local MDT Pro web interface is disabled. Use MDT Cloud instead.</p>
+        <a href="https://mdt.stockhosting.com.au" target="_blank" rel="noopener noreferrer">Open MDT Cloud</a>
+        <div class="mdtCloudLocalLockDetail" aria-live="polite"></div>
+      </div>`
+    document.body.appendChild(overlay)
+    return overlay
+  }
+
+  function setLocked(locked, detail = '') {
+    lastLocked = !!locked
+    const el = ensureOverlay()
+    document.body.classList.toggle('mdtCloudLocalLocked', lastLocked)
+    el.classList.toggle('hidden', !lastLocked)
+    const detailEl = el.querySelector('.mdtCloudLocalLockDetail')
+    if (detailEl) detailEl.textContent = detail || ''
+  }
+
+  async function refresh() {
+    try {
+      const res = await fetch('/cloudStatus', { cache: 'no-store' })
+      if (!res.ok) return
+      const status = await res.json()
+      setLocked(status?.connected === true, status?.detail || status?.status || '')
+    } catch (_) {
+      if (!lastLocked) setLocked(false)
+    }
+  }
+
+  refresh()
+  window.setInterval(refresh, pollIntervalMs)
+  return { refresh }
+})()
+
 async function getConfig() {
   const lsConfig = localStorage.getItem('config')
   if (lsConfig) {
