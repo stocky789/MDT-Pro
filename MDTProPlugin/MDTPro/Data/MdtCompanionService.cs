@@ -759,9 +759,11 @@ namespace MDTPro.Data
 
             JObject jo = JObject.Parse(json);
             NormalizeCloudPascalAliases(jo);
+            var vehicle = jo.ToObject<MDTProVehicleData>();
+            vehicle = HydrateVehicleForDisplay(vehicle, query, "cloud-lookup") ?? vehicle;
             return new VehicleLookupResult
             {
-                VehicleData = jo.ToObject<MDTProVehicleData>(),
+                VehicleData = vehicle,
                 Query = query ?? ""
             };
         }

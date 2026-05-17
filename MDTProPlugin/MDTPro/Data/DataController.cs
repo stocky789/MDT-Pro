@@ -4129,6 +4129,7 @@ namespace MDTPro.Data
             return selectedSource.Equals("context", StringComparison.OrdinalIgnoreCase)
                 || selectedSource.Equals("live-world", StringComparison.OrdinalIgnoreCase)
                 || selectedSource.Equals("nearby-cache", StringComparison.OrdinalIgnoreCase)
+                || selectedSource.StartsWith("cloud-", StringComparison.OrdinalIgnoreCase)
                 || selectedSource.StartsWith("pr-", StringComparison.OrdinalIgnoreCase);
         }
 
