@@ -864,6 +864,7 @@ namespace MDTPro.ServerAPI
                     JuryVotesForConviction = (int?)null,
                     JuryVotesForAcquittal = (int?)null,
                     HasPublicDefender = (bool?)null,
+                    CustodyCredits = new List<CourtData.CustodyCredit>(),
                     OutcomeNotes = "",
                     OutcomeReasoning = ""
                 });
@@ -885,6 +886,7 @@ namespace MDTPro.ServerAPI
                     data.JuryVotesForConviction,
                     data.JuryVotesForAcquittal,
                     data.HasPublicDefender,
+                    data.CustodyCredits,
                     data.OutcomeNotes,
                     data.OutcomeReasoning))
                 {
@@ -908,6 +910,7 @@ namespace MDTPro.ServerAPI
                     {
                         Number = "",
                         Plea = "",
+                        CustodyCredits = new List<CourtData.CustodyCredit>(),
                         OutcomeNotes = ""
                     });
 
@@ -919,7 +922,7 @@ namespace MDTPro.ServerAPI
                         return;
                     }
 
-                    if (DataController.ForceResolveCourtCase(data.Number, data.Plea, data.OutcomeNotes))
+                    if (DataController.ForceResolveCourtCase(data.Number, data.Plea, data.OutcomeNotes, data.CustodyCredits))
                     {
                         buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = true }));
                         contentType = "application/json";

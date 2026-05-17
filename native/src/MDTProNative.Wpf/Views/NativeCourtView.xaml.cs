@@ -604,9 +604,39 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
                 sp.Children.Add(FieldLabelRow("Sentencing rationale"));
                 sp.Children.Add(ReadOnlyMultiline(c["SentenceReasoning"]!.ToString()!));
             }
+            if (status == 1)
+                sp.Children.Add(BuildSentenceBreakdown(c));
         }
 
         return sp;
+    }
+
+    FrameworkElement BuildSentenceBreakdown(JObject c)
+    {
+        var summary = c["SentenceSummary"] as JObject;
+        var order = c["SupervisionOrder"] as JObject;
+        var rows = new List<(string, string)>();
+        if (summary != null)
+        {
+            var gross = summary.Value<int?>("GrossSentenceDays") ?? 0;
+            var credits = summary.Value<int?>("CustodyCreditDays") ?? 0;
+            var net = summary.Value<int?>("NetSentenceDays") ?? 0;
+            var fineAfter = summary.Value<int?>("TotalFineAfterCredits");
+            rows.Add(("Gross custody", summary.Value<bool?>("HasLifeSentence") == true ? NativeCourtFormatting.FormatTotalTime(gross, 1) : NativeCourtFormatting.FormatDaysToYmd(gross)));
+            rows.Add(("Jail credits", NativeCourtFormatting.FormatDaysToYmd(credits)));
+            rows.Add(("Net custody", summary.Value<bool?>("HasLifeSentence") == true ? "Life eligibility tracked" : NativeCourtFormatting.FormatDaysToYmd(net)));
+            if (fineAfter != null) rows.Add(("Fine after credits", NativeCourtFormatting.FormatCurrency(fineAfter.Value)));
+            if (!string.IsNullOrWhiteSpace(summary["CustodyReleaseUtc"]?.ToString())) rows.Add(("Custody release", NativeMdtFormat.IsoDate(summary["CustodyReleaseUtc"])));
+            if (!string.IsNullOrWhiteSpace(summary["ParoleEligibilityUtc"]?.ToString())) rows.Add(("Parole eligibility", NativeMdtFormat.IsoDate(summary["ParoleEligibilityUtc"])));
+        }
+        if (order != null)
+        {
+            rows.Add(("Supervision", $"{order["Type"] ?? "—"} / {order["Status"] ?? "—"}"));
+            if (!string.IsNullOrWhiteSpace(order["EndUtc"]?.ToString())) rows.Add(("Supervision end", NativeMdtFormat.IsoDate(order["EndUtc"])));
+            if (order["Conditions"] is JArray conditions && conditions.Count > 0)
+                rows.Add(("Conditions", string.Join("; ", conditions.Select(x => x?.ToString()).Where(x => !string.IsNullOrWhiteSpace(x)))));
+        }
+        return rows.Count == 0 ? new StackPanel() : KvGrid(rows.ToArray());
     }
 
     TextBox ReadOnlyMultiline(string text) => new()
@@ -922,6 +952,16 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
         pleaCb.SelectedIndex = pleaIdx >= 0 ? pleaIdx : 0;
         sp.Children.Add(pleaCb);
 
+        sp.Children.Add(FieldLabelRow("Custody credits"));
+        var creditsTb = new TextBox
+        {
+            Text = InitialCustodyCreditDays(c).ToString(CultureInfo.InvariantCulture),
+            Style = (Style)FindResource("CadTextBoxCadField"),
+            Margin = new Thickness(0, 4, 0, 8),
+            ToolTip = "Presentence custody days to apply at sentencing."
+        };
+        sp.Children.Add(creditsTb);
+
         sp.Children.Add(FieldLabelRow("Outcome notes"));
         var notesTb = new TextBox
         {
@@ -974,6 +1014,7 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
             ["Number"] = num,
             ["Status"] = newStatus,
             ["Plea"] = pleaCb.SelectedItem as string ?? pleaOptions[0],
+            ["CustodyCredits"] = BuildCustodyCreditsPayload(creditsTb.Text),
             ["OutcomeNotes"] = notesTb.Text ?? "",
             ["OutcomeReasoning"] = c["OutcomeReasoning"]?.ToString() ?? "",
             ["IsJuryTrial"] = c["IsJuryTrial"],
@@ -1076,6 +1117,31 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
             Background = R("CadElevated"),
             Child = sp
         };
+    }
+
+    static int InitialCustodyCreditDays(JObject c)
+    {
+        if (c["CustodyCredits"] is not JArray credits) return 0;
+        var total = 0;
+        foreach (var item in credits.OfType<JObject>())
+            total += Math.Max(0, item.Value<int?>("ActualDays") ?? item.Value<int?>("TotalDays") ?? 0);
+        return total;
+    }
+
+    static JArray BuildCustodyCreditsPayload(string text)
+    {
+        var arr = new JArray();
+        if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var days) || days <= 0) return arr;
+        arr.Add(new JObject
+        {
+            ["Type"] = "Presentence",
+            ["ActualDays"] = days,
+            ["ConductDays"] = 0,
+            ["TotalDays"] = days,
+            ["Source"] = "Court clerk",
+            ["Notes"] = ""
+        });
+        return arr;
     }
 
     TextBlock FieldLabelRow(string s) => new()

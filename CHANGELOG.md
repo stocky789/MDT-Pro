@@ -4,7 +4,10 @@ All notable changes to MDT Pro are documented here.
 
 ## Unreleased
 
-No general release notes yet.
+### MDT Cloud Platform
+
+- **MDT Cloud portal** - Added the official hosted MDT Cloud platform with account sign-in, in-game Cloud login, live plugin connection status, shift tracking, and synced patrol data.
+- **Cloud-connected MDT workflow** - The portal can work with live in-game context for person and vehicle lookups, recent IDs, ALPR activity, BOLO updates, citation handoff, backup/panic actions, reports, court data, and shared people/vehicle records.
 
 ## [0.9.9.4] - 2026-05-16
 
@@ -19,11 +22,15 @@ No general release notes yet.
 
 ### Minor Features
 
+- **Court** - Added custody credits, sentence breakdowns, and structured probation/parole supervision records across MDT Cloud and MDT Pro.
 - **In-game menu key** - One key opens the MDT Pro menu for ALPR, game work mode, cloud sign-in, and **Hand pending citation** (StopThePed path); set it with **`SettingsMenuKey`** in `MDTPro.ini` (shipped default **F10** when nothing valid is set).
 - **Citation suspect lines** - Polite responses are mixed in so it is not always hostile; bundled `citationPedReactions.json` updates when you go on duty if the bundled copy is newer. Turn suspect subtitles off from the in-game MDT Pro menu (or Config) if you stream.
 
 ### Bug Fixes
 
+- **Court** - Drug seizure evidence now accounts for quantity and indicators before supporting trafficking or manufacturing charges.
+- **Court** - MDT Cloud now keeps custody credit and supervision records indexed correctly and uses server policy values when resolving supervision terms.
+- **Ped records** - Cloud-backed re-encounters now push the same licence, permit, and supervision statuses into Common Data Framework that MDT Pro shows for the person.
 - **Court** - Jury trials now resolve each charge separately, summarize count-by-count verdicts, and hide empty outcome notes.
 - **Vehicle Search** - BOLO removal now targets the selected BOLO when duplicate reasons exist.
 - **Game work** - In-game tasks are now better managed, so things like cloud sync and database updates run smoothly without slowing down your game.

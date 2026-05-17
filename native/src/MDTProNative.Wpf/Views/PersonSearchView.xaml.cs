@@ -619,8 +619,29 @@ public partial class PersonSearchView : UserControl, IMdtBoundView
     {
         PedCourtPanel.Children.Clear();
         AddSubjectDossierHeader(PedCourtPanel, "COURT & SUPERVISION", "Docket lines keyed to this master name. Not a full case management system — read-only index from the live plugin court database.");
+        var activeTerms = new List<JObject>();
+        if (p["SupervisionTerms"] is JArray terms)
+        {
+            foreach (var term in terms.OfType<JObject>())
+            {
+                var status = term["Status"]?.ToString() ?? "";
+                if (status.Equals("Active", StringComparison.OrdinalIgnoreCase) || status.Equals("PendingCustodyRelease", StringComparison.OrdinalIgnoreCase))
+                    activeTerms.Add(term);
+            }
+        }
+        foreach (var term in activeTerms)
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(term["RiskLevel"]?.ToString())) parts.Add(term["RiskLevel"]!.ToString());
+            if (!string.IsNullOrWhiteSpace(term["EndUtc"]?.ToString())) parts.Add($"Ends {NativeMdtFormat.IsoDate(term["EndUtc"])}");
+            var violations = term.Value<int?>("ViolationCount") ?? 0;
+            if (violations > 0) parts.Add($"{violations} violation(s)");
+            if (!string.IsNullOrWhiteSpace(term["SourceCaseNumber"]?.ToString())) parts.Add($"Case {term["SourceCaseNumber"]}");
+            PedCourtPanel.Children.Add(CourtCaseMini($"{term["Type"] ?? "Supervision"} · {term["Status"] ?? "Active"}", string.Join(" · ", parts), null));
+        }
         if (p["CourtCases"] is not JArray cc || cc.Count == 0)
         {
+            if (activeTerms.Count > 0) return;
             PedCourtPanel.Children.Add(new TextBlock
             {
                 Text = "No court matters on file for this subject index.",

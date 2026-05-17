@@ -18,7 +18,7 @@ namespace MDTPro.Data {
         private static SQLiteConnection connection;
         private static readonly object dbLock = new object();
 
-        private const int CurrentSchemaVersion = 32;
+        private const int CurrentSchemaVersion = 34;
 
         /// <summary>Reads an INTEGER column from SQLite as uint. SQLite returns INTEGER as Int64; values outside uint range are clamped to 0.</summary>
         private static uint ReadUInt32FromReader(object value) {
@@ -486,10 +486,15 @@ namespace MDTPro.Data {
                     OutcomeNotes            TEXT,
                     OutcomeReasoning        TEXT,
                     SentenceReasoning       TEXT,
+                    SentenceSummary         TEXT,
+                    CustodyCredits          TEXT,
+                    SupervisionOrder        TEXT,
+                    ActiveSupervisionAtOffense TEXT,
                     LicenseRevocations      TEXT,
                     EvidenceUseOfForce      INTEGER NOT NULL DEFAULT 0,
                     AttachedReportIds       TEXT,
                     EvidenceDrugTypesBreakdown   TEXT,
+                    DrugEvidenceAssessments       TEXT,
                     EvidenceFirearmTypesBreakdown TEXT,
                     OfficerTestimonySummary       TEXT
                 );
@@ -715,7 +720,8 @@ namespace MDTPro.Data {
                     OfficerRank TEXT, OfficerCallSign TEXT, OfficerAgency TEXT, OfficerBadgeNumber INTEGER,
                     LocationArea TEXT, LocationStreet TEXT, LocationCounty TEXT, LocationPostal TEXT,
                     TimeStamp TEXT NOT NULL, Status INTEGER NOT NULL DEFAULT 1, Notes TEXT,
-                    SubjectPedName TEXT, SeizedDrugTypes TEXT, SeizedFirearmTypes TEXT, OtherContrabandNotes TEXT
+                    SubjectPedName TEXT, SubjectPedNames TEXT, SeizedDrugTypes TEXT, SeizedDrugs TEXT,
+                    SeizedFirearmTypes TEXT, SalesIndicators TEXT, ManufacturingIndicators TEXT, OtherContrabandNotes TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS vehicle_search_records (
@@ -795,6 +801,15 @@ namespace MDTPro.Data {
         private static List<string> ParseListOrNull(string json) {
             var list = ParseAttachedReportIds(json);
             return list != null && list.Count > 0 ? list : null;
+        }
+
+        private static T ParseJsonOrDefault<T>(string json) {
+            if (string.IsNullOrWhiteSpace(json)) return default(T);
+            try {
+                return JsonConvert.DeserializeObject<T>(json);
+            } catch {
+                return default(T);
+            }
         }
 
         private static int GetSchemaVersion() {
@@ -1260,6 +1275,21 @@ namespace MDTPro.Data {
                     Helper.Log("Database migrated to schema version 32 (peds portrait face slot d/t for second catalogue filename try)");
                 } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             }
+            if (fromVersion < 33) {
+                try {
+                    using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN SentenceSummary TEXT", connection)) { cmd.ExecuteNonQuery(); }
+                    using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN CustodyCredits TEXT", connection)) { cmd.ExecuteNonQuery(); }
+                    using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN SupervisionOrder TEXT", connection)) { cmd.ExecuteNonQuery(); }
+                    using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN ActiveSupervisionAtOffense TEXT", connection)) { cmd.ExecuteNonQuery(); }
+                    Helper.Log("Database migrated to schema version 33 (court sentence credits and supervision metadata)");
+                } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            }
+            if (fromVersion < 34) {
+                try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN DrugEvidenceAssessments TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+                try { using (var cmd = new SQLiteCommand("ALTER TABLE property_evidence_reports ADD COLUMN SalesIndicators TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+                try { using (var cmd = new SQLiteCommand("ALTER TABLE property_evidence_reports ADD COLUMN ManufacturingIndicators TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+                Helper.Log("Database migrated to schema version 34 (drug evidence assessments and seizure indicators)");
+            }
 
             SetSchemaVersion(CurrentSchemaVersion);
         }
@@ -1312,6 +1342,9 @@ namespace MDTPro.Data {
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN ResolveAtUtc TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN LicenseRevocations TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN SentenceReasoning TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            foreach (string col in new[] { "SentenceSummary", "CustodyCredits", "SupervisionOrder", "ActiveSupervisionAtOffense" }) {
+                try { using (var cmd = new SQLiteCommand($"ALTER TABLE court_cases ADD COLUMN {col} TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN AttachedReportIds TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE peds ADD COLUMN IdentificationHistory TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE citation_reports ADD COLUMN FinalAmount INTEGER", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
@@ -1347,10 +1380,13 @@ namespace MDTPro.Data {
             try { using (var cmd = new SQLiteCommand("ALTER TABLE arrest_reports ADD COLUMN DocumentedFirearms INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS property_evidence_reports (Id TEXT PRIMARY KEY, ShortYear INTEGER NOT NULL, OfficerFirstName TEXT, OfficerLastName TEXT, OfficerRank TEXT, OfficerCallSign TEXT, OfficerAgency TEXT, OfficerBadgeNumber INTEGER, LocationArea TEXT, LocationStreet TEXT, LocationCounty TEXT, LocationPostal TEXT, TimeStamp TEXT NOT NULL, Status INTEGER NOT NULL DEFAULT 1, Notes TEXT, SubjectPedName TEXT, SeizedDrugTypes TEXT, SeizedFirearmTypes TEXT, OtherContrabandNotes TEXT)", connection)) { cmd.ExecuteNonQuery(); } } catch { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN EvidenceDrugTypesBreakdown TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN DrugEvidenceAssessments TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN EvidenceFirearmTypesBreakdown TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN OfficerTestimonySummary TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE property_evidence_reports ADD COLUMN SubjectPedNames TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE property_evidence_reports ADD COLUMN SeizedDrugs TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE property_evidence_reports ADD COLUMN SalesIndicators TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            try { using (var cmd = new SQLiteCommand("ALTER TABLE property_evidence_reports ADD COLUMN ManufacturingIndicators TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             try { using (var cmd = new SQLiteCommand("CREATE TABLE IF NOT EXISTS ped_evidence_cache (PedName TEXT PRIMARY KEY, CapturedAt TEXT NOT NULL, HadWeapon INTEGER NOT NULL DEFAULT 0, WasWanted INTEGER NOT NULL DEFAULT 0, WasPatDown INTEGER NOT NULL DEFAULT 0, WasDrunk INTEGER NOT NULL DEFAULT 0, WasFleeing INTEGER NOT NULL DEFAULT 0, AssaultedPed INTEGER NOT NULL DEFAULT 0, DamagedVehicle INTEGER NOT NULL DEFAULT 0, HadIllegalWeapon INTEGER NOT NULL DEFAULT 0, ViolatedSupervision INTEGER NOT NULL DEFAULT 0, Resisted INTEGER NOT NULL DEFAULT 0)", connection)) { cmd.ExecuteNonQuery(); } } catch { }
             try {
                 using (var cmd = new SQLiteCommand(@"
@@ -1603,6 +1639,7 @@ namespace MDTPro.Data {
                                 EvidenceHadDrugs = GetBooleanFromReader(reader, "EvidenceHadDrugs"),
                                 EvidenceUseOfForce = GetBooleanFromReader(reader, "EvidenceUseOfForce"),
                                 EvidenceDrugTypesBreakdown = ParseListOrNull(ReaderOptionalString(reader, "EvidenceDrugTypesBreakdown")),
+                                DrugEvidenceAssessments = ParseJsonOrDefault<List<SeizureEvidenceHelper.DrugEvidenceAssessment>>(ReaderOptionalString(reader, "DrugEvidenceAssessments")),
                                 EvidenceFirearmTypesBreakdown = ParseListOrNull(ReaderOptionalString(reader, "EvidenceFirearmTypesBreakdown")),
                                 ConvictionChance = reader["ConvictionChance"] is DBNull ? 0 : Convert.ToInt32(reader["ConvictionChance"]),
                                 ResolveAtUtc = reader["ResolveAtUtc"] as string,
@@ -1626,6 +1663,10 @@ namespace MDTPro.Data {
                                 OutcomeNotes = reader["OutcomeNotes"] as string,
                                 OutcomeReasoning = reader["OutcomeReasoning"] as string,
                                 SentenceReasoning = ReaderOptionalString(reader, "SentenceReasoning"),
+                                SentenceSummary = ParseJsonOrDefault<CourtData.CourtSentenceSummary>(ReaderOptionalString(reader, "SentenceSummary")),
+                                CustodyCredits = ParseJsonOrDefault<List<CourtData.CustodyCredit>>(ReaderOptionalString(reader, "CustodyCredits")) ?? new List<CourtData.CustodyCredit>(),
+                                SupervisionOrder = ParseJsonOrDefault<CourtData.SupervisionOrderData>(ReaderOptionalString(reader, "SupervisionOrder")),
+                                ActiveSupervisionAtOffense = ParseJsonOrDefault<List<CourtData.SupervisionSnapshot>>(ReaderOptionalString(reader, "ActiveSupervisionAtOffense")) ?? new List<CourtData.SupervisionSnapshot>(),
                                 LicenseRevocations = ParseLicenseRevocations(ReaderOptionalString(reader, "LicenseRevocations")),
                                 AttachedReportIds = ParseAttachedReportIds(ReaderOptionalString(reader, "AttachedReportIds")),
                                 OfficerTestimonySummary = ReaderOptionalString(reader, "OfficerTestimonySummary")
@@ -2059,6 +2100,8 @@ namespace MDTPro.Data {
                                     SubjectPedNames = subjectNames ?? new List<string>(),
                                     SeizedDrugs = seizedDrugs ?? new List<PropertyEvidenceReceiptReport.SeizedDrugEntry>(),
                                     SeizedFirearmTypes = ParseAttachedReportIds(ReaderOptionalString(reader, "SeizedFirearmTypes")) ?? new List<string>(),
+                                    SalesIndicators = ParseAttachedReportIds(ReaderOptionalString(reader, "SalesIndicators")) ?? new List<string>(),
+                                    ManufacturingIndicators = ParseAttachedReportIds(ReaderOptionalString(reader, "ManufacturingIndicators")) ?? new List<string>(),
                                     OtherContrabandNotes = ReaderOptionalString(reader, "OtherContrabandNotes")
                                 };
                                 reports.Add(r);
@@ -2503,8 +2546,10 @@ namespace MDTPro.Data {
                     SentenceMultiplier, ProsecutionStrength, DefenseStrength, DocketPressure, PolicyAdjustment,
                     CourtDistrict, CourtName, CourtType, HasPublicDefender, Plea,
                     JudgeName, ProsecutorName, DefenseAttorneyName,
-                    HearingDateUtc, CreatedAtUtc, LastUpdatedUtc, OutcomeNotes, OutcomeReasoning, SentenceReasoning, LicenseRevocations, AttachedReportIds,
-                    EvidenceDrugTypesBreakdown, EvidenceFirearmTypesBreakdown, OfficerTestimonySummary
+                    HearingDateUtc, CreatedAtUtc, LastUpdatedUtc, OutcomeNotes, OutcomeReasoning, SentenceReasoning,
+                    SentenceSummary, CustodyCredits, SupervisionOrder, ActiveSupervisionAtOffense,
+                    LicenseRevocations, AttachedReportIds,
+                    EvidenceDrugTypesBreakdown, DrugEvidenceAssessments, EvidenceFirearmTypesBreakdown, OfficerTestimonySummary
                 ) VALUES (
                     @Number, @PedName, @ReportId, @ShortYear, @Status,
                     @IsJuryTrial, @JurySize, @JuryVotesForConviction, @JuryVotesForAcquittal,
@@ -2516,8 +2561,10 @@ namespace MDTPro.Data {
                     @SentenceMultiplier, @ProsecutionStrength, @DefenseStrength, @DocketPressure, @PolicyAdjustment,
                     @CourtDistrict, @CourtName, @CourtType, @HasPublicDefender, @Plea,
                     @JudgeName, @ProsecutorName, @DefenseAttorneyName,
-                    @HearingDateUtc, @CreatedAtUtc, @LastUpdatedUtc, @OutcomeNotes, @OutcomeReasoning, @SentenceReasoning, @LicenseRevocations, @AttachedReportIds,
-                    @EvidenceDrugTypesBreakdown, @EvidenceFirearmTypesBreakdown, @OfficerTestimonySummary
+                    @HearingDateUtc, @CreatedAtUtc, @LastUpdatedUtc, @OutcomeNotes, @OutcomeReasoning, @SentenceReasoning,
+                    @SentenceSummary, @CustodyCredits, @SupervisionOrder, @ActiveSupervisionAtOffense,
+                    @LicenseRevocations, @AttachedReportIds,
+                    @EvidenceDrugTypesBreakdown, @DrugEvidenceAssessments, @EvidenceFirearmTypesBreakdown, @OfficerTestimonySummary
                 )",
                 connection, transaction)) {
                 cmd.Parameters.AddWithValue("@Number", (object)courtCase.Number ?? DBNull.Value);
@@ -2568,6 +2615,10 @@ namespace MDTPro.Data {
                 cmd.Parameters.AddWithValue("@OutcomeNotes", (object)courtCase.OutcomeNotes ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@OutcomeReasoning", (object)courtCase.OutcomeReasoning ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@SentenceReasoning", (object)courtCase.SentenceReasoning ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@SentenceSummary", courtCase.SentenceSummary != null ? (object)JsonConvert.SerializeObject(courtCase.SentenceSummary) : DBNull.Value);
+                cmd.Parameters.AddWithValue("@CustodyCredits", courtCase.CustodyCredits != null && courtCase.CustodyCredits.Count > 0 ? (object)JsonConvert.SerializeObject(courtCase.CustodyCredits) : DBNull.Value);
+                cmd.Parameters.AddWithValue("@SupervisionOrder", courtCase.SupervisionOrder != null ? (object)JsonConvert.SerializeObject(courtCase.SupervisionOrder) : DBNull.Value);
+                cmd.Parameters.AddWithValue("@ActiveSupervisionAtOffense", courtCase.ActiveSupervisionAtOffense != null && courtCase.ActiveSupervisionAtOffense.Count > 0 ? (object)JsonConvert.SerializeObject(courtCase.ActiveSupervisionAtOffense) : DBNull.Value);
                 string revocationsJson = courtCase.LicenseRevocations != null && courtCase.LicenseRevocations.Count > 0
                     ? Newtonsoft.Json.JsonConvert.SerializeObject(courtCase.LicenseRevocations) : null;
                 cmd.Parameters.AddWithValue("@LicenseRevocations", (object)revocationsJson ?? DBNull.Value);
@@ -2577,6 +2628,9 @@ namespace MDTPro.Data {
                 string drugBreakdownJson = courtCase.EvidenceDrugTypesBreakdown != null && courtCase.EvidenceDrugTypesBreakdown.Count > 0
                     ? Newtonsoft.Json.JsonConvert.SerializeObject(courtCase.EvidenceDrugTypesBreakdown) : null;
                 cmd.Parameters.AddWithValue("@EvidenceDrugTypesBreakdown", (object)drugBreakdownJson ?? DBNull.Value);
+                string drugEvidenceAssessmentsJson = courtCase.DrugEvidenceAssessments != null && courtCase.DrugEvidenceAssessments.Count > 0
+                    ? Newtonsoft.Json.JsonConvert.SerializeObject(courtCase.DrugEvidenceAssessments) : null;
+                cmd.Parameters.AddWithValue("@DrugEvidenceAssessments", (object)drugEvidenceAssessmentsJson ?? DBNull.Value);
                 string firearmBreakdownJson = courtCase.EvidenceFirearmTypesBreakdown != null && courtCase.EvidenceFirearmTypesBreakdown.Count > 0
                     ? Newtonsoft.Json.JsonConvert.SerializeObject(courtCase.EvidenceFirearmTypesBreakdown) : null;
                 cmd.Parameters.AddWithValue("@EvidenceFirearmTypesBreakdown", (object)firearmBreakdownJson ?? DBNull.Value);
@@ -3021,12 +3075,14 @@ namespace MDTPro.Data {
                             Id, ShortYear, OfficerFirstName, OfficerLastName, OfficerRank,
                             OfficerCallSign, OfficerAgency, OfficerBadgeNumber,
                             LocationArea, LocationStreet, LocationCounty, LocationPostal,
-                            TimeStamp, Status, Notes, SubjectPedName, SubjectPedNames, SeizedDrugTypes, SeizedDrugs, SeizedFirearmTypes, OtherContrabandNotes
+                            TimeStamp, Status, Notes, SubjectPedName, SubjectPedNames, SeizedDrugTypes, SeizedDrugs,
+                            SeizedFirearmTypes, SalesIndicators, ManufacturingIndicators, OtherContrabandNotes
                         ) VALUES (
                             @Id, @ShortYear, @OfficerFirstName, @OfficerLastName, @OfficerRank,
                             @OfficerCallSign, @OfficerAgency, @OfficerBadgeNumber,
                             @LocationArea, @LocationStreet, @LocationCounty, @LocationPostal,
-                            @TimeStamp, @Status, @Notes, @SubjectPedName, @SubjectPedNames, @SeizedDrugTypes, @SeizedDrugs, @SeizedFirearmTypes, @OtherContrabandNotes
+                            @TimeStamp, @Status, @Notes, @SubjectPedName, @SubjectPedNames, @SeizedDrugTypes, @SeizedDrugs,
+                            @SeizedFirearmTypes, @SalesIndicators, @ManufacturingIndicators, @OtherContrabandNotes
                         )", connection, transaction)) {
                         AddReportBaseParams(cmd, report);
                         cmd.Parameters.AddWithValue("@SubjectPedName", (object)report.SubjectPedName ?? DBNull.Value);
@@ -3034,6 +3090,8 @@ namespace MDTPro.Data {
                         cmd.Parameters.AddWithValue("@SeizedDrugTypes", report.SeizedDrugTypes != null && report.SeizedDrugTypes.Count > 0 ? JsonConvert.SerializeObject(report.SeizedDrugTypes) : (object)DBNull.Value);
                         cmd.Parameters.AddWithValue("@SeizedDrugs", report.SeizedDrugs != null && report.SeizedDrugs.Count > 0 ? JsonConvert.SerializeObject(report.SeizedDrugs) : (object)DBNull.Value);
                         cmd.Parameters.AddWithValue("@SeizedFirearmTypes", report.SeizedFirearmTypes != null && report.SeizedFirearmTypes.Count > 0 ? JsonConvert.SerializeObject(report.SeizedFirearmTypes) : (object)DBNull.Value);
+                        cmd.Parameters.AddWithValue("@SalesIndicators", report.SalesIndicators != null && report.SalesIndicators.Count > 0 ? JsonConvert.SerializeObject(report.SalesIndicators) : (object)DBNull.Value);
+                        cmd.Parameters.AddWithValue("@ManufacturingIndicators", report.ManufacturingIndicators != null && report.ManufacturingIndicators.Count > 0 ? JsonConvert.SerializeObject(report.ManufacturingIndicators) : (object)DBNull.Value);
                         cmd.Parameters.AddWithValue("@OtherContrabandNotes", (object)report.OtherContrabandNotes ?? DBNull.Value);
                         cmd.ExecuteNonQuery();
                     }

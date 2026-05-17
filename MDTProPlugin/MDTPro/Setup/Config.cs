@@ -203,6 +203,12 @@ namespace MDTPro.Setup
         public float courtCaseResolutionSeverityScale = 12f;
         public float courtParoleThresholdRealDays = 14f;
         public float courtParoleReleaseFraction = 0.6f;
+        public bool courtPresentenceCreditEnabled = true;
+        public int courtDefaultBookingCreditDays = 1;
+        public float courtConductCreditRatio = 0.5f;
+        public int courtProbationDefaultTermDays = 365;
+        public int courtParoleDefaultTermDays = 365;
+        public int courtViolationRevocationSeverityThreshold = 16;
         public int courtDocketWindowDays = 14;
         public float courtDocketPressureBase = 0.2f;
         public float courtDocketPressureScale = 0.6f;

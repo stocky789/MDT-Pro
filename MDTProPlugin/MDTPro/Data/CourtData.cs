@@ -1,9 +1,12 @@
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-namespace MDTPro.Data {
-    public class CourtData {
-        internal CourtData(string pedName, string number, string reportId, int shortYear) {
+namespace MDTPro.Data
+{
+    public class CourtData
+    {
+        internal CourtData(string pedName, string number, string reportId, int shortYear)
+        {
             PedName = pedName;
             Number = number;
             ReportId = reportId;
@@ -62,6 +65,8 @@ namespace MDTPro.Data {
         public bool EvidenceUseOfForce = false;
         /// <summary>When drug evidence comes from seizure report: specific types documented (e.g. "Heroin", "Cocaine"). Null or empty = generic evidence (drug_records or DocumentedDrugs).</summary>
         public List<string> EvidenceDrugTypesBreakdown;
+        /// <summary>Per-drug-charge assessment explaining whether seized quantity supports possession, sale, trafficking, or manufacturing counts.</summary>
+        public List<SeizureEvidenceHelper.DrugEvidenceAssessment> DrugEvidenceAssessments;
         /// <summary>When firearm evidence comes from seizure report: specific types documented (e.g. "Pistol", "Rifle"). Null or empty = generic (DocumentedFirearms or in-game).</summary>
         public List<string> EvidenceFirearmTypesBreakdown;
         public int RepeatOffenderScore = 0;
@@ -87,6 +92,10 @@ namespace MDTPro.Data {
         public string OutcomeReasoning;
         /// <summary>Reasoning for the sentence imposed (aggravating/mitigating factors, judge remarks). Only set when Status = 1 (convicted).</summary>
         public string SentenceReasoning;
+        public CourtSentenceSummary SentenceSummary;
+        public List<CustodyCredit> CustodyCredits = new List<CustodyCredit>();
+        public SupervisionOrderData SupervisionOrder;
+        public List<SupervisionSnapshot> ActiveSupervisionAtOffense = new List<SupervisionSnapshot>();
         /// <summary>License revocations ordered by the court upon conviction (e.g. "Driver's License Revoked", "Firearms Permit Revoked (10 years)"). Based on California law.</summary>
         public List<string> LicenseRevocations = new List<string>();
         /// <summary>Report IDs attached to this case (evidence). Editable until court date; then frozen.</summary>
@@ -95,21 +104,25 @@ namespace MDTPro.Data {
         public string OfficerTestimonySummary;
         public List<Charge> Charges = new List<Charge>();
 
-        public class Charge {
-            internal Charge(string name, int fine, int? time) {
+        public class Charge
+        {
+            internal Charge(string name, int fine, int? time)
+            {
                 Name = name;
                 Fine = fine;
                 Time = time;
             }
 
-            internal Charge(string name, int fine, int? time, bool isArrestable) {
+            internal Charge(string name, int fine, int? time, bool isArrestable)
+            {
                 Name = name;
                 Fine = fine;
                 Time = time;
                 IsArrestable = isArrestable;
             }
 
-            internal Charge(string name, int fine, int? time, bool isArrestable, int minDays, int? maxDays) {
+            internal Charge(string name, int fine, int? time, bool isArrestable, int minDays, int? maxDays)
+            {
                 Name = name;
                 Fine = fine;
                 Time = time;
@@ -136,7 +149,67 @@ namespace MDTPro.Data {
             public int? SentenceDaysServed;
         }
 
-        public void AddCharge(Charge charge) {
+        public class CourtSentenceSummary
+        {
+            public int GrossSentenceDays;
+            public int CustodyCreditDays;
+            public int? NetSentenceDays;
+            public int ExcessCreditDays;
+            public int TotalFineBeforeCredits;
+            public int FineCreditApplied;
+            public int TotalFineAfterCredits;
+            public bool HasLifeSentence;
+            public string SentenceType;
+            public string CustodyReleaseUtc;
+            public string ParoleEligibilityUtc;
+            public string ParoleReleaseUtc;
+            public string SupervisionType;
+            public string SupervisionStatus;
+        }
+
+        public class CustodyCredit
+        {
+            public string Type = "Manual";
+            public int ActualDays;
+            public int ConductDays;
+            public int TotalDays;
+            public int AppliedToFineAmount;
+            public string Source;
+            public string Notes;
+        }
+
+        public class SupervisionOrderData
+        {
+            public string Type;
+            public string Status;
+            public string StartUtc;
+            public string EndUtc;
+            public string CustodyReleaseUtc;
+            public string ParoleEligibleUtc;
+            public string RiskLevel;
+            public List<string> Conditions = new List<string>();
+            public string SourceCaseNumber;
+            public int ViolationCount;
+            public string Notes;
+        }
+
+        public class SupervisionSnapshot
+        {
+            public string Id;
+            public string Type;
+            public string Status;
+            public string StartUtc;
+            public string EndUtc;
+            public string CustodyReleaseUtc;
+            public string RiskLevel;
+            public List<string> Conditions = new List<string>();
+            public int ViolationCount;
+            public string SourceCaseNumber;
+            public string Notes;
+        }
+
+        public void AddCharge(Charge charge)
+        {
             Charges.Add(charge);
         }
     }

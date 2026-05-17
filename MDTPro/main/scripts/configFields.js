@@ -105,6 +105,12 @@ const CONFIG_SECTIONS = [
       'courtCaseResolutionSeverityScale',
       'courtParoleThresholdRealDays',
       'courtParoleReleaseFraction',
+      'courtPresentenceCreditEnabled',
+      'courtDefaultBookingCreditDays',
+      'courtConductCreditRatio',
+      'courtProbationDefaultTermDays',
+      'courtParoleDefaultTermDays',
+      'courtViolationRevocationSeverityThreshold',
       'courtDocketWindowDays',
       'courtDocketPressureBase',
       'courtDocketPressureScale',
@@ -533,6 +539,30 @@ const CONFIG_FIELD_META = {
   courtParoleReleaseFraction: {
     label: 'Parole release fraction',
     tooltip: 'Fraction of remaining sentence that may be granted on parole (0–1).',
+  },
+  courtPresentenceCreditEnabled: {
+    label: 'Presentence credits',
+    tooltip: 'Apply default booking/presentence custody credits when a case resolves with jail or prison time.',
+  },
+  courtDefaultBookingCreditDays: {
+    label: 'Default booking credit days',
+    tooltip: 'Default presentence custody days credited at sentencing.',
+  },
+  courtConductCreditRatio: {
+    label: 'Conduct credit ratio',
+    tooltip: 'Extra conduct credits as a fraction of actual custody days.',
+  },
+  courtProbationDefaultTermDays: {
+    label: 'Default probation days',
+    tooltip: 'Default supervision term length for probation or mandatory supervision.',
+  },
+  courtParoleDefaultTermDays: {
+    label: 'Default parole days',
+    tooltip: 'Default parole supervision term after custody release.',
+  },
+  courtViolationRevocationSeverityThreshold: {
+    label: 'Revocation severity threshold',
+    tooltip: 'New conviction severity score at or above this value revokes active supervision instead of continuing it.',
   },
   courtDocketWindowDays: {
     label: 'Docket pressure window (days)',

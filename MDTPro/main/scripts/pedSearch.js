@@ -840,17 +840,60 @@ function formatPedCourtShortDate(iso) {
 async function renderPedCourtCasesSection(response, language, stale) {
   document
     .querySelectorAll(
-      '.searchResponseWrapper .pedCourtCases, .searchResponseWrapper .pedCourtCasesTitle, .searchResponseWrapper .pedCourtCasesHint'
+      '.searchResponseWrapper .pedCourtCases, .searchResponseWrapper .pedCourtCasesTitle, .searchResponseWrapper .pedCourtCasesHint, .searchResponseWrapper .pedSupervisionTerms, .searchResponseWrapper .pedSupervisionTitle'
     )
     .forEach((el) => el.remove())
 
   const cases = Array.isArray(response.CourtCases) ? response.CourtCases : []
-  if (cases.length === 0) return
+  const terms = Array.isArray(response.SupervisionTerms)
+    ? response.SupervisionTerms.filter((t) => t && (String(t.Status || '').toLowerCase() === 'active' || String(t.Status || '').toLowerCase() === 'pendingcustodyrelease'))
+    : []
+  if (cases.length === 0 && terms.length === 0) return
   if (stale()) return
 
   const ls = language?.pedSearch?.static || {}
   const courtLang = language?.court || {}
   const statusMap = courtLang.statusMap || ['Pending', 'Convicted', 'Acquitted', 'Dismissed']
+
+  if (terms.length > 0) {
+    const title = document.createElement('div')
+    title.classList.add('searchResponseSectionTitle', 'pedSupervisionTitle')
+    title.textContent = ls.activeSupervisionTitle || 'Active supervision'
+    document.querySelector('.searchResponseWrapper').appendChild(title)
+
+    const termWrap = document.createElement('div')
+    termWrap.classList.add('pedSupervisionTerms')
+    terms.forEach((term) => {
+      const card = document.createElement('div')
+      card.classList.add('pedCourtCaseCard')
+      const head = document.createElement('div')
+      head.className = 'pedCourtCaseHead'
+      const type = document.createElement('span')
+      type.className = 'pedCourtCaseNumber'
+      type.textContent = `${term.Type || 'Supervision'}`
+      const status = document.createElement('span')
+      status.className = 'pedCourtCaseStatus'
+      status.textContent = term.Status || 'Active'
+      head.appendChild(type)
+      head.appendChild(status)
+      card.appendChild(head)
+      const meta = document.createElement('div')
+      meta.className = 'pedCourtCaseMeta'
+      const conditions = Array.isArray(term.Conditions) ? term.Conditions.filter(Boolean).join('; ') : ''
+      meta.textContent = [
+        term.RiskLevel || '',
+        term.EndUtc ? `Ends ${formatPedCourtShortDate(term.EndUtc)}` : '',
+        Number(term.ViolationCount || 0) > 0 ? `${term.ViolationCount} violation(s)` : '',
+        term.SourceCaseNumber ? `Case ${term.SourceCaseNumber}` : '',
+        conditions,
+      ].filter(Boolean).join(' · ')
+      card.appendChild(meta)
+      termWrap.appendChild(card)
+    })
+    document.querySelector('.searchResponseWrapper').appendChild(termWrap)
+  }
+
+  if (cases.length === 0) return
 
   if ((response.IsOnProbation || response.IsOnParole) && cases.some((c) => c && (c.ReportId === 'MDT-SUPERVISION-BACKSTORY' || c.IsSyntheticSupervisionBackstory))) {
     const hint = document.createElement('p')

@@ -457,8 +457,39 @@ namespace MDTPro.Data
             JObject jo = JObject.Parse(JsonConvert.SerializeObject(pedData));
             FormatIdentificationHistoryTypesForMdt(jo);
             jo["CourtCases"] = JArray.FromObject(result.CourtCases);
+            jo["SupervisionTerms"] = BuildSupervisionTermsFromCourtCases(result.CourtCases);
             result.Json = jo.ToString(Formatting.None);
             return result;
+        }
+
+        private static JArray BuildSupervisionTermsFromCourtCases(List<CourtData> cases)
+        {
+            var arr = new JArray();
+            if (cases == null) return arr;
+            foreach (var courtCase in cases)
+            {
+                var order = courtCase?.SupervisionOrder;
+                if (order == null) continue;
+                if (!string.Equals(order.Status, "Active", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(order.Status, "PendingCustodyRelease", StringComparison.OrdinalIgnoreCase)) continue;
+                arr.Add(JObject.FromObject(new
+                {
+                    Id = courtCase.Number,
+                    PersonId = (string)null,
+                    SourceCaseNumber = courtCase.Number,
+                    order.Type,
+                    order.Status,
+                    order.RiskLevel,
+                    order.StartUtc,
+                    order.EndUtc,
+                    order.CustodyReleaseUtc,
+                    order.ParoleEligibleUtc,
+                    order.ViolationCount,
+                    order.Notes,
+                    order.Conditions
+                }));
+            }
+            return arr;
         }
 
         private static bool ShouldUseCloud()

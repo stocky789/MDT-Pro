@@ -85,6 +85,9 @@ namespace MDTPro.Cloud {
 
                     StoreHydrateRecords("report", response["reports"] as JArray, "reportId");
                     StoreHydrateRecords("courtCase", response["courtCases"] as JArray, "caseNumber");
+                    StoreHydrateRecords("supervisionTerm", response["supervisionTerms"] as JArray, "id");
+                    StoreHydrateRecords("supervisionEvent", response["supervisionEvents"] as JArray, "id");
+                    StoreHydrateRecords("custodyCredit", response["custodyCredits"] as JArray, "id");
                     StoreHydrateRecords("alpr", response["alprEvents"] as JArray, "id");
                 } finally {
                     CloudSyncQueue.SuppressEnqueue = false;

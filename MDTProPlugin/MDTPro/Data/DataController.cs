@@ -359,6 +359,10 @@ namespace MDTPro.Data
         private static int _vehicleSearchCaptureCursor;
         private static int _balancedDynamicPass;
         private static int _performanceVehicleSearchPass;
+        private const int PassiveNearbyVehicleHydrationPerformance = 4;
+        private const int PassiveNearbyVehicleHydrationBalanced = 4;
+        private const int PassiveNearbyVehicleHydrationLive = 12;
+        private const int PassiveNearbyVehicleHydrationDemandBonus = 4;
         internal static string CurrentTime = World.TimeOfDay.ToString();
         internal static PlayerCoords PlayerCoords = new PlayerCoords();
 
@@ -405,7 +409,7 @@ namespace MDTPro.Data
             SetVehicleDatabase(hydrateNearby);
         }
 
-        /// <summary>Only Live mode keeps old passive full ped/vehicle hydration; Performance and Balanced rely on events, explicit requests, lightweight snapshots, and a 30s location poll (see <see cref="TryRefreshLocationForReducedGameWorkModes"/>).</summary>
+        /// <summary>Only Live mode keeps old passive full ped/vehicle database hydration; Performance and Balanced rely on events, explicit requests, capped nearby-vehicle snapshots, and a 30s location poll (see <see cref="TryRefreshLocationForReducedGameWorkModes"/>).</summary>
         private static bool ShouldPassiveHydrateWorldEntitiesThisPass()
         {
             GameWorkModeKind mode = SetupController.GetGameWorkModeKind();
@@ -617,7 +621,7 @@ namespace MDTPro.Data
                     RefreshCachedNearbyVehiclesPassive();
                     break;
                 case GameWorkModeKind.Balanced:
-                    // Keep the lightweight nearby snapshot warm so overlay-paused lookups can fall back to cached plates.
+                    // Keep a capped nearby snapshot warm so overlay-paused lookups can fall back to cached vehicle details.
                     RefreshCachedNearbyVehiclesPassive();
                     break;
                 default:
@@ -695,15 +699,37 @@ namespace MDTPro.Data
                 int cooldownMs = ClampIntervalMs(cfg.explicitNearbyVehicleScanCooldownMs, Config.PerfCaptureIntervalMs.ExplicitNearbyVehicleCooldown, 250, 30000);
                 if ((now - _lastExplicitNearbyVehicleScanUtc).TotalMilliseconds < cooldownMs)
                     return false;
-                UpdateCachedNearbyVehicles(fullWorldScan: true, hydrateFullVehicle: true);
+                UpdateCachedNearbyVehicles(fullWorldScan: true, hydrateFullVehicle: true, maxHydratedVehicles: int.MaxValue);
                 _lastExplicitNearbyVehicleScanUtc = now;
                 _lastPassiveNearbyVehicleRefreshUtc = now;
                 return true;
             }
 
-            UpdateCachedNearbyVehicles(fullWorldScan: true, hydrateFullVehicle: false);
+            // Keep a small number of nearby vehicles display-ready before Steam overlay / alt-tab freezes the game fiber.
+            // This avoids bringing back the old expensive full-world hydration loop while still giving overlay lookups real data.
+            UpdateCachedNearbyVehicles(fullWorldScan: true, hydrateFullVehicle: true, maxHydratedVehicles: GetPassiveNearbyVehicleHydrationLimit());
             _lastPassiveNearbyVehicleRefreshUtc = now;
             return true;
+        }
+
+        private static int GetPassiveNearbyVehicleHydrationLimit()
+        {
+            int limit;
+            switch (SetupController.GetGameWorkModeKind())
+            {
+                case GameWorkModeKind.Live:
+                    limit = PassiveNearbyVehicleHydrationLive;
+                    break;
+                case GameWorkModeKind.Balanced:
+                    limit = PassiveNearbyVehicleHydrationBalanced;
+                    break;
+                default:
+                    limit = PassiveNearbyVehicleHydrationPerformance;
+                    break;
+            }
+            if (HasRecentNearbyVehicleDemand())
+                limit += PassiveNearbyVehicleHydrationDemandBonus;
+            return Math.Min(ClampRageNearbyPoolQueryCount(SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles), Math.Max(0, limit));
         }
 
         /// <summary>Visible vehicles you have not stopped or saved: merge BOLO stubs and keep a session row in the in-memory vehicle list only (no SQLite). Lets Vehicle Search find the same plate again without a full world walk.</summary>
@@ -928,7 +954,7 @@ namespace MDTPro.Data
             return null;
         }
 
-        private static void TryAddNearbyVehicleEntry(Vehicle v, Dictionary<string, CachedNearbyVehicleEntry> bestByPlate, ref NearbyVehicleScanStats stats, bool hydrateFullVehicle)
+        private static void TryAddNearbyVehicleEntry(Vehicle v, Dictionary<string, CachedNearbyVehicleEntry> bestByPlate, ref NearbyVehicleScanStats stats, bool hydrateFullVehicle, int maxHydratedVehicles, ref int hydratedVehicles)
         {
             if (Main.Player == null || !Main.Player.Exists()) return;
             if (v == null || !v.Exists())
@@ -971,11 +997,13 @@ namespace MDTPro.Data
             bool stolen = false;
             string vin = null;
             MDTProVehicleData mdtVehicle = null;
-            if (hydrateFullVehicle)
+            bool shouldHydrate = hydrateFullVehicle && hydratedVehicles < maxHydratedVehicles;
+            if (shouldHydrate)
             {
                 try
                 {
                     mdtVehicle = new MDTProVehicleData(v);
+                    hydratedVehicles++;
                     stolen = mdtVehicle.IsStolen;
                     vin = mdtVehicle.VehicleIdentificationNumber;
                     if (!string.IsNullOrWhiteSpace(mdtVehicle.ModelDisplayName)) modelDisplay = mdtVehicle.ModelDisplayName;
@@ -1084,8 +1112,8 @@ namespace MDTPro.Data
         }
 
         /// <param name="fullWorldScan">When true, also walk streamed world vehicles within range so the list is not empty if <see cref="Ped.GetNearbyVehicles"/> omits traffic.</param>
-        /// <param name="hydrateFullVehicle">When true, construct full CDF-backed vehicle rows. Passive cloud snapshots keep this false to avoid document hydration work in Performance/Balanced modes.</param>
-        private static void UpdateCachedNearbyVehicles(bool fullWorldScan, bool hydrateFullVehicle = false)
+        /// <param name="hydrateFullVehicle">When true, construct CDF-backed vehicle rows for up to <paramref name="maxHydratedVehicles"/> vehicles. Passive refreshes cap this to avoid the old expensive full-world hydration loop.</param>
+        private static void UpdateCachedNearbyVehicles(bool fullWorldScan, bool hydrateFullVehicle = false, int maxHydratedVehicles = 0)
         {
             var list = new List<CachedNearbyVehicleEntry>();
             int withDist = 0;
@@ -1099,12 +1127,14 @@ namespace MDTPro.Data
                     var bestByPlate = new Dictionary<string, CachedNearbyVehicleEntry>(StringComparer.OrdinalIgnoreCase);
                     NearbyVehicleScanStats stNearby = default;
                     NearbyVehicleScanStats stWorld = default;
+                    int hydratedVehicles = 0;
+                    int hydrateLimit = hydrateFullVehicle ? Math.Max(0, maxHydratedVehicles) : 0;
 
                     Vehicle[] nearby = Main.Player.GetNearbyVehicles(scanCount);
                     if (nearby != null)
                     {
                         for (int i = 0; i < nearby.Length; i++)
-                            TryAddNearbyVehicleEntry(nearby[i], bestByPlate, ref stNearby, hydrateFullVehicle);
+                            TryAddNearbyVehicleEntry(nearby[i], bestByPlate, ref stNearby, hydrateFullVehicle, hydrateLimit, ref hydratedVehicles);
                     }
 
                     if (fullWorldScan)
@@ -1115,7 +1145,7 @@ namespace MDTPro.Data
                             foreach (Vehicle v in GetVehiclesNearPosition(Main.Player.Position, maxWorldScanMeters))
                             {
                                 if (v == null || !v.Exists()) continue;
-                                TryAddNearbyVehicleEntry(v, bestByPlate, ref stWorld, hydrateFullVehicle);
+                                TryAddNearbyVehicleEntry(v, bestByPlate, ref stWorld, hydrateFullVehicle, hydrateLimit, ref hydratedVehicles);
                             }
                         }
                         catch (Exception ex)
@@ -1739,64 +1769,69 @@ namespace MDTPro.Data
                 // With StopThePed active, live LSPDFR/STP/CDF document state wins. SQLite can hold older document
                 // strings, so only push court revocations back into CDF; normal live document checks refresh MDT instead.
                 bool stpStops = ModIntegration.SubscribedStopThePedStopEvents;
-                bool courtRevokedDriver = IsCourtRevokedDriverLicense(databasePed.LicenseStatus);
-                if (!string.IsNullOrEmpty(databasePed.LicenseStatus) && Enum.TryParse(databasePed.LicenseStatus, true, out ELicenseState licenseStatusValue))
+                bool cloudBackedReEncounter = CloudMode.IsEnabled() && !string.IsNullOrWhiteSpace(CloudIdentityCache.GetPersonId(databasePed));
+                string driverStatus = NormalizeDriverLicenseStatusForCdf(databasePed.LicenseStatus);
+                bool courtRevokedDriver = IsCourtRevokedDriverLicense(driverStatus);
+                if (!string.IsNullOrEmpty(driverStatus) && Enum.TryParse(driverStatus, true, out ELicenseState licenseStatusValue))
                 {
                     try
                     {
-                        if (!stpStops || courtRevokedDriver)
+                        if (!stpStops || courtRevokedDriver || cloudBackedReEncounter)
                             cdf.DriversLicenseState = licenseStatusValue;
                     }
                     catch { }
                 }
-                if (!stpStops
+                if ((!stpStops || courtRevokedDriver || cloudBackedReEncounter)
                     && !string.IsNullOrEmpty(databasePed.LicenseExpiration)
                     && DateTime.TryParse(databasePed.LicenseExpiration, out DateTime licenseExp))
                 {
                     try { cdf.DriversLicenseExpiration = licenseExp; } catch { }
                 }
 
-                bool courtRevokedWeapon = IsCourtRevokedDocumentStatus(databasePed.WeaponPermitStatus);
-                if (cdf.WeaponPermit != null && !string.IsNullOrEmpty(databasePed.WeaponPermitStatus) && Enum.TryParse(databasePed.WeaponPermitStatus, true, out EDocumentStatus weaponStatus))
+                string weaponStatusText = NormalizeDocumentStatusForCdf(databasePed.WeaponPermitStatus);
+                bool courtRevokedWeapon = IsCourtRevokedDocumentStatus(weaponStatusText);
+                if (cdf.WeaponPermit != null && !string.IsNullOrEmpty(weaponStatusText) && Enum.TryParse(weaponStatusText, true, out EDocumentStatus weaponStatus))
                 {
                     try
                     {
-                        if (!stpStops || courtRevokedWeapon)
+                        if (!stpStops || courtRevokedWeapon || cloudBackedReEncounter)
                             cdf.WeaponPermit.Status = weaponStatus;
                     }
                     catch { }
                 }
-                if (cdf.WeaponPermit != null && (!stpStops || courtRevokedWeapon) && !string.IsNullOrEmpty(databasePed.WeaponPermitExpiration) && DateTime.TryParse(databasePed.WeaponPermitExpiration, out DateTime weaponExp))
+                if (cdf.WeaponPermit != null && (!stpStops || courtRevokedWeapon || cloudBackedReEncounter) && !string.IsNullOrEmpty(databasePed.WeaponPermitExpiration) && DateTime.TryParse(databasePed.WeaponPermitExpiration, out DateTime weaponExp))
                 {
                     try { cdf.WeaponPermit.ExpirationDate = weaponExp; } catch { }
                 }
 
-                bool courtRevokedFishing = IsCourtRevokedDocumentStatus(databasePed.FishingPermitStatus);
-                if (cdf.FishingPermit != null && !string.IsNullOrEmpty(databasePed.FishingPermitStatus) && Enum.TryParse(databasePed.FishingPermitStatus, true, out EDocumentStatus fishingStatus))
+                string fishingStatusText = NormalizeDocumentStatusForCdf(databasePed.FishingPermitStatus);
+                bool courtRevokedFishing = IsCourtRevokedDocumentStatus(fishingStatusText);
+                if (cdf.FishingPermit != null && !string.IsNullOrEmpty(fishingStatusText) && Enum.TryParse(fishingStatusText, true, out EDocumentStatus fishingStatus))
                 {
                     try
                     {
-                        if (!stpStops || courtRevokedFishing)
+                        if (!stpStops || courtRevokedFishing || cloudBackedReEncounter)
                             cdf.FishingPermit.Status = fishingStatus;
                     }
                     catch { }
                 }
-                if (cdf.FishingPermit != null && (!stpStops || courtRevokedFishing) && !string.IsNullOrEmpty(databasePed.FishingPermitExpiration) && DateTime.TryParse(databasePed.FishingPermitExpiration, out DateTime fishingExp))
+                if (cdf.FishingPermit != null && (!stpStops || courtRevokedFishing || cloudBackedReEncounter) && !string.IsNullOrEmpty(databasePed.FishingPermitExpiration) && DateTime.TryParse(databasePed.FishingPermitExpiration, out DateTime fishingExp))
                 {
                     try { cdf.FishingPermit.ExpirationDate = fishingExp; } catch { }
                 }
 
-                bool courtRevokedHunting = IsCourtRevokedDocumentStatus(databasePed.HuntingPermitStatus);
-                if (cdf.HuntingPermit != null && !string.IsNullOrEmpty(databasePed.HuntingPermitStatus) && Enum.TryParse(databasePed.HuntingPermitStatus, true, out EDocumentStatus huntingStatus))
+                string huntingStatusText = NormalizeDocumentStatusForCdf(databasePed.HuntingPermitStatus);
+                bool courtRevokedHunting = IsCourtRevokedDocumentStatus(huntingStatusText);
+                if (cdf.HuntingPermit != null && !string.IsNullOrEmpty(huntingStatusText) && Enum.TryParse(huntingStatusText, true, out EDocumentStatus huntingStatus))
                 {
                     try
                     {
-                        if (!stpStops || courtRevokedHunting)
+                        if (!stpStops || courtRevokedHunting || cloudBackedReEncounter)
                             cdf.HuntingPermit.Status = huntingStatus;
                     }
                     catch { }
                 }
-                if (cdf.HuntingPermit != null && (!stpStops || courtRevokedHunting) && !string.IsNullOrEmpty(databasePed.HuntingPermitExpiration) && DateTime.TryParse(databasePed.HuntingPermitExpiration, out DateTime huntingExp))
+                if (cdf.HuntingPermit != null && (!stpStops || courtRevokedHunting || cloudBackedReEncounter) && !string.IsNullOrEmpty(databasePed.HuntingPermitExpiration) && DateTime.TryParse(databasePed.HuntingPermitExpiration, out DateTime huntingExp))
                 {
                     try { cdf.HuntingPermit.ExpirationDate = huntingExp; } catch { }
                 }
@@ -1887,14 +1922,47 @@ namespace MDTPro.Data
         /// <summary>Court outcomes set permit strings to Revoked; those must win over a live CDF row until the next sync. Anything else is refreshed from CDF so StopThePed / PR and Person Search agree.</summary>
         private static bool IsCourtRevokedDocumentStatus(string status)
         {
-            if (string.IsNullOrEmpty(status)) return false;
-            if (status.Equals(EDocumentStatus.Revoked.ToString(), StringComparison.OrdinalIgnoreCase)) return true;
-            return Enum.TryParse(status, true, out EDocumentStatus d) && d == EDocumentStatus.Revoked;
+            return string.Equals(NormalizeDocumentStatusForCdf(status), EDocumentStatus.Revoked.ToString(), StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsCourtRevokedDriverLicense(string status)
         {
-            return !string.IsNullOrEmpty(status) && status.Equals("Revoked", StringComparison.OrdinalIgnoreCase);
+            return string.Equals(NormalizeDriverLicenseStatusForCdf(status), "Revoked", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeDriverLicenseStatusForCdf(string status)
+        {
+            if (string.IsNullOrWhiteSpace(status)) return null;
+            string s = status.Trim();
+            if (s.Equals("None", StringComparison.OrdinalIgnoreCase)) return "None";
+            if (s.Equals("Unlicensed", StringComparison.OrdinalIgnoreCase) || s.Equals("No License", StringComparison.OrdinalIgnoreCase)) return "Unlicensed";
+            if (s.Equals("Valid", StringComparison.OrdinalIgnoreCase)) return "Valid";
+            if (s.Equals("Expired", StringComparison.OrdinalIgnoreCase)) return "Expired";
+            if (s.Equals("Suspended", StringComparison.OrdinalIgnoreCase)) return "Suspended";
+            if (s.Equals("Revoked", StringComparison.OrdinalIgnoreCase)) return "Revoked";
+            string compact = new string(s.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+            if (compact.Contains("revoked")) return "Revoked";
+            if (compact.Contains("suspended")) return "Suspended";
+            if (compact.Contains("expired")) return "Expired";
+            if (compact.Contains("unlicensed") || compact.Contains("nolicense")) return "Unlicensed";
+            if (compact.Contains("valid")) return "Valid";
+            return s;
+        }
+
+        private static string NormalizeDocumentStatusForCdf(string status)
+        {
+            if (string.IsNullOrWhiteSpace(status)) return null;
+            string s = status.Trim();
+            if (s.Equals("None", StringComparison.OrdinalIgnoreCase)) return "None";
+            if (s.Equals("Valid", StringComparison.OrdinalIgnoreCase)) return "Valid";
+            if (s.Equals("Expired", StringComparison.OrdinalIgnoreCase)) return "Expired";
+            if (s.Equals("Revoked", StringComparison.OrdinalIgnoreCase)) return "Revoked";
+            string compact = new string(s.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+            if (compact.Contains("revoked")) return "Revoked";
+            if (compact.Contains("expired")) return "Expired";
+            if (compact.Contains("valid")) return "Valid";
+            if (compact == "none" || compact == "nopermit") return "None";
+            return s;
         }
 
         /// <summary>After refreshing ped display fields from CDF, re-apply court-ordered revocations that live in SQLite (<see cref="ApplyLicenseRevocationsToPed"/>).</summary>
@@ -3520,6 +3588,7 @@ namespace MDTPro.Data
 
                             courtData.EvidenceUseOfForce = arrestReport.UseOfForce != null && !string.IsNullOrEmpty(arrestReport.UseOfForce.Type);
                             BuildCourtCaseMetadata(courtData, arrestReport.OffenderPedName, arrestReport.Location);
+                            ApplyActiveSupervisionSnapshot(courtData, arrestReport.OffenderPedName);
                             ApplyRepeatOffenderSentencing(courtData);
 
                             if (!courtDatabase.Any(x => x.Number == courtCaseNumber))
@@ -5355,6 +5424,236 @@ namespace MDTPro.Data
             }
         }
 
+        private static void ApplySentenceSummaryAndSupervision(CourtData courtData, DateTime nowUtc, Config config = null)
+        {
+            if (courtData == null) return;
+            config = config ?? SetupController.GetConfig();
+
+            int grossDays = 0;
+            int totalFine = 0;
+            bool hasLife = false;
+            if (courtData.Charges != null)
+            {
+                foreach (CourtData.Charge charge in courtData.Charges)
+                {
+                    if (charge == null || charge.Outcome != 1) continue;
+                    totalFine += Math.Max(0, charge.Fine);
+                    if (charge.Time == null && !charge.MaxDays.HasValue)
+                    {
+                        hasLife = true;
+                        continue;
+                    }
+                    grossDays += Math.Max(0, charge.SentenceDaysServed ?? charge.Time ?? 0);
+                }
+            }
+
+            if (courtData.Status != 1)
+            {
+                courtData.SentenceSummary = null;
+                courtData.SupervisionOrder = null;
+                return;
+            }
+
+            NormalizeCustodyCredits(courtData, config, grossDays);
+            int creditDays = courtData.CustodyCredits?.Sum(c => Math.Max(0, c?.TotalDays ?? 0)) ?? 0;
+            int? netDays = hasLife ? (int?)null : Math.Max(0, grossDays - creditDays);
+            int excessCreditDays = hasLife ? 0 : Math.Max(0, creditDays - grossDays);
+            int fineCredit = Math.Min(totalFine, excessCreditDays * 100);
+            if (fineCredit > 0 && courtData.CustodyCredits != null && courtData.CustodyCredits.Count > 0)
+                courtData.CustodyCredits[courtData.CustodyCredits.Count - 1].AppliedToFineAmount = fineCredit;
+
+            string custodyReleaseUtc = null;
+            string paroleEligibilityUtc = null;
+            string paroleReleaseUtc = null;
+            string sentenceType = hasLife ? "IndeterminateCustody" : "DeterminateCustody";
+            courtData.SupervisionOrder = null;
+
+            if (hasLife)
+            {
+                paroleEligibilityUtc = nowUtc.AddDays(25d * RealDaysPerGameYear).ToString("o");
+                courtData.SupervisionOrder = new CourtData.SupervisionOrderData
+                {
+                    Type = "ParoleEligibility",
+                    Status = "EligibilityOnly",
+                    ParoleEligibleUtc = paroleEligibilityUtc,
+                    RiskLevel = "High",
+                    Conditions = BuildSupervisionConditions(courtData),
+                    SourceCaseNumber = courtData.Number,
+                    Notes = "Life or indeterminate sentence. Parole eligibility is tracked without creating active parole."
+                };
+            }
+            else
+            {
+                int net = netDays ?? 0;
+                double scaledRealDays = net * (RealDaysPerGameYear / GameDaysPerYear);
+                float paroleThreshold = config.courtParoleThresholdRealDays > 0 ? config.courtParoleThresholdRealDays : 14f;
+                if (net > 0 && scaledRealDays >= paroleThreshold)
+                {
+                    double releaseFraction = Math.Max(0.1f, Math.Min(1f, config.courtParoleReleaseFraction));
+                    DateTime release = nowUtc.AddDays(scaledRealDays * releaseFraction);
+                    custodyReleaseUtc = release.ToString("o");
+                    paroleReleaseUtc = custodyReleaseUtc;
+                    courtData.SupervisionOrder = BuildSupervisionOrder(courtData, "Parole", "PendingCustodyRelease", release, release.AddDays(Math.Max(1, config.courtParoleDefaultTermDays)), release, null, "Custody followed by parole supervision.");
+                }
+                else if (net > 0)
+                {
+                    DateTime release = nowUtc.AddDays(scaledRealDays);
+                    custodyReleaseUtc = release.ToString("o");
+                    courtData.SupervisionOrder = BuildSupervisionOrder(courtData, "Probation", "PendingCustodyRelease", release, release.AddDays(Math.Max(1, config.courtProbationDefaultTermDays)), release, null, "Short custody term followed by probation.");
+                }
+                else
+                {
+                    string type = grossDays > 0 ? "MandatorySupervision" : "Probation";
+                    sentenceType = grossDays > 0 ? "CreditsSatisfiedCustody" : "CommunitySupervision";
+                    courtData.SupervisionOrder = BuildSupervisionOrder(courtData, type, "Active", nowUtc, nowUtc.AddDays(Math.Max(1, config.courtProbationDefaultTermDays)), null, null, grossDays > 0 ? "Custody credits satisfied the custody term; supervision begins immediately." : "Community supervision ordered in lieu of custody.");
+                }
+            }
+
+            courtData.SentenceSummary = new CourtData.CourtSentenceSummary
+            {
+                GrossSentenceDays = grossDays,
+                CustodyCreditDays = creditDays,
+                NetSentenceDays = netDays,
+                ExcessCreditDays = excessCreditDays,
+                TotalFineBeforeCredits = totalFine,
+                FineCreditApplied = fineCredit,
+                TotalFineAfterCredits = Math.Max(0, totalFine - fineCredit),
+                HasLifeSentence = hasLife,
+                SentenceType = sentenceType,
+                CustodyReleaseUtc = custodyReleaseUtc,
+                ParoleEligibilityUtc = paroleEligibilityUtc,
+                ParoleReleaseUtc = paroleReleaseUtc,
+                SupervisionType = courtData.SupervisionOrder?.Type,
+                SupervisionStatus = courtData.SupervisionOrder?.Status
+            };
+        }
+
+        private static void NormalizeCustodyCredits(CourtData courtData, Config config, int grossDays)
+        {
+            if (courtData.CustodyCredits == null)
+                courtData.CustodyCredits = new List<CourtData.CustodyCredit>();
+            var normalized = new List<CourtData.CustodyCredit>();
+            foreach (var credit in courtData.CustodyCredits)
+            {
+                if (credit == null) continue;
+                if (string.IsNullOrWhiteSpace(credit.Type)) credit.Type = "Manual";
+                credit.ActualDays = Math.Max(0, credit.ActualDays);
+                credit.ConductDays = Math.Max(0, credit.ConductDays);
+                if (credit.TotalDays <= 0)
+                {
+                    if (string.Equals(credit.Type, "Conduct", StringComparison.OrdinalIgnoreCase) && credit.ActualDays > 0 && credit.ConductDays == 0)
+                    {
+                        credit.ConductDays = credit.ActualDays;
+                        credit.ActualDays = 0;
+                    }
+                    if (string.Equals(credit.Type, "Presentence", StringComparison.OrdinalIgnoreCase) && credit.ActualDays > 0 && credit.ConductDays == 0)
+                        credit.ConductDays = (int)Math.Floor(credit.ActualDays * Math.Max(0f, config.courtConductCreditRatio));
+                    credit.TotalDays = credit.ActualDays + credit.ConductDays;
+                }
+                if (credit.TotalDays > 0) normalized.Add(credit);
+            }
+
+            if (normalized.Count == 0 && grossDays > 0 && config.courtPresentenceCreditEnabled && config.courtDefaultBookingCreditDays > 0)
+            {
+                int actual = config.courtDefaultBookingCreditDays;
+                int conduct = (int)Math.Floor(actual * Math.Max(0f, config.courtConductCreditRatio));
+                normalized.Add(new CourtData.CustodyCredit
+                {
+                    Type = "Presentence",
+                    ActualDays = actual,
+                    ConductDays = conduct,
+                    TotalDays = actual + conduct,
+                    Source = "Booking",
+                    Notes = "Default booking/presentence custody credit."
+                });
+            }
+
+            courtData.CustodyCredits = normalized;
+        }
+
+        private static CourtData.SupervisionOrderData BuildSupervisionOrder(CourtData courtData, string type, string status, DateTime start, DateTime end, DateTime? custodyRelease, DateTime? paroleEligible, string notes)
+        {
+            return new CourtData.SupervisionOrderData
+            {
+                Type = type,
+                Status = status,
+                StartUtc = start.ToString("o"),
+                EndUtc = end.ToString("o"),
+                CustodyReleaseUtc = custodyRelease?.ToString("o"),
+                ParoleEligibleUtc = paroleEligible?.ToString("o"),
+                RiskLevel = SupervisionRiskLevel(courtData),
+                Conditions = BuildSupervisionConditions(courtData),
+                SourceCaseNumber = courtData.Number,
+                ViolationCount = 0,
+                Notes = notes
+            };
+        }
+
+        private static List<string> BuildSupervisionConditions(CourtData courtData)
+        {
+            var conditions = new List<string> { "Remain law-abiding", "Report to assigned supervision officer", "Obey all court orders" };
+            if (IsCaseDrugRelated(courtData)) conditions.Add("Submit to substance-use checks when directed");
+            if (IsCaseFirearmRelated(courtData)) conditions.Add("Do not possess firearms or ammunition");
+            if (IsCaseVehicleRelated(courtData)) conditions.Add("Comply with all license and driving restrictions");
+            if (courtData.EvidenceViolatedSupervision) conditions.Add("Enhanced compliance checks after supervision violation");
+            return conditions.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        private static string SupervisionRiskLevel(CourtData courtData)
+        {
+            if (courtData == null) return "Low";
+            if (courtData.SeverityScore >= 22 || courtData.RepeatOffenderScore >= 8 || (courtData.ActiveSupervisionAtOffense != null && courtData.ActiveSupervisionAtOffense.Count > 0)) return "High";
+            if (courtData.SeverityScore >= 12 || courtData.RepeatOffenderScore >= 4) return "Moderate";
+            return "Low";
+        }
+
+        private static void ApplyActiveSupervisionSnapshot(CourtData courtData, string offenderPedName)
+        {
+            if (courtData == null || string.IsNullOrWhiteSpace(offenderPedName)) return;
+            DateTime now = DateTime.UtcNow;
+            string normalized = offenderPedName.Trim().ToLowerInvariant();
+            var active = courtDatabase
+                .Where(c => c != null
+                    && !string.Equals(c.Number, courtData.Number, StringComparison.Ordinal)
+                    && !string.Equals(c.ReportId, CourtData.SyntheticSupervisionReportId, StringComparison.Ordinal)
+                    && string.Equals((c.PedName ?? "").Trim().ToLowerInvariant(), normalized, StringComparison.Ordinal)
+                    && c.SupervisionOrder != null
+                    && (string.Equals(c.SupervisionOrder.Status, "Active", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(c.SupervisionOrder.Status, "PendingCustodyRelease", StringComparison.OrdinalIgnoreCase))
+                    && (string.IsNullOrWhiteSpace(c.SupervisionOrder.EndUtc)
+                        || !DateTime.TryParse(c.SupervisionOrder.EndUtc, null, DateTimeStyles.RoundtripKind, out DateTime end)
+                        || end > now))
+                .OrderByDescending(c => c.LastUpdatedUtc)
+                .Take(10)
+                .ToList();
+            courtData.ActiveSupervisionAtOffense = new List<CourtData.SupervisionSnapshot>();
+            foreach (var activeCase in active)
+            {
+                var order = activeCase.SupervisionOrder;
+                courtData.ActiveSupervisionAtOffense.Add(new CourtData.SupervisionSnapshot
+                {
+                    Id = activeCase.Number,
+                    Type = order.Type,
+                    Status = order.Status,
+                    StartUtc = order.StartUtc,
+                    EndUtc = order.EndUtc,
+                    CustodyReleaseUtc = order.CustodyReleaseUtc,
+                    RiskLevel = order.RiskLevel,
+                    Conditions = order.Conditions != null ? new List<string>(order.Conditions) : new List<string>(),
+                    ViolationCount = order.ViolationCount,
+                    SourceCaseNumber = activeCase.Number,
+                    Notes = order.Notes
+                });
+            }
+            if (courtData.ActiveSupervisionAtOffense.Count > 0)
+            {
+                courtData.EvidenceViolatedSupervision = true;
+                float bonus = SetupController.GetConfig().courtEvidenceSupervisionViolationBonus;
+                if (bonus <= 0f) bonus = 22f;
+                courtData.EvidenceScore = Math.Min(95, courtData.EvidenceScore + (int)Math.Round(bonus));
+            }
+        }
+
         private static void UpdatePedIncarcerationFromCourtData(MDTProPedData pedData, CourtData courtData, Config config = null)
         {
             if (pedData == null || courtData?.Charges == null) return;
@@ -5364,17 +5663,25 @@ namespace MDTPro.Data
             int totalDays = 0;
             bool hasLifeSentence = false;
 
-            foreach (CourtData.Charge charge in courtData.Charges)
+            if (courtData.SentenceSummary != null)
             {
-                if (charge == null) continue;
-                if (charge.Outcome != 1) continue; // Only convicted charges (1 = Convicted)
-                if (charge.Time == null)
+                totalDays = courtData.SentenceSummary.NetSentenceDays ?? 0;
+                hasLifeSentence = courtData.SentenceSummary.HasLifeSentence;
+            }
+            else
+            {
+                foreach (CourtData.Charge charge in courtData.Charges)
                 {
-                    hasLifeSentence = true;
-                    continue;
+                    if (charge == null) continue;
+                    if (charge.Outcome != 1) continue; // Only convicted charges (1 = Convicted)
+                    if (charge.Time == null)
+                    {
+                        hasLifeSentence = true;
+                        continue;
+                    }
+                    int days = charge.SentenceDaysServed ?? charge.Time ?? 0;
+                    if (days > 0) totalDays += days;
                 }
-                int days = charge.SentenceDaysServed ?? charge.Time ?? 0;
-                if (days > 0) totalDays += days;
             }
 
             if (hasLifeSentence)
@@ -5383,7 +5690,15 @@ namespace MDTPro.Data
                 return;
             }
 
-            if (totalDays <= 0) return;
+            if (totalDays <= 0)
+            {
+                string supervisionType = courtData.SupervisionOrder?.Type;
+                if (string.Equals(supervisionType, "Parole", StringComparison.OrdinalIgnoreCase)) pedData.IsOnParole = true;
+                else if (string.Equals(supervisionType, "Probation", StringComparison.OrdinalIgnoreCase)
+                         || string.Equals(supervisionType, "MandatorySupervision", StringComparison.OrdinalIgnoreCase))
+                    pedData.IsOnProbation = true;
+                return;
+            }
 
             DateTime baseDate = DateTime.UtcNow;
             if (string.Equals(pedData.IncarceratedUntil, LifeIncarcerationValue, StringComparison.OrdinalIgnoreCase)) return;
@@ -5410,6 +5725,14 @@ namespace MDTPro.Data
             {
                 pedData.IncarceratedUntil = baseDate.AddDays(scaledRealDays).ToString("o");
                 pedData.IsOnProbation = true;
+            }
+            if (courtData.SupervisionOrder != null)
+            {
+                if (string.Equals(courtData.SupervisionOrder.Type, "Parole", StringComparison.OrdinalIgnoreCase))
+                    pedData.IsOnParole = true;
+                if (string.Equals(courtData.SupervisionOrder.Type, "Probation", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(courtData.SupervisionOrder.Type, "MandatorySupervision", StringComparison.OrdinalIgnoreCase))
+                    pedData.IsOnProbation = true;
             }
         }
 
@@ -5619,7 +5942,8 @@ namespace MDTPro.Data
                 || n.Contains("possession of methamphetamine") || n.Contains("possession of heroin") || n.Contains("possession of pcp")
                 || n.Contains("possession of lsd") || n.Contains("hallucinogen") || n.Contains("possession of ecstasy") || n.Contains("mdma")
                 || n.Contains("possession of fentanyl") || n.Contains("ritalin") || n.Contains("hydrocodone")
-                || n.Contains("prescription") && n.Contains("narcotic");
+                || n.Contains("oxycontin") || n.Contains("vicodin") || n.Contains("codeine") || n.Contains("methadone")
+                || (n.Contains("prescription") && (n.Contains("pill") || n.Contains("drug") || n.Contains("narcotic")));
         }
 
         /// <summary>True if the case has at least one drug-related charge. Used for evidence relevance (e.g. DocumentedDrugs / drug records directly relevant).</summary>
@@ -5775,6 +6099,16 @@ namespace MDTPro.Data
             return (h % 17) - 8; // -8 to +8 (positive = stronger defense = lower conviction)
         }
 
+        private static SeizureEvidenceHelper.DrugEvidenceAssessment GetDrugEvidenceAssessmentForCharge(CourtData courtCase, string chargeName)
+        {
+            if (courtCase?.DrugEvidenceAssessments == null || string.IsNullOrWhiteSpace(chargeName)) return null;
+            return courtCase.DrugEvidenceAssessments
+                .Where(a => a != null && string.Equals(a.ChargeName, chargeName, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(a => a.SupportsCharge ? 1 : 0)
+                .ThenByDescending(a => a.QuantityWeight)
+                .FirstOrDefault();
+        }
+
         /// <summary>Per-charge conviction chance (0-100). Case chance + tier modifier + variance + judge/prosecutor/defense modifiers, then skewed. Evidence cap applies.</summary>
         private static int GetPerChargeConvictionChance(CourtData courtCase, CourtData.Charge charge)
         {
@@ -5806,6 +6140,9 @@ namespace MDTPro.Data
 
             int chance = Math.Max(15, Math.Min(85, baseChance + variance + tierMod));
 
+            var drugAssessment = GetDrugEvidenceAssessmentForCharge(courtCase, name);
+            int? drugEvidenceCap = drugAssessment?.ConvictionChanceCap;
+
             // Homicide without death report: cap conviction chance so documentation matters
             if (isHomicide && !hasDeathReport && config.courtConvictionHomicideNoDeathReportCap > 0)
                 chance = Math.Min(chance, config.courtConvictionHomicideNoDeathReportCap);
@@ -5822,7 +6159,11 @@ namespace MDTPro.Data
             else if (skewRoll <= 95) { /* 15%: no change */ }
             else chance += Helper.GetRandomInt(0, 12);                     // 5%: rare boost
 
-            return Math.Max(15, Math.Min(85, chance));
+            if (drugEvidenceCap.HasValue)
+                chance = Math.Min(chance, drugEvidenceCap.Value);
+
+            int upper = drugEvidenceCap.HasValue ? Math.Min(85, drugEvidenceCap.Value) : 85;
+            return Math.Max(15, Math.Min(upper, chance));
         }
 
         /// <summary>Applies court-ordered license revocations to ped data. Sets LicenseStatus, WeaponPermitStatus, FishingPermitStatus, HuntingPermitStatus when applicable. Uses CDF/PR enums: DriversLicenseState (ELicenseState), WeaponPermit/FishingPermit/HuntingPermit.Status (EDocumentStatus) per https://policing-redefined.netlify.app/docs/developer-docs/cdf/peds/permits</summary>
@@ -5873,6 +6214,7 @@ namespace MDTPro.Data
             int? juryVotesForConviction,
             int? juryVotesForAcquittal,
             bool? hasPublicDefender,
+            List<CourtData.CustodyCredit> custodyCredits,
             string outcomeNotes,
             string outcomeReasoning = null)
         {
@@ -5886,6 +6228,7 @@ namespace MDTPro.Data
             if (juryVotesForConviction.HasValue) courtCase.JuryVotesForConviction = Math.Max(0, juryVotesForConviction.Value);
             if (juryVotesForAcquittal.HasValue) courtCase.JuryVotesForAcquittal = Math.Max(0, juryVotesForAcquittal.Value);
             if (hasPublicDefender.HasValue) courtCase.HasPublicDefender = hasPublicDefender.Value;
+            if (custodyCredits != null) courtCase.CustodyCredits = custodyCredits;
             if (outcomeNotes != null) courtCase.OutcomeNotes = outcomeNotes;
             if (outcomeReasoning != null) courtCase.OutcomeReasoning = outcomeReasoning;
 
@@ -5908,12 +6251,15 @@ namespace MDTPro.Data
 
             if (status == 1)
             {
+                ApplySentenceSummaryAndSupervision(courtCase, DateTime.UtcNow, SetupController.GetConfig());
                 if (string.IsNullOrWhiteSpace(courtCase.SentenceReasoning))
                     courtCase.SentenceReasoning = BuildSentenceReasoning(courtCase);
             }
             else if (status == 2 || status == 3)
             {
                 courtCase.SentenceReasoning = null;
+                courtCase.SentenceSummary = null;
+                courtCase.SupervisionOrder = null;
                 courtCase.LicenseRevocations = new List<string>();
             }
             courtCase.LastUpdatedUtc = DateTime.UtcNow.ToString("o");
@@ -5937,7 +6283,6 @@ namespace MDTPro.Data
                                 ? revocationText
                                 : courtCase.OutcomeReasoning.TrimEnd('.', ' ') + ". " + revocationText;
                         }
-                        pedData.IsOnProbation = true;
                         pedData.IsWanted = false;
                         pedData.WarrantText = null;
                         SyncSinglePedToCDF(pedData);
@@ -7711,6 +8056,7 @@ namespace MDTPro.Data
             courtData.EvidenceResisted = false;
             courtData.EvidenceHadDrugs = false;
             courtData.EvidenceDrugTypesBreakdown = null;
+            courtData.DrugEvidenceAssessments = null;
             courtData.EvidenceFirearmTypesBreakdown = null;
             // EvidenceUseOfForce comes from arrest report; preserve before recalc
             if (!string.IsNullOrEmpty(courtData.ReportId))
@@ -7815,49 +8161,44 @@ namespace MDTPro.Data
                     if (config.courtEvidenceFleeingBonus > 0) score += config.courtEvidenceFleeingBonus;
                 }
                 // Do NOT infer vehicle damage from charges: evading can be on foot, hit-and-run may lack collision evidence. Only use PedEvidenceContext or documented report evidence.
-                // Drug evidence: charge-specific from seizure reports, else drug_records, else DocumentedDrugs (backward compat).
-                // Add bonus once if ANY drug charge is satisfied by seizure OR drug_records OR DocumentedDrugs.
+                // Drug evidence: charge-specific and quantity-aware from seizure reports, else drug_records, else DocumentedDrugs (backward compat).
                 if (config.courtEvidenceDrugsBonus > 0)
                 {
                     var drugTypesFromSeizure = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    bool satisfiedBySeizure = false;
+                    var assessments = new List<SeizureEvidenceHelper.DrugEvidenceAssessment>();
+                    bool anyMatchedSeizure = false;
+                    bool anySupportedSeizure = false;
+                    float bestQuantityWeight = 0f;
                     if (courtData.AttachedReportIds != null && courtData.Charges != null)
                     {
                         foreach (string rid in courtData.AttachedReportIds)
                         {
                             if (string.IsNullOrWhiteSpace(rid)) continue;
                             var per = PropertyEvidenceReports?.FirstOrDefault(r => r.Id == rid);
-                            if (per == null || per.SeizedDrugTypes == null || per.SeizedDrugTypes.Count == 0) continue;
+                            if (per == null || per.SeizedDrugs == null || per.SeizedDrugs.Count == 0) continue;
                             if (!IsAttachedReportRelevantToCase(courtData, rid, "propertyEvidence")) continue;
                             foreach (CourtData.Charge ch in courtData.Charges)
                             {
                                 if (ch == null || !IsDrugRelatedChargeName(ch.Name ?? "")) continue;
-                                if (SeizureEvidenceHelper.ChargeSatisfiedBySeizedDrugs(ch.Name, per.SeizedDrugTypes))
-                                {
-                                    satisfiedBySeizure = true;
-                                    foreach (string dt in per.SeizedDrugTypes) if (!string.IsNullOrEmpty(dt)) drugTypesFromSeizure.Add(dt);
-                                }
+                                var assessment = SeizureEvidenceHelper.BestAssessmentForCharge(ch.Name, per.SeizedDrugs, per.SalesIndicators, per.ManufacturingIndicators, per.OtherContrabandNotes);
+                                if (assessment == null || !assessment.TypeMatched) continue;
+                                assessments.Add(assessment);
+                                anyMatchedSeizure = true;
+                                if (assessment.SupportsCharge) anySupportedSeizure = true;
+                                bestQuantityWeight = Math.Max(bestQuantityWeight, assessment.QuantityWeight);
+                                if (!string.IsNullOrEmpty(assessment.DrugType)) drugTypesFromSeizure.Add(assessment.DrugType);
                             }
                         }
                     }
-                    if (satisfiedBySeizure)
+                    if (anyMatchedSeizure)
                     {
-                        score += config.courtEvidenceDrugsBonus;
+                        score += anySupportedSeizure ? config.courtEvidenceDrugsBonus : Math.Max(3f, config.courtEvidenceDrugsBonus * 0.35f);
                         courtData.EvidenceHadDrugs = true;
                         courtData.EvidenceDrugTypesBreakdown = drugTypesFromSeizure.Count > 0 ? drugTypesFromSeizure.ToList() : null;
-                        // Quantity bonus: when drug evidence comes from seizure report with SeizedDrugs (drug + quantity), add extra based on quantity weight
-                        if (config.courtEvidenceDrugQuantityBonus > 0 && courtData.AttachedReportIds != null)
+                        courtData.DrugEvidenceAssessments = assessments.Count > 0 ? assessments : null;
+                        if (config.courtEvidenceDrugQuantityBonus > 0)
                         {
-                            foreach (string rid in courtData.AttachedReportIds)
-                            {
-                                if (string.IsNullOrWhiteSpace(rid)) continue;
-                                var per = PropertyEvidenceReports?.FirstOrDefault(r => r.Id == rid);
-                                if (per?.SeizedDrugs == null || per.SeizedDrugs.Count == 0) continue;
-                                if (!IsAttachedReportRelevantToCase(courtData, rid, "propertyEvidence")) continue;
-                                float qWeight = SeizureEvidenceHelper.GetTotalQuantityWeight(per.SeizedDrugs);
-                                score += config.courtEvidenceDrugQuantityBonus * Math.Min(1f, qWeight);
-                                break; // apply once per case
-                            }
+                            score += config.courtEvidenceDrugQuantityBonus * Math.Min(1f, Math.Max(0.1f, bestQuantityWeight));
                         }
                     }
                     else
@@ -8358,6 +8699,7 @@ namespace MDTPro.Data
                 EvidenceHadDrugs = source.EvidenceHadDrugs,
                 EvidenceUseOfForce = source.EvidenceUseOfForce,
                 EvidenceDrugTypesBreakdown = source.EvidenceDrugTypesBreakdown,
+                DrugEvidenceAssessments = source.DrugEvidenceAssessments,
                 EvidenceFirearmTypesBreakdown = source.EvidenceFirearmTypesBreakdown,
                 RepeatOffenderScore = source.RepeatOffenderScore,
                 ConvictionChance = source.ConvictionChance,
@@ -8381,6 +8723,10 @@ namespace MDTPro.Data
                 OutcomeNotes = source.OutcomeNotes,
                 OutcomeReasoning = source.OutcomeReasoning,
                 SentenceReasoning = source.SentenceReasoning,
+                SentenceSummary = source.SentenceSummary,
+                CustodyCredits = source.CustodyCredits,
+                SupervisionOrder = source.SupervisionOrder,
+                ActiveSupervisionAtOffense = source.ActiveSupervisionAtOffense,
                 LicenseRevocations = source.LicenseRevocations,
                 AttachedReportIds = source.AttachedReportIds,
                 OfficerTestimonySummary = source.OfficerTestimonySummary,
@@ -8906,6 +9252,13 @@ namespace MDTPro.Data
                     factors.Add("serious property and robbery charges were proven");
                 if (HasDrugCrimeCharge(reasoningChargeScope))
                     factors.Add("drug-related charges formed part of the case");
+                if (courtData.DrugEvidenceAssessments != null)
+                {
+                    var unsupported = courtData.DrugEvidenceAssessments.FirstOrDefault(a => a != null && a.TypeMatched && !a.SupportsCharge && !string.IsNullOrWhiteSpace(a.Reason));
+                    var supported = courtData.DrugEvidenceAssessments.FirstOrDefault(a => a != null && a.SupportsCharge && !string.IsNullOrWhiteSpace(a.Reason));
+                    if (unsupported != null) factors.Add(unsupported.Reason);
+                    else if (supported != null) factors.Add(supported.Reason);
+                }
                 if (HasChargeKeyword(reasoningChargeScope, "escape") && !HasChargeKeyword(reasoningChargeScope, "evad"))
                     factors.Add("escape or attempted escape from custody was established");
                 if (HasChargeKeyword(reasoningChargeScope, "violation of probation") || HasChargeKeyword(reasoningChargeScope, "violation of parole") || HasChargeKeyword(reasoningChargeScope, "protective order"))
@@ -9864,6 +10217,23 @@ namespace MDTPro.Data
                 };
                 b.Append(warrantSent[Helper.GetRandomInt(0, warrantSent.Length - 1)]);
             }
+            if (courtData.DrugEvidenceAssessments != null && courtData.DrugEvidenceAssessments.Count > 0)
+            {
+                var supportedDrug = courtData.DrugEvidenceAssessments.FirstOrDefault(a => a != null && a.SupportsCharge);
+                var limitedDrug = courtData.DrugEvidenceAssessments.FirstOrDefault(a => a != null && a.TypeMatched && !a.SupportsCharge);
+                if (supportedDrug != null || limitedDrug != null)
+                {
+                    if (b.Length > 0) b.Append(" ");
+                    if (supportedDrug != null && (supportedDrug.RequiredProofLevel == "Trafficking" || supportedDrug.RequiredProofLevel == "PossessionForSale"))
+                        b.Append("The documented drug quantity and indicators increased the seriousness of the narcotics sentence.");
+                    else if (supportedDrug != null && supportedDrug.RequiredProofLevel == "Manufacturing")
+                        b.Append("Manufacturing or cultivation indicators were treated as aggravating drug evidence at sentencing.");
+                    else if (limitedDrug != null)
+                        b.Append("The court limited drug sentencing weight because the receipt supported a lesser drug level than the escalated charge alleged.");
+                    else
+                        b.Append("The documented narcotics evidence factored into the sentence.");
+                }
+            }
             if (courtData.SeverityScore >= 15 || hasLife)
             {
                 if (b.Length > 0) b.Append(" ");
@@ -10094,7 +10464,7 @@ namespace MDTPro.Data
         /// <param name="caseNumber">Court case number.</param>
         /// <param name="plea">Optional plea to apply before resolving (e.g. from UI selection).</param>
         /// <param name="outcomeNotes">Optional outcome notes to apply before resolving.</param>
-        internal static bool ForceResolveCourtCase(string caseNumber, string plea = null, string outcomeNotes = null)
+        internal static bool ForceResolveCourtCase(string caseNumber, string plea = null, string outcomeNotes = null, List<CourtData.CustodyCredit> custodyCredits = null)
         {
             if (string.IsNullOrWhiteSpace(caseNumber)) return false;
             CourtData courtCase;
@@ -10108,6 +10478,7 @@ namespace MDTPro.Data
                     _resolvingCourtCaseNumbers.Add(courtCase.Number);
                 if (!string.IsNullOrWhiteSpace(plea)) courtCase.Plea = plea;
                 if (outcomeNotes != null) courtCase.OutcomeNotes = outcomeNotes;
+                if (custodyCredits != null) courtCase.CustodyCredits = custodyCredits;
             }
 
             try
@@ -10155,11 +10526,21 @@ namespace MDTPro.Data
                         else
                         {
                             int chance = GetPerChargeConvictionChance(courtCase, charge);
+                            var drugAssessment = GetDrugEvidenceAssessmentForCharge(courtCase, charge.Name);
                             if (courtCase.IsJuryTrial && courtCase.JurySize > 0)
                                 chance = ClampConvictionChance(chance + juryLeanModifier);
+                            if (drugAssessment?.ConvictionChanceCap != null)
+                                chance = Math.Min(chance, drugAssessment.ConvictionChanceCap.Value);
                             charge.ConvictionChance = chance;
-                            int roll = Helper.GetRandomInt(1, 100);
-                            charge.Outcome = roll <= chance ? 1 : 2; // 1 Convicted, 2 Acquitted
+                            if (drugAssessment?.TypeMatched == true && !drugAssessment.SupportsCharge && SeizureEvidenceHelper.IsEscalatedDrugCharge(charge.Name))
+                            {
+                                charge.Outcome = 3; // Dismissed: quantity/indicator proof does not support this escalated drug count
+                            }
+                            else
+                            {
+                                int roll = Helper.GetRandomInt(1, 100);
+                                charge.Outcome = roll <= chance ? 1 : 2; // 1 Convicted, 2 Acquitted
+                            }
                         }
 
                         if (charge.Outcome == 1)
@@ -10171,10 +10552,13 @@ namespace MDTPro.Data
 
                 int newStatus = (courtCase.Charges != null && courtCase.Charges.Any(c => c != null && c.Outcome == 1)) ? 1 : 2;
                 courtCase.Status = newStatus;
+                ApplySentenceSummaryAndSupervision(courtCase, DateTime.UtcNow, SetupController.GetConfig());
                 courtCase.OutcomeReasoning = BuildOutcomeReasoning(courtCase, courtCase.ConvictionChance, newStatus);
                 if (newStatus == 1)
                 {
                     courtCase.SentenceReasoning = BuildSentenceReasoning(courtCase);
+                    if (courtCase.SentenceSummary != null && courtCase.SentenceSummary.CustodyCreditDays > 0)
+                        courtCase.SentenceReasoning += $" Custody credits applied: {courtCase.SentenceSummary.CustodyCreditDays} day{(courtCase.SentenceSummary.CustodyCreditDays == 1 ? "" : "s")}.";
                     courtCase.LicenseRevocations = ComputeLicenseRevocations(courtCase);
                     if (courtCase.LicenseRevocations != null && courtCase.LicenseRevocations.Count > 0)
                     {
