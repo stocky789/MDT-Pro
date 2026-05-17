@@ -386,39 +386,6 @@ async function getPropertyEvidenceSection(data = {}, isList = false) {
     if (f) addFirearmToList(section, f);
   }
 
-  // --- Drug case indicators ---
-  function createIndicatorTextarea(id, labelText, placeholderText, value) {
-    const cell = document.createElement("div");
-    cell.classList.add("fullWidth", "propertyEvidenceOtherRow");
-    const label = document.createElement("label");
-    label.htmlFor = id;
-    label.textContent = labelText;
-    const input = document.createElement("textarea");
-    input.id = id;
-    input.rows = 2;
-    input.placeholder = placeholderText;
-    input.value = Array.isArray(value) ? value.join(", ") : value || "";
-    input.disabled = isList;
-    cell.appendChild(label);
-    cell.appendChild(input);
-    section.appendChild(cell);
-  }
-
-  createIndicatorTextarea(
-    "propertyEvidenceSalesIndicatorsInput",
-    labels.salesIndicators || "Sales indicators (optional)",
-    labels.salesIndicatorsPlaceholder ||
-      "Scale, cash, ledger, packaging, buyer list",
-    data.SalesIndicators || [],
-  );
-  createIndicatorTextarea(
-    "propertyEvidenceManufacturingIndicatorsInput",
-    labels.manufacturingIndicators || "Manufacturing indicators (optional)",
-    labels.manufacturingIndicatorsPlaceholder ||
-      "Lab equipment, precursors, grow setup, extraction equipment",
-    data.ManufacturingIndicators || [],
-  );
-
   // --- Other contraband ---
   const otherCell = document.createElement("div");
   otherCell.classList.add("fullWidth", "propertyEvidenceOtherRow");

@@ -2136,18 +2136,6 @@ async function saveReport(type, options = {}) {
       )
         .map((item) => item.dataset.firearmType || "")
         .filter(Boolean);
-      const splitIndicators = (value) =>
-        String(value || "")
-          .split(/[,\n]/)
-          .map((v) => v.trim())
-          .filter(Boolean);
-      report.SalesIndicators = splitIndicators(
-        el.querySelector("#propertyEvidenceSalesIndicatorsInput")?.value,
-      );
-      report.ManufacturingIndicators = splitIndicators(
-        el.querySelector("#propertyEvidenceManufacturingIndicatorsInput")
-          ?.value,
-      );
       report.OtherContrabandNotes =
         el.querySelector("#propertyEvidenceOtherInput")?.value?.trim() || null;
       response = await postCreateReport(

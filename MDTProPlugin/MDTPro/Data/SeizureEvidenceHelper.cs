@@ -133,15 +133,71 @@ namespace MDTPro.Data
         public static QuantityTier GetQuantityTier(string quantity)
         {
             if (string.IsNullOrWhiteSpace(quantity)) return QuantityTier.Unknown;
-            string q = quantity.Trim().ToLowerInvariant();
-            if (q == "—" || q == "-" || q.Contains("trace")) return QuantityTier.Trace;
-            if (q.Contains("less than 1g")) return QuantityTier.Minimal;
-            if (q.Contains("1 baggie") || q.Contains("1 pill") || q.Contains("1 capsule") || q.Contains("1 vial") || q == "1g") return QuantityTier.Personal;
-            if (q.Contains("2 baggie") || q.Contains("2 pill") || q.Contains("2-5 pill") || q.Contains("2–5 pill") || q.Contains("2 capsule") || q.Contains("2-5 capsule") || q.Contains("2–5 capsule") || q.Contains("2 vial") || q.Contains("2-5 vial") || q.Contains("2–5 vial") || q == "2g") return QuantityTier.PersonalPlus;
-            if (q.Contains("3–5") || q.Contains("3-5") || q.Contains("3+ baggie") || q.Contains("3.5g") || q.Contains("5g") || q.Contains("1 bundle") || q.Contains("multiple pill") || q.Contains("multiple capsule") || q.Contains("multiple vial") || q.Contains("6–20 pill") || q.Contains("6-20 pill") || q.Contains("6–20 capsule") || q.Contains("6-20 capsule") || q.Contains("6–20 vial") || q.Contains("6-20 vial")) return QuantityTier.Moderate;
-            if (q.Contains("6–10 baggie") || q.Contains("6-10 baggie") || q.Contains("2 bundle") || q.Contains("10g") || q.Contains("10g–27g") || q.Contains("10g-27g") || q.Contains("1 ounce") || q.Contains("28g") || q.Contains("28g–99g") || q.Contains("28g-99g") || q.Contains("21+ pill") || q.Contains("21+ capsule") || q.Contains("21+ vial")) return QuantityTier.Distribution;
-            if (q.Contains("11+ baggie") || q.Contains("3+ bundle") || q.Contains("multiple ounce") || q.Contains("100g") || q.Contains("1 brick") || q.Contains("100+ pill") || q.Contains("100+ capsule") || q.Contains("100+ vial")) return QuantityTier.Trafficking;
-            if (q.Contains("multiple brick") || q.Contains("1 pound") || q.Contains("500g") || q.Contains("kilogram") || q.Contains("kilo")) return QuantityTier.Bulk;
+            string q = quantity.Trim().ToLowerInvariant().Replace("-", "–");
+
+            switch (q)
+            {
+                case "—":
+                case "–":
+                case "other":
+                    return QuantityTier.Unknown;
+
+                case "trace amount":
+                    return QuantityTier.Trace;
+
+                case "less than 1g":
+                    return QuantityTier.Minimal;
+
+                case "1g":
+                case "1 baggie":
+                case "1 pill":
+                case "1 capsule":
+                case "1 vial":
+                    return QuantityTier.Personal;
+
+                case "2g":
+                case "2 baggies":
+                case "2–5 pills":
+                case "2–5 capsules":
+                case "2–5 vials":
+                    return QuantityTier.PersonalPlus;
+
+                case "3.5g":
+                case "5g":
+                case "3–5 baggies":
+                case "1 bundle":
+                case "6–20 pills":
+                case "6–20 capsules":
+                case "6–20 vials":
+                    return QuantityTier.Moderate;
+
+                case "10g–27g":
+                case "28g–99g":
+                case "1 ounce":
+                case "6–10 baggies":
+                case "2 bundles":
+                case "21+ pills":
+                case "21+ capsules":
+                case "21+ vials":
+                    return QuantityTier.Distribution;
+
+                case "100g+":
+                case "multiple ounces":
+                case "11+ baggies":
+                case "3+ bundles":
+                case "100+ pills":
+                case "100+ capsules":
+                case "100+ vials":
+                case "1 brick":
+                    return QuantityTier.Trafficking;
+
+                case "500g+":
+                case "1 pound+":
+                case "1 kilogram+":
+                case "multiple bricks":
+                    return QuantityTier.Bulk;
+            }
+
             return QuantityTier.Unknown;
         }
 
@@ -161,15 +217,13 @@ namespace MDTPro.Data
             }
         }
 
-        public static DrugEvidenceAssessment AssessDrugEvidenceForCharge(string chargeName, PropertyEvidenceReceiptReport.SeizedDrugEntry seizedDrug, IEnumerable<string> salesIndicators = null, IEnumerable<string> manufacturingIndicators = null, string otherNotes = null)
+        public static DrugEvidenceAssessment AssessDrugEvidenceForCharge(string chargeName, PropertyEvidenceReceiptReport.SeizedDrugEntry seizedDrug)
         {
             string drugType = seizedDrug?.DrugType ?? "";
             string quantity = seizedDrug?.Quantity ?? "";
             var tier = GetQuantityTier(quantity);
             var level = GetRequiredProofLevel(chargeName);
             bool typeMatched = ChargeSatisfiedBySeizedDrugs(chargeName, string.IsNullOrWhiteSpace(drugType) ? new List<string>() : new List<string> { drugType });
-            bool hasSalesIndicators = HasAny(salesIndicators) || TextHasAny(otherNotes, "scale", "cash", "ledger", "pay-owe", "pay owe", "packaging", "buyer", "sale", "distribution");
-            bool hasManufacturingIndicators = HasAny(manufacturingIndicators) || TextHasAny(otherNotes, "lab", "precursor", "chemical", "cook", "manufactur", "extraction", "grow", "plant", "processing", "ventilation");
             bool supports = false;
             string lesser = null;
             string reasonCode = "drug_type_not_matched";
@@ -181,9 +235,9 @@ namespace MDTPro.Data
                 switch (level)
                 {
                     case DrugChargeProofLevel.Possession:
-                        supports = tier != QuantityTier.Trace || !string.IsNullOrWhiteSpace(quantity);
-                        reasonCode = supports ? "quantity_supports_possession" : "trace_amount_weak_possession";
-                        reason = supports ? "The seized quantity supports a possession-level drug charge." : "Only a trace amount was documented, making possession evidence weak.";
+                        supports = tier != QuantityTier.Unknown || !string.IsNullOrWhiteSpace(quantity);
+                        reasonCode = tier == QuantityTier.Trace ? "trace_amount_weak_possession" : "quantity_supports_possession";
+                        reason = tier == QuantityTier.Trace ? "Only a trace amount was documented, making possession evidence weak." : "The seized quantity supports a possession-level drug charge.";
                         break;
                     case DrugChargeProofLevel.CannabisOver28g:
                         supports = tier >= QuantityTier.Distribution;
@@ -193,29 +247,29 @@ namespace MDTPro.Data
                         cap = supports ? (int?)null : UnsupportedEscalatedChargeCap;
                         break;
                     case DrugChargeProofLevel.PossessionForSale:
-                        supports = tier >= QuantityTier.Distribution || (tier >= QuantityTier.Moderate && hasSalesIndicators);
+                        supports = tier >= QuantityTier.Distribution;
                         lesser = supports ? null : "Simple possession";
-                        reasonCode = supports ? (hasSalesIndicators ? "sales_indicators_support_for_sale" : "quantity_supports_for_sale") : "quantity_personal_use_not_for_sale";
+                        reasonCode = supports ? "quantity_supports_for_sale" : "quantity_personal_use_not_for_sale";
                         reason = supports
-                            ? (hasSalesIndicators ? "The documented quantity and sales indicators support possession for sale." : "The documented quantity supports possession for sale.")
-                            : "The documented quantity supports possession, but not possession for sale without sales indicators.";
+                            ? "The documented quantity supports possession for sale."
+                            : "The documented quantity supports possession, but not possession for sale.";
                         cap = supports ? (int?)null : (tier >= QuantityTier.Moderate ? WeakEscalatedChargeCap : UnsupportedEscalatedChargeCap);
                         break;
                     case DrugChargeProofLevel.Trafficking:
-                        supports = tier >= QuantityTier.Trafficking || (tier >= QuantityTier.Distribution && hasSalesIndicators);
+                        supports = tier >= QuantityTier.Trafficking;
                         lesser = supports ? null : (tier >= QuantityTier.Distribution ? "Possession for sale" : "Simple possession");
-                        reasonCode = supports ? (hasSalesIndicators ? "sales_indicators_support_trafficking" : "bulk_quantity_supports_trafficking") : "quantity_too_low_for_trafficking";
+                        reasonCode = supports ? (tier >= QuantityTier.Bulk ? "bulk_quantity_supports_trafficking" : "quantity_supports_trafficking") : "quantity_too_low_for_trafficking";
                         reason = supports
-                            ? (hasSalesIndicators && tier < QuantityTier.Trafficking ? "Distribution quantity and sales indicators support the trafficking count." : "Bulk quantity supports the trafficking count.")
-                            : "The seized amount was too small to support trafficking by itself.";
+                            ? (tier >= QuantityTier.Bulk ? "Bulk quantity supports the trafficking count." : "The documented quantity supports the trafficking count.")
+                            : "The seized amount was too small to support trafficking by quantity alone.";
                         cap = supports ? (int?)null : (tier >= QuantityTier.Distribution ? WeakEscalatedChargeCap : UnsupportedEscalatedChargeCap);
                         break;
                     case DrugChargeProofLevel.Manufacturing:
-                        supports = hasManufacturingIndicators;
-                        lesser = supports ? null : (tier >= QuantityTier.Distribution ? "Possession for sale" : "Simple possession");
-                        reasonCode = supports ? "manufacturing_indicators_documented" : "no_manufacturing_indicators";
-                        reason = supports ? "Manufacturing, lab, grow, or precursor indicators were documented." : "Quantity alone does not support a manufacturing charge without lab, grow, precursor, or processing evidence.";
-                        cap = supports ? (int?)null : UnsupportedEscalatedChargeCap;
+                        supports = false;
+                        lesser = tier >= QuantityTier.Trafficking ? "Trafficking" : (tier >= QuantityTier.Distribution ? "Possession for sale" : "Simple possession");
+                        reasonCode = "quantity_only_not_manufacturing";
+                        reason = "The property evidence receipt documents seized quantity, but quantity alone does not establish manufacturing.";
+                        cap = UnsupportedEscalatedChargeCap;
                         break;
                 }
             }
@@ -237,14 +291,14 @@ namespace MDTPro.Data
             };
         }
 
-        public static DrugEvidenceAssessment BestAssessmentForCharge(string chargeName, IEnumerable<PropertyEvidenceReceiptReport.SeizedDrugEntry> seizedDrugs, IEnumerable<string> salesIndicators = null, IEnumerable<string> manufacturingIndicators = null, string otherNotes = null)
+        public static DrugEvidenceAssessment BestAssessmentForCharge(string chargeName, IEnumerable<PropertyEvidenceReceiptReport.SeizedDrugEntry> seizedDrugs)
         {
             if (seizedDrugs == null) return null;
             DrugEvidenceAssessment best = null;
             foreach (var drug in seizedDrugs)
             {
                 if (drug == null) continue;
-                var current = AssessDrugEvidenceForCharge(chargeName, drug, salesIndicators, manufacturingIndicators, otherNotes);
+                var current = AssessDrugEvidenceForCharge(chargeName, drug);
                 if (current == null || !current.TypeMatched) continue;
                 if (best == null || Rank(current) > Rank(best)) best = current;
             }
@@ -274,16 +328,5 @@ namespace MDTPro.Data
             return rank;
         }
 
-        private static bool HasAny(IEnumerable<string> values)
-        {
-            return values != null && values.Any(v => !string.IsNullOrWhiteSpace(v));
-        }
-
-        private static bool TextHasAny(string text, params string[] terms)
-        {
-            if (string.IsNullOrWhiteSpace(text)) return false;
-            string n = text.ToLowerInvariant();
-            return terms.Any(t => n.Contains(t));
-        }
     }
 }

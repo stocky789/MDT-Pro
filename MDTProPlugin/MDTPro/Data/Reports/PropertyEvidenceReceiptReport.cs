@@ -11,9 +11,9 @@ namespace MDTPro.Data.Reports
         public List<SeizedDrugEntry> SeizedDrugs = new List<SeizedDrugEntry>();
         /// <summary>Firearms seized. Each add creates an entry (duplicates allowed for multiple of same type).</summary>
         public List<string> SeizedFirearmTypes = new List<string>();
-        /// <summary>Optional structured indicators supporting possession-for-sale / trafficking counts (scale, cash, ledger, packaging, buyer list, etc.).</summary>
+        /// <summary>Legacy field retained for older saved reports. Court evidence scoring now uses seized quantity thresholds only.</summary>
         public List<string> SalesIndicators = new List<string>();
-        /// <summary>Optional structured indicators supporting manufacturing / cultivation counts (lab equipment, precursors, grow setup, extraction equipment, etc.).</summary>
+        /// <summary>Legacy field retained for older saved reports. Court evidence scoring now uses seized quantity thresholds only.</summary>
         public List<string> ManufacturingIndicators = new List<string>();
         /// <summary>Optional free-text notes for other contraband not covered by drug/firearm dropdowns.</summary>
         public string OtherContrabandNotes;

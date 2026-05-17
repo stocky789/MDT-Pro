@@ -28,7 +28,6 @@ All notable changes to MDT Pro are documented here.
 
 ### Bug Fixes
 
-- **Court** - Drug seizure evidence now accounts for quantity and indicators before supporting trafficking or manufacturing charges.
 - **Court** - MDT Cloud now keeps custody credit and supervision records indexed correctly and uses server policy values when resolving supervision terms.
 - **Ped records** - Cloud-backed re-encounters now push the same licence, permit, and supervision statuses into Common Data Framework that MDT Pro shows for the person.
 - **Court** - Jury trials now resolve each charge separately, summarize count-by-count verdicts, and hide empty outcome notes.

@@ -8452,7 +8452,7 @@ namespace MDTPro.Data
                             foreach (CourtData.Charge ch in courtData.Charges)
                             {
                                 if (ch == null || !IsDrugRelatedChargeName(ch.Name ?? "")) continue;
-                                var assessment = SeizureEvidenceHelper.BestAssessmentForCharge(ch.Name, per.SeizedDrugs, per.SalesIndicators, per.ManufacturingIndicators, per.OtherContrabandNotes);
+                                var assessment = SeizureEvidenceHelper.BestAssessmentForCharge(ch.Name, per.SeizedDrugs);
                                 if (assessment == null || !assessment.TypeMatched) continue;
                                 assessments.Add(assessment);
                                 anyMatchedSeizure = true;
@@ -10497,9 +10497,9 @@ namespace MDTPro.Data
                 {
                     if (b.Length > 0) b.Append(" ");
                     if (supportedDrug != null && (supportedDrug.RequiredProofLevel == "Trafficking" || supportedDrug.RequiredProofLevel == "PossessionForSale"))
-                        b.Append("The documented drug quantity and indicators increased the seriousness of the narcotics sentence.");
+                        b.Append("The documented drug quantity increased the seriousness of the narcotics sentence.");
                     else if (supportedDrug != null && supportedDrug.RequiredProofLevel == "Manufacturing")
-                        b.Append("Manufacturing or cultivation indicators were treated as aggravating drug evidence at sentencing.");
+                        b.Append("Manufacturing or cultivation charges were considered separately from the property evidence quantity assessment.");
                     else if (limitedDrug != null)
                         b.Append("The court limited drug sentencing weight because the receipt supported a lesser drug level than the escalated charge alleged.");
                     else
