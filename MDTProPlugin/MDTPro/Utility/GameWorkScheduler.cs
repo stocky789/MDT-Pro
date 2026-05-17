@@ -344,6 +344,7 @@ namespace MDTPro.Utility {
             var swDb = Stopwatch.StartNew();
             var swDyn = Stopwatch.StartNew();
             var swFire = Stopwatch.StartNew();
+            var swVehicleDamage = Stopwatch.StartNew();
 
             while (MDTPro.Server.RunServer && ShouldRun) {
                 try {
@@ -389,12 +390,20 @@ namespace MDTPro.Utility {
                         RunInstrumented("TryCapturePickupAndPlayerFirearms", GameWorkJobTrigger.Passive, DataController.TryCapturePickupAndPlayerFirearms);
                     }
 
+                    const int vehicleDamageWait = 500;
+                    if (swVehicleDamage.ElapsedMilliseconds >= vehicleDamageWait) {
+                        swVehicleDamage.Restart();
+                        RunInstrumented("TryCaptureVehicleDamageEvidencePassive", GameWorkJobTrigger.Passive, DataController.TryCaptureVehicleDamageEvidencePassive);
+                    }
+
                     long msDb = Math.Max(0, dbInterval - swDb.ElapsedMilliseconds);
                     long msDyn = Math.Max(0, dynInterval - swDyn.ElapsedMilliseconds);
                     long msFire = Math.Max(0, fireWait - swFire.ElapsedMilliseconds);
+                    long msVehicleDamage = Math.Max(0, vehicleDamageWait - swVehicleDamage.ElapsedMilliseconds);
                     long wait = msDb;
                     if (msDyn < wait) wait = msDyn;
                     if (msFire < wait) wait = msFire;
+                    if (msVehicleDamage < wait) wait = msVehicleDamage;
                     if (wait < 10) wait = 10;
                     if (wait > 500) wait = 500;
                     // Slice the idle wait so a Critical/Interactive job enqueued during this window is picked up

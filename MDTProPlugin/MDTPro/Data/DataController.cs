@@ -163,7 +163,7 @@ namespace MDTPro.Data
         private static readonly TimeSpan RecentlyIdentifiedTtl = TimeSpan.FromMinutes(5);
 
         // Evidence trigger reliability (for UI: only show reliably tracked items in court breakdown):
-        // Reliable: HadWeapon (native at arrest), WasWanted (LSPDFR persona or MDT ped IsWanted/WarrantText), AssaultedPed (damage native + player check), DamagedVehicle (damage native).
+        // Reliable: HadWeapon (native at arrest), WasWanted (LSPDFR persona or MDT ped IsWanted/WarrantText), AssaultedPed (damage native + player check), DamagedVehicle (damage native + pursuit health sampling).
         // Resisted: from PR PedAPI.GetPedResistanceAction at arrest (Flee, Attack, Uncooperative = resisted).
         // Unreliable / conditional: WasPatDown (PR OnPedPatDown only; no LSPDFR), WasDrunk (IS_PED_DRUNK rarely set by game),
         // WasFleeing (only true if ped is fleeing at exact moment we run; chase-then-stop usually misses), HadIllegalWeapon (needs CDF permit data),
@@ -194,6 +194,22 @@ namespace MDTPro.Data
         private static readonly Dictionary<Rage.PoolHandle, DateTime> assaultedPedHandles = new Dictionary<Rage.PoolHandle, DateTime>();
         /// <summary>Handles that were armed when we saw them (e.g. at surrender); at arrest they may be disarmed so we merge by handle.</summary>
         private static readonly Dictionary<Rage.PoolHandle, DateTime> hadWeaponHandles = new Dictionary<Rage.PoolHandle, DateTime>();
+
+        private class SuspectVehicleDamageSample
+        {
+            public Rage.PoolHandle VehicleHandle;
+            public float BodyHealth;
+            public float EngineHealth;
+            public int EntityHealth;
+            public DateTime LastSeenUtc = DateTime.UtcNow;
+        }
+
+        private static readonly Dictionary<Rage.PoolHandle, SuspectVehicleDamageSample> suspectVehicleDamageSamples = new Dictionary<Rage.PoolHandle, SuspectVehicleDamageSample>();
+        private const float VehicleDamageHealthDropThreshold = 18f;
+        private const int VehicleDamageEntityHealthDropThreshold = 8;
+        private static readonly TimeSpan VehicleDamageSampleTtl = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan PedEvidenceDatabasePruneInterval = TimeSpan.FromMinutes(10);
+        private static DateTime lastPedEvidenceDatabasePruneUtc = DateTime.MinValue;
 
         private static readonly HashSet<string> capturedVehicleSearchPlates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly object capturedVehicleSearchLock = new object();
@@ -6528,39 +6544,246 @@ namespace MDTPro.Data
             return false;
         }
 
-        /// <summary>True if any vehicle has been damaged by this ped or their vehicle. During pursuits, GTA attributes collision damage to the suspect's vehicle, not the ped, so we check both.</summary>
+        /// <summary>True if any vehicle has been damaged by this ped or their vehicle. During pursuits, GTA often clears or never sets damage attribution by arrest, so this also checks damage sampled while the suspect was fleeing.</summary>
         private static bool CheckVehicleDamageByPed(Ped ped)
         {
             if (ped == null || !ped.IsValid()) return false;
             try
             {
+                bool sampledDamage = false;
+                try
+                {
+                    lock (pedEvidenceLock)
+                    {
+                        sampledDamage = damagedVehicleHandles.ContainsKey(ped.Handle);
+                    }
+                }
+                catch { }
+                if (sampledDamage) return true;
+
                 Vehicle[] nearbyVehicles = ped.GetNearbyVehicles(ClampRageNearbyPoolQueryCount(50));
                 // (1) Direct: vehicle damaged by ped entity (rare; usually applies to on-foot damage)
-                bool any = nearbyVehicles != null && nearbyVehicles.Any(v =>
-                    v != null && v.IsValid() &&
-                    NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(v, ped, false));
-                // (2) Suspect's current vehicle damaged by ped (e.g. they were driving, crashed)
-                if (!any && ped.IsInAnyVehicle(false))
+                bool any = false;
+                if (nearbyVehicles != null)
                 {
-                    Vehicle suspectVehicle = ped.CurrentVehicle;
-                    if (suspectVehicle != null && suspectVehicle.IsValid() &&
-                        NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(suspectVehicle, ped, false))
-                        any = true;
-                }
-                // (3) Key fix: during pursuit, collision damage is attributed to the suspect's VEHICLE, not the ped
-                if (!any && ped.IsInAnyVehicle(false))
-                {
-                    Vehicle suspectVehicle = ped.CurrentVehicle;
-                    if (suspectVehicle != null && suspectVehicle.IsValid() && nearbyVehicles != null)
+                    foreach (Vehicle vehicle in nearbyVehicles)
                     {
-                        any = nearbyVehicles.Any(v =>
-                            v != null && v.IsValid() && v != suspectVehicle &&
-                            NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(v, suspectVehicle, false));
+                        if (vehicle == null || !vehicle.IsValid()) continue;
+                        try
+                        {
+                            if (NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(vehicle, ped, false))
+                            {
+                                any = true;
+                                break;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                Vehicle suspectVehicle = null;
+                if (ped.IsInAnyVehicle(false))
+                {
+                    try { suspectVehicle = ped.CurrentVehicle; } catch { }
+                }
+
+                // (2) Suspect's current vehicle damaged by ped (e.g. they were driving, crashed)
+                if (!any && suspectVehicle != null && suspectVehicle.IsValid())
+                {
+                    try
+                    {
+                        if (NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(suspectVehicle, ped, false))
+                            any = true;
+                    }
+                    catch { }
+                }
+                // (3) During pursuit, collision damage is usually attributed to the suspect's VEHICLE, not the ped
+                if (!any && suspectVehicle != null && suspectVehicle.IsValid() && nearbyVehicles != null)
+                {
+                    foreach (Vehicle vehicle in nearbyVehicles)
+                    {
+                        if (vehicle == null || !vehicle.IsValid() || vehicle == suspectVehicle) continue;
+                        try
+                        {
+                            if (NativeFunction.Natives.HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY<bool>(vehicle, suspectVehicle, false))
+                            {
+                                any = true;
+                                break;
+                            }
+                        }
+                        catch { }
                     }
                 }
                 return any;
             }
             catch { return false; }
+        }
+
+        private static float GetVehicleBodyHealthSafe(Vehicle vehicle)
+        {
+            try { return NativeFunction.Natives.GET_VEHICLE_BODY_HEALTH<float>(vehicle); }
+            catch { return 1000f; }
+        }
+
+        private static float GetVehicleEngineHealthSafe(Vehicle vehicle)
+        {
+            try { return NativeFunction.Natives.GET_VEHICLE_ENGINE_HEALTH<float>(vehicle); }
+            catch { return 1000f; }
+        }
+
+        private static int GetEntityHealthSafe(Rage.Entity entity)
+        {
+            try { return NativeFunction.Natives.GET_ENTITY_HEALTH<int>(entity); }
+            catch { return 1000; }
+        }
+
+        private static bool IsPedVehicleDamageMarked(Ped ped)
+        {
+            if (ped == null || !ped.IsValid()) return false;
+            try
+            {
+                lock (pedEvidenceLock)
+                {
+                    return damagedVehicleHandles.ContainsKey(ped.Handle);
+                }
+            }
+            catch { return false; }
+        }
+
+        private static void MarkPedVehicleDamageByHandle(Ped ped)
+        {
+            if (ped == null || !ped.IsValid()) return;
+            try
+            {
+                DateTime now = DateTime.UtcNow;
+                bool alreadyMarked = false;
+                lock (pedEvidenceLock)
+                {
+                    alreadyMarked = damagedVehicleHandles.ContainsKey(ped.Handle);
+                    damagedVehicleHandles[ped.Handle] = now;
+                }
+
+                if (alreadyMarked) return;
+
+                Persona persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped);
+                if (persona != null && !string.IsNullOrWhiteSpace(persona.FullName))
+                {
+                    string cacheKey = GetPedDataForPed(ped)?.Name ?? persona.FullName;
+                    if (!string.IsNullOrWhiteSpace(cacheKey))
+                    {
+                        lock (pedEvidenceLock)
+                        {
+                            if (!pedEvidenceCache.TryGetValue(cacheKey, out PedEvidenceContext ctx))
+                            {
+                                ctx = new PedEvidenceContext();
+                                pedEvidenceCache[cacheKey] = ctx;
+                            }
+                            ctx.DamagedVehicle = true;
+                            ctx.CapturedAt = now;
+                            UpsertPedEvidenceEntryLocked(cacheKey, ctx);
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private static void PruneStaleVehicleDamageSamplesLocked(DateTime nowUtc)
+        {
+            DateTime threshold = nowUtc.Subtract(VehicleDamageSampleTtl);
+            List<Rage.PoolHandle> staleDamageSamples = suspectVehicleDamageSamples
+                .Where(kvp => kvp.Value == null || kvp.Value.LastSeenUtc < threshold)
+                .Select(kvp => kvp.Key)
+                .ToList();
+            foreach (Rage.PoolHandle h in staleDamageSamples) suspectVehicleDamageSamples.Remove(h);
+        }
+
+        private static void UpsertPedEvidenceEntryLocked(string cacheKey, PedEvidenceContext ctx)
+        {
+            Database.UpsertPedEvidenceEntry(new PedEvidenceCacheEntry
+            {
+                PedName = cacheKey,
+                CapturedAt = ctx.CapturedAt,
+                HadWeapon = ctx.HadWeapon,
+                WasWanted = ctx.WasWanted,
+                WasPatDown = ctx.WasPatDown,
+                WasDrunk = ctx.WasDrunk,
+                WasFleeing = ctx.WasFleeing,
+                AssaultedPed = ctx.AssaultedPed,
+                DamagedVehicle = ctx.DamagedVehicle,
+                HadIllegalWeapon = ctx.HadIllegalWeapon,
+                ViolatedSupervision = ctx.ViolatedSupervision,
+                Resisted = ctx.Resisted,
+            });
+        }
+
+        /// <summary>Polls nearby fleeing drivers and records vehicle damage from health deltas while the pursuit is still active. This catches crash damage even when GTA's HAS_ENTITY_BEEN_DAMAGED_BY_ENTITY relationship is unavailable by arrest.</summary>
+        internal static void TryCaptureVehicleDamageEvidencePassive()
+        {
+            Ped player = Main.Player;
+            if (player == null || !player.IsValid()) return;
+            try
+            {
+                DateTime now = DateTime.UtcNow;
+                lock (pedEvidenceLock)
+                {
+                    PruneStaleVehicleDamageSamplesLocked(now);
+                }
+                Ped[] nearbyPeds = player.GetNearbyPeds(ClampRageNearbyPoolQueryCount(SetupController.GetConfig().maxNumberOfNearbyPedsOrVehicles));
+                if (nearbyPeds == null || nearbyPeds.Length == 0) return;
+                foreach (Ped ped in nearbyPeds)
+                {
+                    if (ped == null || ped == player || !ped.IsValid()) continue;
+                    bool fleeing = false;
+                    try { fleeing = NativeFunction.Natives.IS_PED_FLEEING<bool>(ped) || IsPedFleeingTaskActive(ped); }
+                    catch { }
+                    if (!fleeing || !ped.IsInAnyVehicle(false)) continue;
+                    if (IsPedVehicleDamageMarked(ped)) continue;
+
+                    Vehicle vehicle = null;
+                    try { vehicle = ped.CurrentVehicle; } catch { }
+                    if (vehicle == null || !vehicle.IsValid()) continue;
+
+                    bool nativeDamage = CheckVehicleDamageByPed(ped);
+                    float body = GetVehicleBodyHealthSafe(vehicle);
+                    float engine = GetVehicleEngineHealthSafe(vehicle);
+                    int entityHealth = GetEntityHealthSafe(vehicle);
+                    bool healthDrop = false;
+
+                    lock (pedEvidenceLock)
+                    {
+                        if (!suspectVehicleDamageSamples.TryGetValue(ped.Handle, out SuspectVehicleDamageSample sample)
+                            || sample.VehicleHandle != vehicle.Handle)
+                        {
+                            sample = new SuspectVehicleDamageSample
+                            {
+                                VehicleHandle = vehicle.Handle,
+                                BodyHealth = body,
+                                EngineHealth = engine,
+                                EntityHealth = entityHealth,
+                                LastSeenUtc = now,
+                            };
+                            suspectVehicleDamageSamples[ped.Handle] = sample;
+                        }
+                        else
+                        {
+                            healthDrop = sample.BodyHealth - body >= VehicleDamageHealthDropThreshold
+                                || sample.EngineHealth - engine >= VehicleDamageHealthDropThreshold
+                                || sample.EntityHealth - entityHealth >= VehicleDamageEntityHealthDropThreshold;
+                            sample.BodyHealth = Math.Min(sample.BodyHealth, body);
+                            sample.EngineHealth = Math.Min(sample.EngineHealth, engine);
+                            sample.EntityHealth = Math.Min(sample.EntityHealth, entityHealth);
+                            sample.LastSeenUtc = now;
+                        }
+                    }
+
+                    if (nativeDamage || healthDrop) MarkPedVehicleDamageByHandle(ped);
+                }
+            }
+            catch (Exception e)
+            {
+                Helper.Log($"Vehicle damage evidence polling failed: {e.Message}", false, Helper.LogSeverity.Warning);
+            }
         }
 
         internal static void MarkPedFleeing(Ped ped)
@@ -7913,8 +8136,14 @@ namespace MDTPro.Data
 
         private static void PruneStaleEvidenceEntries()
         {
-            DateTime threshold = DateTime.UtcNow.AddHours(-24);
-            Database.PrunePedEvidenceCache(24);
+            DateTime now = DateTime.UtcNow;
+            DateTime threshold = now.AddHours(-24);
+            if (lastPedEvidenceDatabasePruneUtc == DateTime.MinValue
+                || now - lastPedEvidenceDatabasePruneUtc >= PedEvidenceDatabasePruneInterval)
+            {
+                Database.PrunePedEvidenceCache(24);
+                lastPedEvidenceDatabasePruneUtc = now;
+            }
             List<string> stale = pedEvidenceCache
                 .Where(kvp => kvp.Value.CapturedAt < threshold)
                 .Select(kvp => kvp.Key)
@@ -7924,6 +8153,7 @@ namespace MDTPro.Data
             foreach (Rage.PoolHandle h in staleHandles) fleeingPedHandles.Remove(h);
             staleHandles = damagedVehicleHandles.Where(kvp => kvp.Value < threshold).Select(kvp => kvp.Key).ToList();
             foreach (Rage.PoolHandle h in staleHandles) damagedVehicleHandles.Remove(h);
+            PruneStaleVehicleDamageSamplesLocked(now);
             staleHandles = assaultedPedHandles.Where(kvp => kvp.Value < threshold).Select(kvp => kvp.Key).ToList();
             foreach (Rage.PoolHandle h in staleHandles) assaultedPedHandles.Remove(h);
             staleHandles = hadWeaponHandles.Where(kvp => kvp.Value < threshold).Select(kvp => kvp.Key).ToList();
