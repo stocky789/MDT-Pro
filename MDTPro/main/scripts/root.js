@@ -3,15 +3,33 @@ const isInIframe = window.self !== window.top
 const mdtBridgeAuth = (() => {
   const header = 'X-MDT-Bridge-Token'
   const cookie = 'MDTProBridge'
+  const csrfHeader = 'X-CSRF-TOKEN'
+  const csrfCookies = ['__Host-MDTCloud-CSRF', 'MDTCloud.Dev.CSRF']
+  const csrfExemptPaths = new Set([
+    '/api/auth/csrf',
+    '/api/auth/login',
+    '/api/auth/signup',
+    '/api/auth/refresh',
+    '/api/auth/confirm-email',
+    '/api/auth/resend-confirmation',
+  ])
 
-  function readCookie() {
+  function readCookie(name = cookie) {
     try {
       for (const part of document.cookie.split(';')) {
         const trimmed = part.trim()
-        if (!trimmed.startsWith(`${cookie}=`)) continue
-        return decodeURIComponent(trimmed.slice(cookie.length + 1))
+        if (!trimmed.startsWith(`${name}=`)) continue
+        return decodeURIComponent(trimmed.slice(name.length + 1))
       }
     } catch (_) {}
+    return ''
+  }
+
+  function readCsrfCookie() {
+    for (const name of csrfCookies) {
+      const value = readCookie(name)
+      if (value) return value
+    }
     return ''
   }
 
@@ -41,13 +59,48 @@ const mdtBridgeAuth = (() => {
         })
         .catch(() => '')
 
+  let csrfReady = null
+  async function getCsrfToken() {
+    const fromCookie = readCsrfCookie()
+    if (fromCookie) return fromCookie
+    if (!csrfReady) {
+      csrfReady = fetch('/api/auth/csrf', { credentials: 'same-origin', cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => readCsrfCookie() || j?.token || '')
+        .catch(() => '')
+        .finally(() => {
+          csrfReady = null
+        })
+    }
+    return csrfReady
+  }
+
+  function startsWithSegment(pathname, segment) {
+    return pathname === segment || pathname.startsWith(`${segment}/`)
+  }
+
+  function needsCsrf(input, init) {
+    const method = String(init?.method || (typeof input !== 'string' ? input.method : '') || 'GET').toUpperCase()
+    if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return false
+    try {
+      const url = new URL(typeof input === 'string' ? input : input.url, location.href)
+      if (url.origin !== location.origin || csrfExemptPaths.has(url.pathname)) return false
+      return startsWithSegment(url.pathname, '/post') || startsWithSegment(url.pathname, '/data') || startsWithSegment(url.pathname, '/api')
+    } catch (_) {
+      return false
+    }
+  }
+
   const originalFetch = window.fetch.bind(window)
   window.fetch = async function (input, init = {}) {
-    if (!isProtectedPath(input)) return originalFetch(input, init)
-    const bridgeToken = token || (await ready)
-    if (!bridgeToken) return originalFetch(input, init)
     const headers = new Headers(init.headers || (typeof input !== 'string' ? input.headers : undefined))
-    if (!headers.has(header)) headers.set(header, bridgeToken)
+    if (needsCsrf(input, init) && !headers.has(csrfHeader) && !headers.has('Authorization')) {
+      const csrfToken = await getCsrfToken()
+      if (csrfToken) headers.set(csrfHeader, csrfToken)
+    }
+    if (!isProtectedPath(input)) return originalFetch(input, { ...init, headers })
+    const bridgeToken = token || (await ready)
+    if (bridgeToken && !headers.has(header)) headers.set(header, bridgeToken)
     return originalFetch(input, { ...init, headers })
   }
 
