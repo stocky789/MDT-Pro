@@ -584,8 +584,13 @@ namespace MDTPro.Data {
             if (!string.IsNullOrWhiteSpace(res))
                 Warrants.Add(new WarrantCharge { Name = res.Trim(), Severity = "Misdemeanor", IssuedAtUtc = DateTime.UtcNow.ToString("o") });
             else
-                Warrants.AddRange(WarrantBackstoryHelper.BuildActiveWarrants());
+                Warrants.AddRange(WarrantBackstoryHelper.BuildActiveWarrants(BuildWarrantSeedKey()));
             SyncWarrantTextFromActiveWarrants();
+        }
+
+        string BuildWarrantSeedKey() {
+            return string.Join("|", new[] { Name, FirstName, LastName, Birthday, Address, ModelName, ModelHash == 0 ? null : ModelHash.ToString(CultureInfo.InvariantCulture) }
+                .Where(v => !string.IsNullOrWhiteSpace(v)));
         }
 
         internal void SyncWarrantTextFromActiveWarrants() {
@@ -595,8 +600,7 @@ namespace MDTPro.Data {
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             if (names.Count == 0) return;
-            if (string.IsNullOrWhiteSpace(WarrantText))
-                WarrantText = string.Join("; ", names);
+            WarrantText = string.Join("; ", names);
         }
 
         internal static List<WarrantCharge> CloneWarrantList(IReadOnlyList<WarrantCharge> src) {

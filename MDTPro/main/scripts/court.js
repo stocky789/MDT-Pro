@@ -1043,23 +1043,14 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
   inputWrapper.appendChild(
     createSectionHeader(language.court.sectionDisposition || "Disposition"),
   );
-  let custodyCreditInput = null;
   if (courtCase.Status === 0 && !isSyntheticPriorCase) {
     const creditWrapper = document.createElement("div");
     creditWrapper.appendChild(
       createLabel(language.court.custodyCredits || "Custody Credits"),
     );
-    custodyCreditInput = document.createElement("input");
-    custodyCreditInput.type = "number";
-    custodyCreditInput.min = "0";
-    custodyCreditInput.step = "1";
-    const credits = Array.isArray(courtCase.CustodyCredits)
-      ? courtCase.CustodyCredits
-      : [];
-    custodyCreditInput.value = String(
-      credits.reduce((sum, c) => sum + Math.max(0, Number(c?.ActualDays ?? c?.TotalDays ?? 0) || 0), 0),
+    creditWrapper.appendChild(
+      createReadOnlyInput(language.court.custodyCreditsCourtCalculated || "Calculated by the court at resolution"),
     );
-    creditWrapper.appendChild(custodyCreditInput);
     inputWrapper.appendChild(creditWrapper);
   }
 
@@ -1190,7 +1181,6 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
             JuryVotesForConviction: courtCase.JuryVotesForConviction,
             JuryVotesForAcquittal: courtCase.JuryVotesForAcquittal,
             HasPublicDefender: courtCase.HasPublicDefender,
-            CustodyCredits: buildCustodyCreditsPayload(custodyCreditInput),
             OutcomeNotes: notesInput.value,
             OutcomeReasoning: courtCase.OutcomeReasoning || "",
           }),
@@ -1199,7 +1189,6 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
       if (response === "OK") {
         courtCase.Plea = pleaSelect.value;
         courtCase.OutcomeNotes = notesInput.value;
-        courtCase.CustodyCredits = buildCustodyCreditsPayload(custodyCreditInput);
         topWindow.showNotification(
           language.court.saveCaseSuccess || "Case updated.",
           "success",
@@ -1229,7 +1218,6 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
           body: JSON.stringify({
             Number: courtCase.Number,
             Plea: pleaSelect.value,
-            CustodyCredits: buildCustodyCreditsPayload(custodyCreditInput),
             OutcomeNotes: notesInput.value,
           }),
         });
@@ -1374,22 +1362,6 @@ function createLabel(text) {
   const label = document.createElement("label");
   label.textContent = text ?? "";
   return label;
-}
-
-function buildCustodyCreditsPayload(input) {
-  if (!input) return [];
-  const days = Math.max(0, Math.floor(Number(input.value) || 0));
-  if (days <= 0) return [];
-  return [
-    {
-      Type: "Presentence",
-      ActualDays: days,
-      ConductDays: 0,
-      TotalDays: days,
-      Source: "Court clerk",
-      Notes: "",
-    },
-  ];
 }
 
 async function appendSentenceBreakdown(parent, courtCase, language) {

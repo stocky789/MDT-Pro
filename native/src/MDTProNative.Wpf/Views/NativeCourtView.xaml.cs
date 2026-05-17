@@ -953,14 +953,8 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
         sp.Children.Add(pleaCb);
 
         sp.Children.Add(FieldLabelRow("Custody credits"));
-        var creditsTb = new TextBox
-        {
-            Text = InitialCustodyCreditDays(c).ToString(CultureInfo.InvariantCulture),
-            Style = (Style)FindResource("CadTextBoxCadField"),
-            Margin = new Thickness(0, 4, 0, 8),
-            ToolTip = "Presentence custody days to apply at sentencing."
-        };
-        sp.Children.Add(creditsTb);
+        sp.Children.Add(Muted(CustodyCreditDisplayText(c)));
+
 
         sp.Children.Add(FieldLabelRow("Outcome notes"));
         var notesTb = new TextBox
@@ -1014,7 +1008,6 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
             ["Number"] = num,
             ["Status"] = newStatus,
             ["Plea"] = pleaCb.SelectedItem as string ?? pleaOptions[0],
-            ["CustodyCredits"] = BuildCustodyCreditsPayload(creditsTb.Text),
             ["OutcomeNotes"] = notesTb.Text ?? "",
             ["OutcomeReasoning"] = c["OutcomeReasoning"]?.ToString() ?? "",
             ["IsJuryTrial"] = c["IsJuryTrial"],
@@ -1119,29 +1112,13 @@ public partial class NativeCourtView : UserControl, IMdtBoundView
         };
     }
 
-    static int InitialCustodyCreditDays(JObject c)
+    static string CustodyCreditDisplayText(JObject c)
     {
-        if (c["CustodyCredits"] is not JArray credits) return 0;
+        if (c["CustodyCredits"] is not JArray credits) return "Calculated by the court at resolution.";
         var total = 0;
         foreach (var item in credits.OfType<JObject>())
-            total += Math.Max(0, item.Value<int?>("ActualDays") ?? item.Value<int?>("TotalDays") ?? 0);
-        return total;
-    }
-
-    static JArray BuildCustodyCreditsPayload(string text)
-    {
-        var arr = new JArray();
-        if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var days) || days <= 0) return arr;
-        arr.Add(new JObject
-        {
-            ["Type"] = "Presentence",
-            ["ActualDays"] = days,
-            ["ConductDays"] = 0,
-            ["TotalDays"] = days,
-            ["Source"] = "Court clerk",
-            ["Notes"] = ""
-        });
-        return arr;
+            total += Math.Max(0, item.Value<int?>("TotalDays") ?? item.Value<int?>("ActualDays") ?? 0);
+        return total > 0 ? $"{NativeCourtFormatting.FormatDaysToYmd(total)} credited by the court." : "Calculated by the court at resolution.";
     }
 
     TextBlock FieldLabelRow(string s) => new()

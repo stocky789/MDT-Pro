@@ -216,6 +216,7 @@ namespace MDTPro.Data {
             if (stpStops && !ped.LicenseExpirationVerifiedFromLiveDocument)
                 licenseExpirationForCloud = "Error";
 
+            var warrants = BuildPedWarrantsCloudArray(ped);
             var payload = new Newtonsoft.Json.Linq.JObject {
                 ["name"] = ped.Name,
                 ["firstName"] = ped.FirstName,
@@ -227,6 +228,8 @@ namespace MDTPro.Data {
                 ["modelName"] = ped.ModelName,
                 ["sourceInstallId"] = installId,
                 ["identificationHistory"] = identificationHistory,
+                ["warrants"] = warrants,
+                ["Warrants"] = warrants.DeepClone(),
                 ["payload"] = Newtonsoft.Json.Linq.JObject.FromObject(new {
                     ped.Name,
                     ped.FirstName,
@@ -240,6 +243,7 @@ namespace MDTPro.Data {
                     ped.AdvisoryText,
                     ped.IsWanted,
                     ped.WarrantText,
+                    Warrants = warrants.DeepClone(),
                     ped.IsOnProbation,
                     ped.IsOnParole,
                     ped.LicenseStatus,
@@ -264,6 +268,24 @@ namespace MDTPro.Data {
             return payload;
         }
 
+        private static Newtonsoft.Json.Linq.JArray BuildPedWarrantsCloudArray(MDTProPedData ped) {
+            var arr = new Newtonsoft.Json.Linq.JArray();
+            if (ped?.Warrants == null) return arr;
+            foreach (var w in ped.Warrants) {
+                if (w == null || string.IsNullOrWhiteSpace(w.Name)) continue;
+                var o = new Newtonsoft.Json.Linq.JObject {
+                    ["name"] = w.Name,
+                    ["severity"] = string.IsNullOrWhiteSpace(w.Severity) ? "Misdemeanor" : w.Severity,
+                    ["issuedAtUtc"] = string.IsNullOrWhiteSpace(w.IssuedAtUtc) ? DateTime.UtcNow.ToString("o") : w.IssuedAtUtc
+                };
+                if (!string.IsNullOrWhiteSpace(w.ClearedAtUtc)) o["clearedAtUtc"] = w.ClearedAtUtc;
+                if (!string.IsNullOrWhiteSpace(w.ClearedByReportType)) o["clearedByReportType"] = w.ClearedByReportType;
+                if (!string.IsNullOrWhiteSpace(w.ClearedByReportId)) o["clearedByReportId"] = w.ClearedByReportId;
+                arr.Add(o);
+            }
+            return arr;
+        }
+
         private static string BuildPedCloudIdempotencyKey(MDTProPedData ped) {
             string latestIdentification = "noid";
             try {
@@ -277,7 +299,14 @@ namespace MDTPro.Data {
                 StableCloudKeyPart(ped.WeaponPermitStatus),
                 StableCloudKeyPart(ped.WeaponPermitExpiration),
                 StableCloudKeyPart(ped.WeaponPermitType));
-            return $"person:{StableCloudKeyPart(ped.Name)}:{StableCloudKeyPart(ped.Birthday)}:{StableCloudKeyPart(ped.Address)}:{latestIdentification}:{documentState}:upsert";
+            string warrantState = string.Join("|", (ped.Warrants ?? new List<WarrantCharge>())
+                .Where(w => w != null)
+                .Select(w => string.Join(":",
+                    StableCloudKeyPart(w.Name),
+                    StableCloudKeyPart(w.Severity),
+                    StableCloudKeyPart(w.IssuedAtUtc),
+                    StableCloudKeyPart(w.ClearedAtUtc))));
+            return $"person:{StableCloudKeyPart(ped.Name)}:{StableCloudKeyPart(ped.Birthday)}:{StableCloudKeyPart(ped.Address)}:{latestIdentification}:{documentState}:{StableCloudKeyPart(ped.IsWanted.ToString())}:{StableCloudKeyPart(warrantState)}:upsert";
         }
 
         private static Newtonsoft.Json.Linq.JObject BuildVehicleCloudPayload(MDTProVehicleData vehicle) {
@@ -2399,17 +2428,17 @@ namespace MDTPro.Data {
             lock (dbLock) {
                 if (connection == null) return null;
                 using (var cmd = new SQLiteCommand(@"
-                    SELECT Damage, ArmourDamage, WeaponType, WeaponGroup, BodyRegion, VictimAlive, AtUtc 
-                    FROM damage_cache 
-                    WHERE VictimName = @name 
-                    ORDER BY 
-                        CASE WHEN UPPER(COALESCE(WeaponGroup,'')) LIKE '%BULLET%' 
-                                  OR UPPER(COALESCE(WeaponType,'')) LIKE '%PISTOL%' 
+                    SELECT Damage, ArmourDamage, WeaponType, WeaponGroup, BodyRegion, VictimAlive, AtUtc
+                    FROM damage_cache
+                    WHERE VictimName = @name
+                    ORDER BY
+                        CASE WHEN UPPER(COALESCE(WeaponGroup,'')) LIKE '%BULLET%'
+                                  OR UPPER(COALESCE(WeaponType,'')) LIKE '%PISTOL%'
                                   OR UPPER(COALESCE(WeaponType,'')) LIKE '%RIFLE%'
                                   OR UPPER(COALESCE(WeaponType,'')) LIKE '%GUN%'
                                   OR UPPER(COALESCE(WeaponType,'')) LIKE '%SHOTGUN%'
                              THEN 0 ELSE 1 END,
-                        AtUtc DESC 
+                        AtUtc DESC
                     LIMIT 1", connection)) {
                     cmd.Parameters.AddWithValue("@name", victimName);
                     using (var reader = cmd.ExecuteReader()) {

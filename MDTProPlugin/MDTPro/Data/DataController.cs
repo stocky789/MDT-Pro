@@ -1984,13 +1984,41 @@ namespace MDTPro.Data
             string sf = persistedRow.FishingPermitStatus;
             string sh = persistedRow.HuntingPermitStatus;
             int persistedTimes = persistedRow.TimesStopped;
+            var persistedActiveWarrants = persistedRow.HasActiveWarrants()
+                ? MDTProPedData.CloneWarrantList(persistedRow.Warrants?.Where(w => w != null && w.IsActive).ToList())
+                : null;
             persistedRow.CopyCdfMirroredDisplayFieldsFrom(liveRead);
+            if (persistedActiveWarrants != null && persistedActiveWarrants.Count > 0)
+            {
+                persistedRow.Warrants = persistedActiveWarrants;
+                persistedRow.IsWanted = true;
+                persistedRow.SyncWarrantTextFromActiveWarrants();
+            }
             NormalizeStopThePedLicenseExpirationFromBirthdayAndCdfYear(persistedRow, liveRead);
             persistedRow.TimesStopped = Math.Max(liveRead.TimesStopped, persistedTimes);
             if (IsCourtRevokedDriverLicense(sl)) persistedRow.LicenseStatus = sl;
             if (IsCourtRevokedDocumentStatus(sw)) persistedRow.WeaponPermitStatus = sw;
             if (IsCourtRevokedDocumentStatus(sf)) persistedRow.FishingPermitStatus = sf;
             if (IsCourtRevokedDocumentStatus(sh)) persistedRow.HuntingPermitStatus = sh;
+        }
+
+        private static void ApplyWantedAndWarrantsFromLiveSnapshot(MDTProPedData target, MDTProPedData liveRead)
+        {
+            if (target == null || liveRead == null) return;
+            if (target.HasActiveWarrants())
+            {
+                target.IsWanted = true;
+                target.SyncWarrantTextFromActiveWarrants();
+                return;
+            }
+            target.IsWanted = liveRead.IsWanted;
+            target.WarrantText = liveRead.WarrantText;
+            target.Warrants = MDTProPedData.CloneWarrantList(liveRead.Warrants);
+            if (target.HasActiveWarrants())
+            {
+                target.IsWanted = true;
+                target.SyncWarrantTextFromActiveWarrants();
+            }
         }
 
         private static bool SamePedDocumentFields(MDTProPedData a, MDTProPedData b)
@@ -2718,12 +2746,15 @@ namespace MDTPro.Data
                 if (ourPed == null) return;
                 bool cdfWanted = cdf.Wanted;
                 string cdfWarrant = cdfWanted ? CdfWarrantTextResolver.TryResolveWarrantText(cdf, ped) : null;
-                ourPed.IsWanted = cdfWanted;
-                ourPed.WarrantText = cdfWarrant;
                 if (ourPed.HasActiveWarrants())
                 {
                     ourPed.IsWanted = true;
                     ourPed.SyncWarrantTextFromActiveWarrants();
+                }
+                else
+                {
+                    ourPed.IsWanted = cdfWanted;
+                    ourPed.WarrantText = cdfWarrant;
                 }
                 ourPed.IsOnProbation = cdf.IsOnProbation;
                 ourPed.IsOnParole = cdf.IsOnParole;
@@ -3776,8 +3807,7 @@ namespace MDTPro.Data
                     ReconcilePedCdfBackedFieldsWithLiveSnapshot(existingPed, liveSnapshot);
                 else
                 {
-                    existingPed.IsWanted = liveSnapshot.IsWanted;
-                    existingPed.WarrantText = liveSnapshot.WarrantText;
+                    ApplyWantedAndWarrantsFromLiveSnapshot(existingPed, liveSnapshot);
                     existingPed.IsOnProbation = liveSnapshot.IsOnProbation;
                     existingPed.IsOnParole = liveSnapshot.IsOnParole;
                     existingPed.LicenseStatus = liveSnapshot.LicenseStatus;
@@ -3880,8 +3910,7 @@ namespace MDTPro.Data
                         ReconcilePedCdfBackedFieldsWithLiveSnapshot(existingPed, mdtProPedData);
                     else
                     {
-                        existingPed.IsWanted = mdtProPedData.IsWanted;
-                        existingPed.WarrantText = mdtProPedData.WarrantText;
+                        ApplyWantedAndWarrantsFromLiveSnapshot(existingPed, mdtProPedData);
                         existingPed.IsOnProbation = mdtProPedData.IsOnProbation;
                         existingPed.IsOnParole = mdtProPedData.IsOnParole;
                         if (mdtProPedData.ModelHash != 0) existingPed.ModelHash = mdtProPedData.ModelHash;
@@ -5531,45 +5560,50 @@ namespace MDTPro.Data
 
         private static void NormalizeCustodyCredits(CourtData courtData, Config config, int grossDays)
         {
-            if (courtData.CustodyCredits == null)
-                courtData.CustodyCredits = new List<CourtData.CustodyCredit>();
             var normalized = new List<CourtData.CustodyCredit>();
-            foreach (var credit in courtData.CustodyCredits)
-            {
-                if (credit == null) continue;
-                if (string.IsNullOrWhiteSpace(credit.Type)) credit.Type = "Manual";
-                credit.ActualDays = Math.Max(0, credit.ActualDays);
-                credit.ConductDays = Math.Max(0, credit.ConductDays);
-                if (credit.TotalDays <= 0)
-                {
-                    if (string.Equals(credit.Type, "Conduct", StringComparison.OrdinalIgnoreCase) && credit.ActualDays > 0 && credit.ConductDays == 0)
-                    {
-                        credit.ConductDays = credit.ActualDays;
-                        credit.ActualDays = 0;
-                    }
-                    if (string.Equals(credit.Type, "Presentence", StringComparison.OrdinalIgnoreCase) && credit.ActualDays > 0 && credit.ConductDays == 0)
-                        credit.ConductDays = (int)Math.Floor(credit.ActualDays * Math.Max(0f, config.courtConductCreditRatio));
-                    credit.TotalDays = credit.ActualDays + credit.ConductDays;
-                }
-                if (credit.TotalDays > 0) normalized.Add(credit);
-            }
 
-            if (normalized.Count == 0 && grossDays > 0 && config.courtPresentenceCreditEnabled && config.courtDefaultBookingCreditDays > 0)
+            if (grossDays > 0 && config.courtPresentenceCreditEnabled && config.courtDefaultBookingCreditDays > 0)
             {
-                int actual = config.courtDefaultBookingCreditDays;
-                int conduct = (int)Math.Floor(actual * Math.Max(0f, config.courtConductCreditRatio));
-                normalized.Add(new CourtData.CustodyCredit
+                int actual = EstimateCourtCustodyCreditActualDays(courtData, config);
+                if (actual > 0)
                 {
-                    Type = "Presentence",
-                    ActualDays = actual,
-                    ConductDays = conduct,
-                    TotalDays = actual + conduct,
-                    Source = "Booking",
-                    Notes = "Default booking/presentence custody credit."
-                });
+                    int conduct = (int)Math.Floor(actual * Math.Max(0f, config.courtConductCreditRatio));
+                    normalized.Add(new CourtData.CustodyCredit
+                    {
+                        Type = "Presentence",
+                        ActualDays = actual,
+                        ConductDays = conduct,
+                        TotalDays = actual + conduct,
+                        Source = "Court",
+                        Notes = "Court-calculated presentence credit based on booking policy, severity, plea, supervision, and case complexity."
+                    });
+                }
             }
 
             courtData.CustodyCredits = normalized;
+        }
+
+        private static int EstimateCourtCustodyCreditActualDays(CourtData courtData, Config config)
+        {
+            int actual = Math.Max(0, config.courtDefaultBookingCreditDays);
+            int severity = Math.Max(0, courtData?.SeverityScore ?? 0);
+            int repeatScore = Math.Max(0, courtData?.RepeatOffenderScore ?? 0);
+            bool supervisionViolation = courtData?.EvidenceViolatedSupervision == true || (courtData?.ActiveSupervisionAtOffense != null && courtData.ActiveSupervisionAtOffense.Count > 0);
+            bool juryTrial = courtData?.IsJuryTrial == true;
+            bool publicDefender = courtData?.HasPublicDefender == true;
+            string plea = courtData?.Plea ?? "";
+
+            if (severity >= 8) actual += 1;
+            if (severity >= 16) actual += 1;
+            if (severity >= 24) actual += 1;
+            if (repeatScore >= 6) actual += 1;
+            if (supervisionViolation) actual += 1;
+            if (juryTrial) actual += 1;
+            if (publicDefender && severity >= 12) actual += 1;
+            if (string.Equals(plea, "Guilty", StringComparison.OrdinalIgnoreCase) || string.Equals(plea, "No Contest", StringComparison.OrdinalIgnoreCase))
+                actual = Math.Max(Math.Max(0, config.courtDefaultBookingCreditDays), actual - 1);
+
+            return Math.Min(Math.Max(actual, 0), 30);
         }
 
         private static CourtData.SupervisionOrderData BuildSupervisionOrder(CourtData courtData, string type, string status, DateTime start, DateTime end, DateTime? custodyRelease, DateTime? paroleEligible, string notes)
@@ -6229,7 +6263,7 @@ namespace MDTPro.Data
             if (juryVotesForConviction.HasValue) courtCase.JuryVotesForConviction = Math.Max(0, juryVotesForConviction.Value);
             if (juryVotesForAcquittal.HasValue) courtCase.JuryVotesForAcquittal = Math.Max(0, juryVotesForAcquittal.Value);
             if (hasPublicDefender.HasValue) courtCase.HasPublicDefender = hasPublicDefender.Value;
-            if (custodyCredits != null) courtCase.CustodyCredits = custodyCredits;
+            if (status == 0) courtCase.CustodyCredits = new List<CourtData.CustodyCredit>();
             if (outcomeNotes != null) courtCase.OutcomeNotes = outcomeNotes;
             if (outcomeReasoning != null) courtCase.OutcomeReasoning = outcomeReasoning;
 
@@ -10479,7 +10513,7 @@ namespace MDTPro.Data
                     _resolvingCourtCaseNumbers.Add(courtCase.Number);
                 if (!string.IsNullOrWhiteSpace(plea)) courtCase.Plea = plea;
                 if (outcomeNotes != null) courtCase.OutcomeNotes = outcomeNotes;
-                if (custodyCredits != null) courtCase.CustodyCredits = custodyCredits;
+                courtCase.CustodyCredits = new List<CourtData.CustodyCredit>();
             }
 
             try
