@@ -40,6 +40,9 @@ x86/
 *.VC.db
 *.VC.VC.opendb
 
+# Local-only export helper for mirroring MDT-Cloud into the public MDT-Pro repo.
+scripts/export-mdt-pro.local.sh
+
 # Ped catalogue fetch log (regenerate with scripts/fetchPedCatalogueImages.mjs)
 scripts/pedCatalogue_fetch_failures.txt
 

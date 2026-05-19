@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MDT Pro user guide</title>
+    <meta
+      name="description"
+      content="Install, set up, and troubleshoot MDT Pro for LSPDFR. Covers local mode, MDT Cloud, Policing Redefined, StopThePed, reports, ALPR, wallpapers, and common questions."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="siteHeader">
+      <a class="brand" href="#top" aria-label="MDT Pro docs home">
+        <span class="brandMark">MDT</span>
+        <span>
+          <strong>MDT Pro</strong>
+          <small>user guide</small>
+        </span>
+      </a>
+      <nav class="topNav" aria-label="Main navigation">
+        <a href="#install">Install</a>
+        <a href="#cloud-local">Cloud vs local</a>
+        <a href="#features">Features</a>
+        <a href="#faq">FAQ</a>
+        <a href="#troubleshooting">Troubleshooting</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="heroCopy">
+          <p class="eyebrow">LSPDFR police computer</p>
+          <h1>Set up MDT Pro without the guesswork.</h1>
+          <p class="lede">
+            MDT Pro starts a local police computer when you go on duty with LSPDFR. Use it in a browser,
+            Steam overlay, another device on your network, or the optional native Windows app. MDT Cloud is available
+            too, but it has stricter requirements than the local MDT.
+          </p>
+          <div class="heroActions">
+            <a class="button primary" href="#install">Start with installation</a>
+            <a class="button" href="#faq">Read the FAQ</a>
+          </div>
+        </div>
+        <figure class="heroShot">
+          <img src="assets/screenshots/mdt-dashboard.png" alt="MDT Pro dashboard with quick actions and navigation" />
+          <figcaption>The local MDT opens after you go on duty and the plugin starts its web server.</figcaption>
+        </figure>
+      </section>
+
+      <section class="notice">
+        <h2>Short version</h2>
+        <ul>
+          <li>Install LSPDFR, RagePluginHook, and CommonDataFramework. CDF is required for every setup.</li>
+          <li>Pick one local integration stack: Policing Redefined, or StopThePed plus Ultimate Backup.</li>
+          <li>Use MDT Cloud only if you have an account and you are running Policing Redefined.</li>
+          <li>Do not mix Policing Redefined with StopThePed and Ultimate Backup unless you know exactly why you are doing it.</li>
+        </ul>
+      </section>
+
+      <section id="install" class="section">
+        <div class="sectionIntro">
+          <p class="eyebrow">Installation</p>
+          <h2>Install the mod with the folder layout intact</h2>
+          <p>
+            Use the OpenIV package from the release if you can. Manual installs work too, but most broken setups come
+            from files landing in the wrong folder.
+          </p>
+        </div>
+
+        <div class="grid two">
+          <article class="card">
+            <h3>External mods you install yourself</h3>
+            <ul class="checklist">
+              <li>LSPDFR and RagePluginHook</li>
+              <li>CommonDataFramework (CDF)</li>
+              <li>Policing Redefined, or StopThePed plus Ultimate Backup</li>
+              <li>Callout Interface if you want live Active Call details</li>
+            </ul>
+            <p class="fineprint">
+              MDT Pro ships its support DLLs, but it does not install LSPDFR, CDF, Policing Redefined, StopThePed,
+              Ultimate Backup, or the Callout Interface plugin for you.
+            </p>
+          </article>
+
+          <article class="card">
+            <h3>Files the MDT Pro release provides</h3>
+            <pre><code>plugins/LSPDFR/MDTPro.dll
+plugins/LSPDFR/CalloutInterfaceAPI.dll
+plugins/LSPDFR/Newtonsoft.Json.dll
+plugins/LSPDFR/LemonUI.RagePluginHook.dll
+System.Data.SQLite.dll
+x64/SQLite.Interop.dll
+MDTPro/
+MDTProNative/</code></pre>
+            <p class="fineprint">
+              SQLite is fussy. <code>System.Data.SQLite.dll</code> belongs in the GTA V root folder, beside
+              <code>GTA5.exe</code>. Do not leave it only under <code>plugins/LSPDFR</code>.
+            </p>
+          </article>
+        </div>
+
+        <div class="steps">
+          <h3>First launch</h3>
+          <ol>
+            <li>Start GTA V through RagePluginHook.</li>
+            <li>Go on duty with LSPDFR.</li>
+            <li>Watch for the MDT Pro address notification. The default address is usually <code>http://127.0.0.1:9000</code>.</li>
+            <li>Open that address in Chrome, Edge, Brave, the Steam overlay, or the native Windows MDT.</li>
+            <li>If you miss the notification, check <code>MDTPro/ipAddresses.txt</code>.</li>
+          </ol>
+        </div>
+      </section>
+
+      <section id="cloud-local" class="section tinted">
+        <div class="sectionIntro">
+          <p class="eyebrow">Cloud vs local</p>
+          <h2>You do not need MDT Cloud to use MDT Pro</h2>
+          <p>
+            The local MDT is the normal in-game workflow. MDT Cloud is an account-based sync and hosted MDT option.
+            Treat them as two different modes, not the same feature with two names.
+          </p>
+        </div>
+
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Mode</th>
+                <th>Needs an account?</th>
+                <th>Policing Redefined</th>
+                <th>StopThePed + Ultimate Backup</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Local browser/native MDT</td>
+                <td>No</td>
+                <td>Supported</td>
+                <td>Supported</td>
+              </tr>
+              <tr>
+                <td>MDT Cloud login</td>
+                <td>Yes, at <a href="https://mdt.stockhosting.com.au">mdt.stockhosting.com.au</a></td>
+                <td>Supported</td>
+                <td>Not currently supported</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          In code, local mode is the default <code>storageMode</code>. Cloud mode keeps the game/CDF integration on the
+          plugin side but syncs persistent records through the hosted API. That is why Cloud support is stricter.
+        </p>
+      </section>
+
+      <section id="integrations" class="section">
+        <div class="sectionIntro">
+          <p class="eyebrow">Integrations</p>
+          <h2>Pick the stack that matches how you play</h2>
+        </div>
+
+        <div class="grid three">
+          <article class="card">
+            <h3>CommonDataFramework</h3>
+            <p>
+              Required. MDT Pro uses CDF for person and vehicle data. If CDF is missing, installed badly, or fails to
+              initialise, the MDT will not behave correctly.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Policing Redefined</h3>
+            <p>
+              Best supported for the full MDT Pro experience. Use this if you want MDT Cloud login and the cleanest
+              citation/search integration path.
+            </p>
+          </article>
+          <article class="card">
+            <h3>StopThePed + Ultimate Backup</h3>
+            <p>
+              Supported for local MDT use. StopThePed does not expose every action through a public plugin API, so some
+              handoffs are handled inside MDT Pro instead of being pushed directly into StopThePed.
+            </p>
+          </article>
+        </div>
+
+        <div class="callout">
+          <h3>Active Call depends on external callout data</h3>
+          <p>
+            The Active Call page can show callout information when LSPDFR and Callout Interface expose a usable callout
+            handle. It will not be reliable for every callout pack. If the handle cannot be resolved, MDT Pro cannot
+            invent the missing callout details.
+          </p>
+        </div>
+      </section>
+
+      <section id="features" class="section">
+        <div class="sectionIntro">
+          <p class="eyebrow">Common workflows</p>
+          <h2>The bits people usually ask about</h2>
+        </div>
+
+        <div class="featureBlock">
+          <div>
+            <h3>Reports and printing</h3>
+            <p>
+              Reports live under the Reports page. You can create incident, citation, arrest, impound, traffic incident,
+              injury, and property/evidence reports. The report document view includes a <strong>Print / Save as PDF</strong>
+              button in the browser where the report layout supports it. That button calls the browser print dialog,
+              so PDF export depends on your browser or Windows print setup.
+            </p>
+          </div>
+          <figure>
+            <img src="assets/screenshots/reports-menu.png" alt="Reports page with the new report menu open" />
+            <figcaption>The Reports page separates report types instead of hiding everything behind one form.</figcaption>
+          </figure>
+        </div>
+
+        <div class="featureBlock flip">
+          <div>
+            <h3>Custom wallpaper</h3>
+            <p>
+              Open <strong>Settings</strong>, then <strong>Config and Plugins</strong>. Enable the Custom Wallpaper plugin on
+              the Plugins tab, then switch to Config. The Desktop wallpaper block accepts PNG and JPEG files. Choose an
+              image, click <strong>Apply</strong>, then refresh or reopen the main MDT window if it was already open.
+            </p>
+            <p>
+              Use <strong>Use default</strong> to remove your custom image. The wallpaper image is stored by MDT Pro and
+              reapplies when the MDT opens again.
+            </p>
+          </div>
+          <figure>
+            <img src="assets/screenshots/custom-wallpaper-config.png" alt="Config page showing the Desktop wallpaper block" />
+            <figcaption>The wallpaper controls appear in Config after the Custom Wallpaper plugin is enabled.</figcaption>
+          </figure>
+        </div>
+
+        <div class="featureBlock">
+          <div>
+            <h3>ALPR alerts</h3>
+            <p>
+              ALPR highlights vehicles with serious flags, BOLOs, stolen status, or paperwork problems pulled from the
+              vehicle/person data MDT Pro can see. A red plate is not always a bug. It usually means the record has a
+              condition worth checking before you clear the stop.
+            </p>
+            <p>
+              If ALPR feels too noisy, include your MDT Pro version, Policing Redefined/CDF version, and ALPR config when
+              reporting it. Without those details, it is hard to tell bad tuning from bad source data.
+            </p>
+          </div>
+          <figure>
+            <img src="assets/screenshots/vehicle-search-flagged.png" alt="Vehicle Search showing a flagged nearby vehicle" />
+            <figcaption>A red nearby vehicle entry means MDT Pro has flagged that plate or vehicle record.</figcaption>
+          </figure>
+        </div>
+
+        <div class="featureBlock flip">
+          <div>
+            <h3>Plugins and config</h3>
+            <p>
+              The Config and Plugins screen is where you enable plugins, change the HTTP port, choose integration providers,
+              tune game work mode, and adjust display/report/court options. If you change the port, update any browser,
+              Steam overlay, or second-device bookmark that points at the MDT.
+            </p>
+          </div>
+          <figure>
+            <img src="assets/screenshots/plugins-page.png" alt="Config and Plugins page showing installed plugins" />
+            <figcaption>Plugins load on the main MDT page after they are enabled. Refresh the MDT after changing plugin state.</figcaption>
+          </figure>
+        </div>
+
+        <article class="card wide">
+          <h3>Language and localisation</h3>
+          <p>
+            MDT Pro creates <code>MDTPro/language.json</code> the first time it needs one. You can edit that file to change
+            labels and messages. The plugin reads it back on load and fills in missing defaults when new fields are added
+            in later versions.
+          </p>
+          <p>
+            Keep a backup before editing. If the file becomes messy, close the game, rename or delete
+            <code>MDTPro/language.json</code>, then let MDT Pro generate a fresh one on next load.
+          </p>
+        </article>
+      </section>
+
+      <section id="faq" class="section tinted">
+        <div class="sectionIntro">
+          <p class="eyebrow">FAQ</p>
+          <h2>Answers to the questions that keep coming up</h2>
+        </div>
+
+        <div class="faqList">
+          <details open>
+            <summary>Do I need an MDT Cloud account?</summary>
+            <p>No. You only need an account if you want MDT Cloud login. The local browser/native MDT works without signing in.</p>
+          </details>
+
+          <details>
+            <summary>Can I use StopThePed?</summary>
+            <p>
+              Yes, for local MDT use. Pair StopThePed with Ultimate Backup. Do not expect MDT Cloud login to support that
+              stack right now.
+            </p>
+          </details>
+
+          <details>
+            <summary>Why does Cloud require Policing Redefined?</summary>
+            <p>
+              Cloud sync depends on a tighter set of game-context and data assumptions. Policing Redefined is the supported
+              Cloud path. StopThePed plus Ultimate Backup remains a local MDT path.
+            </p>
+          </details>
+
+          <details>
+            <summary>Why does Active Call show nothing?</summary>
+            <p>
+              Active Call relies on LSPDFR/Callout Interface exposing a callout that MDT Pro can resolve. Some callout packs
+              and API combinations do not expose enough data. Install Callout Interface if you want this page, but understand
+              that it is still limited by what the external callout stack provides.
+            </p>
+          </details>
+
+          <details>
+            <summary>How do I print a citation or report?</summary>
+            <p>
+              Open the saved report and use <strong>Print / Save as PDF</strong> if the document toolbar is shown. That opens
+              your browser print dialog. Pick a physical printer or "Save as PDF" from there.
+            </p>
+          </details>
+
+          <details>
+            <summary>Where is the MDT address?</summary>
+            <p>
+              MDT Pro shows it in-game when the server starts, unless that notification is disabled. It also writes addresses
+              to <code>MDTPro/ipAddresses.txt</code>. The default port is <code>9000</code>.
+            </p>
+          </details>
+
+          <details>
+            <summary>Can I open the MDT on my phone or another PC?</summary>
+            <p>
+              Usually, yes. Use the local network address from <code>MDTPro/ipAddresses.txt</code>. If the other device cannot
+              connect, add a Windows Firewall inbound rule for the MDT port on the game PC.
+            </p>
+          </details>
+
+          <details>
+            <summary>How do I reset MDT Pro?</summary>
+            <p>
+              Close the game first. To reset records, clear <code>MDTPro/data/</code>. To reset settings, delete
+              <code>MDTPro/config.json</code>. Keep backups if you care about your existing reports or records.
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <section id="troubleshooting" class="section">
+        <div class="sectionIntro">
+          <p class="eyebrow">Troubleshooting</p>
+          <h2>What to send when reporting a problem</h2>
+          <p>
+            "It doesn't work" is hard to fix. A short report with the right files usually gets an answer much faster.
+          </p>
+        </div>
+
+        <div class="grid two">
+          <article class="card">
+            <h3>Useful files</h3>
+            <ul>
+              <li><code>MDTPro/MDTPro.log</code></li>
+              <li><code>RAGEPluginHook.log</code> in your GTA V folder</li>
+              <li><code>MDTPro/config.json</code> if the issue is settings-related</li>
+              <li>A screenshot of your <code>plugins/LSPDFR</code> folder for install problems</li>
+            </ul>
+          </article>
+
+          <article class="card">
+            <h3>Version details</h3>
+            <ul>
+              <li>MDT Pro version</li>
+              <li>LSPDFR and RagePluginHook versions</li>
+              <li>CommonDataFramework version</li>
+              <li>Policing Redefined or StopThePed/Ultimate Backup versions</li>
+              <li>Callout pack name if the issue is callout-related</li>
+            </ul>
+          </article>
+        </div>
+
+        <div class="callout warning">
+          <h3>Do not paste private tokens</h3>
+          <p>
+            If you share logs or config publicly, remove account tokens, machine names, private IPs, and anything else you
+            do not want on the internet.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>MDT Pro documentation. Written for the public release.</p>
+      <a href="#top">Back to top</a>
+    </footer>
+  </body>
+</html>

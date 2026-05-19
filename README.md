@@ -139,6 +139,18 @@ Open **Settings** -> **Config and Plugins** from the Control Panel or browse to 
 From there you can change the port, clock mode, game time behavior, map options, window sizing, court
 settings, evidence weights, ALPR behavior, and plugin state. Settings are stored in `MDTPro/config.json`.
 
+### Custom Wallpaper
+
+To change the MDT desktop background:
+
+1. Open **Settings** -> **Config and Plugins**.
+2. Enable the **Custom Wallpaper** plugin.
+3. In the **Desktop wallpaper** section, choose a PNG or JPG image.
+4. Click **Apply**.
+5. Refresh or reopen the main MDT window if it was already open.
+
+Use **Use default** in the wallpaper section to remove your custom wallpaper.
+
 ## Plugins
 
 Plugins live in `MDTPro/plugins/`. Enable or disable them from **Config and Plugins**.
