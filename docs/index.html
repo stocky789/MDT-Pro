@@ -52,7 +52,7 @@
       <section class="notice">
         <h2>Short version</h2>
         <ul>
-          <li>Install LSPDFR, RagePluginHook, CommonDataFramework, and LemonUI. CDF and LemonUI are required for every setup.</li>
+          <li>Install LSPDFR, RagePluginHook, LemonUI, and one integration stack. LemonUI is required, and CDF is required too, but Policing Redefined already includes CDF.</li>
           <li>Pick one local integration stack: Policing Redefined, or StopThePed plus Ultimate Backup.</li>
           <li>Use MDT Cloud only if you have an account and you are running Policing Redefined.</li>
           <li>Do not mix Policing Redefined with StopThePed and Ultimate Backup unless you know exactly why you are doing it.</li>
@@ -78,21 +78,21 @@
                 and <a href="https://ragepluginhook.net/Downloads.aspx">RagePluginHook</a>
               </li>
               <li>
-                <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/35562-common-data-framework/">CommonDataFramework</a>
-                (CDF)
-              </li>
-              <li>
                 <a href="https://github.com/LemonUIbyLemon/LemonUI/releases/tag/v2.2">LemonUI v2.2</a>
                 for the in-game MDT Pro menus
               </li>
               <li>
-                <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/48038-policing-redefined/">Policing Redefined</a>,
-                or <a href="https://www.bejoijo.com/post/stop-the-ped">StopThePed</a> plus
+                <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/52191-policing-redefined/">Policing Redefined</a>
+                (includes CommonDataFramework), or <a href="https://www.bejoijo.com/post/stop-the-ped">StopThePed</a> plus
                 <a href="https://www.bejoijo.com/post/ultimate-backup">Ultimate Backup</a>
               </li>
               <li>
+                <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/35562-common-data-framework/">CommonDataFramework</a>
+                (CDF) separately if you are not using Policing Redefined
+              </li>
+              <li>
                 <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/37828-callout-interface/">Callout Interface</a>
-                if you want live Active Call details
+                (in development) for future live Active Call details
               </li>
             </ul>
             <p class="fineprint">
@@ -123,14 +123,14 @@ MDTProNative/</code></pre>
           <p>
             If you are setting up manually, grab the required pieces from their release pages:
             <a href="https://www.lcpdfr.com/downloads/gta5mods/g17media/7792-lspd-first-response/">LSPDFR</a>,
-            <a href="https://ragepluginhook.net/Downloads.aspx">RagePluginHook</a>,
-            <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/35562-common-data-framework/">CommonDataFramework</a>,
-            <a href="https://github.com/LemonUIbyLemon/LemonUI/releases/tag/v2.2">LemonUI v2.2</a>, and then either
-            <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/48038-policing-redefined/">Policing Redefined</a>
+            <a href="https://ragepluginhook.net/Downloads.aspx">RagePluginHook</a>, and
+            <a href="https://github.com/LemonUIbyLemon/LemonUI/releases/tag/v2.2">LemonUI v2.2</a>. Then choose either
+            <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/52191-policing-redefined/">Policing Redefined</a>
+            (includes <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/35562-common-data-framework/">CommonDataFramework</a>)
             or <a href="https://www.bejoijo.com/post/stop-the-ped">StopThePed</a> plus
-            <a href="https://www.bejoijo.com/post/ultimate-backup">Ultimate Backup</a>. Add
+            <a href="https://www.bejoijo.com/post/ultimate-backup">Ultimate Backup</a> with CommonDataFramework installed separately. The
             <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/37828-callout-interface/">Callout Interface</a>
-            if you want the Active Call page to receive live callout details.
+            integration is still in development.
           </p>
         </div>
 
@@ -200,10 +200,9 @@ MDTProNative/</code></pre>
           <article class="card">
             <h3>CommonDataFramework</h3>
             <p>
-              Required. MDT Pro uses <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/35562-common-data-framework/">CDF</a>
-              for person and vehicle data. If CDF is missing, installed badly, or fails to
-              initialise, the MDT may still open in your browser, but person lookups, plate lookups, IDs, reports, and
-              ALPR data can be empty or wrong.
+              Required for MDT Pro's person and vehicle data. <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/52191-policing-redefined/">Policing Redefined</a>
+              includes <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/35562-common-data-framework/">CDF</a>; if you use StopThePed plus Ultimate Backup instead, install CDF separately.
+              If CDF is missing, installed badly, or fails to initialise, searches, IDs, reports, and ALPR data can be empty or wrong.
             </p>
           </article>
           <article class="card">
@@ -216,7 +215,7 @@ MDTProNative/</code></pre>
           <article class="card">
             <h3>Policing Redefined</h3>
             <p>
-              <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/48038-policing-redefined/">Policing Redefined</a>
+              <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/52191-policing-redefined/">Policing Redefined</a>
               is best supported for the full MDT Pro experience. Use this if you want MDT Cloud login and the cleanest
               citation/search integration path.
             </p>
@@ -233,12 +232,11 @@ MDTProNative/</code></pre>
         </div>
 
         <div class="callout">
-          <h3>Active Call depends on external callout data</h3>
+          <h3>Active Call / Callout Interface integration is in development</h3>
           <p>
-            The Active Call page is still limited by LSPDFR,
-            <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/37828-callout-interface/">Callout Interface</a>,
-            and the callout pack you are using. Some callout setups do not provide enough reliable data for MDT Pro to
-            show the current call, so an empty Active Call page is not automatically an install mistake.
+            The <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/37828-callout-interface/">Callout Interface (in development)</a>
+            integration is in development and does not work yet. For now, an empty Active Call page is expected, even if
+            LSPDFR, Callout Interface, and your callout pack are installed.
           </p>
         </div>
       </section>
@@ -354,15 +352,15 @@ MDTProNative/</code></pre>
           <details>
             <summary>Where do I download the dependencies?</summary>
             <p>
-              Start with <a href="https://www.lcpdfr.com/downloads/gta5mods/g17media/7792-lspd-first-response/">LSPDFR</a>
-              and <a href="https://ragepluginhook.net/Downloads.aspx">RagePluginHook</a>, then install
-              <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/35562-common-data-framework/">CommonDataFramework</a>
-              and <a href="https://github.com/LemonUIbyLemon/LemonUI/releases/tag/v2.2">LemonUI v2.2</a>. After that,
-              choose either <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/48038-policing-redefined/">Policing Redefined</a>
+              Start with <a href="https://www.lcpdfr.com/downloads/gta5mods/g17media/7792-lspd-first-response/">LSPDFR</a>,
+              <a href="https://ragepluginhook.net/Downloads.aspx">RagePluginHook</a>, and
+              <a href="https://github.com/LemonUIbyLemon/LemonUI/releases/tag/v2.2">LemonUI v2.2</a>. After that,
+              choose either <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/52191-policing-redefined/">Policing Redefined</a>
+              (includes <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/35562-common-data-framework/">CommonDataFramework</a>)
               or <a href="https://www.bejoijo.com/post/stop-the-ped">StopThePed</a> plus
-              <a href="https://www.bejoijo.com/post/ultimate-backup">Ultimate Backup</a>. Install
-              <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/37828-callout-interface/">Callout Interface</a>
-              only if you want live Active Call details.
+              <a href="https://www.bejoijo.com/post/ultimate-backup">Ultimate Backup</a> with CommonDataFramework installed separately.
+              <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/37828-callout-interface/">Callout Interface (in development)</a>
+              integration is in development and does not work yet.
             </p>
           </details>
 
@@ -379,7 +377,7 @@ MDTProNative/</code></pre>
             <summary>Why does Cloud require Policing Redefined?</summary>
             <p>
               Cloud sync depends on a tighter set of game-context and data assumptions.
-              <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/48038-policing-redefined/">Policing Redefined</a>
+              <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/52191-policing-redefined/">Policing Redefined</a>
               is the supported
               Cloud path. StopThePed plus Ultimate Backup remains a local MDT path.
             </p>
@@ -388,10 +386,8 @@ MDTProNative/</code></pre>
           <details>
             <summary>Why does Active Call show nothing?</summary>
             <p>
-              Active Call is still a work-in-progress and is limited by LSPDFR,
-              <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/37828-callout-interface/">Callout Interface</a>,
-              and the callout pack you are using. Some combinations do not expose enough reliable callout data for MDT Pro
-              to resolve the current call. If the page is empty, it is usually not your fault.
+              The <a href="https://www.lcpdfr.com/downloads/gta5mods/scripts/37828-callout-interface/">Callout Interface (in development)</a>
+              integration is in development and does not work yet. If the Active Call page is empty, that is expected for now.
             </p>
           </details>
 
@@ -399,8 +395,8 @@ MDTProNative/</code></pre>
             <summary>Why do name, plate, or ID searches return nothing?</summary>
             <p>
               Check CommonDataFramework first. MDT Pro depends on CDF for person and vehicle data, so searches can fail even
-              when the MDT page itself opens. Make sure CDF is installed, loading correctly, and compatible with your selected
-              Policing Redefined or StopThePed setup. If it still fails, include <code>RAGEPluginHook.log</code> and
+              when the MDT page itself opens. Policing Redefined includes CDF; if you use StopThePed instead, install CDF
+              separately. Make sure CDF is loading correctly and compatible with your selected setup. If it still fails, include <code>RAGEPluginHook.log</code> and
               <code>MDTPro/MDTPro.log</code> when reporting it.
             </p>
           </details>
@@ -466,7 +462,7 @@ MDTProNative/</code></pre>
             <ul>
               <li>MDT Pro version</li>
               <li>LSPDFR and RagePluginHook versions</li>
-              <li>CommonDataFramework version</li>
+              <li>CommonDataFramework version, either bundled with Policing Redefined or installed separately</li>
               <li>LemonUI version</li>
               <li>Policing Redefined or StopThePed/Ultimate Backup versions</li>
               <li>Callout pack name if the issue is callout-related</li>
