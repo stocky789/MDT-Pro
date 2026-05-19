@@ -1,7 +1,5 @@
 # MDT Pro
 
-[Read the MDT Pro user guide](https://stocky789.github.io/MDT-Pro/)
-
 MDT Pro is a police computer for LSPDFR. When you go on duty, it starts a local web MDT that you can
 open in a browser, Steam overlay, another device on your network, or the optional native Windows client.
 
