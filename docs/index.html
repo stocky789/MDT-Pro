@@ -152,7 +152,8 @@ MDTProNative/</code></pre>
 
         <p>
           In code, local mode is the default <code>storageMode</code>. Cloud mode keeps the game/CDF integration on the
-          plugin side but syncs persistent records through the hosted API. That is why Cloud support is stricter.
+          plugin side but syncs persistent records through the hosted API. If Cloud login is unavailable or your account
+          is not ready yet, you can still use the normal local MDT through the address shown in-game.
         </p>
       </section>
 
@@ -167,7 +168,8 @@ MDTProNative/</code></pre>
             <h3>CommonDataFramework</h3>
             <p>
               Required. MDT Pro uses CDF for person and vehicle data. If CDF is missing, installed badly, or fails to
-              initialise, the MDT will not behave correctly.
+              initialise, the MDT may still open in your browser, but person lookups, plate lookups, IDs, reports, and
+              ALPR data can be empty or wrong.
             </p>
           </article>
           <article class="card">
@@ -189,9 +191,9 @@ MDTProNative/</code></pre>
         <div class="callout">
           <h3>Active Call depends on external callout data</h3>
           <p>
-            The Active Call page can show callout information when LSPDFR and Callout Interface expose a usable callout
-            handle. It will not be reliable for every callout pack. If the handle cannot be resolved, MDT Pro cannot
-            invent the missing callout details.
+            The Active Call page is still limited by what LSPDFR, Callout Interface, and the active callout pack expose.
+            Some callout setups do not provide enough reliable data for MDT Pro to show the current call, so an empty
+            Active Call page is not automatically an install mistake.
           </p>
         </div>
       </section>
@@ -224,11 +226,13 @@ MDTProNative/</code></pre>
             <p>
               Open <strong>Settings</strong>, then <strong>Config and Plugins</strong>. Enable the Custom Wallpaper plugin on
               the Plugins tab, then switch to Config. The Desktop wallpaper block accepts PNG and JPEG files. Choose an
-              image, click <strong>Apply</strong>, then refresh or reopen the main MDT window if it was already open.
+              image, click <strong>Apply</strong>, save your config, then refresh or reopen the main MDT window if it was
+              already open.
             </p>
             <p>
               Use <strong>Use default</strong> to remove your custom image. The wallpaper image is stored by MDT Pro and
-              reapplies when the MDT opens again.
+              reapplies when the MDT opens again. Replacing files in the MDT Pro folders is not the supported way to
+              change the wallpaper.
             </p>
           </div>
           <figure>
@@ -246,8 +250,10 @@ MDTProNative/</code></pre>
               condition worth checking before you clear the stop.
             </p>
             <p>
-              If ALPR feels too noisy, include your MDT Pro version, Policing Redefined/CDF version, and ALPR config when
-              reporting it. Without those details, it is hard to tell bad tuning from bad source data.
+              MDT Pro is not meant to overwrite your Policing Redefined settings, but ALPR results depend heavily on the
+              data exposed by CommonDataFramework and your installed integration stack. If ALPR feels too noisy, include
+              your MDT Pro version, Policing Redefined/CDF version, and ALPR config when reporting it. Without those
+              details, it is hard to tell bad tuning from bad source data.
             </p>
           </div>
           <figure>
@@ -294,7 +300,10 @@ MDTProNative/</code></pre>
         <div class="faqList">
           <details open>
             <summary>Do I need an MDT Cloud account?</summary>
-            <p>No. You only need an account if you want MDT Cloud login. The local browser/native MDT works without signing in.</p>
+            <p>
+              No. You only need an account if you want MDT Cloud login. The normal local browser/native MDT works without
+              signing in: go on duty, open the local address shown in-game, and use the local MDT as usual.
+            </p>
           </details>
 
           <details>
@@ -316,9 +325,19 @@ MDTProNative/</code></pre>
           <details>
             <summary>Why does Active Call show nothing?</summary>
             <p>
-              Active Call relies on LSPDFR/Callout Interface exposing a callout that MDT Pro can resolve. Some callout packs
-              and API combinations do not expose enough data. Install Callout Interface if you want this page, but understand
-              that it is still limited by what the external callout stack provides.
+              Active Call is still a work-in-progress and is limited by LSPDFR, Callout Interface, and the callout pack you
+              are using. Some combinations do not expose enough reliable callout data for MDT Pro to resolve the current
+              call. If the page is empty, it is usually not your fault.
+            </p>
+          </details>
+
+          <details>
+            <summary>Why do name, plate, or ID searches return nothing?</summary>
+            <p>
+              Check CommonDataFramework first. MDT Pro depends on CDF for person and vehicle data, so searches can fail even
+              when the MDT page itself opens. Make sure CDF is installed, loading correctly, and compatible with your selected
+              Policing Redefined or StopThePed setup. If it still fails, include <code>RAGEPluginHook.log</code> and
+              <code>MDTPro/MDTPro.log</code> when reporting it.
             </p>
           </details>
 
@@ -341,8 +360,10 @@ MDTProNative/</code></pre>
           <details>
             <summary>Can I open the MDT on my phone or another PC?</summary>
             <p>
-              Usually, yes. Use the local network address from <code>MDTPro/ipAddresses.txt</code>. If the other device cannot
-              connect, add a Windows Firewall inbound rule for the MDT port on the game PC.
+              Usually, yes. Use the local network address from <code>MDTPro/ipAddresses.txt</code>, not
+              <code>127.0.0.1</code>. That address only works on the same PC running GTA V. If the other device cannot
+              connect, make sure it is on the same network and add a Windows Firewall inbound rule for the MDT port on the
+              game PC, usually <code>9000</code>.
             </p>
           </details>
 
