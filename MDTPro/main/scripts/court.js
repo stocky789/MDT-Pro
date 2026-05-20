@@ -747,7 +747,8 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
     (courtCase.EvidenceWasFleeing ?? false) ||
     (courtCase.EvidenceViolatedSupervision ?? false) ||
     (courtCase.EvidenceWasPatDown ?? false) ||
-    (courtCase.EvidenceIllegalWeapon ?? false);
+    (courtCase.EvidenceIllegalWeapon ?? false) ||
+    (courtCase.EvidenceStolenRecoveryImpound ?? false);
   const noEvidenceNote = document.createElement("div");
   noEvidenceNote.classList.add("evidenceBreakdownNote");
   noEvidenceNote.innerText = hasAnyRealEvidence
@@ -851,6 +852,12 @@ async function createCourtCaseElement(courtCase, language, refreshCourtList) {
     {
       key: "EvidenceIllegalWeapon",
       label: language.court.exhibitIllegalWeapon || "Illegal weapon evidence",
+    },
+    {
+      key: "EvidenceStolenRecoveryImpound",
+      label:
+        language.court.exhibitStolenRecoveryImpound ||
+        "Stolen recovery impound report",
     },
   ];
   const exhibitLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -1373,10 +1380,18 @@ async function appendSentenceBreakdown(parent, courtCase, language) {
     createSectionHeader(language.court.sentenceBreakdown || "Sentence Breakdown"),
   );
 
-  const addRow = (label, value) => {
+  const addRow = (label, value, options = {}) => {
     const wrapper = document.createElement("div");
+    if (options.long) wrapper.classList.add("courtLongReadOnlyRow");
     wrapper.appendChild(createLabel(label));
-    wrapper.appendChild(createReadOnlyInput(value));
+    if (options.long) {
+      const longValue = document.createElement("div");
+      longValue.classList.add("courtLongReadOnlyValue");
+      longValue.textContent = value ?? "";
+      wrapper.appendChild(longValue);
+    } else {
+      wrapper.appendChild(createReadOnlyInput(value));
+    }
     parent.appendChild(wrapper);
   };
 
@@ -1407,7 +1422,7 @@ async function appendSentenceBreakdown(parent, courtCase, language) {
     if (order.EndUtc || order.endUtc)
       addRow(language.court.supervisionEnd || "Supervision End", await formatIsoDate(order.EndUtc || order.endUtc));
     if (conditions.length > 0)
-      addRow(language.court.conditions || "Conditions", conditions.join("; "));
+      addRow(language.court.conditions || "Conditions", conditions.join("; "), { long: true });
   }
 }
 

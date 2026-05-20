@@ -95,6 +95,7 @@ const CONFIG_SECTIONS = [
       'courtEvidenceDrugQuantityBonus',
       'courtEvidenceUseOfForceBonus',
       'courtEvidenceSeizureReportBonus',
+      'courtEvidenceStolenRecoveryImpoundBonus',
     ],
   },
   {
@@ -519,6 +520,10 @@ const CONFIG_FIELD_META = {
   courtEvidenceSeizureReportBonus: {
     label: 'Seizure report bonus',
     tooltip: 'Evidence points per attached Property and Evidence Receipt (seizure) report.',
+  },
+  courtEvidenceStolenRecoveryImpoundBonus: {
+    label: 'Stolen recovery impound bonus',
+    tooltip: 'Extra evidence when a Stolen Recovery impound report supports a stolen vehicle charge.',
   },
   courtCaseResolutionMinBase: {
     label: 'Min resolution time (minutes)',

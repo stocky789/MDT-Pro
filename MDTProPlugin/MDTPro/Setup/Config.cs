@@ -186,6 +186,8 @@ namespace MDTPro.Setup
         public float courtEvidenceTrafficIncidentReportBonus = 6f;
         /// <summary>Per attached impound report (e.g. stolen recovery, evidence).</summary>
         public float courtEvidenceImpoundReportBonus = 5f;
+        /// <summary>Extra evidence when a Stolen Recovery impound report supports a stolen vehicle charge.</summary>
+        public float courtEvidenceStolenRecoveryImpoundBonus = 15f;
         /// <summary>Per attached Property and Evidence Receipt (seized contraband documentation). Charge-specific drug/firearm matching handled in court integration.</summary>
         public float courtEvidencePropertyEvidenceReportBonus = 8f;
         /// <summary>Per attached seizure report (Property and Evidence Receipt). Optional bonus similar to incident/citation. Uses courtEvidencePropertyEvidenceReportBonus when 0.</summary>

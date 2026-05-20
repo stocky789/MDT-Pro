@@ -552,6 +552,25 @@ body {
   margin-left: 2px;
 }
 
+.courtLongReadOnlyRow {
+  grid-column: 1 / -1;
+}
+
+.courtLongReadOnlyValue {
+  width: 100%;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* Tooltip icon */
 .courtLabelWithTooltip {
   display: inline-flex;

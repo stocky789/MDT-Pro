@@ -5962,6 +5962,41 @@ namespace MDTPro.Data
                 || (n.Contains("vehicle") && (n.Contains("theft") || n.Contains("stolen") || n.Contains("evidence")));
         }
 
+        private static bool IsStolenVehicleChargeName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.Trim().ToLowerInvariant();
+            if (n.Contains("grand theft auto") || n.Contains("stolen vehicle") || n.Contains("vehicle theft") || n.Contains("auto theft") || n.Contains("stolen auto") || n.Contains("stolen car"))
+                return true;
+            bool theftTerm = n.Contains("stolen") || n.Contains("theft") || n.Contains("steal") || n.Contains("receiving stolen");
+            bool vehicleTerm = n.Contains("vehicle") || n.Contains("auto") || n.Contains("car");
+            return theftTerm && vehicleTerm;
+        }
+
+        private static bool IsStolenRecoveryReason(string reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason)) return false;
+            string n = reason.Trim().ToLowerInvariant();
+            return n == "stolen recovery"
+                || n == "recovered stolen vehicle"
+                || n == "stolen vehicle recovery"
+                || (n.Contains("stolen") && n.Contains("recover"));
+        }
+
+        private static bool IsStolenRecoveryImpoundReport(string reportId)
+        {
+            if (string.IsNullOrWhiteSpace(reportId)) return false;
+            ImpoundReport report = ImpoundReports?.FirstOrDefault(r => r.Id == reportId);
+            return report != null && IsStolenRecoveryReason(report.ImpoundReason);
+        }
+
+        private static bool HasStolenRecoveryImpoundEvidence(CourtData courtData)
+        {
+            if (courtData?.AttachedReportIds == null || courtData.Charges == null) return false;
+            if (!courtData.Charges.Any(c => c != null && IsStolenVehicleChargeName(c.Name ?? ""))) return false;
+            return courtData.AttachedReportIds.Any(IsStolenRecoveryImpoundReport);
+        }
+
         /// <summary>True if the charge is firearm/weapon-related. Matches arrest charge names from arrestOptions.json (Misdemeanor/Felony Firearms / Weapons groups). Used so the system can treat firearm charges consistently (e.g. evidence relevance, future use).</summary>
         private static bool IsFirearmChargeName(string name)
         {
@@ -6219,6 +6254,9 @@ namespace MDTPro.Data
 
             if (drugEvidenceCap.HasValue)
                 chance = Math.Min(chance, drugEvidenceCap.Value);
+
+            if (courtCase.EvidenceStolenRecoveryImpound && IsStolenVehicleChargeName(name))
+                chance = Math.Max(chance, 55);
 
             int upper = drugEvidenceCap.HasValue ? Math.Min(85, drugEvidenceCap.Value) : 85;
             return Math.Max(15, Math.Min(upper, chance));
@@ -8327,6 +8365,7 @@ namespace MDTPro.Data
             courtData.EvidenceViolatedSupervision = false;
             courtData.EvidenceResisted = false;
             courtData.EvidenceHadDrugs = false;
+            courtData.EvidenceStolenRecoveryImpound = false;
             courtData.EvidenceDrugTypesBreakdown = null;
             courtData.DrugEvidenceAssessments = null;
             courtData.EvidenceFirearmTypesBreakdown = null;
@@ -8387,6 +8426,13 @@ namespace MDTPro.Data
                         score += config.courtEvidenceOtherAttachedReportBonus;
                     }
                 }
+            }
+
+            if (HasStolenRecoveryImpoundEvidence(courtData))
+            {
+                courtData.EvidenceStolenRecoveryImpound = true;
+                if (config.courtEvidenceStolenRecoveryImpoundBonus > 0)
+                    score += config.courtEvidenceStolenRecoveryImpoundBonus;
             }
 
             // Arrest report notes length bonus (primary report only)
@@ -8970,6 +9016,7 @@ namespace MDTPro.Data
                 EvidenceResisted = source.EvidenceResisted,
                 EvidenceHadDrugs = source.EvidenceHadDrugs,
                 EvidenceUseOfForce = source.EvidenceUseOfForce,
+                EvidenceStolenRecoveryImpound = source.EvidenceStolenRecoveryImpound,
                 EvidenceDrugTypesBreakdown = source.EvidenceDrugTypesBreakdown,
                 DrugEvidenceAssessments = source.DrugEvidenceAssessments,
                 EvidenceFirearmTypesBreakdown = source.EvidenceFirearmTypesBreakdown,

@@ -18,7 +18,7 @@ namespace MDTPro.Data {
         private static SQLiteConnection connection;
         private static readonly object dbLock = new object();
 
-        private const int CurrentSchemaVersion = 34;
+        private const int CurrentSchemaVersion = 35;
 
         /// <summary>Reads an INTEGER column from SQLite as uint. SQLite returns INTEGER as Int64; values outside uint range are clamped to 0.</summary>
         private static uint ReadUInt32FromReader(object value) {
@@ -493,6 +493,7 @@ namespace MDTPro.Data {
                     EvidenceViolatedSupervision INTEGER NOT NULL DEFAULT 0,
                     EvidenceResisted         INTEGER NOT NULL DEFAULT 0,
                     EvidenceHadDrugs         INTEGER NOT NULL DEFAULT 0,
+                    EvidenceStolenRecoveryImpound INTEGER NOT NULL DEFAULT 0,
                     ConvictionChance        INTEGER NOT NULL DEFAULT 0,
                     ResolveAtUtc            TEXT,
                     RepeatOffenderScore     INTEGER NOT NULL DEFAULT 0,
@@ -1319,6 +1320,12 @@ namespace MDTPro.Data {
                 try { using (var cmd = new SQLiteCommand("ALTER TABLE property_evidence_reports ADD COLUMN ManufacturingIndicators TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
                 Helper.Log("Database migrated to schema version 34 (drug evidence assessments and seizure indicators)");
             }
+            if (fromVersion < 35) {
+                try {
+                    using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN EvidenceStolenRecoveryImpound INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); }
+                    Helper.Log("Database migrated to schema version 35 (stolen recovery impound court evidence)");
+                } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
+            }
 
             SetSchemaVersion(CurrentSchemaVersion);
         }
@@ -1364,7 +1371,7 @@ namespace MDTPro.Data {
                 try { using (var cmd = new SQLiteCommand($"ALTER TABLE court_cases ADD COLUMN {col} {(col == "EvidenceScore" ? "INTEGER NOT NULL DEFAULT 0" : "REAL NOT NULL DEFAULT 0")}", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN OutcomeReasoning TEXT", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
-            foreach (string col in new[] { "EvidenceHadWeapon", "EvidenceWasWanted", "EvidenceWasPatDown", "EvidenceWasDrunk", "EvidenceWasFleeing", "EvidenceAssaultedPed", "EvidenceDamagedVehicle", "EvidenceIllegalWeapon", "EvidenceViolatedSupervision", "EvidenceResisted", "EvidenceHadDrugs", "EvidenceUseOfForce" }) {
+            foreach (string col in new[] { "EvidenceHadWeapon", "EvidenceWasWanted", "EvidenceWasPatDown", "EvidenceWasDrunk", "EvidenceWasFleeing", "EvidenceAssaultedPed", "EvidenceDamagedVehicle", "EvidenceIllegalWeapon", "EvidenceViolatedSupervision", "EvidenceResisted", "EvidenceHadDrugs", "EvidenceUseOfForce", "EvidenceStolenRecoveryImpound" }) {
                 try { using (var cmd = new SQLiteCommand($"ALTER TABLE court_cases ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
             }
             try { using (var cmd = new SQLiteCommand("ALTER TABLE court_cases ADD COLUMN ConvictionChance INTEGER NOT NULL DEFAULT 0", connection)) { cmd.ExecuteNonQuery(); } } catch (Exception ex) when (ex.Message?.Contains("duplicate column") == true) { }
@@ -1666,6 +1673,7 @@ namespace MDTPro.Data {
                                 EvidenceViolatedSupervision = reader["EvidenceViolatedSupervision"] is DBNull ? false : Convert.ToBoolean(reader["EvidenceViolatedSupervision"]),
                                 EvidenceResisted = reader["EvidenceResisted"] is DBNull ? false : Convert.ToBoolean(reader["EvidenceResisted"]),
                                 EvidenceHadDrugs = GetBooleanFromReader(reader, "EvidenceHadDrugs"),
+                                EvidenceStolenRecoveryImpound = GetBooleanFromReader(reader, "EvidenceStolenRecoveryImpound"),
                                 EvidenceUseOfForce = GetBooleanFromReader(reader, "EvidenceUseOfForce"),
                                 EvidenceDrugTypesBreakdown = ParseListOrNull(ReaderOptionalString(reader, "EvidenceDrugTypesBreakdown")),
                                 DrugEvidenceAssessments = ParseJsonOrDefault<List<SeizureEvidenceHelper.DrugEvidenceAssessment>>(ReaderOptionalString(reader, "DrugEvidenceAssessments")),
@@ -2570,7 +2578,7 @@ namespace MDTPro.Data {
                     PriorCitationCount, PriorArrestCount, PriorConvictionCount, SeverityScore, EvidenceScore,
                     EvidenceHadWeapon, EvidenceWasWanted, EvidenceWasPatDown,
                     EvidenceWasDrunk, EvidenceWasFleeing, EvidenceAssaultedPed, EvidenceDamagedVehicle, EvidenceIllegalWeapon,
-                    EvidenceViolatedSupervision, EvidenceResisted, EvidenceHadDrugs, EvidenceUseOfForce, ConvictionChance, ResolveAtUtc,
+                    EvidenceViolatedSupervision, EvidenceResisted, EvidenceHadDrugs, EvidenceStolenRecoveryImpound, EvidenceUseOfForce, ConvictionChance, ResolveAtUtc,
                     RepeatOffenderScore,
                     SentenceMultiplier, ProsecutionStrength, DefenseStrength, DocketPressure, PolicyAdjustment,
                     CourtDistrict, CourtName, CourtType, HasPublicDefender, Plea,
@@ -2585,7 +2593,7 @@ namespace MDTPro.Data {
                     @PriorCitationCount, @PriorArrestCount, @PriorConvictionCount, @SeverityScore, @EvidenceScore,
                     @EvidenceHadWeapon, @EvidenceWasWanted, @EvidenceWasPatDown,
                     @EvidenceWasDrunk, @EvidenceWasFleeing, @EvidenceAssaultedPed, @EvidenceDamagedVehicle, @EvidenceIllegalWeapon,
-                    @EvidenceViolatedSupervision, @EvidenceResisted, @EvidenceHadDrugs, @EvidenceUseOfForce, @ConvictionChance, @ResolveAtUtc,
+                    @EvidenceViolatedSupervision, @EvidenceResisted, @EvidenceHadDrugs, @EvidenceStolenRecoveryImpound, @EvidenceUseOfForce, @ConvictionChance, @ResolveAtUtc,
                     @RepeatOffenderScore,
                     @SentenceMultiplier, @ProsecutionStrength, @DefenseStrength, @DocketPressure, @PolicyAdjustment,
                     @CourtDistrict, @CourtName, @CourtType, @HasPublicDefender, @Plea,
@@ -2621,6 +2629,7 @@ namespace MDTPro.Data {
                 cmd.Parameters.AddWithValue("@EvidenceViolatedSupervision", courtCase.EvidenceViolatedSupervision ? 1 : 0);
                 cmd.Parameters.AddWithValue("@EvidenceResisted", courtCase.EvidenceResisted ? 1 : 0);
                 cmd.Parameters.AddWithValue("@EvidenceHadDrugs", courtCase.EvidenceHadDrugs ? 1 : 0);
+                cmd.Parameters.AddWithValue("@EvidenceStolenRecoveryImpound", courtCase.EvidenceStolenRecoveryImpound ? 1 : 0);
                 cmd.Parameters.AddWithValue("@EvidenceUseOfForce", courtCase.EvidenceUseOfForce ? 1 : 0);
                 cmd.Parameters.AddWithValue("@ConvictionChance", courtCase.ConvictionChance);
                 cmd.Parameters.AddWithValue("@ResolveAtUtc", (object)courtCase.ResolveAtUtc ?? DBNull.Value);
