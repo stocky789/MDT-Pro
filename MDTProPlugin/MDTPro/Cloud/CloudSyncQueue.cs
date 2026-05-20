@@ -12,8 +12,10 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace MDTPro.Cloud {
-    internal sealed class CloudSyncEnvelope {
+namespace MDTPro.Cloud
+{
+    internal sealed class CloudSyncEnvelope
+    {
         public string EntityType { get; set; }
         public string Operation { get; set; }
         public string IdempotencyKey { get; set; }
@@ -21,7 +23,8 @@ namespace MDTPro.Cloud {
         public JObject Payload { get; set; }
     }
 
-    internal static class CloudSyncQueue {
+    internal static class CloudSyncQueue
+    {
         private static readonly object LockObj = new object();
         private static readonly Queue<CloudSyncEnvelope> Pending = new Queue<CloudSyncEnvelope>();
         private static DateTime _lastFlushUtc = DateTime.MinValue;
@@ -31,15 +34,19 @@ namespace MDTPro.Cloud {
         private static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(12) };
         private static string QueuePath => Path.Combine(SetupController.DataPath, "cloudSyncQueue.json");
 
-        internal static int Count {
-            get {
+        internal static int Count
+        {
+            get
+            {
                 EnsureLoaded();
                 lock (LockObj) return Pending.Count;
             }
         }
 
-        internal static void Enqueue(string entityType, string operation, JObject payload, string idempotencyKey = null) {
-            if (!CloudMode.IsEnabled()) return;
+        internal static void Enqueue(string entityType, string operation, JObject payload, string idempotencyKey = null)
+        {
+            int generation = CloudPluginBridge.AuthGeneration;
+            if (!CloudPluginBridge.IsCloudWorkCurrent(generation)) return;
             if (CloudStopThePedBlock.ShouldBlockMdtCloudApiTraffic()) return;
             if (SuppressEnqueue) return;
             if (payload == null) payload = new JObject();
@@ -47,15 +54,18 @@ namespace MDTPro.Cloud {
 
             Config cfg = SetupController.GetConfig();
             int max = cfg.cloudSyncMaxQueuedItems <= 0 ? 1000 : cfg.cloudSyncMaxQueuedItems;
-            lock (LockObj) {
+            lock (LockObj)
+            {
                 bool dropped = false;
-                while (Pending.Count >= max) {
+                while (Pending.Count >= max)
+                {
                     Pending.Dequeue();
                     dropped = true;
                 }
                 if (dropped && !cfg.cloudOfflineFallbackEnabled)
                     Helper.Log("Cloud sync queue reached its maximum size and dropped the oldest pending item.", false, Helper.LogSeverity.Warning);
-                Pending.Enqueue(new CloudSyncEnvelope {
+                Pending.Enqueue(new CloudSyncEnvelope
+                {
                     EntityType = entityType,
                     Operation = operation,
                     IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? BuildStableKey(entityType, operation, payload) : idempotencyKey,
@@ -68,25 +78,35 @@ namespace MDTPro.Cloud {
         }
 
         /// <param name="respectFlushInterval">When true (game fiber heartbeat), do not POST more often than <c>cloudSyncFlushIntervalMs</c> after the last attempt. When false, flush as soon as there is queued work so person/vehicle updates reach the cloud without waiting for the next poll tick.</param>
-        internal static void TryFlushInBackground(bool respectFlushInterval = true) {
-            if (!CloudMode.IsEnabled()) return;
+        internal static void TryFlushInBackground(bool respectFlushInterval = true)
+        {
+            int generation = CloudPluginBridge.AuthGeneration;
+            if (!CloudPluginBridge.IsCloudWorkCurrent(generation)) return;
             if (CloudStopThePedBlock.ShouldBlockMdtCloudApiTraffic()) return;
             EnsureLoaded();
             Config cfg = SetupController.GetConfig();
             int interval = cfg.cloudSyncFlushIntervalMs <= 0 ? Config.PerfCaptureIntervalMs.CloudSyncFlush : cfg.cloudSyncFlushIntervalMs;
-            lock (LockObj) {
+            lock (LockObj)
+            {
                 if (_flushRunning || Pending.Count == 0) return;
                 if (respectFlushInterval && (DateTime.UtcNow - _lastFlushUtc).TotalMilliseconds < interval) return;
                 _flushRunning = true;
             }
-            ThreadPool.QueueUserWorkItem(_ => {
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
                 bool flushSucceeded = false;
-                try {
+                try
+                {
                     flushSucceeded = FlushAsync().ConfigureAwait(false).GetAwaiter().GetResult();
-                } catch (Exception ex) {
+                }
+                catch (Exception ex)
+                {
                     Helper.Log($"Cloud sync flush failed: {ex.Message}", false, Helper.LogSeverity.Warning);
-                } finally {
-                    lock (LockObj) {
+                }
+                finally
+                {
+                    lock (LockObj)
+                    {
                         _flushRunning = false;
                         _lastFlushUtc = DateTime.UtcNow;
                     }
@@ -96,24 +116,34 @@ namespace MDTPro.Cloud {
             });
         }
 
-        internal static bool FlushSynchronously(int maxBatches = 10) {
-            if (!CloudMode.IsEnabled()) return false;
+        internal static bool FlushSynchronously(int maxBatches = 10)
+        {
+            int generation = CloudPluginBridge.AuthGeneration;
+            if (!CloudPluginBridge.IsCloudWorkCurrent(generation)) return false;
             if (CloudStopThePedBlock.ShouldBlockMdtCloudApiTraffic()) return false;
             EnsureLoaded();
             bool anySuccess = false;
-            for (int i = 0; i < maxBatches; i++) {
-                lock (LockObj) {
+            for (int i = 0; i < maxBatches; i++)
+            {
+                lock (LockObj)
+                {
                     if (_flushRunning || Pending.Count == 0) return anySuccess;
                     _flushRunning = true;
                 }
-                try {
+                try
+                {
                     FlushAsync().ConfigureAwait(false).GetAwaiter().GetResult();
                     anySuccess = true;
-                } catch (Exception ex) {
+                }
+                catch (Exception ex)
+                {
                     Helper.Log($"Cloud sync startup flush failed: {ex.Message}", false, Helper.LogSeverity.Warning);
                     return anySuccess;
-                } finally {
-                    lock (LockObj) {
+                }
+                finally
+                {
+                    lock (LockObj)
+                    {
                         _flushRunning = false;
                         _lastFlushUtc = DateTime.UtcNow;
                     }
@@ -123,40 +153,81 @@ namespace MDTPro.Cloud {
         }
 
         /// <returns>True if a batch was POSTed and the server returned success; false if nothing to send, requeued, or HTTP failure.</returns>
-        private static async Task<bool> FlushAsync() {
+        private static async Task<bool> FlushAsync()
+        {
+            int generation = CloudPluginBridge.AuthGeneration;
+            if (!CloudPluginBridge.IsCloudWorkCurrent(generation)) return false;
             List<CloudSyncEnvelope> batch = new List<CloudSyncEnvelope>();
-            lock (LockObj) {
+            lock (LockObj)
+            {
                 while (Pending.Count > 0 && batch.Count < 50) batch.Add(Pending.Dequeue());
                 PersistLocked();
             }
             if (batch.Count == 0) return true;
-            if (CloudStopThePedBlock.ShouldBlockMdtCloudApiTraffic()) {
+            if (!CloudPluginBridge.IsCloudWorkCurrent(generation) || CloudStopThePedBlock.ShouldBlockMdtCloudApiTraffic())
+            {
                 Requeue(batch);
                 return false;
             }
 
             Config cfg = SetupController.GetConfig();
             CloudCredentials credentials = CloudCredentialStore.Load(cfg);
-            if (string.IsNullOrWhiteSpace(credentials.AccessToken) || string.IsNullOrWhiteSpace(credentials.DeviceToken)) {
+            if (!CloudPluginBridge.IsCloudWorkCurrent(generation))
+            {
+                Requeue(batch);
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(credentials.AccessToken) || string.IsNullOrWhiteSpace(credentials.DeviceToken))
+            {
                 Requeue(batch);
                 return false;
             }
 
             string installId = EnsureInstallId(cfg);
-            JObject body = new JObject {
+            if (!CloudPluginBridge.IsCloudWorkCurrent(generation))
+            {
+                Requeue(batch);
+                return false;
+            }
+            JObject body = new JObject
+            {
                 ["installId"] = installId,
                 ["items"] = JArray.FromObject(batch)
             };
 
+            if (!CloudPluginBridge.IsCloudWorkCurrent(generation))
+            {
+                Requeue(batch);
+                return false;
+            }
             HttpResponseMessage res = await SendSyncRequestAsync(credentials, body).ConfigureAwait(false);
-            if ((res.StatusCode == System.Net.HttpStatusCode.Unauthorized || res.StatusCode == System.Net.HttpStatusCode.Forbidden) &&
-                CloudCredentialStore.TryRefresh(cfg, ref credentials)) {
+            if (!CloudPluginBridge.IsCloudWorkCurrent(generation))
+            {
                 res.Dispose();
+                Requeue(batch);
+                return false;
+            }
+            if ((res.StatusCode == System.Net.HttpStatusCode.Unauthorized || res.StatusCode == System.Net.HttpStatusCode.Forbidden) &&
+                CloudPluginBridge.IsCloudWorkCurrent(generation) && CloudCredentialStore.TryRefresh(cfg, ref credentials))
+            {
+                res.Dispose();
+                if (!CloudPluginBridge.IsCloudWorkCurrent(generation))
+                {
+                    Requeue(batch);
+                    return false;
+                }
                 res = await SendSyncRequestAsync(credentials, body).ConfigureAwait(false);
             }
 
-            using (res) {
-                if (!res.IsSuccessStatusCode) {
+            using (res)
+            {
+                if (!CloudPluginBridge.IsCloudWorkCurrent(generation))
+                {
+                    Requeue(batch);
+                    return false;
+                }
+                if (!res.IsSuccessStatusCode)
+                {
                     if (res.StatusCode == System.Net.HttpStatusCode.Unauthorized || res.StatusCode == System.Net.HttpStatusCode.Forbidden)
                         CloudCredentialStore.Clear();
                     Requeue(batch);
@@ -170,13 +241,16 @@ namespace MDTPro.Cloud {
             }
         }
 
-        private static void RememberResolvedEntityIds(List<CloudSyncEnvelope> batch, string responseJson) {
+        private static void RememberResolvedEntityIds(List<CloudSyncEnvelope> batch, string responseJson)
+        {
             if (batch == null || batch.Count == 0 || string.IsNullOrWhiteSpace(responseJson)) return;
-            try {
+            try
+            {
                 JObject response = JObject.Parse(responseJson);
                 JArray results = response["results"] as JArray;
                 if (results == null) return;
-                foreach (JObject result in results) {
+                foreach (JObject result in results)
+                {
                     string key = result.Value<string>("idempotencyKey");
                     string entityId = result.Value<string>("entityId");
                     bool accepted = result.Value<bool?>("accepted") ?? false;
@@ -185,12 +259,15 @@ namespace MDTPro.Cloud {
                     if (envelope == null) continue;
                     CloudIdentityCache.RememberFromSyncResult(envelope.EntityType ?? "", envelope.Payload, entityId);
                 }
-            } catch (Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 Helper.Log($"Cloud sync identity cache update failed: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
         }
 
-        private static Task<HttpResponseMessage> SendSyncRequestAsync(CloudCredentials credentials, JObject body) {
+        private static Task<HttpResponseMessage> SendSyncRequestAsync(CloudCredentials credentials, JObject body)
+        {
             HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Post, CloudMode.ApiBaseUrl() + "/api/mdt/sync");
             req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", credentials.AccessToken);
             req.Headers.TryAddWithoutValidation("X-MDT-Device-Token", credentials.DeviceToken);
@@ -198,59 +275,80 @@ namespace MDTPro.Cloud {
             return Http.SendAsync(req);
         }
 
-        private static string EnsureInstallId(Config cfg) {
+        private static string EnsureInstallId(Config cfg)
+        {
             if (!string.IsNullOrWhiteSpace(cfg.cloudInstallId)) return cfg.cloudInstallId;
             cfg.cloudInstallId = Guid.NewGuid().ToString("N");
-            try {
+            try
+            {
                 Helper.WriteToJsonFile(SetupController.ConfigPath, cfg);
                 SetupController.ClearCache();
-            } catch { }
+            }
+            catch { }
             return cfg.cloudInstallId;
         }
 
-        private static void Requeue(List<CloudSyncEnvelope> batch) {
-            lock (LockObj) {
+        private static void Requeue(List<CloudSyncEnvelope> batch)
+        {
+            lock (LockObj)
+            {
                 for (int i = 0; i < batch.Count; i++)
                     Pending.Enqueue(batch[i]);
                 PersistLocked();
             }
         }
 
-        private static void EnsureLoaded() {
+        private static void EnsureLoaded()
+        {
             if (_loadedFromDisk) return;
-            lock (LockObj) {
+            lock (LockObj)
+            {
                 if (_loadedFromDisk) return;
-                try {
-                    if (File.Exists(QueuePath)) {
+                try
+                {
+                    if (File.Exists(QueuePath))
+                    {
                         var items = JsonConvert.DeserializeObject<List<CloudSyncEnvelope>>(File.ReadAllText(QueuePath));
-                        if (items != null) {
-                            foreach (var item in items) {
+                        if (items != null)
+                        {
+                            foreach (var item in items)
+                            {
                                 if (item != null && !string.IsNullOrWhiteSpace(item.IdempotencyKey))
                                     Pending.Enqueue(item);
                             }
                         }
                     }
-                } catch (Exception ex) {
+                }
+                catch (Exception ex)
+                {
                     Helper.Log($"Cloud sync queue load failed: {ex.Message}", false, Helper.LogSeverity.Warning);
-                } finally {
+                }
+                finally
+                {
                     _loadedFromDisk = true;
                 }
             }
         }
 
-        private static void PersistLocked() {
-            try {
+        private static void PersistLocked()
+        {
+            try
+            {
                 string dir = Path.GetDirectoryName(QueuePath);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
                 File.WriteAllText(QueuePath, JsonConvert.SerializeObject(Pending.ToArray(), Formatting.None));
-            } catch (Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 Helper.Log($"Cloud sync queue persist failed: {ex.Message}", false, Helper.LogSeverity.Warning);
             }
         }
 
-        private static string BuildStableKey(string entityType, string operation, JObject payload) {
+        private static string BuildStableKey(string entityType, string operation, JObject payload)
+        {
             string canonical = $"{entityType ?? ""}:{operation ?? ""}:{payload.ToString(Formatting.None)}";
-            using (SHA256 sha = SHA256.Create()) {
+            using (SHA256 sha = SHA256.Create())
+            {
                 byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(canonical));
                 StringBuilder sb = new StringBuilder(hash.Length * 2);
                 for (int i = 0; i < hash.Length; i++) sb.Append(hash[i].ToString("x2"));

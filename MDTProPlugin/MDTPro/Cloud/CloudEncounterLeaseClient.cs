@@ -9,8 +9,10 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 
-namespace MDTPro.Cloud {
-    internal static class CloudEncounterLeaseClient {
+namespace MDTPro.Cloud
+{
+    internal static class CloudEncounterLeaseClient
+    {
         private static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
         private static readonly object LockObj = new object();
         private static string _personId;
@@ -19,17 +21,20 @@ namespace MDTPro.Cloud {
         private static DateTimeOffset _lastRenewAttemptUtc;
         private static bool _leaseRequestRunning;
 
-        internal static bool CanPushPedToCdf(MDTProPedData ped) {
+        internal static bool CanPushPedToCdf(MDTProPedData ped)
+        {
             if (ped == null || !CloudMode.IsEnabled()) return true;
             if (CloudStopThePedBlock.ShouldBlockMdtCloudApiTraffic()) return true;
             string personId = CloudIdentityCache.GetPersonId(ped);
             if (string.IsNullOrWhiteSpace(personId)) return true;
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            lock (LockObj) {
+            lock (LockObj)
+            {
                 bool hasLease = string.Equals(_personId, personId, StringComparison.OrdinalIgnoreCase) &&
                     !string.IsNullOrWhiteSpace(_leaseToken) &&
                     _expiresAtUtc > now.AddSeconds(2);
-                if (hasLease) {
+                if (hasLease)
+                {
                     if (_expiresAtUtc <= now.AddSeconds(10))
                         QueueEnsureLease(personId, BuildContext(ped));
                     return true;
@@ -39,45 +44,71 @@ namespace MDTPro.Cloud {
             return false;
         }
 
-        internal static void ObserveContextPerson(MDTProPedData ped) {
-            if (!CloudMode.IsEnabled()) {
+        internal static void ObserveContextPerson(MDTProPedData ped)
+        {
+            if (!CloudMode.IsEnabled())
+            {
                 QueueReleaseCurrent();
                 return;
             }
-            if (CloudStopThePedBlock.ShouldBlockMdtCloudApiTraffic()) {
+            if (CloudStopThePedBlock.ShouldBlockMdtCloudApiTraffic())
+            {
                 lock (LockObj) ClearLocked();
                 return;
             }
             string personId = ped == null ? null : CloudIdentityCache.GetPersonId(ped);
-            if (!string.IsNullOrWhiteSpace(personId)) {
+            if (!string.IsNullOrWhiteSpace(personId))
+            {
                 QueueEnsureLease(personId, BuildContext(ped));
                 return;
             }
             QueueReleaseCurrent();
         }
 
-        internal static void ReleaseCurrent() {
+        internal static void ReleaseCurrent()
+        {
             string personId;
             string token;
             ClearAndCopyLease(out personId, out token);
+            if (!CloudMode.IsEnabled()) return;
             if (CloudStopThePedBlock.ShouldBlockMdtCloudApiTraffic()) return;
             if (!string.IsNullOrWhiteSpace(personId) && !string.IsNullOrWhiteSpace(token))
                 SendLeaseRequest("/api/mdt/reencounter/release", personId, token, null);
         }
 
-        private static bool EnsureLease(string personId, JObject context) {
+        internal static void ClearLocalState()
+        {
+            lock (LockObj) ClearLocked();
+        }
+
+        internal static void ReleaseCurrentForLogout(Config cfg, CloudCredentials credentials)
+        {
+            string personId;
+            string token;
+            ClearAndCopyLease(out personId, out token);
+            if (CloudStopThePedBlock.ShouldBlockMdtCloudApiTraffic()) return;
+            if (!string.IsNullOrWhiteSpace(personId) && !string.IsNullOrWhiteSpace(token))
+                SendLeaseRequest("/api/mdt/reencounter/release", personId, token, null, cfg, credentials, retry: false);
+        }
+
+        private static bool EnsureLease(string personId, JObject context)
+        {
             DateTimeOffset now = DateTimeOffset.UtcNow;
             string previousPersonId = null;
             string previousToken = null;
             bool shouldRenew = false;
-            lock (LockObj) {
+            lock (LockObj)
+            {
                 if (string.Equals(_personId, personId, StringComparison.OrdinalIgnoreCase) &&
                     !string.IsNullOrWhiteSpace(_leaseToken) &&
-                    _expiresAtUtc > now.AddSeconds(10)) {
+                    _expiresAtUtc > now.AddSeconds(10))
+                {
                     if ((now - _lastRenewAttemptUtc).TotalSeconds < 20) return true;
                     shouldRenew = true;
-                } else if (!string.IsNullOrWhiteSpace(_personId) &&
-                    !string.Equals(_personId, personId, StringComparison.OrdinalIgnoreCase)) {
+                }
+                else if (!string.IsNullOrWhiteSpace(_personId) &&
+                    !string.Equals(_personId, personId, StringComparison.OrdinalIgnoreCase))
+                {
                     previousPersonId = _personId;
                     previousToken = _leaseToken;
                     ClearLocked();
@@ -89,47 +120,66 @@ namespace MDTPro.Cloud {
             return TryClaim(personId, context);
         }
 
-        private static void QueueEnsureLease(string personId, JObject context) {
+        private static void QueueEnsureLease(string personId, JObject context)
+        {
             if (CloudStopThePedBlock.ShouldBlockMdtCloudApiTraffic()) return;
             if (string.IsNullOrWhiteSpace(personId)) return;
+            int generation = CloudPluginBridge.AuthGeneration;
+            if (!CloudPluginBridge.IsCloudWorkCurrent(generation)) return;
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            lock (LockObj) {
+            lock (LockObj)
+            {
                 if (_leaseRequestRunning) return;
                 if (string.Equals(_personId, personId, StringComparison.OrdinalIgnoreCase) &&
                     !string.IsNullOrWhiteSpace(_leaseToken) &&
                     _expiresAtUtc > now.AddSeconds(10) &&
-                    (now - _lastRenewAttemptUtc).TotalSeconds < 20) {
+                    (now - _lastRenewAttemptUtc).TotalSeconds < 20)
+                {
                     return;
                 }
                 _leaseRequestRunning = true;
             }
 
-            ThreadPool.QueueUserWorkItem(_ => {
-                try {
-                    EnsureLease(personId, context);
-                } catch (Exception ex) {
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    if (CloudPluginBridge.IsCloudWorkCurrent(generation)) EnsureLease(personId, context);
+                }
+                catch (Exception ex)
+                {
                     Helper.Log($"Cloud re-encounter lease background update failed: {ex.Message}", false, Helper.LogSeverity.Warning);
-                } finally {
-                    lock (LockObj) {
+                }
+                finally
+                {
+                    lock (LockObj)
+                    {
                         _leaseRequestRunning = false;
                     }
                 }
             });
         }
 
-        private static void QueueReleaseCurrent() {
-            ThreadPool.QueueUserWorkItem(_ => {
-                try {
+        private static void QueueReleaseCurrent()
+        {
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
                     ReleaseCurrent();
-                } catch (Exception ex) {
+                }
+                catch (Exception ex)
+                {
                     Helper.Log($"Cloud re-encounter lease background release failed: {ex.Message}", false, Helper.LogSeverity.Warning);
                 }
             });
         }
 
-        private static bool TryClaim(string personId, JObject context) {
+        private static bool TryClaim(string personId, JObject context)
+        {
             JObject response = SendLeaseRequest("/api/mdt/reencounter/claim", personId, null, context);
-            if (response == null || !(response.Value<bool?>("accepted") ?? false)) {
+            if (response == null || !(response.Value<bool?>("accepted") ?? false))
+            {
                 Helper.Log("Cloud re-encounter claim denied; skipped CDF overwrite for this person.", false, Helper.LogSeverity.Info);
                 return false;
             }
@@ -137,7 +187,8 @@ namespace MDTPro.Cloud {
             DateTimeOffset expires;
             if (string.IsNullOrWhiteSpace(token) || !DateTimeOffset.TryParse(response.Value<string>("expiresAtUtc"), out expires))
                 return false;
-            lock (LockObj) {
+            lock (LockObj)
+            {
                 _personId = personId;
                 _leaseToken = token;
                 _expiresAtUtc = expires;
@@ -146,9 +197,11 @@ namespace MDTPro.Cloud {
             return true;
         }
 
-        private static bool TryRenew(string personId, JObject context) {
+        private static bool TryRenew(string personId, JObject context)
+        {
             string token;
-            lock (LockObj) {
+            lock (LockObj)
+            {
                 if (!string.Equals(_personId, personId, StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(_leaseToken))
                     return false;
                 token = _leaseToken;
@@ -156,44 +209,65 @@ namespace MDTPro.Cloud {
             }
 
             JObject response = SendLeaseRequest("/api/mdt/reencounter/renew", personId, token, context);
-            if (response == null || !(response.Value<bool?>("accepted") ?? false)) {
+            if (response == null || !(response.Value<bool?>("accepted") ?? false))
+            {
                 lock (LockObj) ClearLocked();
                 Helper.Log("Cloud re-encounter lease could not be renewed; skipped CDF overwrite for this person.", false, Helper.LogSeverity.Info);
                 return false;
             }
             DateTimeOffset expires;
-            if (DateTimeOffset.TryParse(response.Value<string>("expiresAtUtc"), out expires)) {
+            if (DateTimeOffset.TryParse(response.Value<string>("expiresAtUtc"), out expires))
+            {
                 lock (LockObj) _expiresAtUtc = expires;
             }
             return true;
         }
 
-        private static JObject SendLeaseRequest(string path, string personId, string leaseToken, JObject context, bool retry = true) {
+        private static JObject SendLeaseRequest(string path, string personId, string leaseToken, JObject context, bool retry = true)
+        {
             if (CloudStopThePedBlock.ShouldBlockMdtCloudApiTraffic()) return null;
+            int generation = CloudPluginBridge.AuthGeneration;
+            if (!CloudPluginBridge.IsCloudWorkCurrent(generation)) return null;
             Config cfg = SetupController.GetConfig();
             CloudCredentials credentials = CloudCredentialStore.Load(cfg);
+            return SendLeaseRequest(path, personId, leaseToken, context, cfg, credentials, retry, generation);
+        }
+
+        private static JObject SendLeaseRequest(string path, string personId, string leaseToken, JObject context, Config cfg, CloudCredentials credentials, bool retry = true, int? generation = null)
+        {
+            if (CloudStopThePedBlock.ShouldBlockMdtCloudApiTraffic()) return null;
+            if (generation.HasValue && !CloudPluginBridge.IsCloudWorkCurrent(generation.Value)) return null;
             if (string.IsNullOrWhiteSpace(credentials.AccessToken) ||
                 string.IsNullOrWhiteSpace(credentials.DeviceToken) ||
-                string.IsNullOrWhiteSpace(cfg.cloudInstallId)) {
+                string.IsNullOrWhiteSpace(cfg.cloudInstallId))
+            {
                 return null;
             }
 
-            JObject body = new JObject {
+            JObject body = new JObject
+            {
                 ["installId"] = cfg.cloudInstallId,
                 ["personId"] = personId,
                 ["leaseToken"] = leaseToken,
                 ["context"] = context
             };
-            try {
-                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, CloudMode.ApiBaseUrl() + path)) {
+            try
+            {
+                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, CloudMode.ApiBaseUrl() + path))
+                {
                     request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", credentials.AccessToken);
                     request.Headers.TryAddWithoutValidation("X-MDT-Device-Token", credentials.DeviceToken);
                     request.Content = new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json");
-                    using (HttpResponseMessage response = Http.SendAsync(request).ConfigureAwait(false).GetAwaiter().GetResult()) {
+                    using (HttpResponseMessage response = Http.SendAsync(request).ConfigureAwait(false).GetAwaiter().GetResult())
+                    {
+                        if (generation.HasValue && !CloudPluginBridge.IsCloudWorkCurrent(generation.Value)) return null;
                         if (retry && (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden) &&
-                            CloudCredentialStore.TryRefresh(cfg, ref credentials)) {
-                            return SendLeaseRequest(path, personId, leaseToken, context, retry: false);
+                            (!generation.HasValue || CloudPluginBridge.IsCloudWorkCurrent(generation.Value)) &&
+                            CloudCredentialStore.TryRefresh(cfg, ref credentials))
+                        {
+                            return SendLeaseRequest(path, personId, leaseToken, context, cfg, credentials, retry: false, generation: generation);
                         }
+                        if (generation.HasValue && !CloudPluginBridge.IsCloudWorkCurrent(generation.Value)) return null;
                         if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
                             CloudCredentialStore.Clear();
                         if (!response.IsSuccessStatusCode) return null;
@@ -201,15 +275,19 @@ namespace MDTPro.Cloud {
                         return JObject.Parse(json);
                     }
                 }
-            } catch (Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 Helper.Log($"Cloud re-encounter lease request failed: {ex.Message}", false, Helper.LogSeverity.Warning);
                 return null;
             }
         }
 
-        private static JObject BuildContext(MDTProPedData ped) {
+        private static JObject BuildContext(MDTProPedData ped)
+        {
             if (ped == null) return null;
-            return JObject.FromObject(new {
+            return JObject.FromObject(new
+            {
                 name = ped.Name,
                 firstName = ped.FirstName,
                 lastName = ped.LastName,
@@ -221,15 +299,18 @@ namespace MDTPro.Cloud {
             });
         }
 
-        private static void ClearLocked() {
+        private static void ClearLocked()
+        {
             _personId = null;
             _leaseToken = null;
             _expiresAtUtc = DateTimeOffset.MinValue;
             _lastRenewAttemptUtc = DateTimeOffset.MinValue;
         }
 
-        private static void ClearAndCopyLease(out string personId, out string token) {
-            lock (LockObj) {
+        private static void ClearAndCopyLease(out string personId, out string token)
+        {
+            lock (LockObj)
+            {
                 personId = _personId;
                 token = _leaseToken;
                 ClearLocked();
