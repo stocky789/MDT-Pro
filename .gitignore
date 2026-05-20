@@ -43,9 +43,6 @@ x86/
 # Local-only export helper for mirroring MDT-Cloud into the public MDT-Pro repo.
 scripts/export-mdt-pro.local.sh
 
-# Local source-of-truth notes; do not publish.
-/Sources.txt
-
 # Ped catalogue fetch log (regenerate with scripts/fetchPedCatalogueImages.mjs)
 scripts/pedCatalogue_fetch_failures.txt
 
@@ -144,3 +141,4 @@ PERFORMANCE_ANALYSIS.md
 *~
 *.swp
 *.swo
+Sources.txt
