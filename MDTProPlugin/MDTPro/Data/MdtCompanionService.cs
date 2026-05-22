@@ -213,13 +213,20 @@ namespace MDTPro.Data
                 vehicleData = DataController.GetCachedNearbyVehicleByPlateOrVin(query);
                 if (vehicleData != null) selectedSource = "nearby-cache";
             }
-            if (vehicleData == null && !string.IsNullOrEmpty(query) && !wantsContext)
+            if (!string.IsNullOrEmpty(query) && !wantsContext)
             {
-                vehicleData = DataController.GetVehicleByPlateOrVin(query);
-                if (vehicleData != null)
-                    selectedSource = SetupController.GetConfig()?.localVehicleLookupDebugLogging == true
-                        ? DataController.GetVehicleStorageSource(vehicleData)
-                        : "cache-or-database";
+                MDTProVehicleData storedVehicleData = DataController.GetVehicleByPlateOrVin(query);
+                if (storedVehicleData != null)
+                {
+                    MDTProVehicleData selectedBeforeMerge = vehicleData;
+                    vehicleData = DataController.PreferRicherVehicleForDisplay(vehicleData, storedVehicleData);
+                    if (selectedBeforeMerge == null || object.ReferenceEquals(vehicleData, storedVehicleData))
+                    {
+                        selectedSource = SetupController.GetConfig()?.localVehicleLookupDebugLogging == true
+                            ? DataController.GetVehicleStorageSource(vehicleData)
+                            : "cache-or-database";
+                    }
+                }
             }
             if (vehicleData == null && !string.IsNullOrEmpty(query) && !wantsContext)
             {

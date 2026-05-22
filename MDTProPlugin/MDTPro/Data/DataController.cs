@@ -152,6 +152,9 @@ namespace MDTPro.Data
         private static MDTProVehicleData _lastContextVehicleData;
         private static DateTime _lastContextVehicleSetAt = DateTime.MinValue;
         private static readonly TimeSpan ContextVehicleTtl = TimeSpan.FromSeconds(60);
+        private static PoolHandle? _lastStopThePedVehicleHandle;
+        private static DateTime _lastStopThePedVehicleAt = DateTime.MinValue;
+        private static readonly TimeSpan LastStopThePedVehicleTtl = TimeSpan.FromMinutes(2);
 
         /// <summary>Maps recent-ID lookup key -> (handle, timestamp). Keys: <c>fullName</c> (weak, last ID wins); <c>fullName + '\u001f' + yyyy-MM-dd</c> when CDF DOB was known; <c>fullName + '\u001f' + m + 8-hex</c> from live <see cref="Rage.Ped"/>.<c>Model.Hash</c>. Lookup in <see cref="GetRecentlyIdentifiedPedHandle"/> tries DOB, then model, then name. CDF 1.0.0.8 <c>PedData</c> (NuGet) has no cross-session person id; true duplicate legal names in one DB would need a future surrogate key (<c>peds</c> is <c>Name</c> PK).
         /// </summary>
@@ -1472,6 +1475,29 @@ namespace MDTPro.Data
             if (source.InsuranceExpirationVerifiedFromLiveDocument) target.InsuranceExpirationVerifiedFromLiveDocument = true;
             if ((target.BOLOs == null || target.BOLOs.Length == 0) && source.BOLOs != null) target.BOLOs = source.BOLOs;
             target.IsStolen = target.IsStolen || source.IsStolen;
+        }
+
+        internal static MDTProVehicleData PreferRicherVehicleForDisplay(MDTProVehicleData selected, MDTProVehicleData candidate)
+        {
+            if (selected == null) return candidate;
+            if (candidate == null) return selected;
+
+            string selectedPlate = NormalizeVehiclePlateKey(selected.LicensePlate);
+            string candidatePlate = NormalizeVehiclePlateKey(candidate.LicensePlate);
+            string selectedVin = NormalizeVehicleVinKey(selected.VehicleIdentificationNumber);
+            string candidateVin = NormalizeVehicleVinKey(candidate.VehicleIdentificationNumber);
+            bool sameVehicle = (!string.IsNullOrEmpty(selectedPlate) && selectedPlate == candidatePlate)
+                || (!string.IsNullOrEmpty(selectedVin) && selectedVin == candidateVin);
+            if (!sameVehicle) return selected;
+
+            if (ShouldReplaceVehicleRow(selected, candidate))
+            {
+                MergeMissingVehicleFields(candidate, selected);
+                return candidate;
+            }
+
+            MergeMissingVehicleFields(selected, candidate);
+            return selected;
         }
 
         internal static string GetVehicleStorageSource(MDTProVehicleData vehicleData)
@@ -4103,6 +4129,16 @@ namespace MDTPro.Data
             }
         }
 
+        internal static void RememberStopThePedVehicleEvent(Vehicle vehicle)
+        {
+            if (!ModIntegration.SubscribedStopThePedStopEvents || vehicle == null || !vehicle.Exists()) return;
+            lock (_contextVehicleLock)
+            {
+                _lastStopThePedVehicleHandle = vehicle.Handle;
+                _lastStopThePedVehicleAt = DateTime.UtcNow;
+            }
+        }
+
         internal static MDTProVehicleData GetContextVehicleIfValid()
         {
             lock (_contextVehicleLock)
@@ -4115,6 +4151,176 @@ namespace MDTPro.Data
                 }
                 return _lastContextVehicleData;
             }
+        }
+
+        internal static Vehicle ResolveStopThePedVehicleForDocumentEvent(Ped ped, string eventName, bool persistToSql, out string selectedSource)
+        {
+            selectedSource = "none";
+            if (!ModIntegration.SubscribedStopThePedStopEvents || ped == null || !ped.IsValid()) return null;
+
+            var candidates = new List<(Vehicle Vehicle, string Source, int Bias)>();
+            void AddCandidate(Vehicle vehicle, string source, int bias)
+            {
+                try
+                {
+                    if (vehicle == null || !vehicle.Exists()) return;
+                    PoolHandle handle = vehicle.Handle;
+                    if (candidates.Any(c => c.Vehicle != null && c.Vehicle.Exists() && c.Vehicle.Handle == handle)) return;
+                    candidates.Add((vehicle, source, bias));
+                }
+                catch { }
+            }
+
+            try
+            {
+                if (ped.IsInAnyVehicle(false))
+                    AddCandidate(ped.CurrentVehicle, "ped-current-vehicle", 300);
+            }
+            catch { }
+
+            MDTProVehicleData context = GetContextVehicleIfValid();
+            try
+            {
+                if (context?.Holder != null && context.Holder.Exists())
+                    AddCandidate(context.Holder, "context-vehicle", 80);
+            }
+            catch { }
+
+            PoolHandle? lastHandle = null;
+            DateTime lastAt = DateTime.MinValue;
+            lock (_contextVehicleLock)
+            {
+                lastHandle = _lastStopThePedVehicleHandle;
+                lastAt = _lastStopThePedVehicleAt;
+            }
+            if (lastHandle.HasValue && DateTime.UtcNow - lastAt <= LastStopThePedVehicleTtl)
+            {
+                try
+                {
+                    Vehicle last = World.GetEntityByHandle<Vehicle>(lastHandle.Value);
+                    AddCandidate(last, "last-stp-vehicle-event", 70);
+                }
+                catch { }
+            }
+
+            try
+            {
+                Vehicle[] nearby = ped.GetNearbyVehicles(ClampRageNearbyPoolQueryCount(16));
+                if (nearby != null)
+                {
+                    foreach (Vehicle vehicle in nearby)
+                        AddCandidate(vehicle, "ped-nearby", 35);
+                }
+            }
+            catch { }
+
+            try
+            {
+                foreach (Vehicle vehicle in GetVehiclesNearPosition(ped.Position, 35f))
+                    AddCandidate(vehicle, "stop-ped-scene", 30);
+            }
+            catch { }
+
+            try
+            {
+                if (_stpStopScenePosition.HasValue && DateTime.UtcNow - _stpStopSceneUtc <= StpStopLocationMaxAge)
+                {
+                    foreach (Vehicle vehicle in GetVehiclesNearPosition(_stpStopScenePosition.Value, 45f))
+                        AddCandidate(vehicle, "recent-stp-scene", 25);
+                }
+            }
+            catch { }
+
+            try
+            {
+                if (Main.Player != null && Main.Player.Exists())
+                {
+                    float radius = ClampDistanceMeters(SetupController.GetConfig().explicitNearbyVehicleScanRadiusMeters, 95f, 25f, 250f);
+                    foreach (Vehicle vehicle in GetVehiclesNearPosition(Main.Player.Position, radius))
+                        AddCandidate(vehicle, "player-nearby", 10);
+                }
+            }
+            catch { }
+
+            Vehicle best = null;
+            string bestSource = "none";
+            double bestScore = double.MinValue;
+            string pedName = TryGetLivePedName(ped);
+            foreach (var candidate in candidates)
+            {
+                Vehicle vehicle = candidate.Vehicle;
+                if (vehicle == null || !vehicle.Exists()) continue;
+                double score = candidate.Bias;
+                float distance = 9999f;
+                try
+                {
+                    distance = (float)DistanceMeters(ped.Position, vehicle.Position);
+                    score += Math.Max(0d, 60d - distance);
+                }
+                catch { }
+                try
+                {
+                    Ped driver = vehicle.Driver;
+                    if (driver != null && driver.IsValid() && driver.Handle == ped.Handle)
+                        score += 500;
+                    else if (driver != null && driver.IsValid())
+                    {
+                        string driverName = TryGetLivePedName(driver);
+                        if (!string.IsNullOrWhiteSpace(driverName) && !string.IsNullOrWhiteSpace(pedName)
+                            && string.Equals(driverName, pedName, StringComparison.OrdinalIgnoreCase))
+                            score += 200;
+                    }
+                }
+                catch { }
+                try
+                {
+                    var cdf = vehicle.GetVehicleData();
+                    string owner = cdf?.Owner?.FullName?.Trim();
+                    if (!string.IsNullOrWhiteSpace(owner) && !string.IsNullOrWhiteSpace(pedName)
+                        && string.Equals(owner, pedName, StringComparison.OrdinalIgnoreCase))
+                        score += 120;
+                }
+                catch { }
+                try
+                {
+                    string plate = TryResolveLiveVehiclePlate(vehicle, out _);
+                    if (!string.IsNullOrWhiteSpace(plate) && context != null && VehicleMatchesLookup(context, plate))
+                        score += 40;
+                }
+                catch { }
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    best = vehicle;
+                    bestSource = candidate.Source;
+                }
+            }
+
+            if (best == null || !best.Exists()) return null;
+            selectedSource = bestSource;
+            RememberStopThePedVehicleEvent(best);
+            ResolveVehicleAndDriverForStop(best, persistToSql);
+            LogStopThePedVehicleDocumentDebug(eventName, ped, best, bestSource, null, null, false);
+            return best;
+        }
+
+        private static string TryGetLivePedName(Ped ped)
+        {
+            if (ped == null || !ped.IsValid()) return null;
+            try
+            {
+                string cdf = ped.GetPedData()?.FullName?.Trim();
+                if (!string.IsNullOrWhiteSpace(cdf)) return cdf;
+            }
+            catch { }
+            try
+            {
+                string persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(ped)?.FullName?.Trim();
+                if (!string.IsNullOrWhiteSpace(persona)) return persona;
+            }
+            catch { }
+            return null;
         }
 
         internal static bool VehicleMatchesLookup(MDTProVehicleData vehicleData, string query)
@@ -4228,8 +4434,16 @@ namespace MDTPro.Data
                     MergeBOLOsFromStubByPlate(selected);
                 }
                 GtaVVehicleMakeModelCatalog.TryEnrichFromSpawnName(selected.ModelName, selected);
-                if (ModIntegration.SubscribedStopThePedStopEvents && (allowLiveWorldScan || VehicleHasLiveHolder(selected)))
-                    TryRefreshVehicleDocumentsFromLiveWorld(selected);
+                // PR and Cloud keep their existing CDF/bridge paths. The STP API overlay is local-only and only
+                // runs when MDT Pro subscribed to StopThePed stop events; Cloud traffic remains blocked elsewhere.
+                if (ModIntegration.SubscribedStopThePedStopEvents)
+                {
+                    bool stpRefreshed = false;
+                    if (allowLiveWorldScan || VehicleHasLiveHolder(selected))
+                        stpRefreshed = TryRefreshVehicleDocumentsFromLiveWorld(selected, selectedSource ?? "display-hydration");
+                    if (!stpRefreshed && ShouldClearUnverifiedStopThePedDocumentDates(selectedSource))
+                        ClearUnverifiedStopThePedDocumentDates(selected);
+                }
                 TrySyncVehicleOwnerWantedFromCdf(selected);
                 AddOrReplaceVehicleInLiveVehicleDatabase(selected);
                 UpsertCachedNearbyVehicleFromResolvedVehicle(selected);
@@ -4337,7 +4551,7 @@ namespace MDTPro.Data
         }
 
         /// <summary>StopThePed-only: resolves live <see cref="Vehicle"/> (Holder or world scan by plate), copies CDF reg/ins, then STP status API. Must run on the game fiber — <see cref="TryRefreshVehicleDocumentsFromLiveWorld"/> marshals from HTTP.</summary>
-        private static bool TryRefreshVehicleDocumentsFromLiveWorldExecute(MDTProVehicleData vehicleData)
+        private static bool TryRefreshVehicleDocumentsFromLiveWorldExecute(MDTProVehicleData vehicleData, string source = null)
         {
             if (!ModIntegration.SubscribedStopThePedStopEvents) return false;
             if (vehicleData == null || string.IsNullOrWhiteSpace(vehicleData.LicensePlate)) return false;
@@ -4375,12 +4589,33 @@ namespace MDTPro.Data
             try { cdf = live.GetVehicleData(); } catch { }
             if (cdf != null)
                 vehicleData.CopyRegistrationInsuranceFromCdf(cdf);
-            bool stp = TryOverlayStopThePedVehicleDocStatusFromApi(vehicleData, live);
+            bool stp = TryOverlayStopThePedVehicleDocStatusFromApi(vehicleData, live, source ?? "live-world-refresh");
             return cdf != null || stp;
         }
 
+        private static bool ShouldClearUnverifiedStopThePedDocumentDates(string selectedSource)
+        {
+            if (!ModIntegration.SubscribedStopThePedStopEvents) return false;
+            if (string.IsNullOrWhiteSpace(selectedSource)) return false;
+            return selectedSource.Equals("context", StringComparison.OrdinalIgnoreCase)
+                || selectedSource.Equals("nearby-cache", StringComparison.OrdinalIgnoreCase)
+                || selectedSource.Equals("live-world", StringComparison.OrdinalIgnoreCase)
+                || selectedSource.Equals("mdt-database", StringComparison.OrdinalIgnoreCase)
+                || selectedSource.Equals("persisted-database", StringComparison.OrdinalIgnoreCase)
+                || selectedSource.Equals("cache-or-database", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void ClearUnverifiedStopThePedDocumentDates(MDTProVehicleData vehicleData)
+        {
+            if (vehicleData == null) return;
+            vehicleData.RegistrationExpiration = null;
+            vehicleData.RegistrationExpirationVerifiedFromLiveDocument = false;
+            vehicleData.InsuranceExpiration = null;
+            vehicleData.InsuranceExpirationVerifiedFromLiveDocument = false;
+        }
+
         /// <summary>StopThePed-only: registration/insurance in Vehicle Search must match STP’s doc check. RAGE entity + STP APIs are not reliable from the HTTP thread — run on game fiber (blocking when called from pool).</summary>
-        internal static bool TryRefreshVehicleDocumentsFromLiveWorld(MDTProVehicleData vehicleData)
+        internal static bool TryRefreshVehicleDocumentsFromLiveWorld(MDTProVehicleData vehicleData, string source = null)
         {
             if (!ModIntegration.SubscribedStopThePedStopEvents || vehicleData == null || string.IsNullOrWhiteSpace(vehicleData.LicensePlate))
                 return false;
@@ -4389,7 +4624,7 @@ namespace MDTPro.Data
             {
                 if (GameFiber.CanSleepNow)
                 {
-                    result = TryRefreshVehicleDocumentsFromLiveWorldExecute(vehicleData);
+                    result = TryRefreshVehicleDocumentsFromLiveWorldExecute(vehicleData, source);
                 }
                 else
                 {
@@ -4397,7 +4632,7 @@ namespace MDTPro.Data
                         return false;
                     if (!GameFiberHttpBridge.TryExecuteBlocking(() =>
                     {
-                        result = TryRefreshVehicleDocumentsFromLiveWorldExecute(vehicleData);
+                        result = TryRefreshVehicleDocumentsFromLiveWorldExecute(vehicleData, source);
                     }, 2500, out var docEx))
                     {
                         Helper.Log("TryRefreshVehicleDocumentsFromLiveWorld: timed out waiting for game fiber (paused game?).", false, Helper.LogSeverity.Warning);
@@ -4418,10 +4653,13 @@ namespace MDTPro.Data
         internal static bool TryRefreshVehicleDocumentsForCloudLookup(MDTProVehicleData vehicleData, string query)
         {
             if (vehicleData == null) return false;
+            // Cloud/STP traffic is blocked by CloudStopThePedBlock. Keep cloud lookups from directly invoking
+            // StopThePed document reflection even if this helper is reached from a future bridge path.
+            if (CloudStopThePedBlock.ShouldBlockMdtCloudApiTraffic()) return false;
             bool liveContext = IsContextVehicleLookup(vehicleData, query);
             // Non-context cloud lookups may still point at a live nearby vehicle; refresh only succeeds when the
             // vehicle can be resolved in the live world by holder or nearby plate scan.
-            bool refreshed = TryRefreshVehicleDocumentsFromLiveWorld(vehicleData);
+            bool refreshed = TryRefreshVehicleDocumentsFromLiveWorld(vehicleData, "cloud-lookup");
             if (!refreshed) return false;
             try
             {
@@ -4466,7 +4704,7 @@ namespace MDTPro.Data
                             if (live == null || !live.Exists()) return;
                             MDTProVehicleData vehicleData = GetVehicleByPlateOrVin(plate) ?? new MDTProVehicleData(live);
                             if (string.IsNullOrWhiteSpace(vehicleData.LicensePlate)) return;
-                            bool refreshed = TryRefreshVehicleDocumentsFromLiveWorld(vehicleData);
+                            bool refreshed = TryRefreshVehicleDocumentsFromLiveWorld(vehicleData, source);
                             if (!refreshed) continue;
                             if (vehicleData.CDFVehicleData != null)
                                 MergeBOLOsFromStubByPlate(vehicleData);
@@ -4491,35 +4729,71 @@ namespace MDTPro.Data
         }
 
         /// <summary>STP stop integration: sets registration/insurance status strings from StopThePed public API (matches in-game plate/doc checks). Call on game thread.</summary>
-        internal static bool TryOverlayStopThePedVehicleDocStatusFromApi(MDTProVehicleData vehicleData, Vehicle live)
+        internal static bool TryOverlayStopThePedVehicleDocStatusFromApi(MDTProVehicleData vehicleData, Vehicle live, string source = null)
         {
             if (!ModIntegration.SubscribedStopThePedStopEvents || vehicleData == null || live == null || !live.Exists()) return false;
             bool any = false;
-            if (StpReflectionHelper.TryGetVehicleRegistrationDocumentStp(live, out string reg, out string regExpiration))
+            string cdfReg = vehicleData.RegistrationStatus;
+            string cdfIns = vehicleData.InsuranceStatus;
+            string stpReg = null;
+            string stpIns = null;
+            if (StpReflectionHelper.TryGetVehicleRegistrationDocumentStp(live, out string reg, out string regExpiration)
+                && !string.IsNullOrWhiteSpace(reg))
             {
-                vehicleData.RegistrationStatus = string.IsNullOrWhiteSpace(reg) ? "Error" : reg;
+                stpReg = NormalizeStopThePedVehicleDocumentStatus(reg);
+                vehicleData.RegistrationStatus = stpReg;
                 ApplyStopThePedVehicleDocumentExpiration(regExpiration, ref vehicleData.RegistrationExpiration, ref vehicleData.RegistrationExpirationVerifiedFromLiveDocument);
                 any = true;
             }
             else
             {
-                vehicleData.RegistrationStatus = "Error";
-                ApplyStopThePedVehicleDocumentExpiration(null, ref vehicleData.RegistrationExpiration, ref vehicleData.RegistrationExpirationVerifiedFromLiveDocument);
-                any = true;
+                stpReg = "read-failed";
             }
-            if (StpReflectionHelper.TryGetVehicleInsuranceDocumentStp(live, out string ins, out string insExpiration))
+            if (StpReflectionHelper.TryGetVehicleInsuranceDocumentStp(live, out string ins, out string insExpiration)
+                && !string.IsNullOrWhiteSpace(ins))
             {
-                vehicleData.InsuranceStatus = string.IsNullOrWhiteSpace(ins) ? "Error" : ins;
+                stpIns = NormalizeStopThePedVehicleDocumentStatus(ins);
+                vehicleData.InsuranceStatus = stpIns;
                 ApplyStopThePedVehicleDocumentExpiration(insExpiration, ref vehicleData.InsuranceExpiration, ref vehicleData.InsuranceExpirationVerifiedFromLiveDocument);
                 any = true;
             }
             else
             {
-                vehicleData.InsuranceStatus = "Error";
-                ApplyStopThePedVehicleDocumentExpiration(null, ref vehicleData.InsuranceExpiration, ref vehicleData.InsuranceExpirationVerifiedFromLiveDocument);
-                any = true;
+                stpIns = "read-failed";
             }
+            LogStopThePedVehicleDocumentDebug(source ?? "stp-api", null, live, source ?? "stp-api", cdfReg, cdfIns, any, stpReg, stpIns);
             return any;
+        }
+
+        private static string NormalizeStopThePedVehicleDocumentStatus(string status)
+        {
+            string value = status?.Trim();
+            if (string.IsNullOrWhiteSpace(value)) return "None";
+            if (value.Equals("Valid", StringComparison.OrdinalIgnoreCase)) return "Valid";
+            if (value.Equals("Expired", StringComparison.OrdinalIgnoreCase)) return "Expired";
+            if (value.Equals("None", StringComparison.OrdinalIgnoreCase)) return "None";
+            return value;
+        }
+
+        private static void LogStopThePedVehicleDocumentDebug(string eventName, Ped ped, Vehicle live, string source, string cdfReg, string cdfIns, bool saved, string stpReg = null, string stpIns = null)
+        {
+            try
+            {
+                if (SetupController.GetConfig()?.localVehicleLookupDebugLogging != true) return;
+                string pedText = "n/a";
+                if (ped != null && ped.IsValid())
+                    pedText = $"{ped.Handle}:{TryGetLivePedName(ped) ?? "unknown"}";
+                string vehicleText = "none";
+                if (live != null && live.Exists())
+                {
+                    string plate = TryResolveLiveVehiclePlate(live, out _);
+                    string model = null;
+                    try { model = live.Model.Name; } catch { }
+                    vehicleText = $"{live.Handle}:{plate ?? ""}:{model ?? ""}";
+                }
+                Helper.Log($"[VehicleLookup][STPDocs] event={eventName ?? ""} ped={pedText} vehicle={vehicleText} source={source ?? ""} cdfReg={cdfReg ?? ""} cdfIns={cdfIns ?? ""} stpReg={stpReg ?? ""} stpIns={stpIns ?? ""} saved={(saved ? "yes" : "no")}", false, Helper.LogSeverity.Info);
+            }
+            catch { }
         }
 
         private static void ApplyStopThePedVehicleDocumentExpiration(string stpExpiration, ref string expiration, ref bool verifiedFromLiveDocument)

@@ -154,6 +154,7 @@ namespace MDTPro.EventListeners {
                 }
 
                 if (kind == "vehicle" && args != null && args.Length >= 1 && args[0] is Vehicle veh && veh.Exists()) {
+                    DataController.RememberStopThePedVehicleEvent(veh);
                     DataController.TouchStopThePedStopScene(veh.Position);
                     if (eventName == "askPassengerIdEvent") {
                         // RAM + search UX only; SQLite vehicle row when registration/insurance is run (see ped-side STP handlers).
@@ -215,7 +216,7 @@ namespace MDTPro.EventListeners {
                 if (eventName == "askRegistrationEvent" || eventName == "askInsuranceEvent") {
                     string documentType = eventName == "askRegistrationEvent" ? "Registration" : "Insurance";
                     DataController.ResolvePedForReEncounter(ped, persistToSql: false);
-                    Vehicle vehicle = TryAssociateVehicleForStoppedPed(ped, persistVehicleToSql: true);
+                    Vehicle vehicle = TryResolveVehicleForStopThePedDocumentEvent(ped, eventName, persistVehicleToSql: true);
                     if (!DataController.AddVehicleDocumentIdentificationEventForOwner(vehicle, documentType))
                         DataController.AddIdentificationEvent(ped, documentType);
                     DataController.ScheduleDelayedPedDocumentRefresh(ped, documentType + " (STP)");
@@ -300,6 +301,17 @@ namespace MDTPro.EventListeners {
                 }
             } catch { /* ignore */ }
             return null;
+        }
+
+        /// <summary>STP document events provide only a ped. Resolve the live vehicle locally so STP's own registration/insurance API wins over cached MDT rows.</summary>
+        private static Vehicle TryResolveVehicleForStopThePedDocumentEvent(Ped ped, string eventName, bool persistVehicleToSql = false) {
+            try {
+                string source;
+                Vehicle vehicle = DataController.ResolveStopThePedVehicleForDocumentEvent(ped, eventName, persistVehicleToSql, out source);
+                if (vehicle != null && vehicle.Exists())
+                    return vehicle;
+            } catch { /* fall back to the older current-vehicle association */ }
+            return TryAssociateVehicleForStoppedPed(ped, persistVehicleToSql);
         }
     }
 }

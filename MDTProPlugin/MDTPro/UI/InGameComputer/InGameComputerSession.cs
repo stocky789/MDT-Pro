@@ -12,7 +12,7 @@ using System.Linq;
 
 namespace MDTPro.UI.InGameComputer {
     internal sealed class InGameComputerSession {
-        private const int MouseWheelScrollRows = 3;
+        private const int MouseWheelScrollRows = 1;
         private const int ActionTitleMax = 48;
         private const int ActionAltTitleMax = 24;
         private const int ReadOnlyTitleMax = 48;
