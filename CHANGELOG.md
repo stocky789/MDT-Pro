@@ -9,7 +9,7 @@ All notable changes to MDT Pro are documented here.
 - **MDT Cloud portal** - Added the official hosted MDT Cloud platform with account sign-in, in-game Cloud login, live plugin connection status, shift tracking, and synced patrol data.
 - **Cloud-connected MDT workflow** - The portal can work with live in-game context for person and vehicle lookups, recent IDs, ALPR activity, BOLO updates, citation handoff, backup/panic actions, reports, court data, and shared people/vehicle records.
 
-## [0.9.9.4] - 2026-05-16
+## [0.9.9.4] - 2026-05-22
 
 ### Major Features
 
@@ -25,6 +25,7 @@ All notable changes to MDT Pro are documented here.
 - **Court** - Added custody credits, sentence breakdowns, and structured probation/parole supervision records across MDT Cloud and MDT Pro.
 - **In-game menu key** - One key opens the MDT Pro menu for ALPR, game work mode, cloud sign-in, and **Hand pending citation** (StopThePed path); set it with **`SettingsMenuKey`** in `MDTPro.ini` (shipped default **F10** when nothing valid is set).
 - **Citation suspect lines** - Polite responses are mixed in so it is not always hostile; bundled `citationPedReactions.json` updates when you go on duty if the bundled copy is newer. Turn suspect subtitles off from the in-game MDT Pro menu (or Config) if you stream.
+- Added performance mod selection to the in-game MDT Pro menu.
 
 ### Bug Fixes
 
