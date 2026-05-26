@@ -36,6 +36,25 @@ namespace MDTPro.ServerAPI
             return whenAvailableFail;
         }
 
+        private static DateTime GetCurrentShiftTimestamp()
+        {
+            DateTime shiftTime = DateTime.Now;
+            Exception bridgeError;
+            bool ran = GameFiberHttpBridge.TryExecuteBlocking(() =>
+            {
+                shiftTime = DataController.GetCurrentShiftTimestamp();
+            }, 1500, out bridgeError, "legacy-shift-time", GameWorkJobTrigger.HttpBridge, GameWorkPriority.Interactive);
+
+            if (!ran || bridgeError != null)
+            {
+                string reason = bridgeError != null ? bridgeError.Message : "timed out";
+                Utility.Helper.Log($"[modifyCurrentShift] In-game time unavailable; using real time. {reason}", false, Utility.Helper.LogSeverity.Warning);
+                shiftTime = DateTime.Now;
+            }
+
+            return shiftTime;
+        }
+
         private static readonly HashSet<string> ProtectedConfigKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
             "storageMode",
             "cloudApiBaseUrl",
@@ -223,7 +242,7 @@ namespace MDTPro.ServerAPI
                     try
                     {
                         var data = JsonConvert.DeserializeAnonymousType(bodyCallout, new { action = (string)null, calloutId = (string)null, message = (string)null });
-                        action = data?.action?.Trim().ToLowerInvariant();
+                        action = CalloutActionHelper.NormalizeAction(data?.action);
                         calloutId = data?.calloutId?.Trim();
                         sendMessage = data?.message;
                     }
@@ -236,10 +255,10 @@ namespace MDTPro.ServerAPI
                     status = 400;
                     return;
                 }
-                var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "accept", "enroute", "en_route", "sendmessage", "send_message" };
+                var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "attach", "enroute", "sendmessage", "close" };
                 if (string.IsNullOrEmpty(action) || !allowed.Contains(action))
                 {
-                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "action must be 'accept', 'enRoute', or 'sendMessage' (optional message)." }));
+                    buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = false, error = "action must be 'attach', 'enRoute', 'sendMessage', or 'close'." }));
                     contentType = "application/json";
                     status = 400;
                     return;
@@ -251,10 +270,16 @@ namespace MDTPro.ServerAPI
                     CalloutActionHelper.CalloutActionResult.Ok => 200,
                     CalloutActionHelper.CalloutActionResult.NotFound => 404,
                     CalloutActionHelper.CalloutActionResult.BadState => 409,
+                    CalloutActionHelper.CalloutActionResult.Unsupported => 501,
                     _ => 500
                 };
+                if (ok)
+                {
+                    WebSocketHandler.BroadcastCalloutPayload();
+                    MDTPro.Cloud.CloudPluginBridge.RequestSessionRefresh();
+                }
                 buffer = Encoding.UTF8.GetBytes(ok
-                    ? JsonConvert.SerializeObject(new { success = true })
+                    ? JsonConvert.SerializeObject(new { success = true, message = outcome.Message })
                     : JsonConvert.SerializeObject(new { success = false, error = outcome.Message }));
                 contentType = "application/json";
                 status = httpStatus;
@@ -281,9 +306,7 @@ namespace MDTPro.ServerAPI
                     status = 400;
                     return;
                 }
-                CalloutEvents.CadUnitStatus = statusText;
-                CalloutInterfaceCadPublisher.TryPublishCadUnitStatus(statusText);
-                WebSocketHandler.BroadcastCalloutPayload();
+                CalloutEvents.SetCadUnitStatus(statusText);
                 buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { success = true }));
                 contentType = "application/json";
                 status = 200;
@@ -421,43 +444,24 @@ namespace MDTPro.ServerAPI
                     status = 400;
                     return;
                 }
-                Exception shiftFiberError = null;
-                bool ran;
-                if (action.Equals("start", StringComparison.OrdinalIgnoreCase))
+                try
                 {
-                    ran = GameFiberHttpBridge.TryExecuteBlocking(() =>
+                    DateTime shiftTime = GetCurrentShiftTimestamp();
+                    if (action.Equals("start", StringComparison.OrdinalIgnoreCase))
+                        DataController.StartCurrentShift(shiftTime);
+                    else if (action.Equals("end", StringComparison.OrdinalIgnoreCase))
+                        DataController.EndCurrentShift(shiftTime);
+                    else
                     {
-                        try { DataController.StartCurrentShift(); }
-                        catch (Exception ex) { shiftFiberError = ex; }
-                    }, 5000, out var bridgeStartErr);
-                    if (bridgeStartErr != null) shiftFiberError = shiftFiberError ?? bridgeStartErr;
+                        buffer = Encoding.UTF8.GetBytes("Bad Request - Invalid Action");
+                        contentType = "text/plain";
+                        status = 400;
+                        return;
+                    }
                 }
-                else if (action.Equals("end", StringComparison.OrdinalIgnoreCase))
+                catch (Exception ex)
                 {
-                    ran = GameFiberHttpBridge.TryExecuteBlocking(() =>
-                    {
-                        try { DataController.EndCurrentShift(); }
-                        catch (Exception ex) { shiftFiberError = ex; }
-                    }, 5000, out var bridgeEndErr);
-                    if (bridgeEndErr != null) shiftFiberError = shiftFiberError ?? bridgeEndErr;
-                }
-                else
-                {
-                    buffer = Encoding.UTF8.GetBytes("Bad Request - Invalid Action");
-                    contentType = "text/plain";
-                    status = 400;
-                    return;
-                }
-                if (!ran)
-                {
-                    buffer = Encoding.UTF8.GetBytes("Shift control timed out (game busy or paused). Try again.");
-                    contentType = "text/plain";
-                    status = 503;
-                    return;
-                }
-                if (shiftFiberError != null)
-                {
-                    Utility.Helper.Log($"[modifyCurrentShift] {shiftFiberError.Message}", true, Utility.Helper.LogSeverity.Error);
+                    Utility.Helper.Log($"[modifyCurrentShift] {ex.Message}", true, Utility.Helper.LogSeverity.Error);
                     buffer = Encoding.UTF8.GetBytes("Shift control failed.");
                     contentType = "text/plain";
                     status = 500;

@@ -50,6 +50,10 @@ body {
   font-weight: 400;
 }
 
+.searchResponseWrapper .inputWrapper > div.hasVehicleImage input {
+  padding-right: 58px;
+}
+
 .searchResponseWrapper .inputWrapper > div img {
   position: absolute;
   top: 50%;

@@ -15,7 +15,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <Version>0.9.9.2</Version>
+    <Version>0.9.9.6</Version>
     <!-- Different from LSPDFR plugin MDTPro.dll — same filename there would break RPH. -->
     <AssemblyName>MDTProNative</AssemblyName>
     <AssemblyTitle>MDT Pro</AssemblyTitle>

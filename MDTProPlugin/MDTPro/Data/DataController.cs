@@ -3343,14 +3343,43 @@ namespace MDTPro.Data
 
         internal static void StartCurrentShift()
         {
-            currentShiftData.startTime = SetupController.GetConfig().useInGameTime ? DateTime.ParseExact(World.TimeOfDay.ToString(), "HH:mm:ss", CultureInfo.InvariantCulture) : DateTime.Now;
+            StartCurrentShift(null);
+        }
+
+        internal static DateTime GetCurrentShiftTimestamp()
+        {
+            if (!SetupController.GetConfig().useInGameTime) return DateTime.Now;
+
+            try
+            {
+                TimeSpan gameTime = TimeSpan.ParseExact(World.TimeOfDay.ToString(), "hh\\:mm\\:ss", CultureInfo.InvariantCulture);
+                return DateTime.Today.Add(gameTime);
+            }
+            catch
+            {
+                return DateTime.Now;
+            }
+        }
+
+        internal static void StartCurrentShift(DateTime? startTimeOverride)
+        {
+            currentShiftData.startTime = startTimeOverride ?? GetCurrentShiftTimestamp();
         }
 
         internal static void EndCurrentShift()
         {
+            EndCurrentShift(null);
+        }
+
+        internal static void EndCurrentShift(DateTime? endTimeOverride)
+        {
             if (currentShiftData.startTime == null) return;
 
-            currentShiftData.endTime = SetupController.GetConfig().useInGameTime ? DateTime.ParseExact(World.TimeOfDay.ToString(), "HH:mm:ss", CultureInfo.InvariantCulture) : DateTime.Now;
+            DateTime endTime = endTimeOverride ?? GetCurrentShiftTimestamp();
+            if (currentShiftData.startTime.HasValue && endTime < currentShiftData.startTime.Value)
+                endTime = endTime.AddDays(1);
+
+            currentShiftData.endTime = endTime;
             shiftHistoryData.Add(currentShiftData);
             Database.SaveShift(currentShiftData);
             currentShiftData = new ShiftData();
@@ -11380,33 +11409,72 @@ namespace MDTPro.Data
 
         private static OfficerInformationData GetOfficerInformation()
         {
-            LSPD_First_Response.Engine.Scripting.Entities.Persona persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(Main.Player);
+            OfficerInformationData existing = OfficerInformationData ?? OfficerInformation ?? new OfficerInformationData();
 
-            string scriptName = null;
             try
             {
-                scriptName = LSPD_First_Response.Mod.API.Functions.GetCurrentAgencyScriptName();
-            }
-            catch
-            {
-                /* ignore */
-            }
+                LSPD_First_Response.Engine.Scripting.Entities.Persona persona = null;
+                try
+                {
+                    if (Main.Player != null && Main.Player.IsValid())
+                    {
+                        persona = LSPD_First_Response.Mod.API.Functions.GetPersonaForPed(Main.Player);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Helper.Log($"Officer info persona lookup failed: {ex.Message}", false, Helper.LogSeverity.Warning);
+                }
 
-            OfficerInformationData result = new OfficerInformationData
-            {
-                agency = Helper.GetAgencyNameFromScriptName(scriptName) ?? scriptName,
-                agencyScriptName = scriptName,
-                firstName = persona.Forename,
-                lastName = persona.Surname,
-                callSign = DependencyCheck.IsIPTCommonAvailable() ? Helper.GetCallSignFromIPTCommon() : null
-            };
+                string scriptName = null;
+                try
+                {
+                    scriptName = LSPD_First_Response.Mod.API.Functions.GetCurrentAgencyScriptName();
+                }
+                catch (Exception ex)
+                {
+                    Helper.Log($"Officer info agency lookup failed: {ex.Message}", false, Helper.LogSeverity.Warning);
+                }
 
-            return result;
+                string callSign = null;
+                try
+                {
+                    callSign = DependencyCheck.IsIPTCommonAvailable() ? Helper.GetCallSignFromIPTCommon() : null;
+                }
+                catch (Exception ex)
+                {
+                    Helper.Log($"Officer info callsign lookup failed: {ex.Message}", false, Helper.LogSeverity.Warning);
+                }
+
+                return new OfficerInformationData
+                {
+                    agency = Helper.GetAgencyNameFromScriptName(scriptName) ?? scriptName ?? existing.agency,
+                    agencyScriptName = scriptName ?? existing.agencyScriptName,
+                    firstName = persona?.Forename ?? existing.firstName,
+                    lastName = persona?.Surname ?? existing.lastName,
+                    rank = existing.rank,
+                    badgeNumber = existing.badgeNumber,
+                    callSign = callSign ?? existing.callSign
+                };
+            }
+            catch (Exception ex)
+            {
+                Helper.Log($"Officer info refresh failed: {ex.Message}", false, Helper.LogSeverity.Warning);
+                return existing;
+            }
         }
 
         internal static void SetOfficerInformation()
         {
-            OfficerInformation = GetOfficerInformation();
+            try
+            {
+                OfficerInformation = GetOfficerInformation() ?? OfficerInformation ?? OfficerInformationData ?? new OfficerInformationData();
+            }
+            catch (Exception ex)
+            {
+                Helper.Log($"SetOfficerInformation failed: {ex.Message}", false, Helper.LogSeverity.Warning);
+                if (OfficerInformation == null) OfficerInformation = OfficerInformationData ?? new OfficerInformationData();
+            }
         }
 
         /// <summary>Game thread: refresh last-known STP stop coordinates so report/taskbar location matches the traffic stop.</summary>

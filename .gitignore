@@ -54,18 +54,6 @@ MDTPro/images/peds/
 
 # Node (e.g. dev-server.js)
 node_modules/
-cloud/portal/node_modules/
-
-# MDT web mirror + Vite output under API wwwroot (rebuilt by prepare-wwwroot.sh / Docker)
-cloud/src/MDTCloud.Api/wwwroot/app/
-cloud/src/MDTCloud.Api/wwwroot/pages/
-cloud/src/MDTCloud.Api/wwwroot/scripts/
-cloud/src/MDTCloud.Api/wwwroot/styles/
-cloud/src/MDTCloud.Api/wwwroot/style/
-cloud/src/MDTCloud.Api/wwwroot/script/
-# Copied from MDTPro/images/peds by prepare-wwwroot.sh (do not commit binaries)
-cloud/src/MDTCloud.Api/wwwroot/image/peds/*
-!cloud/src/MDTCloud.Api/wwwroot/image/peds/.gitkeep
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -99,6 +87,7 @@ STP/
 UltimateBackup/
 LemonUI-master/
 CalloutInterfaceAPI/
+CalloutInterfaceAPI-master/
 # ---- Secrets / env (never commit) ----
 .env
 .env.*
@@ -106,7 +95,6 @@ CalloutInterfaceAPI/
 .sentryclirc
 sentry.properties
 *.pfx
-cloud/backups/
 
 # ---- Test & coverage ----
 # Playwright / e2e output (hyphenated name; [Tt]est[Rr]esult* does not match)

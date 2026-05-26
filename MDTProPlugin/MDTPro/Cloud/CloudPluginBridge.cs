@@ -1,5 +1,7 @@
 using MDTPro.Setup;
 using MDTPro.Data;
+using MDTPro.EventListeners;
+using MDTPro.ServerAPI;
 using MDTPro.Utility;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -27,6 +29,7 @@ namespace MDTPro.Cloud
         private static readonly object StatusLock = new object();
         private static readonly object LspdfrShiftStateLock = new object();
         private static readonly AutoResetEvent PollWake = new AutoResetEvent(false);
+        private static readonly string PluginRuntimeId = Guid.NewGuid().ToString("N");
         private static int _lspdfrShiftStartPending;
         private static string _trackedLspdfrShiftId;
         private static DateTimeOffset? _trackedLspdfrShiftStartedUtc;
@@ -377,6 +380,57 @@ namespace MDTPro.Cloud
             result = new JObject { ["source"] = "plugin" };
             string name = command.Value<string>("command") ?? "";
             JObject payload = command["payload"] as JObject ?? command["Payload"] as JObject;
+            string normalizedCalloutAction = CalloutActionHelper.NormalizeAction(name);
+            if (normalizedCalloutAction == "attach" || normalizedCalloutAction == "close" || normalizedCalloutAction == "enroute" || normalizedCalloutAction == "sendmessage")
+            {
+                string calloutId = payload?.Value<string>("calloutId") ?? payload?.Value<string>("id") ?? command.Value<string>("calloutId") ?? "";
+                string message = payload?.Value<string>("message") ?? command.Value<string>("message");
+                if (!CalloutCommandSnapshotMatches(payload, out string staleReason))
+                {
+                    result["success"] = false;
+                    result["calloutId"] = calloutId;
+                    result["source"] = "plugin";
+                    result["snapshotVersion"] = CalloutEvents.CalloutSnapshotVersion;
+                    result["error"] = staleReason;
+                    return false;
+                }
+                var outcome = CalloutActionHelper.RunOnGameThread(normalizedCalloutAction, calloutId, message);
+                bool ok = outcome.Result == CalloutActionHelper.CalloutActionResult.Ok;
+                result["success"] = ok;
+                result["calloutId"] = calloutId;
+                result["source"] = "plugin";
+                result["snapshotVersion"] = CalloutEvents.CalloutSnapshotVersion;
+                if (!string.IsNullOrWhiteSpace(outcome.Message))
+                {
+                    if (ok) result["message"] = outcome.Message;
+                    else result["error"] = outcome.Message;
+                }
+                if (ok)
+                {
+                    WebSocketHandler.BroadcastCalloutPayload();
+                    RequestSessionRefresh();
+                }
+                return ok;
+            }
+            if (normalizedCalloutAction == "calloutcadstatus")
+            {
+                string statusText = payload?.Value<string>("status") ?? payload?.Value<string>("cadUnitStatus") ?? command.Value<string>("status") ?? "";
+                if (string.IsNullOrWhiteSpace(statusText))
+                {
+                    result["success"] = false;
+                    result["source"] = "plugin";
+                    result["error"] = "status is required.";
+                    result["snapshotVersion"] = CalloutEvents.CalloutSnapshotVersion;
+                    return false;
+                }
+                if (statusText.Length > 120) statusText = statusText.Substring(0, 120);
+                CalloutEvents.SetCadUnitStatus(statusText);
+                result["success"] = true;
+                result["source"] = "plugin";
+                result["snapshotVersion"] = CalloutEvents.CalloutSnapshotVersion;
+                result["message"] = "CAD unit status updated.";
+                return true;
+            }
             if (name.Equals("vehicleLookup", StringComparison.OrdinalIgnoreCase))
             {
                 string query = payload?.Value<string>("query") ?? payload?.Value<string>("plate") ?? payload?.Value<string>("licensePlate") ?? "";
@@ -837,6 +891,26 @@ namespace MDTPro.Cloud
             }
         }
 
+        private static bool CalloutCommandSnapshotMatches(JObject payload, out string reason)
+        {
+            reason = null;
+            string runtimeId = payload?.Value<string>("pluginRuntimeId");
+            if (!string.IsNullOrWhiteSpace(runtimeId) && !string.Equals(runtimeId, PluginRuntimeId, StringComparison.Ordinal))
+            {
+                reason = "Callout command is stale for this plugin runtime.";
+                return false;
+            }
+
+            long? snapshotVersion = payload?.Value<long?>("snapshotVersion") ?? payload?.Value<long?>("expectedSnapshotVersion");
+            if (snapshotVersion.HasValue && snapshotVersion.Value != CalloutEvents.CalloutSnapshotVersion)
+            {
+                reason = "Callout snapshot is stale. Refresh the callout list.";
+                return false;
+            }
+
+            return true;
+        }
+
         private static void ShowBuddyMessageFromPayload(JObject payload)
         {
             string rank = payload.Value<string>("senderRank") ?? "";
@@ -921,14 +995,22 @@ namespace MDTPro.Cloud
                     locationJson = JsonConvert.SerializeObject(DataController.MdtPreferredLocation);
             }
             catch { /* leave null */ }
+            var calloutSnapshot = CalloutEvents.BuildCloudSnapshot();
             JObject body = new JObject
             {
                 ["installId"] = cfg.cloudInstallId,
+                ["pluginRuntimeId"] = PluginRuntimeId,
                 ["currentLocation"] = locationJson,
                 ["contextPed"] = contextPed,
                 ["contextVehicle"] = contextVehicle ?? new JObject { ["source"] = "nearby-cache", ["count"] = nearbyVehicles.Count },
                 ["nearbyVehicles"] = nearbyVehicles,
                 ["recentIds"] = BuildRecentIds(),
+                ["callouts"] = JArray.FromObject(calloutSnapshot.callouts),
+                ["cadUnitStatus"] = calloutSnapshot.cadUnitStatus,
+                ["calloutSnapshotObservedAtUtc"] = calloutSnapshot.observedAtUtc.ToString("o"),
+                ["calloutsUpdatedAtUtc"] = calloutSnapshot.updatedAtUtc.ToString("o"),
+                ["calloutSnapshotVersion"] = calloutSnapshot.calloutSnapshotVersion,
+                ["calloutCapabilities"] = JObject.FromObject(calloutSnapshot.capabilities),
                 ["observedAtUtc"] = DateTimeOffset.UtcNow.ToString("o")
             };
             if (_roundTripMsToReportOnNextSessionPost.HasValue)
@@ -1195,6 +1277,7 @@ namespace MDTPro.Cloud
                 ["status"] = status,
                 ["result"] = result ?? new JObject { ["source"] = "plugin" }
             };
+            body["result"]["pluginRuntimeId"] = PluginRuntimeId;
             using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, CloudMode.ApiBaseUrl() + $"/api/mdt/plugin/commands/{id}/ack?installId={Uri.EscapeDataString(cfg.cloudInstallId)}"))
             {
                 AddCloudHeaders(request, credentials);

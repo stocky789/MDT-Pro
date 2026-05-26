@@ -14,8 +14,10 @@ using System.Threading.Tasks;
 using static MDTPro.Setup.Language.Callout;
 using static MDTPro.Utility.Helper;
 
-namespace MDTPro.ServerAPI {
-    internal class WebSocketHandler {
+namespace MDTPro.ServerAPI
+{
+    internal class WebSocketHandler
+    {
         private static readonly List<WebSocket> WebSockets = new List<WebSocket>();
         private static readonly HashSet<WebSocket> AlprSubscribers = new HashSet<WebSocket>();
         private static readonly HashSet<WebSocket> CalloutSubscribers = new HashSet<WebSocket>();
@@ -25,52 +27,65 @@ namespace MDTPro.ServerAPI {
         private static readonly object WebSocketLock = new Object();
         private static readonly Dictionary<WebSocket, CancellationTokenSource> IntervalTokens = new Dictionary<WebSocket, CancellationTokenSource>();
 
-        internal static async void HandleWebSocket(HttpListenerContext ctx) {
+        internal static async void HandleWebSocket(HttpListenerContext ctx)
+        {
             WebSocket webSocket = null;
             Action shiftHistoryHandler = null;
             CalloutEvents.CalloutEventHandler calloutEventHandler = null;
 
-            void UnsubscribeIfNeeded() {
-                if (shiftHistoryHandler != null) {
+            void UnsubscribeIfNeeded()
+            {
+                if (shiftHistoryHandler != null)
+                {
                     DataController.ShiftHistoryUpdated -= shiftHistoryHandler;
                     shiftHistoryHandler = null;
                 }
-                if (calloutEventHandler != null) {
+                if (calloutEventHandler != null)
+                {
                     CalloutEvents.OnCalloutEvent -= calloutEventHandler;
                     calloutEventHandler = null;
                 }
             }
 
-            try {
+            try
+            {
                 HttpListenerWebSocketContext wsContext = await ctx.AcceptWebSocketAsync(null);
                 webSocket = wsContext.WebSocket;
                 byte[] buffer = new byte[1024];
 
-                lock (WebSocketLock) {
+                lock (WebSocketLock)
+                {
                     WebSockets.Add(webSocket);
                 }
 
                 if (SetupController.GetConfig().verboseFileLogging)
                     Log($"New WebSocket #{WebSockets.IndexOf(webSocket)}", false, LogSeverity.Info);
 
-                while (webSocket.State == WebSocketState.Open && Server.RunServer) {
+                while (webSocket.State == WebSocketState.Open && Server.RunServer)
+                {
                     var result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
 
-                    if (result.MessageType == WebSocketMessageType.Close) {
+                    if (result.MessageType == WebSocketMessageType.Close)
+                    {
                         break;
                     }
 
                     string clientMsg = Encoding.UTF8.GetString(buffer, 0, result.Count).Trim();
 
-                    if (clientMsg.StartsWith("interval/")) {
+                    if (clientMsg.StartsWith("interval/"))
+                    {
                         string intervalMsg = clientMsg.Substring("interval/".Length);
                         CancellationTokenSource cts = new CancellationTokenSource();
-                        lock (WebSocketLock) {
+                        lock (WebSocketLock)
+                        {
                             IntervalTokens[webSocket] = cts;
                         }
                         await SendUpdatesOnInterval(webSocket, clientMsg.Substring("interval/".Length), cts.Token);
-                    } else {
-                        switch (clientMsg) {
+                    }
+                    else
+                    {
+                        switch (clientMsg)
+                        {
                             case "ping":
                                 await SendData(webSocket, "\"Pong!\"", clientMsg);
                                 break;
@@ -79,7 +94,8 @@ namespace MDTPro.ServerAPI {
                                 await SendData(webSocket, "\"subscribed\"", clientMsg);
                                 break;
                             case "shiftHistoryUpdated":
-                                shiftHistoryHandler = () => {
+                                shiftHistoryHandler = () =>
+                                {
                                     if (webSocket.State != WebSocketState.Open || !Server.RunServer) return;
                                     SendData(webSocket, "\"Shift history updated\"", clientMsg).Wait();
                                 };
@@ -89,7 +105,8 @@ namespace MDTPro.ServerAPI {
                                 lock (WebSocketLock) { CalloutSubscribers.Add(webSocket); }
                                 SendData(webSocket, BuildCalloutPayloadJson(), clientMsg).Wait();
 
-                                calloutEventHandler = (calloutInfo) => {
+                                calloutEventHandler = (calloutInfo) =>
+                                {
                                     if (webSocket.State != WebSocketState.Open || !Server.RunServer) return;
                                     SendData(webSocket, BuildCalloutPayloadJson(), clientMsg).Wait();
                                 };
@@ -105,55 +122,74 @@ namespace MDTPro.ServerAPI {
                         }
                     }
                 }
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 if (Server.RunServer) Log($"WebSocket Error: {e.Message}", false, LogSeverity.Error);
-            } finally {
+            }
+            finally
+            {
                 UnsubscribeIfNeeded();
-                if (webSocket != null) {
-                    lock (WebSocketLock) {
+                if (webSocket != null)
+                {
+                    lock (WebSocketLock)
+                    {
                         WebSockets.Remove(webSocket);
                         AlprSubscribers.Remove(webSocket);
                         CalloutSubscribers.Remove(webSocket);
                         DataInvalidationSubscribers.Remove(webSocket);
-                        if (IntervalTokens.TryGetValue(webSocket, out var cts)) {
+                        if (IntervalTokens.TryGetValue(webSocket, out var cts))
+                        {
                             try { cts.Cancel(); } catch { }
                             IntervalTokens.Remove(webSocket);
                         }
                     }
-                    if (webSocket.State == WebSocketState.Open) {
-                        try {
+                    if (webSocket.State == WebSocketState.Open)
+                    {
+                        try
+                        {
                             webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None).Wait(500);
-                        } catch { }
+                        }
+                        catch { }
                     }
                 }
             }
         }
 
-        private static Task SendUpdatesOnInterval(WebSocket webSocket, string clientMsg, CancellationToken token) {
-            return Task.Run(async () => {
+        private static Task SendUpdatesOnInterval(WebSocket webSocket, string clientMsg, CancellationToken token)
+        {
+            return Task.Run(async () =>
+            {
                 if (IsPerformanceDiagnosticLoggingEnabled())
                     Log($"[Perf] WebSocket interval started: {clientMsg}", false, LogSeverity.Info);
                 int intervalMs = Config.PerfCaptureIntervalMs.WebSocket;
-                try {
+                try
+                {
                     int iv = SetupController.GetConfig().webSocketUpdateInterval;
                     if (iv < 50) iv = 50;
                     intervalMs = iv;
-                } catch {
+                }
+                catch
+                {
                     /* keep default */
                 }
                 string lastLocationJson = null;
                 string lastCoordsJson = null;
-                try {
-                    while (webSocket.State == WebSocketState.Open && Server.RunServer && !token.IsCancellationRequested) {
+                try
+                {
+                    while (webSocket.State == WebSocketState.Open && Server.RunServer && !token.IsCancellationRequested)
+                    {
                         string responseMsg;
-                        switch (clientMsg) {
+                        switch (clientMsg)
+                        {
                             case "playerLocation":
                                 // Mark visible taskbar demand; the scheduler resolves address data on its passive cadence
                                 // only while a client is actively watching it.
                                 DataController.MarkMdtLocationDemand();
                                 responseMsg = JsonConvert.SerializeObject(DataController.MdtPreferredLocation);
 
-                                if (responseMsg != lastLocationJson) {
+                                if (responseMsg != lastLocationJson)
+                                {
                                     lastLocationJson = responseMsg;
                                     await SendData(webSocket, responseMsg, clientMsg, token);
                                 }
@@ -167,7 +203,8 @@ namespace MDTPro.ServerAPI {
                             case "playerCoords":
                                 responseMsg = JsonConvert.SerializeObject(DataController.PlayerCoords);
 
-                                if (responseMsg != lastCoordsJson) {
+                                if (responseMsg != lastCoordsJson)
+                                {
                                     lastCoordsJson = responseMsg;
                                     await SendData(webSocket, responseMsg, clientMsg, token);
                                 }
@@ -179,34 +216,43 @@ namespace MDTPro.ServerAPI {
 
                         await Task.Delay(intervalMs, token);
                     }
-                } catch (OperationCanceledException) {
-                } catch (WebSocketException wse) when (wse.InnerException?.Message.Contains("nonexistent network connection") ?? false) {
+                }
+                catch (OperationCanceledException)
+                {
+                }
+                catch (WebSocketException wse) when (wse.InnerException?.Message.Contains("nonexistent network connection") ?? false)
+                {
                     Log("WebSocket lost", false, LogSeverity.Warning);
-                } catch (Exception e) {
+                }
+                catch (Exception e)
+                {
                     string innerMessage = e.InnerException != null ? $"Inner: {e.InnerException.Message}" : "";
                     Log($"WebSocket Error on interval: {e.Message}{innerMessage}", false, LogSeverity.Error);
                 }
             });
         }
 
-        internal static string BuildCalloutPayloadJson() {
-            return JsonConvert.SerializeObject(new {
-                callouts = CalloutEvents.CalloutList,
-                cadUnitStatus = CalloutEvents.CadUnitStatus ?? ""
-            });
+        internal static string BuildCalloutPayloadJson()
+        {
+            return JsonConvert.SerializeObject(CalloutEvents.BuildLocalLegacySnapshot());
         }
 
         /// <summary>Pushes the latest callout list + CAD unit status to all <c>calloutEvent</c> subscribers (e.g. after <c>POST /post/cadUnitStatus</c>).</summary>
-        internal static void BroadcastCalloutPayload() {
+        internal static void BroadcastCalloutPayload()
+        {
             string inner = BuildCalloutPayloadJson();
             string msg = $"{{\"response\":{inner},\"request\":\"calloutEvent\"}}";
             byte[] bytes = Encoding.UTF8.GetBytes(msg);
-            lock (WebSocketLock) {
-                foreach (var ws in new List<WebSocket>(CalloutSubscribers)) {
-                    try {
+            lock (WebSocketLock)
+            {
+                foreach (var ws in new List<WebSocket>(CalloutSubscribers))
+                {
+                    try
+                    {
                         if (ws.State == WebSocketState.Open)
                             ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, System.Threading.CancellationToken.None);
-                    } catch { }
+                    }
+                    catch { }
                 }
             }
         }
@@ -214,12 +260,14 @@ namespace MDTPro.ServerAPI {
         /// <summary>Notify subscribed clients that <paramref name="scope"/> data changed. Per-scope coalesce
         /// (~250 ms) absorbs event bursts (e.g. STP firing license + registration + insurance back-to-back)
         /// without flooding the WS or the client refresh handlers.</summary>
-        internal static void BroadcastDataInvalidation(string scope) {
+        internal static void BroadcastDataInvalidation(string scope)
+        {
             string safeScope = string.IsNullOrWhiteSpace(scope) ? "all" : scope.Trim();
             DateTime now = DateTime.UtcNow;
             byte[] bytes;
             List<WebSocket> targets;
-            lock (WebSocketLock) {
+            lock (WebSocketLock)
+            {
                 if (DataInvalidationSubscribers.Count == 0) return;
                 if (DataInvalidationLastSentUtc.TryGetValue(safeScope, out DateTime last)
                     && (now - last).TotalMilliseconds < DataInvalidationCoalesceMs)
@@ -230,15 +278,19 @@ namespace MDTPro.ServerAPI {
                 bytes = Encoding.UTF8.GetBytes(msg);
                 targets = new List<WebSocket>(DataInvalidationSubscribers);
             }
-            foreach (var ws in targets) {
-                try {
+            foreach (var ws in targets)
+            {
+                try
+                {
                     if (ws.State == WebSocketState.Open)
                         ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
-                } catch { }
+                }
+                catch { }
             }
         }
 
-        private static async Task SendData(WebSocket webSocket, string data, string clientMsg, CancellationToken token = default) {
+        private static async Task SendData(WebSocket webSocket, string data, string clientMsg, CancellationToken token = default)
+        {
             string responseMsg = $"{{ \"response\": {data}, \"request\": \"{clientMsg}\" }}";
 
             await webSocket.SendAsync(
@@ -250,9 +302,11 @@ namespace MDTPro.ServerAPI {
         }
 
         /// <summary>Broadcast ALPR hit to subscribed clients.</summary>
-        internal static void BroadcastALPRHit(ALPRHit hit) {
+        internal static void BroadcastALPRHit(ALPRHit hit)
+        {
             if (hit == null) return;
-            string json = JsonConvert.SerializeObject(new {
+            string json = JsonConvert.SerializeObject(new
+            {
                 plate = hit.Plate,
                 owner = hit.Owner,
                 modelDisplayName = hit.ModelDisplayName,
@@ -262,20 +316,27 @@ namespace MDTPro.ServerAPI {
             });
             string msg = $"{{\"response\":{json},\"request\":\"alprSubscribe\"}}";
             byte[] bytes = Encoding.UTF8.GetBytes(msg);
-            lock (WebSocketLock) {
-                foreach (var ws in new List<WebSocket>(AlprSubscribers)) {
-                    try {
+            lock (WebSocketLock)
+            {
+                foreach (var ws in new List<WebSocket>(AlprSubscribers))
+                {
+                    try
+                    {
                         if (ws.State == WebSocketState.Open)
                             ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, System.Threading.CancellationToken.None);
-                    } catch { }
+                    }
+                    catch { }
                 }
             }
         }
 
-        internal static async Task CloseAllWebSockets() {
+        internal static async Task CloseAllWebSockets()
+        {
             WebSocket[] webSocketsArr;
-            lock (WebSocketLock) {
-                foreach (var cts in IntervalTokens.Values) {
+            lock (WebSocketLock)
+            {
+                foreach (var cts in IntervalTokens.Values)
+                {
                     cts.Cancel();
                 }
                 IntervalTokens.Clear();
@@ -288,14 +349,19 @@ namespace MDTPro.ServerAPI {
                 WebSockets.Clear();
             }
 
-            foreach (WebSocket webSocket in webSocketsArr) {
-                try {
-                    if (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.CloseReceived) {
+            foreach (WebSocket webSocket in webSocketsArr)
+            {
+                try
+                {
+                    if (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.CloseReceived)
+                    {
                         if (SetupController.GetConfig().verboseFileLogging)
                             Log($"Closing WebSocket #{Array.IndexOf(webSocketsArr, webSocket)}", false, LogSeverity.Info);
                         await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
                     }
-                } catch (Exception e) {
+                }
+                catch (Exception e)
+                {
                     Log($"WebSocket close error: {e.Message}", false, LogSeverity.Warning);
                 }
             }

@@ -81,6 +81,9 @@ const placeholderVehicles = [
   { LicensePlate: '4FUN555', ModelDisplayName: 'Dominator', ModelName: 'DOMINATOR', Make: 'Vapid', Owner: 'Mike Johnson', Color: 'Red', VinStatus: 'Valid', VehicleIdentificationNumber: '3HGBH41JXMN109188', IsStolen: true, BOLOs: null, RegistrationStatus: 'Suspended', RegistrationExpiration: '2024-01-10', InsuranceStatus: 'Expired', InsuranceExpiration: '2023-12-01' },
   { LicensePlate: '22SAHP01', ModelDisplayName: 'Buffalo', ModelName: 'BUFFALO', Make: 'Bravado', Owner: 'Sarah Davis', Color: 'Blue', VinStatus: 'Valid', VehicleIdentificationNumber: '4HGBH41JXMN109189', IsStolen: false, BOLOs: null, RegistrationStatus: 'Valid', RegistrationExpiration: '2026-08-30', InsuranceStatus: 'Valid', InsuranceExpiration: '2026-09-15' },
   { LicensePlate: 'PLATE99', ModelDisplayName: 'Sandking', ModelName: 'SANDKING', Make: 'Vapid', Owner: 'Tom Miller', Color: 'Green', VinStatus: 'Scratched', VehicleIdentificationNumber: null, IsStolen: false, BOLOs: null, RegistrationStatus: 'Valid', RegistrationExpiration: '2026-12-01', InsuranceStatus: 'Valid', InsuranceExpiration: '2026-11-20' },
+  { LicensePlate: 'DOCSONLY', ModelDisplayName: 'Oracle', ModelName: 'ORACLE', Make: 'Ubermacht', Owner: 'Jane Smith', Color: 'Black', VinStatus: 'Valid', VehicleIdentificationNumber: 'DOCSONLY00000001', IsStolen: false, BOLOs: null, RegistrationStatus: 'Valid', RegistrationExpiration: null, InsuranceStatus: 'Expired', InsuranceExpiration: null },
+  { LicensePlate: 'DOCLONG', ModelDisplayName: 'Extremely Long Display Name Vehicle Used For Layout Testing', ModelName: 'SULTANRS', Make: 'Karin With Long Make Text', Owner: 'Very Long Owner Name For Overflow Testing', Color: 'Metallic Midnight Purple / Worn Graphite Secondary', VinStatus: 'Scratched', VehicleIdentificationNumber: 'LONGVIN1234567890FULLSCREEN', IsStolen: false, BOLOs: null, RegistrationStatus: 'Suspended', RegistrationExpiration: '2024-01-10', InsuranceStatus: 'Valid', InsuranceExpiration: '2027-01-10' },
+  { licensePlate: 'CAMELDOC', modelDisplayName: 'Camel Case Payload Car', modelName: 'ASEA', make: 'Declasse', ownerName: 'John Doe', color: 'White', vinStatus: 'Valid', vehicleIdentificationNumber: 'CAMELCASE0000001', isStolen: false, bolos: null, registrationStatus: 'Valid', registrationExpiration: '2026-08-15', insuranceStatus: 'Valid', insuranceExpiration: '2026-09-15' },
 ];
 
 function getRecentIds() {
@@ -230,6 +233,9 @@ const mockConfig = {
   showListeningAddressNotification: true,
 };
 
+let mockCurrentShift = {};
+const mockShiftHistory = [];
+
 const mockLanguage = {
   index: {
     title: 'MDT Pro',
@@ -360,6 +366,19 @@ const mockLanguage = {
     static: { title: 'Customization', sidebar: { plugins: 'Plugins', config: 'Config' } },
     plugins: { version: 'Version', author: 'Author', noPlugins: 'No plugins installed.' },
   },
+  values: {
+    empty: '',
+    true: 'Yes',
+    false: 'No',
+    Valid: 'Valid',
+    Expired: 'Expired',
+    Suspended: 'Suspended',
+    Revoked: 'Revoked',
+    None: 'None',
+    Scratched: 'Scratched',
+    wanted: 'Wanted',
+    notWanted: 'Not wanted',
+  },
   units: {
     year: 'y', month: 'mo', day: 'd', hour: 'h', minute: 'm', second: 's',
     currencySymbol: '$', life: 'Life', meters: 'm', kilometers: 'km', feet: 'ft', miles: 'mi',
@@ -469,7 +488,7 @@ const server = http.createServer((req, res) => {
     serveFile(res, filePath, contentType, true);
     return;
   } else if (url === '/version') {
-    send(res, 200, '1.0.0-dev', 'text/plain');
+    send(res, 200, '0.9.9.5-dev', 'text/plain');
     return;
   } else if (url === '/config') {
     send(res, 200, JSON.stringify(mockConfig), 'application/json');
@@ -561,7 +580,7 @@ const server = http.createServer((req, res) => {
     }), 'application/json');
     return;
   } else if (url === '/data/currentShift') {
-    send(res, 200, JSON.stringify({}), 'application/json');
+    send(res, 200, JSON.stringify(mockCurrentShift), 'application/json');
     return;
   } else if (url === '/data/shiftHistory') {
     const d = new Date();
@@ -570,7 +589,7 @@ const server = http.createServer((req, res) => {
       { startTime: new Date(d.getFullYear(), d.getMonth(), 5, 7, 0).toISOString(), endTime: new Date(d.getFullYear(), d.getMonth(), 5, 15, 0).toISOString(), reports: [] },
       { startTime: new Date(d.getFullYear(), d.getMonth(), 12, 20, 0).toISOString(), endTime: new Date(d.getFullYear(), d.getMonth(), 13, 4, 0).toISOString(), reports: [] },
     ];
-    send(res, 200, JSON.stringify(mockShifts), 'application/json');
+    send(res, 200, JSON.stringify([...mockShifts, ...mockShiftHistory]), 'application/json');
     return;
   } else if (url === '/data/citationReports') {
     const d = new Date();
@@ -649,7 +668,11 @@ const server = http.createServer((req, res) => {
   } else if (req.method === 'POST' && (url === '/data/specificVehicle' || url === '/data/specificVehicle/')) {
     readBody(req).then(body => {
       const plateOrVin = parseNameOrPlate(body).toUpperCase();
-      const vehicle = placeholderVehicles.find(v => v.LicensePlate && (v.LicensePlate.toUpperCase() === plateOrVin || (v.VehicleIdentificationNumber && v.VehicleIdentificationNumber.toUpperCase() === plateOrVin)));
+      const vehicle = placeholderVehicles.find(v => {
+        const plate = v.LicensePlate || v.licensePlate;
+        const vin = v.VehicleIdentificationNumber || v.vehicleIdentificationNumber;
+        return plate && (plate.toUpperCase() === plateOrVin || (vin && vin.toUpperCase() === plateOrVin));
+      });
       send(res, 200, JSON.stringify(vehicle != null ? vehicle : null), 'application/json');
     }).catch(() => send(res, 500, 'Error reading body', 'text/plain'));
     return;
@@ -672,12 +695,12 @@ const server = http.createServer((req, res) => {
     readBody(req).then(body => {
       const limit = Math.min(20, Math.max(1, parseInt(body, 10) || 8));
       const list = placeholderVehicles.slice(0, limit).map(v => ({
-        LicensePlate: v.LicensePlate,
-        VehicleIdentificationNumber: v.VehicleIdentificationNumber,
-        ModelDisplayName: v.ModelDisplayName,
-        Owner: v.Owner,
+        LicensePlate: v.LicensePlate || v.licensePlate,
+        VehicleIdentificationNumber: v.VehicleIdentificationNumber || v.vehicleIdentificationNumber,
+        ModelDisplayName: v.ModelDisplayName || v.modelDisplayName,
+        Owner: v.Owner || v.ownerName,
         Distance: 10 + Math.floor(Math.random() * 50),
-        IsStolen: v.IsStolen,
+        IsStolen: v.IsStolen || v.isStolen,
       }));
       send(res, 200, JSON.stringify(list), 'application/json');
     }).catch(() => send(res, 200, JSON.stringify(placeholderVehicles.slice(0, 8)), 'application/json'));
@@ -746,6 +769,34 @@ const server = http.createServer((req, res) => {
     return;
   } else if (req.method === 'POST' && url === '/post/attachReportToArrest') {
     readBody(req).then(() => send(res, 200, 'OK', 'text/plain')).catch(() => send(res, 200, 'OK', 'text/plain'));
+    return;
+  } else if (req.method === 'POST' && url === '/post/modifyCurrentShift') {
+    readBody(req).then(body => {
+      let action = (body || '').trim();
+      if (action.startsWith('"') && action.endsWith('"')) {
+        try { action = JSON.parse(action); } catch (_) {}
+      } else if (action.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(action);
+          action = parsed.action || parsed.Action || '';
+        } catch (_) {}
+      }
+      action = String(action || '').trim().toLowerCase();
+      if (action === 'start') {
+        mockCurrentShift = { startTime: new Date().toISOString(), reports: [] };
+        send(res, 200, 'OK', 'text/plain');
+        return;
+      }
+      if (action === 'end') {
+        if (mockCurrentShift.startTime) {
+          mockShiftHistory.push({ ...mockCurrentShift, endTime: new Date().toISOString() });
+        }
+        mockCurrentShift = {};
+        send(res, 200, 'OK', 'text/plain');
+        return;
+      }
+      send(res, 400, 'Bad Request - Invalid Action', 'text/plain');
+    }).catch(() => send(res, 500, 'Error reading body', 'text/plain'));
     return;
   } else if (url.startsWith('/page/')) {
     const name = url.slice('/page/'.length).replace(/\.html$/, '') || 'index';

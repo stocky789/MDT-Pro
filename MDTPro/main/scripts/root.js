@@ -79,11 +79,19 @@ const mdtBridgeAuth = (() => {
     return pathname === segment || pathname.startsWith(`${segment}/`)
   }
 
+  function isLocalBridgeOrigin(url) {
+    return (
+      url.protocol === 'http:' &&
+      (url.hostname === '127.0.0.1' || url.hostname === 'localhost' || url.hostname === '[::1]')
+    )
+  }
+
   function needsCsrf(input, init) {
     const method = String(init?.method || (typeof input !== 'string' ? input.method : '') || 'GET').toUpperCase()
     if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return false
     try {
       const url = new URL(typeof input === 'string' ? input : input.url, location.href)
+      if (isLocalBridgeOrigin(url)) return false
       if (url.origin !== location.origin || csrfExemptPaths.has(url.pathname)) return false
       return startsWithSegment(url.pathname, '/post') || startsWithSegment(url.pathname, '/data') || startsWithSegment(url.pathname, '/api')
     } catch (_) {
@@ -420,9 +428,10 @@ function copyToClipboard(text) {
 
 async function getLanguageValue(value) {
   const language = await getLanguage()
+  const values = language.values || {}
   if (value === '' || value === null || value === undefined)
-    return language.values.empty
-  return language.values[value] || value
+    return values.empty || ''
+  return values[value] || value
 }
 
 async function openInPedSearch(pedName) {

@@ -3,6 +3,7 @@
 
   let currentDate = new Date()
   let reportsByDate = {}
+  let selectedDateKey = dateKey(new Date())
 
   const monthTitle = document.querySelector('.monthTitle')
   const prevBtn = document.querySelector('.navBtn.prev')
@@ -18,11 +19,11 @@
 
   async function loadReports() {
     const [citations, arrests, incidents, shiftHistory, currentShift] = await Promise.all([
-      fetch('/data/citationReports').then((r) => r.json()).catch(() => []),
-      fetch('/data/arrestReports').then((r) => r.json()).catch(() => []),
-      fetch('/data/incidentReports').then((r) => r.json()).catch(() => []),
-      fetch('/data/shiftHistory').then((r) => r.json()).catch(() => []),
-      fetch('/data/currentShift').then((r) => r.json()).catch(() => ({})),
+      fetchJsonArray('/data/citationReports'),
+      fetchJsonArray('/data/arrestReports'),
+      fetchJsonArray('/data/incidentReports'),
+      fetchJsonArray('/data/shiftHistory'),
+      fetchJsonObject('/data/currentShift'),
     ])
 
     const map = {}
@@ -44,36 +45,67 @@
       if (d && !isNaN(d)) add(dateKey(d), 'incidents', r)
     }
 
-    for (const shift of shiftHistory || []) {
-      if (shift.startTime) {
-        const d = new Date(shift.startTime)
+    for (const shift of shiftHistory) {
+      const startTime = shiftTimeValue(shift, 'startTime')
+      const endTime = shiftTimeValue(shift, 'endTime')
+      if (startTime) {
+        const d = new Date(startTime)
         if (!isNaN(d)) {
           const key = dateKey(d)
           if (!map[key]) map[key] = { arrests: [], citations: [], incidents: [], shifts: [] }
-          map[key].shifts.push({ type: 'onDuty', time: shift.startTime })
+          map[key].shifts.push({ type: 'onDuty', time: startTime })
         }
       }
-      if (shift.endTime) {
-        const d = new Date(shift.endTime)
+      if (endTime) {
+        const d = new Date(endTime)
         if (!isNaN(d)) {
           const key = dateKey(d)
           if (!map[key]) map[key] = { arrests: [], citations: [], incidents: [], shifts: [] }
-          map[key].shifts.push({ type: 'offDuty', time: shift.endTime })
+          map[key].shifts.push({ type: 'offDuty', time: endTime })
         }
       }
     }
-    if (currentShift && currentShift.startTime) {
-      const d = new Date(currentShift.startTime)
+    const currentShiftStart = shiftTimeValue(currentShift, 'startTime')
+    if (currentShiftStart) {
+      const d = new Date(currentShiftStart)
       if (!isNaN(d)) {
         const key = dateKey(d)
         if (!map[key]) map[key] = { arrests: [], citations: [], incidents: [], shifts: [] }
         map[key].shifts = map[key].shifts || []
-        map[key].shifts.push({ type: 'onDuty', time: currentShift.startTime })
+        map[key].shifts.push({ type: 'onDuty', time: currentShiftStart })
       }
     }
 
     reportsByDate = map
     return map
+  }
+
+  async function fetchJsonArray(url) {
+    try {
+      const response = await fetch(url, { cache: 'no-store' })
+      if (!response.ok) return []
+      const data = await response.json()
+      return Array.isArray(data) ? data : []
+    } catch (_) {
+      return []
+    }
+  }
+
+  async function fetchJsonObject(url) {
+    try {
+      const response = await fetch(url, { cache: 'no-store' })
+      if (!response.ok) return {}
+      const data = await response.json()
+      return data && typeof data === 'object' && !Array.isArray(data) ? data : {}
+    } catch (_) {
+      return {}
+    }
+  }
+
+  function shiftTimeValue(shift, camelKey) {
+    if (!shift || typeof shift !== 'object') return null
+    const pascalKey = camelKey.charAt(0).toUpperCase() + camelKey.slice(1)
+    return shift[camelKey] || shift[pascalKey] || null
   }
 
   function dateKey(d) {
@@ -106,13 +138,15 @@
       const data = reportsByDate[key] || { arrests: [], citations: [], incidents: [], shifts: [] }
       const total = data.arrests.length + data.citations.length + data.incidents.length
       const hasShift = (data.shifts && data.shifts.length) > 0
+      const isToday = key === dateKey(new Date())
+      const isSelected = key === selectedDateKey
       const badges = []
       if (data.arrests.length) badges.push(`<span class="badge arrest" title="${data.arrests.length} arrest(s)">${data.arrests.length}</span>`)
       if (data.citations.length) badges.push(`<span class="badge citation" title="${data.citations.length} citation(s)">${data.citations.length}</span>`)
       if (data.incidents.length) badges.push(`<span class="badge incident" title="${data.incidents.length} incident(s)">${data.incidents.length}</span>`)
       if (hasShift) badges.push(`<span class="badge shift" title="Shift">Shift</span>`)
       cells.push(
-        `<div class="dayCell${total || hasShift ? ' hasActivity' : ''}" data-date="${key}">
+        `<div class="dayCell${total || hasShift ? ' hasActivity' : ''}${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}" data-date="${key}">
           <span class="dayNum">${d}</span>
           ${badges.length ? `<div class="badges">${badges.join('')}</div>` : ''}
         </div>`
@@ -121,11 +155,13 @@
     daysEl.innerHTML = cells.join('')
 
     daysEl.querySelectorAll('.dayCell[data-date]').forEach((cell) => {
-      cell.addEventListener('click', () => showDay(cell.dataset.date))
+      cell.addEventListener('click', () => showDay(cell.dataset.date, true))
     })
   }
 
-  function showDay(key) {
+  function showDay(key, rerender = false) {
+    selectedDateKey = key
+    if (rerender) renderMonth()
     const data = reportsByDate[key] || { arrests: [], citations: [], incidents: [], shifts: [] }
     const d = toDate(key)
     dayDetailTitle.textContent = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
@@ -198,6 +234,9 @@
   if (prevBtn) prevBtn.addEventListener('click', goPrevMonth)
   if (nextBtn) nextBtn.addEventListener('click', goNextMonth)
 
+  renderMonth()
+  showDay(selectedDateKey)
   await loadReports()
   renderMonth()
+  showDay(selectedDateKey)
 })()

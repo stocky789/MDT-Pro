@@ -51,7 +51,10 @@
             >
                 Basic Information
             </div>
-            <div class="inputWrapper grid basicInfo">
+            <div
+                class="inputWrapper grid basicInfo"
+                data-section="vehicleBasicInfo"
+            >
                 <div>
                     <label
                         for="licensePlateInput"
@@ -202,12 +205,18 @@
                 </div>
             </div>
             <div
+                id="vehicleDocumentsTitle"
                 class="searchResponseSectionTitle"
                 data-language="documentsTitle"
+                data-section-title="vehicleDocuments"
             >
                 Documents
             </div>
-            <div class="inputWrapper grid basicInfo">
+            <div
+                id="vehicleDocumentsGrid"
+                class="inputWrapper grid documentsInfo"
+                data-section="vehicleDocuments"
+            >
                 <div>
                     <label
                         for="registrationStatusInput"

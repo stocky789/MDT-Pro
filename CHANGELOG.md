@@ -8,6 +8,23 @@ All notable changes to MDT Pro are documented here.
 
 - **MDT Cloud portal** - Added the official hosted MDT Cloud platform with account sign-in, in-game Cloud login, live plugin connection status, shift tracking, and synced patrol data.
 - **Cloud-connected MDT workflow** - The portal can work with live in-game context for person and vehicle lookups, recent IDs, ALPR activity, BOLO updates, citation handoff, backup/panic actions, reports, court data, and shared people/vehicle records.
+- **Active Callouts** - Added Cloud session storage, sanitization, command validation, and plugin bridge execution for callout snapshots, attach, close, en route, send message, and CAD status actions.
+
+### Minor Features
+
+- **Active Callouts** - Added attach and current-callout close actions.
+
+### Bug Fixes
+
+- **Legacy MDT Pro callouts** - Reworked local callout websocket payloads, action state updates, CAD status handling, reconnect behavior, and untrusted callout text rendering.
+
+## [0.9.9.5] - 2026-05-25
+
+### Bug Fixes
+
+- **Vehicle Search** - Fixed rendering in maximized/fullscreen legacy web MDT windows, including document/status rows for registration and insurance.
+
+- **Legacy MDT Pro shifts** - Fixed the web MDT Start Shift / End Shift controls so local shift tracking no longer fails when the game bridge is busy or unavailable; completed shifts continue to appear in Shift History and the Calendar plugin.
 
 ## [0.9.9.4] - 2026-05-22
 

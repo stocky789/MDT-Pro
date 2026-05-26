@@ -139,6 +139,79 @@
   });
 })();
 
+const VEHICLE_RESPONSE_ALIASES = {
+  LicensePlate: ["licensePlate", "plate"],
+  ModelName: ["modelName"],
+  ModelDisplayName: ["modelDisplayName", "displayName"],
+  IsStolen: ["isStolen"],
+  Owner: ["owner", "ownerName", "OwnerName"],
+  Color: ["color"],
+  VinStatus: ["vinStatus"],
+  Make: ["make"],
+  Model: ["model"],
+  PrimaryColor: ["primaryColor"],
+  SecondaryColor: ["secondaryColor"],
+  PrimaryColorSpecific: ["primaryColorSpecific"],
+  SecondaryColorSpecific: ["secondaryColorSpecific"],
+  VehicleIdentificationNumber: ["vehicleIdentificationNumber", "vin"],
+  RegistrationStatus: ["registrationStatus"],
+  RegistrationExpiration: ["registrationExpiration"],
+  RegistrationExpirationVerifiedFromLiveDocument: [
+    "registrationExpirationVerifiedFromLiveDocument",
+  ],
+  InsuranceStatus: ["insuranceStatus"],
+  InsuranceExpiration: ["insuranceExpiration"],
+  InsuranceExpirationVerifiedFromLiveDocument: [
+    "insuranceExpirationVerifiedFromLiveDocument",
+  ],
+  BOLOs: ["bolos"],
+  CanModifyBOLOs: ["canModifyBOLOs"],
+};
+
+const DOCUMENT_FIELD_KEYS = [
+  "RegistrationStatus",
+  "RegistrationExpiration",
+  "InsuranceStatus",
+  "InsuranceExpiration",
+];
+
+function normalizeVehicleResponseFields(vehicle) {
+  if (!vehicle || typeof vehicle !== "object") return vehicle;
+  for (const [target, aliases] of Object.entries(VEHICLE_RESPONSE_ALIASES)) {
+    if (vehicle[target] !== undefined && vehicle[target] !== null) continue;
+    for (const alias of aliases) {
+      if (vehicle[alias] !== undefined && vehicle[alias] !== null) {
+        vehicle[target] = vehicle[alias];
+        break;
+      }
+    }
+  }
+  return vehicle;
+}
+
+function syncVehicleDocumentsSectionVisibility() {
+  const documentsTitle = document.querySelector("#vehicleDocumentsTitle");
+  const documentsGrid = document.querySelector("#vehicleDocumentsGrid");
+  if (!documentsTitle || !documentsGrid) return;
+
+  const anyDocumentVisible = DOCUMENT_FIELD_KEYS.some((key) => {
+    const row = documentsGrid.querySelector(
+      `[data-property="${key}"]`,
+    )?.parentElement;
+    return row && !row.classList.contains("hidden");
+  });
+
+  documentsTitle.classList.toggle("hidden", !anyDocumentVisible);
+  documentsGrid.classList.toggle("hidden", !anyDocumentVisible);
+}
+
+function formatVehicleDate(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : date.toLocaleDateString();
+}
+
 document
   .querySelector(".searchInputWrapper #vehicleSearchInput")
   .addEventListener("keydown", async function (e) {
@@ -291,6 +364,7 @@ async function performSearch(query) {
   const response = res.ok ? await res.json().catch(() => null) : null;
 
   if (!response) {
+    document.querySelector(".searchResponseWrapper")?.classList.add("hidden");
     topWindow.showNotification(
       language.vehicleSearch.notifications.vehicleNotFound,
       "warning",
@@ -298,11 +372,40 @@ async function performSearch(query) {
     return;
   }
 
+  normalizeVehicleResponseFields(response);
+
   if (typeof response === "object" && response !== null) {
     const o = response;
+    const aliases = {
+      licensePlate: "LicensePlate",
+      modelDisplayName: "ModelDisplayName",
+      modelName: "ModelName",
+      owner: "Owner",
+      ownerName: "Owner",
+      make: "Make",
+      model: "Model",
+      color: "Color",
+      primaryColor: "PrimaryColor",
+      secondaryColor: "SecondaryColor",
+      primaryColorSpecific: "PrimaryColorSpecific",
+      secondaryColorSpecific: "SecondaryColorSpecific",
+      isStolen: "IsStolen",
+      vehicleIdentificationNumber: "VehicleIdentificationNumber",
+      vinStatus: "VinStatus",
+      registrationStatus: "RegistrationStatus",
+      registrationExpiration: "RegistrationExpiration",
+      insuranceStatus: "InsuranceStatus",
+      insuranceExpiration: "InsuranceExpiration",
+      bolos: "BOLOs",
+      canModifyBOLOs: "CanModifyBOLOs",
+      canModifyBolos: "CanModifyBOLOs",
+    };
+    for (const [from, to] of Object.entries(aliases)) {
+      if ((o[to] == null || String(o[to]).trim() === "") && o[from] != null)
+        o[to] = o[from];
+    }
     const ownerEmpty = o.Owner == null || String(o.Owner).trim() === "";
-    if (ownerEmpty && o.ownerName) o.Owner = o.ownerName;
-    else if (ownerEmpty && o.OwnerName) o.Owner = o.OwnerName;
+    if (ownerEmpty && o.OwnerName) o.Owner = o.OwnerName;
   }
 
   // Alert notification for stolen vehicles
@@ -324,7 +427,7 @@ async function performSearch(query) {
       w.classList.remove("hidden");
     });
 
-  const emptyToken = language.values.empty;
+  const emptyToken = language.values?.empty ?? "";
   const optionalFields = new Set([
     "Owner",
     "Make",
@@ -394,7 +497,12 @@ async function performSearch(query) {
     }
     showField(key);
     el.style.color = "var(--color-text-primary)";
-    el.value = new Date(value).toLocaleDateString();
+    const parsedDate = new Date(value);
+    if (Number.isNaN(parsedDate.getTime())) {
+      hideField(key);
+      continue;
+    }
+    el.value = formatVehicleDate(value);
     const statusKey =
       key === "RegistrationExpiration"
         ? "RegistrationStatus"
@@ -419,17 +527,7 @@ async function performSearch(query) {
     vinStatusEl.style.color = "var(--color-warning)";
   }
 
-  const documentsTitle = document.querySelector(
-    '.searchResponseWrapper [data-language="documentsTitle"]',
-  );
-  const documentsGrid = documentsTitle?.nextElementSibling;
-  if (documentsGrid?.classList?.contains("basicInfo")) {
-    const anyDocumentVisible = [
-      ...documentsGrid.querySelectorAll(":scope > div"),
-    ].some((row) => !row.classList.contains("hidden"));
-    documentsTitle.classList.toggle("hidden", !anyDocumentVisible);
-    documentsGrid.classList.toggle("hidden", !anyDocumentVisible);
-  }
+  syncVehicleDocumentsSectionVisibility();
 
   const compactNorm = (value) => norm(value).replace(/[^a-z0-9]/g, "");
   const modelDisplay = norm(response.ModelDisplayName);
@@ -503,10 +601,15 @@ async function performSearch(query) {
   const modelDisplayEl = getFieldEl("ModelDisplayName");
   if (modelDisplayEl) {
     modelDisplayEl.parentElement.querySelector("img")?.remove();
+    modelDisplayEl.parentElement.classList.remove("hasVehicleImage");
     if (hasUsableValue(modelName)) {
       const imageEl = document.createElement("img");
       imageEl.src = `https://docs.fivem.net/vehicles/${String(modelName).toLowerCase()}.webp`;
-      imageEl.onerror = () => imageEl.remove();
+      imageEl.onerror = () => {
+        imageEl.remove();
+        modelDisplayEl.parentElement.classList.remove("hasVehicleImage");
+      };
+      modelDisplayEl.parentElement.classList.add("hasVehicleImage");
       modelDisplayEl.parentElement.appendChild(imageEl);
     }
   }
@@ -525,6 +628,7 @@ async function performSearch(query) {
   for (const key of optionalFields) {
     if (!hasUsableValue(response[key])) hideField(key);
   }
+  syncVehicleDocumentsSectionVisibility();
 
   document
     .querySelectorAll(
@@ -574,9 +678,15 @@ async function performSearch(query) {
     const boloList = document.createElement("div");
     boloList.classList.add("boloList");
     for (const b of bolos) {
-      const reason = b.Reason || "Unknown";
-      const issuedBy = b.IssuedBy || "";
-      const exp = b.ExpirationDate || b.ExpiresAt || b.Expires;
+      const reason = b.Reason || b.reason || "Unknown";
+      const issuedBy = b.IssuedBy || b.issuedBy || "";
+      const exp =
+        b.ExpirationDate ||
+        b.expirationDate ||
+        b.ExpiresAt ||
+        b.expiresAt ||
+        b.Expires ||
+        b.expires;
       const expStr = exp ? new Date(exp).toLocaleDateString() : "-";
       const row = document.createElement("div");
       row.classList.add("boloRow");
@@ -599,8 +709,22 @@ async function performSearch(query) {
               body: JSON.stringify({
                 LicensePlate: response.LicensePlate,
                 Reason: reason,
-                Issued: b.Issued || b.IssuedAt || b.IssuedDate || null,
-                Expires: b.Expires || b.ExpiresAt || b.ExpirationDate || null,
+                Issued:
+                  b.Issued ||
+                  b.issued ||
+                  b.IssuedAt ||
+                  b.issuedAt ||
+                  b.IssuedDate ||
+                  b.issuedDate ||
+                  null,
+                Expires:
+                  b.Expires ||
+                  b.expires ||
+                  b.ExpiresAt ||
+                  b.expiresAt ||
+                  b.ExpirationDate ||
+                  b.expirationDate ||
+                  null,
               }),
             })
           ).json();

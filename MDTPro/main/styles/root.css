@@ -324,7 +324,7 @@ input[type='number'] {
 
 .inputWrapper.grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
 }
 
 .inputWrapper > div label {
@@ -406,7 +406,10 @@ input[type='number'] {
 }
 
 .searchResponseWrapper {
+  box-sizing: border-box;
+  max-width: 100%;
   margin: 10px;
+  overflow-x: hidden;
 }
 
 .searchResponseWrapper .inputWrapper {
@@ -414,6 +417,8 @@ input[type='number'] {
 }
 
 .searchResponseWrapper .inputWrapper > div {
+  box-sizing: border-box;
+  min-width: 0;
   border: 1px solid var(--color-border);
   border-radius: 0;
   padding: 5px 10px;
@@ -440,10 +445,20 @@ input[type='number'] {
 }
 
 .searchResponseWrapper input:disabled {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   background-color: transparent;
   border: none;
   padding: 0;
   font-weight: 600;
+}
+
+.searchResponseWrapper [data-property] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .searchResponseWrapper .clickable input:disabled {

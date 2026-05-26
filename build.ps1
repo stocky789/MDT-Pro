@@ -5,6 +5,8 @@
 #   .\build.ps1                    Clean rebuild. Release\ is mod-only; Native Release\ includes MDTProNative.
 #   .\build.ps1 -Incremental       Faster: no Release\ wipe, incremental. Still refreshes stale native folders.
 #   .\build.ps1 -SkipWindowsApp    Mod + web + OIV only; removes/omits MDTProNative from both output folders.
+#   .\build.ps1 -SkipWindowsApp -SkipNativeRelease
+#                                  CI/release-artifact mode: build only Release\ and do not stage Native Release\.
 #   .\build.ps1 -Deploy            Build then copy to GTA V (use -GamePath if not default)
 #   .\build.ps1 -Deploy -GamePath "D:\Games\GTA V"
 #   GamePath is also used to copy DamageTrackingFramework.dll into Release (required for injury reports; or use References\DamageTrackingFramework.dll).
@@ -19,6 +21,7 @@ param(
     [switch]$Incremental,
     [switch]$Deploy,
     [switch]$SkipWindowsApp,
+    [switch]$SkipNativeRelease,
     [string]$GamePath = 'C:\Program Files\Rockstar Games\Grand Theft Auto V'
 )
 
@@ -294,7 +297,9 @@ $deleteXml
 $depsFolder = Join-Path $root 'Dependencies'
 $packagesDir = Join-Path $root 'MDTProPlugin\packages'
 $sqlitePkg = Get-ChildItem -Path $packagesDir -Directory -Filter 'System.Data.SQLite.Core*' -ErrorAction SilentlyContinue | Select-Object -First 1
+$sqliteStubPkg = Get-ChildItem -Path $packagesDir -Directory -Filter 'Stub.System.Data.SQLite.Core.NetFramework*' -ErrorAction SilentlyContinue | Select-Object -First 1
 $sqlitePackageDir = if ($sqlitePkg) { $sqlitePkg.FullName } else { $null }
+$sqliteStubPackageDir = if ($sqliteStubPkg) { $sqliteStubPkg.FullName } else { $null }
 
 $sqliteDllPaths = @(
     (Join-Path $depsFolder 'System.Data.SQLite.dll')
@@ -302,6 +307,13 @@ $sqliteDllPaths = @(
 if ($sqlitePackageDir) {
     $sqliteDllPaths += (Join-Path $sqlitePackageDir 'lib\net46\System.Data.SQLite.dll')
     $sqliteDllPaths += (Join-Path $sqlitePackageDir 'lib\net48\System.Data.SQLite.dll')
+    $sqliteDllPaths += Get-ChildItem -LiteralPath $sqlitePackageDir -Recurse -File -Filter 'System.Data.SQLite.dll' -ErrorAction SilentlyContinue |
+        ForEach-Object { $_.FullName }
+}
+if ($sqliteStubPackageDir) {
+    $sqliteDllPaths += (Join-Path $sqliteStubPackageDir 'lib\net46\System.Data.SQLite.dll')
+    $sqliteDllPaths += Get-ChildItem -LiteralPath $sqliteStubPackageDir -Recurse -File -Filter 'System.Data.SQLite.dll' -ErrorAction SilentlyContinue |
+        ForEach-Object { $_.FullName }
 }
 
 $sqliteInteropPaths = @(
@@ -310,6 +322,31 @@ $sqliteInteropPaths = @(
 if ($sqlitePackageDir) {
     $sqliteInteropPaths += (Join-Path $sqlitePackageDir 'build\net46\x64\SQLite.Interop.dll')
     $sqliteInteropPaths += (Join-Path $sqlitePackageDir 'build\net48\x64\SQLite.Interop.dll')
+    $sqliteInteropPaths += Get-ChildItem -LiteralPath $sqlitePackageDir -Recurse -File -Filter 'SQLite.Interop.dll' -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -match '([\\/])x64([\\/])' } |
+        ForEach-Object { $_.FullName }
+}
+if ($sqliteStubPackageDir) {
+    $sqliteInteropPaths += (Join-Path $sqliteStubPackageDir 'build\net46\x64\SQLite.Interop.dll')
+    $sqliteInteropPaths += Get-ChildItem -LiteralPath $sqliteStubPackageDir -Recurse -File -Filter 'SQLite.Interop.dll' -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -match '([\\/])x64([\\/])' } |
+        ForEach-Object { $_.FullName }
+}
+
+$cdfDllPaths = @(
+    (Join-Path $depsFolder 'CommonDataFramework.dll')
+)
+if (Test-Path $depsFolder) {
+    $cdfDllPaths += Get-ChildItem -LiteralPath $depsFolder -Recurse -File -Filter 'CommonDataFramework.dll' -ErrorAction SilentlyContinue |
+        ForEach-Object { $_.FullName }
+}
+$cdfDllPaths += (Join-Path $packagesDir 'CommonDataFramework.1.0.0.8\lib\net48\CommonDataFramework.dll')
+
+$cdfFolderSource = $null
+if (Test-Path $depsFolder) {
+    $cdfFolderSource = Get-ChildItem -LiteralPath $depsFolder -Recurse -Directory -Filter 'CommonDataFramework' -ErrorAction SilentlyContinue |
+        Where-Object { Test-Path (Join-Path $_.FullName 'PostalXMLs') } |
+        Select-Object -First 1
 }
 
 # 1) Wipe Release (unless incremental)
@@ -413,17 +450,43 @@ if ($sqliteInteropSource) {
     Write-Warning "SQLite.Interop.dll not found. Place it in Dependencies\x64\ or run NuGet restore."
 }
 
+$cdfDllSource = $cdfDllPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+$cdfDllDest = Join-Path $dllDestDir 'CommonDataFramework.dll'
+$cdfFolderDest = Join-Path $dllDestDir 'CommonDataFramework'
+if ($cdfDllSource) {
+    New-Item -ItemType Directory -Path $dllDestDir -Force | Out-Null
+    Copy-Item -Path $cdfDllSource -Destination $cdfDllDest -Force
+    Write-Host "  -> $cdfDllDest"
+} else {
+    Write-Warning "CommonDataFramework.dll not found. Restore the CommonDataFramework package or place it in Dependencies\."
+}
+if ($cdfFolderSource) {
+    if (Test-Path $cdfFolderDest) { Remove-Item $cdfFolderDest -Recurse -Force }
+    Copy-Item -LiteralPath $cdfFolderSource.FullName -Destination $cdfFolderDest -Recurse -Force
+    Write-Host "  -> $cdfFolderDest (postal XMLs)"
+} else {
+    Write-Warning "CommonDataFramework postal XML folder not found. Place the official CDF plugins\LSPDFR\CommonDataFramework folder under Dependencies\."
+}
+
 # 6b) Validate required files for OpenIV package - fail early if SQLite is missing
 # (Users installing via .oiv report "SQL stops working" when these DLLs are absent)
 $newtonsoftInRelease = Join-Path $dllDestDir 'Newtonsoft.Json.dll'
 $sqliteInRelease = Join-Path $releaseRoot 'System.Data.SQLite.dll'
 $interopInRelease = Join-Path $releaseX64 'SQLite.Interop.dll'
+$cdfDllInRelease = Join-Path $dllDestDir 'CommonDataFramework.dll'
+$cdfPostalOcrpInRelease = Join-Path $dllDestDir 'CommonDataFramework\PostalXMLs\ocrp.xml'
+$cdfPostalPriestInRelease = Join-Path $dllDestDir 'CommonDataFramework\PostalXMLs\priest0802.xml'
+$cdfPostalVirusInRelease = Join-Path $dllDestDir 'CommonDataFramework\PostalXMLs\virus_city.xml'
 
 $oivRequired = @(
     @{ Path = $dllDest; Name = 'MDTPro.dll' }
     @{ Path = $newtonsoftInRelease; Name = 'Newtonsoft.Json.dll' }
     @{ Path = $sqliteInRelease; Name = 'System.Data.SQLite.dll' }
     @{ Path = $interopInRelease; Name = 'x64\SQLite.Interop.dll' }
+    @{ Path = $cdfDllInRelease; Name = 'plugins\LSPDFR\CommonDataFramework.dll' }
+    @{ Path = $cdfPostalOcrpInRelease; Name = 'plugins\LSPDFR\CommonDataFramework\PostalXMLs\ocrp.xml' }
+    @{ Path = $cdfPostalPriestInRelease; Name = 'plugins\LSPDFR\CommonDataFramework\PostalXMLs\priest0802.xml' }
+    @{ Path = $cdfPostalVirusInRelease; Name = 'plugins\LSPDFR\CommonDataFramework\PostalXMLs\virus_city.xml' }
 )
 $missing = $oivRequired | Where-Object { -not (Test-Path $_.Path) } | ForEach-Object { $_.Name }
 if ($missing) {
@@ -432,11 +495,13 @@ Cannot create OpenIV package: the following required files are missing from Rele
   $($missing -join "`n  ")
 
 SQL features will not work without System.Data.SQLite.dll and x64\SQLite.Interop.dll.
+Postal lookup features will not work without CommonDataFramework.dll and plugins\LSPDFR\CommonDataFramework\PostalXMLs\*.xml.
 Ensure you have run 'dotnet restore' and that Dependencies\ contains:
   - System.Data.SQLite.dll
   - x64\SQLite.Interop.dll
+  - the official CommonDataFramework release payload, including plugins\LSPDFR\CommonDataFramework\PostalXMLs\
 
-Or run from a clean clone: dotnet restore MDTProPlugin\MDTPro.sln ; .\build.ps1
+Or run from a clean clone after restoring CDF runtime files: dotnet restore MDTProPlugin\MDTPro.sln ; .\build.ps1
 "@
     exit 1
 }
@@ -463,6 +528,14 @@ if ($Deploy) {
     # Copying only MDTPro.dll used to drop satellites and broke F7 -> MDT Cloud detection and startup.
     Get-ChildItem -LiteralPath $dllDestDir -Filter '*.dll' -File -ErrorAction SilentlyContinue | ForEach-Object {
         Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $pluginsDest $_.Name) -Force
+    }
+
+    # Deploy CommonDataFramework postal XML folder.
+    $cdfReleaseFolder = Join-Path $dllDestDir 'CommonDataFramework'
+    if (Test-Path -LiteralPath $cdfReleaseFolder) {
+        $cdfGameDest = Join-Path $pluginsDest 'CommonDataFramework'
+        if (Test-Path -LiteralPath $cdfGameDest) { Remove-Item -LiteralPath $cdfGameDest -Recurse -Force }
+        Copy-Item -LiteralPath $cdfReleaseFolder -Destination $cdfGameDest -Recurse -Force
     }
 
     # Deploy web folder
@@ -724,6 +797,8 @@ Install these external mods:
 The normal MDT Pro release installs these support files with the plugin:
 
   - plugins\LSPDFR\MDTPro.dll
+  - plugins\LSPDFR\CommonDataFramework.dll
+  - plugins\LSPDFR\CommonDataFramework\PostalXMLs\*.xml
   - plugins\LSPDFR\CalloutInterfaceAPI.dll
   - plugins\LSPDFR\Newtonsoft.Json.dll
   - plugins\LSPDFR\LemonUI.RagePluginHook.dll
@@ -834,6 +909,26 @@ if (Test-Path $nativePublishInRelease) {
 }
 New-MdtProOpenIvPackages -SourcePayloadDir $release -OutputPackageDir $release -VersionInfo $versionInfo
 
+if ($SkipNativeRelease) {
+    if (Test-Path $nativeReleaseDir) {
+        Write-Host "Removing stale Native Release..."
+        Remove-Item -Path $nativeReleaseDir -Recurse -Force
+    }
+    if (Test-Path $legacyReleasesDir) {
+        Write-Host "Removing legacy Releases..."
+        Remove-Item -Path $legacyReleasesDir -Recurse -Force
+    }
+    Write-Host "Done. Mod-only release: $release"
+    Write-Host "  Release\plugins\lspdfr\MDTPro.dll"
+    Write-Host "  Release\plugins\lspdfr\CommonDataFramework.dll"
+    Write-Host "  Release\plugins\lspdfr\CommonDataFramework\PostalXMLs\"
+    Write-Host "  Release\System.Data.SQLite.dll (GTA V root)"
+    Write-Host "  Release\x64\SQLite.Interop.dll (GTA V root\x64)"
+    Write-Host "  Release\MDTPro\"
+    Write-Host '  (Native Release was skipped.)'
+    exit 0
+}
+
 # 9) Stage Native Release from the clean mod-only Release, then optionally add MDTProNative.
 Write-Host "Staging Native Release\ from mod-only Release\..."
 if (Test-Path $legacyReleasesDir) {
@@ -934,6 +1029,8 @@ License: EPL-2.0 - see LICENSE next to README in the release.
 
 Write-Host "Done. Mod-only release: $release"
 Write-Host "  Release\plugins\lspdfr\MDTPro.dll"
+Write-Host "  Release\plugins\lspdfr\CommonDataFramework.dll"
+Write-Host "  Release\plugins\lspdfr\CommonDataFramework\PostalXMLs\"
 Write-Host "  Release\System.Data.SQLite.dll (GTA V root)"
 Write-Host "  Release\x64\SQLite.Interop.dll (GTA V root\x64)"
 Write-Host "  Release\MDTPro\"

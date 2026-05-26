@@ -7,14 +7,14 @@
     "ped:portraits": "node scripts/processPedPortraitCatalogue.mjs",
     "ped:build-catalogue": "node scripts/processPedPortraitCatalogue.mjs --clean && node scripts/fetchPedCatalogueImages.mjs && node scripts/processPedPortraitCatalogue.mjs",
     "audit:root": "npm audit --audit-level=moderate",
-    "audit:portal": "npm --prefix cloud/portal audit --audit-level=moderate",
-    "audit:dotnet": "dotnet list cloud/MDTCloud.sln package --vulnerable",
-    "audit:security": "npm run audit:root && npm run audit:portal && npm run audit:dotnet"
+    "audit:security": "npm run audit:root",
+    "test:legacy-ui": "playwright test -c tests/legacy-ui/playwright.config.ts"
   },
   "engines": {
     "node": ">=18"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "sharp": "^0.33.5"
   }
 }

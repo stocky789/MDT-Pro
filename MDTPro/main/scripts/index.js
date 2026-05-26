@@ -594,6 +594,28 @@ async function openWindow(name, pluginId = null) {
   let x, y
   let lastSize
   let lastOffset
+
+  function enterMaximizedWindow() {
+    lastSize = [windowElement.style.width, windowElement.style.height]
+    lastOffset = [windowElement.style.left, windowElement.style.top]
+    windowElement.style.width = ''
+    windowElement.style.height = ''
+    windowElement.style.left = ''
+    windowElement.style.top = ''
+    windowElement.style.minWidth = `${
+      iconTitleWrapper.offsetWidth + windowControls.offsetWidth
+    }px`
+    windowElement.classList.add('maximized')
+  }
+
+  function exitMaximizedWindow() {
+    windowElement.classList.remove('maximized')
+    windowElement.style.width = lastSize?.[0] || `${size[0]}px`
+    windowElement.style.height = lastSize?.[1] || `${size[1]}px`
+    windowElement.style.left = lastOffset?.[0] || `${offset[0]}px`
+    windowElement.style.top = lastOffset?.[1] || `${offset[1]}px`
+  }
+
   header.addEventListener('mousedown', function (e) {
     e.preventDefault()
     x = e.clientX - windowElement.offsetLeft
@@ -617,18 +639,16 @@ async function openWindow(name, pluginId = null) {
         return
       }
       windowElement.style.transition = 'none'
-      windowElement.style.left = e.clientX - x + 'px'
-      windowElement.style.top = e.clientY - y + 'px'
       if (windowElement.classList.contains('maximized')) {
-        windowElement.classList.remove('maximized')
-        windowElement.style.width = lastSize[0]
-        windowElement.style.height = lastSize[1]
+        exitMaximizedWindow()
         windowElement.querySelector(
           '.windowHeader .windowControls .maximizeButton'
         ).innerHTML = document.querySelector(
           '.iconAccess .maximizeWindow'
         ).innerHTML
       }
+      windowElement.style.left = e.clientX - x + 'px'
+      windowElement.style.top = e.clientY - y + 'px'
     }
   })
 
@@ -709,27 +729,14 @@ async function openWindow(name, pluginId = null) {
   maximize.addEventListener('click', function (e) {
     e.stopPropagation()
     if (windowElement.classList.contains('maximized')) {
-      windowElement.classList.remove('maximized')
-      windowElement.style.width = lastSize[0]
-      windowElement.style.height = lastSize[1]
-      windowElement.style.left = lastOffset[0]
-      windowElement.style.top = lastOffset[1]
+      exitMaximizedWindow()
       windowElement.querySelector(
         '.windowHeader .windowControls .maximizeButton'
       ).innerHTML = document.querySelector(
         '.iconAccess .maximizeWindow'
       ).innerHTML
     } else {
-      lastSize = [windowElement.style.width, windowElement.style.height]
-      lastOffset = [windowElement.style.left, windowElement.style.top]
-      windowElement.style.width = `calc(100% - var(--sidebar-width) - 1px)`
-      windowElement.style.height = `calc(100% - var(--tb-height) - var(--status-height))`
-      windowElement.style.left = 'var(--sidebar-width)'
-      windowElement.style.top = 'var(--tb-height)'
-      windowElement.style.minWidth = `${
-        iconTitleWrapper.offsetWidth + windowControls.offsetWidth
-      }px`
-      windowElement.classList.add('maximized')
+      enterMaximizedWindow()
       windowElement.querySelector(
         '.windowHeader .windowControls .maximizeButton'
       ).innerHTML = document.querySelector(
@@ -883,7 +890,7 @@ document
     // Persist filled data so it's remembered across sessions
     const payload = buildOfficerInformationPayload()
     const response = await (
-      await fetch('post/updateOfficerInformationData', {
+      await fetch('/post/updateOfficerInformationData', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -977,7 +984,7 @@ document
     showLoadingOnButton(this)
 
     const response = await (
-      await fetch('post/updateOfficerInformationData', {
+      await fetch('/post/updateOfficerInformationData', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

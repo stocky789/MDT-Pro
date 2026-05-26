@@ -2,6 +2,7 @@
 :root {
   --tb-height: 56px;
   --sidebar-width: 220px;
+  --status-height: 0px;
 }
 
 /* ---------- Top bar (taskbar) ---------- */
@@ -434,6 +435,7 @@ html[data-mdt-custom-wallpaper="1"] .desktopWallpaper {
 .overlay .windows .window {
   --window-header-height: 36px;
   --window-control-width: 44px;
+  box-sizing: border-box;
   pointer-events: all;
   position: fixed;
   background-color: var(--color-surface);
@@ -448,14 +450,13 @@ html[data-mdt-custom-wallpaper="1"] .desktopWallpaper {
 }
 
 .overlay .windows .window.maximized {
-  top: 0;
-  left: 0;
-  width: calc(100% - 2px);
-  height: calc(100% - var(--tb-height));
+  top: var(--tb-height);
+  left: var(--sidebar-width);
+  width: calc(100vw - var(--sidebar-width));
+  height: calc(100vh - var(--tb-height) - var(--status-height));
   resize: none;
   border-radius: 0;
   border-left: none;
-  border-top: none;
 }
 
 .overlay .windows .window.minimized {
@@ -876,6 +877,10 @@ html[data-mdt-custom-wallpaper="1"] .desktopWallpaper {
 
 /* ---------- Responsive ---------- */
 @media (max-width: 700px) {
+  :root {
+    --sidebar-width: 56px;
+  }
+
   .sidebar {
     width: 56px;
     padding: 8px 0;
